@@ -1,0 +1,21 @@
+/target/
+**/*.rs.bk
+
+# 生成されたタイル・DEM キャッシュ。数百 GB になり得るのでコミットしない。
+/data/cache/
+/data/tiles/
+/assets/generated/
+
+# API キー等。ADR-0003 のデータソースは無償だが、
+# 将来 Cesium ion 等を併用する場合の受け皿。
+.env
+/config/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Windows
+Thumbs.db
+desktop.ini
