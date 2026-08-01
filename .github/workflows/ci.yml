@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # 警告をエラーとして扱う。警告の蓄積を許すと、本当に見るべき指摘が埋もれる。
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows が対象プラットフォームなので必ず含める。
+        # Linux も回すのは、プラットフォーム依存の思い込みを早期に検出するため。
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # core / fdm / world は Bevy 非依存なので、GUI もアセットもなしに数秒で回る。
+      # これは ADR-0001 の技術選定で意図的に確保した性質。
+      - name: Test
+        run: cargo test --workspace --all-targets
+
+      - name: Doc tests
+        run: cargo test --workspace --doc
+
+  architecture:
+    name: architecture rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # 設計規約を人間の注意力ではなく機械で守る。
+      # 破られた時点で落とすのが目的（ARCHITECTURE.md §2）。
+      - name: Check dependency and layering rules
+        run: bash scripts/check-architecture.sh
+
+  docs:
+    name: documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # 壊れたドキュメントリンクは、設計意図が読まれなくなる原因になる。
+      - name: Build docs
+        run: cargo doc --workspace --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
