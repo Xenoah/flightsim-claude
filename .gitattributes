@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
+# 既定はテキストの自動検出と LF 正規化。
 * text=auto
+
+# シェルスクリプトは必ず LF。
+# CRLF に変換されると shebang が `/usr/bin/env bash\r` と解釈され、
+# 「bad interpreter」で実行できなくなる。CI は Linux で走るのでそちらは
+# 問題ないが、Windows で新規クローンした開発者が踏む。
+*.sh text eol=lf
+
+# YAML も LF に固定しておく。GitHub Actions のランナーによっては
+# CRLF が混ざると読みづらい差分になる。
+*.yml text eol=lf
+*.yaml text eol=lf
