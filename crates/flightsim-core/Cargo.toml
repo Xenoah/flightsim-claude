@@ -1,0 +1,15 @@
+[package]
+name = "flightsim-core"
+description = "座標系・単位・共通基盤。他のいかなるクレートにも依存しない。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# 依存はここに glam 以外を足さないこと。
+# core は依存グラフの底であり、ここが太ると全クレートのビルド時間に効く。
+[dependencies]
+glam.workspace = true
+
+[lints]
+workspace = true

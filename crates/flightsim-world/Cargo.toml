@@ -1,0 +1,15 @@
+[package]
+name = "flightsim-world"
+description = "地形タイル・DEM・LOD 選択・ストリーミング。GPU には触れない。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# ここに `bevy` を足すと CI が落ちる（ADR-0001）。
+# メッシュの「データ」までが担当で、GPU への投入は flightsim-render の責務。
+[dependencies]
+flightsim-core.workspace = true
+
+[lints]
+workspace = true

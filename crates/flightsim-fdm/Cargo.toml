@@ -1,0 +1,16 @@
+[package]
+name = "flightsim-fdm"
+description = "6DoF 飛行力学モデル。決定論的で、描画にもワールドにも依存しない。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# ここに `bevy` を足すと CI が落ちる（ADR-0001）。
+# `flightsim-world` への依存も禁止。地形高度は引数で受け取ること。
+[dependencies]
+flightsim-core.workspace = true
+glam.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,46 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/flightsim-core",
+    "crates/flightsim-fdm",
+    "crates/flightsim-world",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+flightsim-core = { path = "crates/flightsim-core" }
+flightsim-fdm = { path = "crates/flightsim-fdm" }
+flightsim-world = { path = "crates/flightsim-world" }
+
+glam = "0.30"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# 数値シミュレーションでの定番の事故を機械的に潰す。
+# 単位取り違えと精度劣化はレビューで見つけるより lint で止めるほうが確実。
+cast_possible_truncation = "warn"
+cast_precision_loss = "warn"
+cast_lossless = "warn"
+float_cmp = "warn"
+needless_pass_by_value = "warn"
+doc_markdown = "allow"
+
+# 開発ビルドでも物理が実時間で動く程度には最適化する。
+# 依存クレートは常にフル最適化（ビルド時間は初回のみ）。
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
