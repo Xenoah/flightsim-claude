@@ -2,6 +2,8 @@
 
 地球規模のフライトシミュレータ（Rust + Bevy / Windows）。
 
+**新しく入った担当者は [docs/HANDOFF.md](docs/HANDOFF.md) から読むこと。** 現状・次のタスク・すでに踏んだ地雷がまとまっています。
+
 **作業前に [ARCHITECTURE.md](ARCHITECTURE.md) と [docs/adr/](docs/adr/) を読むこと。** 設計判断には理由があり、それを知らずに書いた変更はレビューで差し戻されます。
 
 ## コマンド
