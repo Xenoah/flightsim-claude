@@ -30,6 +30,7 @@ pub struct ControlInputs {
     rudder: f64,
     throttle: f64,
     flaps: f64,
+    brakes: f64,
 }
 
 /// NaN を 0 に潰したうえで範囲内へクランプする。
@@ -53,6 +54,7 @@ impl ControlInputs {
             rudder: 0.0,
             throttle: 0.0,
             flaps: 0.0,
+            brakes: 0.0,
         }
     }
 
@@ -60,6 +62,9 @@ impl ControlInputs {
     ///
     /// - `aileron` / `elevator` / `rudder`: `[-1, 1]`
     /// - `throttle` / `flaps`: `[0, 1]`
+    ///
+    /// ブレーキは既存呼び出しとの互換性を保つため 0 で初期化される。
+    /// [`Self::with_brakes`] で指定する。
     #[must_use]
     pub fn new(aileron: f64, elevator: f64, rudder: f64, throttle: f64, flaps: f64) -> Self {
         Self {
@@ -68,6 +73,7 @@ impl ControlInputs {
             rudder: sanitize(rudder, -1.0, 1.0),
             throttle: sanitize(throttle, 0.0, 1.0),
             flaps: sanitize(flaps, 0.0, 1.0),
+            brakes: 0.0,
         }
     }
 
@@ -101,6 +107,12 @@ impl ControlInputs {
         self
     }
 
+    #[must_use]
+    pub fn with_brakes(mut self, value: f64) -> Self {
+        self.brakes = sanitize(value, 0.0, 1.0);
+        self
+    }
+
     /// 右ロール指示。`[-1, 1]`
     #[must_use]
     pub const fn aileron(self) -> f64 {
@@ -130,6 +142,12 @@ impl ControlInputs {
     pub const fn flaps(self) -> f64 {
         self.flaps
     }
+
+    /// ホイールブレーキ。`[0, 1]`
+    #[must_use]
+    pub const fn brakes(self) -> f64 {
+        self.brakes
+    }
 }
 
 #[cfg(test)]
@@ -157,6 +175,7 @@ mod tests {
             c.rudder(),
             c.throttle(),
             c.flaps(),
+            c.brakes(),
         ] {
             assert!(value.is_finite(), "NaN leaked through sanitisation");
             assert!(value.abs() < f64::EPSILON);
@@ -181,6 +200,7 @@ mod tests {
         assert!((modified.rudder() - base.rudder()).abs() < f64::EPSILON);
         assert!((modified.throttle() - base.throttle()).abs() < f64::EPSILON);
         assert!((modified.flaps() - base.flaps()).abs() < f64::EPSILON);
+        assert!((modified.brakes() - base.brakes()).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -188,5 +208,19 @@ mod tests {
         let c = ControlInputs::neutral();
         assert_eq!(c, ControlInputs::default());
         assert!(c.throttle().abs() < f64::EPSILON);
+        assert!(c.brakes().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn brake_input_is_sanitized() {
+        assert!((ControlInputs::neutral().with_brakes(2.0).brakes() - 1.0).abs() < f64::EPSILON);
+        assert!(ControlInputs::neutral().with_brakes(-1.0).brakes().abs() < f64::EPSILON);
+        assert!(
+            ControlInputs::neutral()
+                .with_brakes(f64::NAN)
+                .brakes()
+                .abs()
+                < f64::EPSILON
+        );
     }
 }

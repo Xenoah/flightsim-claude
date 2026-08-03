@@ -4,14 +4,14 @@ version = 4
 
 [[package]]
 name = "flightsim-core"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "glam",
 ]
 
 [[package]]
 name = "flightsim-fdm"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "flightsim-core",
  "glam",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-world"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "flightsim-core",
 ]
