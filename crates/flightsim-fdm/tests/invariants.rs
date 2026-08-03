@@ -13,9 +13,9 @@
               切り捨ても符号も問題にならない"
 )]
 
-use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Ned, Seconds};
+use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Meters, Ned, Seconds};
 use flightsim_fdm::{
-    AircraftConfig, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
+    AircraftConfig, ControlInputs, Environment, FlightDynamics, GroundSlope, RECOMMENDED_FIXED_DT,
     RigidBodyState, aircraft::MassProperties, gravity,
 };
 use glam::DVec3;
@@ -612,5 +612,292 @@ fn gyroscopic_coupling_is_present() {
         yaw_rate.abs() > 1e-6,
         "no yaw rate appeared from combined roll and pitch; \
          the ω × (Iω) coupling term is probably missing"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 着陸装置と接地反力
+// ---------------------------------------------------------------------------
+
+fn resting_state(config: &AircraftConfig) -> RigidBodyState {
+    let latitude = 0.0;
+    let gravity = gravity::magnitude(Geodetic::from_degrees(latitude, 0.0, 1.0));
+    let total_spring_rate: f64 = config
+        .landing_gear
+        .legs()
+        .iter()
+        .map(|leg| leg.spring_rate().get())
+        .sum();
+    let compression = config.mass_properties.mass().get() * gravity / total_spring_rate;
+    let gear_height = config.landing_gear.legs()[0].contact_point().as_vec().z;
+
+    RigidBodyState::from_geodetic(
+        Geodetic::from_degrees(latitude, 0.0, gear_height - compression),
+        Attitude::default(),
+        Ned::default(),
+    )
+}
+
+#[test]
+fn aircraft_remains_settled_on_the_ground_for_ten_minutes() {
+    let config = AircraftConfig::light_single();
+    let initial = resting_state(&config);
+    let initial_altitude = initial.altitude().get();
+    let mut fdm = FlightDynamics::new(config, initial);
+    let environment = Environment::still_air();
+    let mut maximum_altitude_error: f64 = 0.0;
+
+    for step in 0..(600 * 120) {
+        fdm.step(
+            RECOMMENDED_FIXED_DT,
+            ControlInputs::neutral().with_brakes(1.0),
+            &environment,
+        );
+        assert!(
+            fdm.state().is_finite(),
+            "state became non-finite at step {step}"
+        );
+        maximum_altitude_error =
+            maximum_altitude_error.max((fdm.state().altitude().get() - initial_altitude).abs());
+    }
+
+    assert!(
+        maximum_altitude_error <= 0.01,
+        "resting altitude deviated by up to {maximum_altitude_error:.6} m in ten minutes"
+    );
+    assert!(fdm.state().vertical_speed().get().abs() < 0.01);
+    assert!(fdm.state().angular_velocity.length() < 1.0e-3);
+    assert!(fdm.state().is_finite());
+}
+
+#[test]
+fn static_gear_compression_matches_weight_over_total_spring_rate() {
+    let config = AircraftConfig::light_single();
+    let initial = resting_state(&config);
+    let mut fdm = FlightDynamics::new(config.clone(), initial);
+    let environment = Environment::still_air();
+
+    fly(
+        &mut fdm,
+        ControlInputs::neutral().with_brakes(1.0),
+        &environment,
+        5.0,
+    );
+
+    let total_spring_rate: f64 = config
+        .landing_gear
+        .legs()
+        .iter()
+        .map(|leg| leg.spring_rate().get())
+        .sum();
+    let expected = config.mass_properties.mass().get() * gravity::magnitude(fdm.state().geodetic())
+        / total_spring_rate;
+    let gear_height = config.landing_gear.legs()[0].contact_point().as_vec().z;
+    let actual = gear_height - fdm.state().altitude().get();
+
+    assert!(
+        (actual - expected).abs() < 1.0e-3,
+        "static compression was {actual:.6} m, expected {expected:.6} m"
+    );
+}
+
+#[test]
+fn full_throttle_ground_roll_reaches_liftoff() {
+    let config = AircraftConfig::light_single();
+    let initial = resting_state(&config);
+    let mut fdm = FlightDynamics::new(config, initial);
+    let environment = Environment::still_air();
+    let controls = ControlInputs::neutral().with_throttle(1.0);
+    let mut liftoff_speed = None;
+    let sea_level_air = environment.atmosphere.sample(Meters(0.0));
+    let weight = fdm.config().mass_properties.mass().get()
+        * gravity::magnitude(Geodetic::from_degrees(0.0, 0.0, 0.0));
+    let theoretical_liftoff_speed = (2.0 * weight
+        / (sea_level_air.density.get()
+            * fdm.config().geometry.wing_area.get()
+            * fdm.config().aero.lift_zero))
+        .sqrt();
+    let mut stayed_on_ground_below_liftoff_speed = true;
+
+    for _ in 0..(120 * 120) {
+        fdm.step(RECOMMENDED_FIXED_DT, controls, &environment);
+        let altitude = fdm.state().altitude().get();
+        let airspeed = fdm.state().velocity.length();
+        if airspeed < theoretical_liftoff_speed * 0.8 && altitude > 1.01 {
+            stayed_on_ground_below_liftoff_speed = false;
+        }
+        if altitude > 1.10 && fdm.state().vertical_speed().get() > 0.0 {
+            liftoff_speed = Some(airspeed);
+            break;
+        }
+    }
+
+    let liftoff_speed = liftoff_speed.unwrap_or_else(|| {
+        panic!(
+            "aircraft did not lift off: altitude {:.3} m, speed {:.3} m/s, vertical speed {:.3} m/s",
+            fdm.state().altitude().get(),
+            fdm.state().velocity.length(),
+            fdm.state().vertical_speed().get()
+        )
+    });
+    assert!(
+        stayed_on_ground_below_liftoff_speed,
+        "aircraft left the runway well below its theoretical liftoff speed"
+    );
+    assert!(
+        (theoretical_liftoff_speed * 0.9..theoretical_liftoff_speed * 1.5).contains(&liftoff_speed),
+        "liftoff speed {liftoff_speed:.2} m/s was inconsistent with theoretical {theoretical_liftoff_speed:.2} m/s"
+    );
+    assert!(fdm.state().is_finite());
+}
+
+#[test]
+fn three_meter_per_second_touchdown_settles_without_bouncing_back_into_flight() {
+    let config = AircraftConfig::light_single();
+    let initial = RigidBodyState::from_geodetic(
+        Geodetic::from_degrees(0.0, 0.0, 1.005),
+        Attitude::default(),
+        Ned::new(0.0, 0.0, 3.0),
+    );
+    let mut fdm = FlightDynamics::new(config, initial);
+    let environment = Environment::still_air();
+    let mut contact_has_occurred = false;
+    let mut maximum_altitude_after_contact = f64::NEG_INFINITY;
+
+    for step in 0..(10 * 120) {
+        fdm.step(
+            RECOMMENDED_FIXED_DT,
+            ControlInputs::neutral().with_brakes(1.0),
+            &environment,
+        );
+        assert!(
+            fdm.state().is_finite(),
+            "state became non-finite at step {step}"
+        );
+        let altitude = fdm.state().altitude().get();
+        if altitude <= 1.0 {
+            contact_has_occurred = true;
+        }
+        if contact_has_occurred {
+            maximum_altitude_after_contact = maximum_altitude_after_contact.max(altitude);
+        }
+    }
+
+    assert!(
+        contact_has_occurred,
+        "the touchdown scenario never reached the ground"
+    );
+    assert!(
+        maximum_altitude_after_contact < 1.001,
+        "soft landing bounced back into the air to {maximum_altitude_after_contact:.3} m"
+    );
+    assert!(fdm.state().vertical_speed().get().abs() < 0.1);
+}
+
+#[test]
+fn ten_meter_per_second_hard_landing_never_produces_nan() {
+    let config = AircraftConfig::light_single();
+    let initial = RigidBodyState::from_geodetic(
+        Geodetic::from_degrees(0.0, 0.0, 1.01),
+        Attitude::default(),
+        Ned::new(0.0, 0.0, 10.0),
+    );
+    let mut fdm = FlightDynamics::new(config, initial);
+    let environment = Environment::still_air();
+    let mut minimum_altitude = f64::INFINITY;
+
+    for step in 0..(10 * 120) {
+        fdm.step(
+            RECOMMENDED_FIXED_DT,
+            ControlInputs::neutral().with_brakes(1.0),
+            &environment,
+        );
+        assert!(
+            fdm.state().is_finite(),
+            "state became non-finite at step {step}"
+        );
+        minimum_altitude = minimum_altitude.min(fdm.state().altitude().get());
+    }
+
+    assert!(
+        minimum_altitude > 0.4,
+        "hard landing penetrated implausibly far through the ground: {minimum_altitude:.3} m"
+    );
+    assert!(
+        (0.8..1.1).contains(&fdm.state().altitude().get()),
+        "hard landing did not settle near the ground: {:.3} m",
+        fdm.state().altitude().get()
+    );
+}
+
+#[test]
+fn aircraft_pitches_to_follow_an_uphill_ground_plane() {
+    let config = AircraftConfig::light_single();
+    let initial = resting_state(&config);
+    let origin = initial.geodetic();
+    let origin_frame = LocalFrame::new(origin);
+    let slope = GroundSlope::new(0.05, 0.0);
+    let mut fdm = FlightDynamics::new(config, initial);
+
+    for _ in 0..(5 * 120) {
+        let offset = origin_frame.ecef_to_ned_position(fdm.state().position);
+        let environment = Environment::still_air().with_ground_plane(
+            fdm.state().geodetic(),
+            Meters(slope.north() * offset.north()),
+            slope,
+        );
+        fdm.step(
+            RECOMMENDED_FIXED_DT,
+            ControlInputs::neutral().with_brakes(1.0),
+            &environment,
+        );
+        assert!(fdm.state().is_finite());
+    }
+
+    let pitch = fdm.state().attitude().pitch.get();
+    let expected = slope.north().atan();
+    assert!(
+        pitch > 0.01,
+        "aircraft did not pitch uphill: pitch was {:.3} deg",
+        pitch.to_degrees()
+    );
+    assert!(
+        (pitch - expected).abs() < 0.01,
+        "pitch {:.3} deg did not follow {:.3} deg slope",
+        pitch.to_degrees(),
+        expected.to_degrees()
+    );
+    assert!(
+        fdm.state().angular_velocity.length() < 0.01,
+        "aircraft merely passed through the slope angle without settling"
+    );
+}
+
+#[test]
+fn touchdown_trajectory_is_bit_identical() {
+    let run = || {
+        let initial = RigidBodyState::from_geodetic(
+            Geodetic::from_degrees(0.0, 0.0, 1.005),
+            Attitude::default(),
+            Ned::new(15.0, 0.0, 3.0),
+        );
+        let mut fdm = FlightDynamics::new(AircraftConfig::light_single(), initial);
+        let environment = Environment::still_air();
+        let controls = ControlInputs::neutral().with_brakes(0.4);
+        let mut samples = Vec::new();
+
+        for step in 0..600 {
+            fdm.step(RECOMMENDED_FIXED_DT, controls, &environment);
+            if step % 20 == 0 {
+                samples.push(*fdm.state());
+            }
+        }
+        samples
+    };
+
+    assert_eq!(
+        run(),
+        run(),
+        "ground-contact trajectory is not deterministic"
     );
 }

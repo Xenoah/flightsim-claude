@@ -5,6 +5,22 @@
 
 ---
 
+## [Unreleased]
+
+---
+
+## [0.2.0-alpha.1] — 2026-08-03
+
+### 追加
+
+- `flightsim-fdm` に前脚 1 本・主脚 2 本の着陸装置を追加。ばねダンパ式の接地反力、
+  最大ストローク後のバンプストップ、転がり・横滑り摩擦、ホイールブレーキに対応
+- 呼び出し側が `Environment` へ地面の楕円体高とローカル勾配を渡す接地平面入力
+- 脚の固有振動数を考慮する内部サブステップ判定
+- 10 分静止、理論沈み込み、滑走離陸、3 m/s・10 m/s 着地、傾斜面、決定論の回帰テスト
+
+---
+
 ## [0.1.0] — 2026-08-01
 
 **M1: 物理と地形の基盤。**
@@ -90,4 +106,6 @@
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.2.0-alpha.1...HEAD
+[0.2.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.1.0...v0.2.0-alpha.1
 [0.1.0]: https://github.com/Xenoah/flightsim-claude/releases/tag/v0.1.0

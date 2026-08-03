@@ -50,7 +50,7 @@
 | クレート | 責務 | Bevy 依存 | 担当エージェント |
 |---|---|:---:|---|
 | `flightsim-core` | WGS84 測地系、ECEF/ENU/NED 変換、単位型、シミュレーション時刻 | ✗ | architect |
-| `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、積分器 | ✗ | simulation |
+| `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、着陸装置、積分器 | ✗ | simulation |
 | `flightsim-world` | タイル分割、DEM、LOD 選択、ストリーミング、地形高度クエリ | ✗ | world |
 | `flightsim-render` | 大気散乱、雲、地形メッシュ生成、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
@@ -150,7 +150,7 @@ LOD は幾何誤差ベースの screen-space error で選択する（距離ベ�
 | クレート | 内容 | テスト数 |
 |---|---|---:|
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ | 50 |
-| `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、RK4 + サブステップ | 86 |
+| `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、3 点式着陸装置、接地摩擦・ブレーキ、RK4 + 剛性対応サブステップ | 103 |
 | `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ | 63 |
 
 CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 / `cargo doc -D warnings` を回している。
@@ -158,7 +158,7 @@ CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 
 ### 未実装
 
 - **描画が一切ない。** M1 はヘッドレスの物理・地形基盤まで
-- 推力線オフセット、着陸装置と接地反力、乱流
+- 推力線オフセット、乱流
 - オフラインのタイル生成パイプライン（Copernicus DEM → 実行時タイル）
 - 地形メッシュ生成（亀裂対策のスカート込み）
 - 天候、ライブ交通、オンライン共有ワールド、複数機体、コックピット操作

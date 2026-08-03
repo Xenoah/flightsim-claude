@@ -1,10 +1,225 @@
-//! 機体設定。質量特性・幾何・空力係数・エンジン。
+//! 機体設定。質量特性・幾何・空力係数・エンジン・着陸装置。
 //!
 //! 係数をコードに直書きせず設定として外に出しているのは、機体を差し替えられるようにするため。
 //! 将来これを設定ファイルから読み込む形にする（インタフェースはそのままで済む）。
 
-use flightsim_core::{Kilograms, Meters, Newtons, Radians, SquareMeters};
-use glam::DMat3;
+use flightsim_core::{Kilograms, Meters, MetersPerSecond, Newtons, Radians, SquareMeters};
+use glam::{DMat3, DVec3};
+
+/// 機体重心を原点とする機体軸上の点。
+///
+/// X は前、Y は右、Z は下。各成分の単位はメートル。
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(transparent)]
+pub struct BodyPoint(DVec3);
+
+impl BodyPoint {
+    #[must_use]
+    pub const fn new(x: Meters, y: Meters, z: Meters) -> Self {
+        Self(DVec3::new(x.get(), y.get(), z.get()))
+    }
+
+    #[must_use]
+    pub const fn as_vec(self) -> DVec3 {
+        self.0
+    }
+
+    #[must_use]
+    pub fn is_finite(self) -> bool {
+        self.0.is_finite()
+    }
+}
+
+/// 着陸脚のばね定数 `N/m`。
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct SpringRate(pub f64);
+
+impl SpringRate {
+    #[must_use]
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
+/// 着陸脚の粘性減衰係数 `N·s/m`。
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct DampingCoefficient(pub f64);
+
+impl DampingCoefficient {
+    #[must_use]
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
+/// 1 本の着陸脚。
+#[derive(Debug, Clone, Copy)]
+pub struct LandingGearLeg {
+    /// 脚を伸ばし切った状態の接地点。
+    contact_point: BodyPoint,
+    spring_rate: SpringRate,
+    damping_coefficient: DampingCoefficient,
+    max_stroke: Meters,
+}
+
+impl LandingGearLeg {
+    /// # Panics
+    ///
+    /// 接地点または脚の物理量が有限でない場合、ばね定数・最大ストロークが正でない場合、
+    /// 減衰係数が負の場合にパニックする。
+    #[must_use]
+    pub fn new(
+        contact_point: BodyPoint,
+        spring_rate: SpringRate,
+        damping_coefficient: DampingCoefficient,
+        max_stroke: Meters,
+    ) -> Self {
+        assert!(
+            contact_point.is_finite(),
+            "gear contact point must be finite"
+        );
+        assert!(
+            spring_rate.get().is_finite() && spring_rate.get() > 0.0,
+            "gear spring rate must be finite and positive"
+        );
+        assert!(
+            damping_coefficient.get().is_finite() && damping_coefficient.get() >= 0.0,
+            "gear damping coefficient must be finite and non-negative"
+        );
+        assert!(
+            max_stroke.is_finite() && max_stroke.get() > 0.0,
+            "gear maximum stroke must be finite and positive"
+        );
+
+        Self {
+            contact_point,
+            spring_rate,
+            damping_coefficient,
+            max_stroke,
+        }
+    }
+
+    #[must_use]
+    pub const fn contact_point(&self) -> BodyPoint {
+        self.contact_point
+    }
+
+    #[must_use]
+    pub const fn spring_rate(&self) -> SpringRate {
+        self.spring_rate
+    }
+
+    #[must_use]
+    pub const fn damping_coefficient(&self) -> DampingCoefficient {
+        self.damping_coefficient
+    }
+
+    #[must_use]
+    pub const fn max_stroke(&self) -> Meters {
+        self.max_stroke
+    }
+}
+
+/// 3 点式着陸装置とタイヤ摩擦の設定。
+#[derive(Debug, Clone, Copy)]
+pub struct LandingGearConfig {
+    /// 前脚 1 本と主脚 2 本。順序に物理的な意味は持たせない。
+    legs: [LandingGearLeg; 3],
+    /// 自由転動中の前後方向摩擦係数。
+    rolling_friction_coefficient: f64,
+    /// ブレーキ全開時に加算する前後方向摩擦係数。
+    braking_friction_coefficient: f64,
+    /// 横滑りを拘束する摩擦係数。
+    lateral_friction_coefficient: f64,
+    /// 摩擦を Coulomb 上限へ滑らかにつなぐ速度幅。
+    friction_transition_speed: MetersPerSecond,
+}
+
+impl LandingGearConfig {
+    /// # Panics
+    ///
+    /// 摩擦係数が有限な非負値でない場合、または遷移速度が有限な正値でない場合に
+    /// パニックする。
+    #[must_use]
+    pub fn new(
+        legs: [LandingGearLeg; 3],
+        rolling_friction_coefficient: f64,
+        braking_friction_coefficient: f64,
+        lateral_friction_coefficient: f64,
+        friction_transition_speed: MetersPerSecond,
+    ) -> Self {
+        for (name, coefficient) in [
+            ("rolling", rolling_friction_coefficient),
+            ("braking", braking_friction_coefficient),
+            ("lateral", lateral_friction_coefficient),
+        ] {
+            assert!(
+                coefficient.is_finite() && coefficient >= 0.0,
+                "{name} friction coefficient must be finite and non-negative"
+            );
+        }
+        assert!(
+            friction_transition_speed.is_finite() && friction_transition_speed.get() > 0.0,
+            "friction transition speed must be finite and positive"
+        );
+
+        Self {
+            legs,
+            rolling_friction_coefficient,
+            braking_friction_coefficient,
+            lateral_friction_coefficient,
+            friction_transition_speed,
+        }
+    }
+
+    /// 軽単発機向けの前輪式 3 点着陸装置。
+    #[must_use]
+    pub fn light_single() -> Self {
+        let leg = |x, y| {
+            LandingGearLeg::new(
+                BodyPoint::new(Meters(x), Meters(y), Meters(1.0)),
+                SpringRate(120_000.0),
+                DampingCoefficient(13_000.0),
+                Meters(0.25),
+            )
+        };
+
+        Self::new(
+            [leg(1.6, 0.0), leg(-0.8, -1.3), leg(-0.8, 1.3)],
+            0.015,
+            0.70,
+            0.80,
+            MetersPerSecond(0.25),
+        )
+    }
+
+    #[must_use]
+    pub const fn legs(&self) -> &[LandingGearLeg; 3] {
+        &self.legs
+    }
+
+    #[must_use]
+    pub const fn rolling_friction_coefficient(&self) -> f64 {
+        self.rolling_friction_coefficient
+    }
+
+    #[must_use]
+    pub const fn braking_friction_coefficient(&self) -> f64 {
+        self.braking_friction_coefficient
+    }
+
+    #[must_use]
+    pub const fn lateral_friction_coefficient(&self) -> f64 {
+        self.lateral_friction_coefficient
+    }
+
+    #[must_use]
+    pub const fn friction_transition_speed(&self) -> MetersPerSecond {
+        self.friction_transition_speed
+    }
+}
 
 /// 機体軸まわりの質量特性。
 ///
@@ -234,6 +449,7 @@ pub struct AircraftConfig {
     pub geometry: Geometry,
     pub aero: AeroCoefficients,
     pub engine: EngineConfig,
+    pub landing_gear: LandingGearConfig,
 }
 
 impl AircraftConfig {
@@ -303,6 +519,7 @@ impl AircraftConfig {
                 propeller_efficiency: 0.8,
                 static_thrust: Newtons(2_400.0),
             },
+            landing_gear: LandingGearConfig::light_single(),
         }
     }
 }
@@ -359,6 +576,28 @@ mod tests {
     #[should_panic(expected = "principal moments of inertia must be positive")]
     fn zero_inertia_is_rejected() {
         let _ = MassProperties::new(Kilograms(1.0), 0.0, 1.0, 1.0, 0.0);
+    }
+
+    #[test]
+    fn default_landing_gear_is_symmetric_about_the_longitudinal_axis() {
+        let gear = LandingGearConfig::light_single();
+        let left = gear.legs()[1].contact_point().as_vec();
+        let right = gear.legs()[2].contact_point().as_vec();
+
+        assert!((left.x - right.x).abs() < f64::EPSILON);
+        assert!((left.y + right.y).abs() < f64::EPSILON);
+        assert!((left.z - right.z).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    #[should_panic(expected = "gear spring rate must be finite and positive")]
+    fn invalid_landing_gear_spring_rate_is_rejected() {
+        let _ = LandingGearLeg::new(
+            BodyPoint::new(Meters(0.0), Meters(0.0), Meters(1.0)),
+            SpringRate(f64::NAN),
+            DampingCoefficient(1.0),
+            Meters(0.2),
+        );
     }
 
     // --- エンジン ---
