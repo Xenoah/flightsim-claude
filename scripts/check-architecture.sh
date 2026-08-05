@@ -17,6 +17,9 @@ fail() {
     failures=$((failures + 1))
 }
 
+# 検査対象のクレート。
+CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen)
+
 # `cargo tree` の出力からパッケージ名の一覧を得る。
 # --edges normal で dev-dependencies と build-dependencies を除外する
 # （テスト専用の依存は設計上の問題ではない）。
@@ -32,10 +35,11 @@ deps_of() {
 # これらが GUI なしにテストできることが技術選定の根拠そのもの。
 # ここが崩れると QA エージェントが回帰網を維持できなくなる。
 # --------------------------------------------------------------------------
-for crate in flightsim-core flightsim-fdm flightsim-world; do
+for crate in "${CRATES[@]}"; do
     if deps_of "$crate" | grep -qiE '^bevy'; then
         fail "$crate depends on bevy" \
-             "ADR-0001: core/fdm/world must stay engine-independent so that \`cargo test\` runs headless."
+             "ADR-0001: core/fdm/world must stay engine-independent so that \`cargo test\` runs headless. \
+Offline tools such as tilegen have no use for a render engine either."
     fi
 done
 
@@ -59,6 +63,16 @@ if deps_of flightsim-world | grep -qE '^flightsim-fdm$'; then
     fail "flightsim-world depends on flightsim-fdm" \
          "world and fdm are siblings; neither may depend on the other."
 fi
+
+# flightsim-tilegen はオフラインのツールで、world の上に乗る。
+# 逆に runtime 側がツールへ依存すると、実行時に GeoTIFF デコーダを抱え込むことになる
+# （ADR-0003 が禁じているもの）。
+for crate in flightsim-core flightsim-fdm flightsim-world; do
+    if deps_of "$crate" | grep -qE '^flightsim-tilegen$'; then
+        fail "$crate depends on flightsim-tilegen" \
+             "tilegen is an offline tool that sits above world. Runtime crates must not pull in the GeoTIFF decoder (ADR-0003)."
+    fi
+done
 
 # --------------------------------------------------------------------------
 # 規約 3: 座標変換は flightsim-core にのみ置く（ADR-0002）

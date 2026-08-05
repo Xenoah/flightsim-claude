@@ -4,6 +4,7 @@ members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
     "crates/flightsim-world",
+    "crates/flightsim-tilegen",
 ]
 
 [workspace.package]
@@ -16,6 +17,7 @@ license = "MIT OR Apache-2.0"
 flightsim-core = { path = "crates/flightsim-core" }
 flightsim-fdm = { path = "crates/flightsim-fdm" }
 flightsim-world = { path = "crates/flightsim-world" }
+flightsim-tilegen = { path = "crates/flightsim-tilegen" }
 
 glam = "0.30"
 

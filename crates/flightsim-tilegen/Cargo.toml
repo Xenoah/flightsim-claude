@@ -1,0 +1,18 @@
+[package]
+name = "flightsim-tilegen"
+description = "Copernicus DEM の GeoTIFF から実行時タイル (.fsdem) を焼くオフライン CLI。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# オフラインのツールなので flightsim-world に依存してよい（依存の向きは正しい）。
+# ただし `bevy` は不可。焼き込み処理に描画エンジンは要らない。
+[dependencies]
+flightsim-core.workspace = true
+flightsim-world.workspace = true
+clap = { version = "4", features = ["derive"] }
+tiff = "0.11"
+
+[lints]
+workspace = true
