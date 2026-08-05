@@ -11,6 +11,8 @@
 //! 行優先で、**先頭行が最北端**。タイルの正規化座標 `(u, v)` と直接対応する
 //! （`v = 0` が北）。この向きを間違えると地形が南北反転し、山と谷が入れ替わる。
 
+pub mod io;
+
 use crate::tile::GeoBounds;
 use flightsim_core::{Geodetic, Meters};
 
@@ -190,6 +192,23 @@ impl DemTile {
     #[must_use]
     pub fn new(bounds: GeoBounds, grid: HeightGrid) -> Self {
         let geometric_error = grid.geometric_error();
+        Self {
+            bounds,
+            grid,
+            geometric_error,
+        }
+    }
+
+    /// 既知の幾何誤差からタイルを組み立てる。
+    ///
+    /// [`Self::new`] は幾何誤差を格子から再計算する（格子点数に比例するコスト）。
+    /// ファイルから読む場合は生成時に算出済みの値が埋まっているので、
+    /// **ストリーミング中に再計算しないためにこちらを使う**（ADR-0005）。
+    ///
+    /// 呼び出し側が渡す値を検証しない。ファイル由来の値は
+    /// [`io::read_tile`] が有限性と符号を検査したうえで渡してくる。
+    #[must_use]
+    pub const fn from_parts(bounds: GeoBounds, grid: HeightGrid, geometric_error: Meters) -> Self {
         Self {
             bounds,
             grid,

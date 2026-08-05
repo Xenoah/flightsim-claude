@@ -17,6 +17,7 @@
 //! |---|---|
 //! | [`tile`] | 地理座標系クアッドツリー。タイル ID と範囲、隣接関係 |
 //! | [`dem`] | 標高格子とバイリニアサンプリング、幾何誤差の算出 |
+//! | [`dem::io`] | 実行時タイル形式 `.fsdem` の読み書き（ADR-0005） |
 //! | [`lod`] | 幾何誤差ベースの screen-space error による細分化判定 |
 //! | [`streaming`] | 優先度付き読み込みキューと、バイト数上限つき LRU キャッシュ |
 //!
@@ -59,6 +60,7 @@ pub mod lod;
 pub mod streaming;
 pub mod tile;
 
+pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};
 pub use lod::{LodSelection, LodSelector};
 pub use streaming::{StreamingScheduler, TileCache};
