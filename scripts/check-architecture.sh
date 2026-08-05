@@ -30,6 +30,26 @@ deps_of() {
 }
 
 # --------------------------------------------------------------------------
+# 事前検査: 依存グラフがそもそも読めること
+#
+# deps_of は cargo tree の失敗を握り潰す（パイプラインの中で使うので、
+# 関数内から exit しても親シェルは止まらない）。その結果、マニフェストに
+# 誤りがあると **全ての規約検査が「依存ゼロ」として黙って通る**。
+#
+# 安全網が事故時に無言で外れるのが最悪なので、ここで先に落とす。
+# 実際にこの穴を踏んで気付いたため、検査を足してある。
+# --------------------------------------------------------------------------
+for crate in "${CRATES[@]}"; do
+    if ! output=$(cargo tree --package "$crate" --edges normal --prefix none 2>&1); then
+        echo "FAIL: could not resolve the dependency tree for $crate"
+        echo "      Every architecture check would pass vacuously in this state, so this is fatal."
+        echo "      cargo tree said:"
+        echo "$output" | sed 's/^/        /'
+        exit 2
+    fi
+done
+
+# --------------------------------------------------------------------------
 # 規約 1: core / fdm / world は Bevy に依存しない（ADR-0001）
 #
 # これらが GUI なしにテストできることが技術選定の根拠そのもの。
