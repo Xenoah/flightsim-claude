@@ -56,10 +56,16 @@
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
 | `flightsim-app` | 全体統合、実行バイナリ | ✓ | orchestrator |
+| `flightsim-tilegen` | **オフライン CLI。** GeoTIFF → 実行時タイル `.fsdem` の焼き込み | ✗ | world |
+
+`flightsim-tilegen` は実行時のグラフに乗らない。`world` の上に位置し、
+GeoTIFF デコーダ（`tiff`）を抱えるのはこのツールだけ。**実行時クレートが
+tilegen に依存してはならない**（デコーダが実行時に載ってしまう。ADR-0003）。
 
 **禁止事項（レビュー自動失格）**
-- `core` / `fdm` / `world` の `Cargo.toml` に `bevy` を追加すること
+- `core` / `fdm` / `world` / `tilegen` の `Cargo.toml` に `bevy` を追加すること
 - `fdm` から `world` を参照すること（地形高度は呼び出し側が引数で渡す）
+- `core` / `fdm` / `world` から `tilegen` を参照すること
 - 単位付きでない生の `f32` / `f64` を公開 API の引数にすること（[§4](#4-単位と型)）
 
 ---
@@ -139,6 +145,14 @@ pub struct Radians(pub f64);
 
 LOD は幾何誤差ベースの screen-space error で選択する（距離ベースではなく）。理由は山岳と平野で必要ポリゴン数が桁違いに違うため。
 
+実行時タイル形式 `.fsdem` は `u16` 量子化 + タイル毎スケールの自前バイナリ（[ADR-0005](docs/adr/0005-runtime-tile-format.md)）。焼き込みは `flightsim-tilegen` が行う。
+
+```text
+Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  tiles/{level}/{x}/{y}.fsdem
+                                                                          │
+                                                              [flightsim-world / 実行時]
+```
+
 ---
 
 ## 7. 現状のスコープ
@@ -151,16 +165,18 @@ LOD は幾何誤差ベースの screen-space error で選択する（距離ベ�
 |---|---|---:|
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ | 50 |
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、3 点式着陸装置、接地摩擦・ブレーキ、RK4 + 剛性対応サブステップ | 103 |
-| `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ | 63 |
+| `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ、実行時タイル形式の読み書き | 86 |
+| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI | 55 |
 
 CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 / `cargo doc -D warnings` を回している。
 
 ### 未実装
 
 - **描画が一切ない。** M1 はヘッドレスの物理・地形基盤まで
+- **FDM とワールドの結線。** 焼いたタイルの標高を FDM へ渡すヘッドレス統合ランナーが無い
 - 推力線オフセット、乱流
-- オフラインのタイル生成パイプライン（Copernicus DEM → 実行時タイル）
 - 地形メッシュ生成（亀裂対策のスカート込み）
+- OSM（空港・建物）と地表画像の取り込み。tilegen が扱うのは標高のみ
 - 天候、ライブ交通、オンライン共有ワールド、複数機体、コックピット操作
 
 詳細は [docs/ROADMAP.md](docs/ROADMAP.md)。

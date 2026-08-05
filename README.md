@@ -10,7 +10,7 @@
 ## 何ができるか（今）
 
 ```bash
-cargo test --workspace           # 約 200 件、数秒で完了
+cargo test --workspace           # 約 300 件、数秒で完了
 ```
 
 - **WGS84 測地系と `f64` ECEF 世界座標** — 地球全体で振動しない位置表現。描画用の
@@ -20,14 +20,18 @@ cargo test --workspace           # 約 200 件、数秒で完了
   10 分の飛行を数秒でヘッドレス検証できる
 - **地形タイル基盤** — 地理座標系クアッドツリー（極まで表現可能）、DEM のバイリニア
   サンプリング、幾何誤差ベースの LOD 選択、フレーム予算つきストリーミング
+- **実地形の焼き込み** — Copernicus DEM の GeoTIFF から実行時タイルを生成する
+  オフライン CLI。日付変更線と極、投影座標系の誤読、nodata を扱う
 
 ```bash
 cargo run -p flightsim-fdm --example aero_trace   # 空力の内訳を時系列で表示
+
+cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif     --output data/tiles --min-level 8 --max-level 12
 ```
 
 ## 何がまだないか
 
-描画、実地形データの読み込み、天候、複数機体、オンライン。
+描画、FDM とワールドの結線、天候、複数機体、オンライン。
 [docs/ROADMAP.md](docs/ROADMAP.md) に段階と、後回しにした理由を書いています。
 
 ---
@@ -41,10 +45,11 @@ cargo run -p flightsim-fdm --example aero_trace   # 空力の内訳を時系列�
 | [ADR-0002](docs/adr/0002-coordinate-system.md) | なぜ `f64` ECEF + floating origin か |
 | [ADR-0003](docs/adr/0003-terrain-data.md) | なぜオープンデータと自前パイプラインか |
 | [ADR-0004](docs/adr/0004-simulation-loop.md) | なぜ固定ステップ RK4 か |
+| [ADR-0005](docs/adr/0005-runtime-tile-format.md) | なぜ自前の `u16` 量子化タイル形式か |
 
 設計の要は 1 点に集約されます。
 
-> **`flightsim-core` / `flightsim-fdm` / `flightsim-world` は Bevy に依存しない。**
+> **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-tilegen` は Bevy に依存しない。**
 
 物理と地形が純 Rust であるおかげで、`cargo test` が GUI もアセットもなしに数秒で回ります。
 これは慣習ではなく [CI で検査される規約](scripts/check-architecture.sh) です。

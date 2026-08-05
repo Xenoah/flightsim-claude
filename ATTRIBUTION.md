@@ -10,23 +10,23 @@
 
 ## 現在利用しているデータ
 
-**なし。**
+### 標高 — Copernicus DEM GLO-30
 
-M1 時点ではタイル生成パイプラインが未実装のため、実データを一切読み込んでいません。
-テストは全て合成データで動いています。
+`flightsim-tilegen` が読み込む対象です。**焼いたタイルを配布する場合、
+この表示をゲーム内クレジットにも出すこと。**
+
+> Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and
+> Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA;
+> all rights reserved.
+
+なお、リポジトリに実データは含まれていません（全球で数百 GB あるため）。
+テストは合成 GeoTIFF で動いており、CI は実データを必要としません。
 
 ---
 
 ## 利用予定のデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）
 
 パイプライン実装時にここへ移し、ゲーム内クレジットにも追加すること。
-
-### 標高
-
-**Copernicus DEM GLO-30**
-Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and
-Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA;
-all rights reserved.
 
 ### 空港・滑走路・建物
 
@@ -53,8 +53,13 @@ CC BY 4.0。https://esa-worldcover.org/
 
 ## ソフトウェア
 
-| 依存 | ライセンス |
-|---|---|
-| [glam](https://github.com/bitshifter/glam-rs) | MIT OR Apache-2.0 |
+| 依存 | ライセンス | 使う場所 |
+|---|---|---|
+| [glam](https://github.com/bitshifter/glam-rs) | MIT OR Apache-2.0 | 全体（線形代数） |
+| [tiff](https://github.com/image-rs/image-tiff) | MIT | `flightsim-tilegen`（GeoTIFF デコード） |
+| [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen`（CLI） |
+
+`tiff` と `clap` はオフラインのタイル生成ツールのみが使い、実行時には載りません
+（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
 本プロジェクト自体は MIT OR Apache-2.0 です。
