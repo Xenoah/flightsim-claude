@@ -20,6 +20,7 @@
 //! | [`dem::io`] | 実行時タイル形式 `.fsdem` の読み書き（ADR-0005） |
 //! | [`lod`] | 幾何誤差ベースの screen-space error による細分化判定 |
 //! | [`streaming`] | 優先度付き読み込みキューと、バイト数上限つき LRU キャッシュ |
+//! | [`terrain`] | 焼かれたタイルから測地座標の標高を引く層 |
 //!
 //! ## 使い方
 //!
@@ -58,10 +59,12 @@
 pub mod dem;
 pub mod lod;
 pub mod streaming;
+pub mod terrain;
 pub mod tile;
 
 pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};
 pub use lod::{LodSelection, LodSelector};
 pub use streaming::{StreamingScheduler, TileCache};
+pub use terrain::{DiskTileSource, MemoryTileSource, Terrain, TerrainError, TileSource};
 pub use tile::{Direction, GeoBounds, TileId};
