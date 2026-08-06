@@ -265,6 +265,7 @@ fn uncovered_points_are_filled_with_the_requested_elevation() {
         &TileGenOptions {
             grid_size: 33,
             fill: Meters(-500.0),
+            ..TileGenOptions::default()
         },
         Path::new("<dry-run>"),
         true,

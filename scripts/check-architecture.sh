@@ -18,7 +18,7 @@ fail() {
 }
 
 # 検査対象のクレート。
-CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen)
+CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim)
 
 # `cargo tree` の出力からパッケージ名の一覧を得る。
 # --edges normal で dev-dependencies と build-dependencies を除外する
@@ -50,7 +50,7 @@ for crate in "${CRATES[@]}"; do
 done
 
 # --------------------------------------------------------------------------
-# 規約 1: core / fdm / world は Bevy に依存しない（ADR-0001）
+# 規約 1: core / fdm / world / sim / tilegen は Bevy に依存しない（ADR-0001）
 #
 # これらが GUI なしにテストできることが技術選定の根拠そのもの。
 # ここが崩れると QA エージェントが回帰網を維持できなくなる。
@@ -58,8 +58,8 @@ done
 for crate in "${CRATES[@]}"; do
     if deps_of "$crate" | grep -qiE '^bevy'; then
         fail "$crate depends on bevy" \
-             "ADR-0001: core/fdm/world must stay engine-independent so that \`cargo test\` runs headless. \
-Offline tools such as tilegen have no use for a render engine either."
+             "ADR-0001: these crates must stay engine-independent so that \`cargo test\` runs headless. \
+The headless runner (sim) and the offline baker (tilegen) have no use for a render engine either."
     fi
 done
 
@@ -91,6 +91,20 @@ for crate in flightsim-core flightsim-fdm flightsim-world; do
     if deps_of "$crate" | grep -qE '^flightsim-tilegen$'; then
         fail "$crate depends on flightsim-tilegen" \
              "tilegen is an offline tool that sits above world. Runtime crates must not pull in the GeoTIFF decoder (ADR-0003)."
+    fi
+done
+
+# flightsim-sim は fdm と world の上に乗る統合層（ADR-0006）。
+# 下位クレートが sim を参照すると、FDM 単体のテストが地形データを要求するようになり、
+# 「fdm は world を参照しない」という規約が実質的に骨抜きになる。
+#
+# 注意: sim / tilegen への上向き依存は、実際には Cargo が循環依存として先に拒否する
+# （sim は fdm と world に依存しているため）。したがってこの 2 つの検査が発火する
+# ことはまずなく、実質は上の事前検査が守っている。規約を明文化するために残してある。
+for crate in flightsim-core flightsim-fdm flightsim-world; do
+    if deps_of "$crate" | grep -qE '^flightsim-sim$'; then
+        fail "$crate depends on flightsim-sim" \
+             "sim is the integration layer above fdm and world. Depending on it upwards defeats the fdm/world separation (ADR-0006)."
     fi
 done
 

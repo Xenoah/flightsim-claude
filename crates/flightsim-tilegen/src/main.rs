@@ -36,6 +36,15 @@ struct Cli {
     #[arg(long, default_value_t = 0.0, value_name = "METRES")]
     fill: f64,
 
+    /// タイルを書くのに必要な被覆率 `0.0..=1.0`。これを下回るタイルは書かない。
+    ///
+    /// ほとんどが fill のタイルは、実データとの境界が崖になる。実測では焼いた
+    /// 範囲の縁で 179 m の段差が飛行中に現れた。しかもタイルは存在するため、
+    /// 実行時からは「地形データがある」ようにしか見えない。
+    /// 縁の崖が問題になる場合は 0.9 以上を指定する。
+    #[arg(long, default_value_t = 0.0, value_name = "FRACTION")]
+    min_coverage: f64,
+
     /// 対象範囲 `west,south,east,north` [度]。省略時は入力ラスタの被覆範囲。
     ///
     /// west > east は日付変更線をまたぐ範囲として扱う。
@@ -105,6 +114,7 @@ fn run(cli: &Cli) -> Result<(), String> {
     let options = TileGenOptions {
         grid_size: cli.grid_size,
         fill: Meters(cli.fill),
+        min_coverage: cli.min_coverage,
     };
     let report = generate_tiles(
         &rasters,
@@ -128,6 +138,13 @@ fn run(cli: &Cli) -> Result<(), String> {
             report.tiles_without_coverage
         );
     }
+    if report.tiles_below_min_coverage > 0 {
+        eprintln!(
+            "skipped {} tile(s) below the {:.0}% coverage threshold",
+            report.tiles_below_min_coverage,
+            cli.min_coverage * 100.0
+        );
+    }
     if report.grid_points_filled > 0 {
         // 黙って埋めると、地形に平坦な板が現れた理由が分からなくなる。
         // さらに、埋めた部分との段差が幾何誤差を押し上げ、実データの無い場所ほど
@@ -142,8 +159,9 @@ fn run(cli: &Cli) -> Result<(), String> {
              so those tiles subdivide more than they should."
         );
         eprintln!(
-            "         Use --bounds to keep generation inside the covered area if that matters."
+            "         Use --bounds to keep generation inside the covered area, or --min-coverage"
         );
+        eprintln!("         to skip mostly-filled tiles (they read as real terrain at runtime).");
     }
 
     Ok(())

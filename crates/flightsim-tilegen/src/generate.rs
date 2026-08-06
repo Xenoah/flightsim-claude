@@ -23,6 +23,23 @@ pub struct TileGenOptions {
     ///
     /// 実行時形式に穴の概念は無いので、ここで必ず値を決める（ADR-0005）。
     pub fill: Meters,
+    /// タイルを書き出すのに必要な、元データに被覆された格子点の割合 `0.0..=1.0`。
+    ///
+    /// これを下回るタイルは**書かない**。
+    ///
+    /// # なぜ必要か
+    ///
+    /// ほとんどが `fill` のタイルは、実データとの境界が崖になる。
+    /// 実測では、焼いた範囲の縁を飛んだ機体が 1 サンプル（0.5 秒）のあいだに
+    /// **179 m の段差**に遭遇した。しかもタイル自体は存在するので、
+    /// 実行時からは「地形データがある」ようにしか見えない。
+    ///
+    /// 書かなければ実行時は「タイルが無い」と正しく認識し、
+    /// 呼び出し側の既定値（海面など）へ落ちる。
+    ///
+    /// 既定は 0.0（従来どおり全て書く）。**黙ってタイルを捨てないため**であって、
+    /// 0.0 が推奨値という意味ではない。縁の崖が問題になる用途では 0.9 以上を勧める。
+    pub min_coverage: f64,
 }
 
 impl Default for TileGenOptions {
@@ -30,6 +47,7 @@ impl Default for TileGenOptions {
         Self {
             grid_size: 65,
             fill: Meters::ZERO,
+            min_coverage: 0.0,
         }
     }
 }
@@ -182,6 +200,8 @@ pub enum GenerateError {
     },
     /// `grid_size` が 2 未満。
     InvalidGridSize(u32),
+    /// `min_coverage` が `0.0..=1.0` の外、または非有限。
+    InvalidMinCoverage(f64),
     /// `min_level > max_level`。
     InvalidLevelRange { min: u8, max: u8 },
 }
@@ -199,6 +219,9 @@ impl core::fmt::Display for GenerateError {
                 formatter,
                 "grid size {size} is too small; bilinear interpolation needs at least 2 per axis"
             ),
+            Self::InvalidMinCoverage(value) => {
+                write!(formatter, "minimum coverage {value} is outside 0.0..=1.0")
+            }
             Self::InvalidLevelRange { min, max } => {
                 write!(formatter, "min level {min} is deeper than max level {max}")
             }
@@ -222,6 +245,8 @@ pub struct GenerationReport {
     pub tiles_written: usize,
     /// 元データの被覆が全く無く、作らなかったタイルの数。
     pub tiles_without_coverage: usize,
+    /// `min_coverage` に満たず、意図的に書かなかったタイルの数。
+    pub tiles_below_min_coverage: usize,
     /// `fill` で埋めた格子点の総数。**0 でないなら地形に平坦な穴がある。**
     pub grid_points_filled: u64,
     pub bytes_written: u64,
@@ -245,6 +270,9 @@ pub fn generate_tiles(
     if options.grid_size < 2 {
         return Err(GenerateError::InvalidGridSize(options.grid_size));
     }
+    if !options.min_coverage.is_finite() || !(0.0..=1.0).contains(&options.min_coverage) {
+        return Err(GenerateError::InvalidMinCoverage(options.min_coverage));
+    }
     if levels.start() > levels.end() {
         return Err(GenerateError::InvalidLevelRange {
             min: *levels.start(),
@@ -260,6 +288,15 @@ pub fn generate_tiles(
                 report.tiles_without_coverage += 1;
                 continue;
             };
+
+            // 被覆が薄いタイルは書かない。書くと実データとの境界が崖になり、
+            // しかも実行時からは「地形データがある」ようにしか見えない。
+            let total = f64::from(options.grid_size) * f64::from(options.grid_size);
+            let covered = (total - f64::from(build.filled_points)) / total;
+            if covered < options.min_coverage {
+                report.tiles_below_min_coverage += 1;
+                continue;
+            }
 
             let mut encoded = Vec::new();
             write_tile(&mut encoded, id, &build.grid)
@@ -370,6 +407,7 @@ mod tests {
         let options = TileGenOptions {
             grid_size: 17,
             fill: Meters(-1_234.0),
+            ..TileGenOptions::default()
         };
         let build = build_tile(&rasters, id, &options).expect("partially covered");
 
@@ -621,7 +659,7 @@ mod tests {
                 8..=8,
                 &TileGenOptions {
                     grid_size: 1,
-                    fill: Meters::ZERO
+                    ..TileGenOptions::default()
                 },
                 StdPath::new("<unused>"),
                 true
@@ -643,6 +681,101 @@ mod tests {
             ),
             Err(GenerateError::InvalidLevelRange { min: 9, max: 7 })
         ));
+    }
+
+    #[test]
+    fn a_coverage_threshold_skips_mostly_filled_tiles() {
+        // 縁のタイルは大半が fill になる。書くと実データとの境界が崖になり、
+        // しかも実行時からは「地形データがある」ようにしか見えない。
+        let raster = ramp_raster(139.0, 36.0, 64, 0.02);
+        let rasters = RasterSet::new(vec![raster]);
+        // ラスタより広い範囲を要求して、縁のタイルを必ず作らせる。
+        let region = Region::from_degrees(138.5, 34.0, 140.0, 36.5).expect("valid");
+
+        let permissive = generate_tiles(
+            &rasters,
+            region,
+            10..=10,
+            &TileGenOptions::default(),
+            StdPath::new("<unused>"),
+            true,
+        )
+        .expect("dry run");
+
+        let strict = generate_tiles(
+            &rasters,
+            region,
+            10..=10,
+            &TileGenOptions {
+                min_coverage: 0.95,
+                ..TileGenOptions::default()
+            },
+            StdPath::new("<unused>"),
+            true,
+        )
+        .expect("dry run");
+
+        assert!(
+            strict.tiles_written < permissive.tiles_written,
+            "a 95% threshold wrote {} tiles, the same as no threshold ({})",
+            strict.tiles_written,
+            permissive.tiles_written
+        );
+        assert!(strict.tiles_below_min_coverage > 0);
+        assert_eq!(permissive.tiles_below_min_coverage, 0);
+        assert!(
+            strict.grid_points_filled < permissive.grid_points_filled,
+            "the threshold should reduce the amount of fill written"
+        );
+    }
+
+    #[test]
+    fn a_full_coverage_threshold_writes_only_complete_tiles() {
+        let rasters = RasterSet::new(vec![ramp_raster(139.0, 36.0, 64, 0.02)]);
+        let region = Region::from_degrees(138.5, 34.0, 140.0, 36.5).expect("valid");
+
+        let report = generate_tiles(
+            &rasters,
+            region,
+            10..=10,
+            &TileGenOptions {
+                min_coverage: 1.0,
+                ..TileGenOptions::default()
+            },
+            StdPath::new("<unused>"),
+            true,
+        )
+        .expect("dry run");
+
+        assert_eq!(
+            report.grid_points_filled, 0,
+            "a full-coverage threshold must not write any filled points"
+        );
+        assert!(report.tiles_written > 0, "nothing was written at all");
+    }
+
+    #[test]
+    fn an_out_of_range_coverage_threshold_is_rejected() {
+        let region = Region::from_degrees(0.0, 0.0, 1.0, 1.0).expect("valid");
+        for value in [-0.1, 1.1, f64::NAN] {
+            assert!(
+                matches!(
+                    generate_tiles(
+                        &RasterSet::default(),
+                        region,
+                        8..=8,
+                        &TileGenOptions {
+                            min_coverage: value,
+                            ..TileGenOptions::default()
+                        },
+                        StdPath::new("<unused>"),
+                        true
+                    ),
+                    Err(GenerateError::InvalidMinCoverage(_))
+                ),
+                "min_coverage {value} should have been rejected"
+            );
+        }
     }
 
     #[test]
