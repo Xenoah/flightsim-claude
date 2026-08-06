@@ -7,6 +7,72 @@
 
 ## [Unreleased]
 
+---
+
+## [0.3.0-alpha.1] — 2026-08-06
+
+**M1 完了。実地形の上をヘッドレスで飛べる。**
+
+### 追加 — `flightsim-sim`（新クレート）
+
+地形と飛行力学を結線する統合層（[ADR-0006](docs/adr/0006-simulation-integration-layer.md)）。
+`flightsim-fdm` は `flightsim-world` を参照できないため、その規約を守ったまま
+両者を繋ぐ場所として新設した。純 Rust で、Bevy に依存しない。
+
+- **接地平面の生成** — 地形標高と、有限差分で求めた北・東方向の勾配を
+  `Environment::with_ground_plane` へ渡す。勾配は NaN を潰し `tan(60°)` でクランプする
+- **決定論的フライトディレクタ** — PD 制御。壁時計時間・乱数・積分状態を持たない
+  純粋関数なので FDM の決定論を壊さない。**実機の自動操縦の再現ではなく、
+  回帰テストの駆動装置**
+- **フェーズ駆動の場周飛行** — 離陸滑走 → 上昇 → 巡航 → 旋回 → 進入 → フレア →
+  接地 → 減速
+- **ヘッドレスランナー `flightsim-headless`** — 軌跡を CSV で出力する CLI
+
+### 追加 — `flightsim-world`
+
+- `terrain` モジュール。焼いたタイルから測地座標の標高を引く。深いレベルから順に
+  探し、無ければ粗いレベルへ落ちる
+- `DiskTileSource` / `MemoryTileSource` / `Box<dyn TileSource>`
+- パスと中身のタイル ID が食い違うファイルを拒否する。使うと**全く違う場所の
+  地形が静かに使われる**
+
+### 追加 — `flightsim-tilegen`
+
+- `--min-coverage`。被覆率がこれを下回るタイルを書かない
+
+### 修正
+
+- 依存規約の検査を `flightsim-sim` まで拡張
+
+### 検証
+
+357 件のテストが通る。M1 の完了条件は 14 件の統合テストで検査している。
+実測値:
+
+| 項目 | 値 |
+|---|---|
+| 接地時の沈下率 | 1.86 m/s（設計限界 3 m/s） |
+| タイル境界での標高段差 | 最大 0.07 m |
+| 接地時の車輪めり込み | 0.028 m（理論値 10 232 N ÷ 360 000 N/m = 0.0284 m と一致） |
+| 決定論 | 同一シナリオの 2 回実行がビット単位で一致 |
+
+### 既知の制限
+
+- **fill を含むタイルは実行時から「実データ」と区別できない。** 焼いた範囲の縁を
+  飛んだ機体が、実測で 179 m の段差に遭遇した。しかも 1201 サンプル全てで
+  「地形データあり」と報告される。`--min-coverage` はこの**嘘を消す**（該当 113
+  サンプルが 0 件になる）が、**段差自体は消えない**。データ境界では不可避で、
+  呼び出し側が既定値（海面）を決める設計だから
+- **衝突判定が無い。** 上昇率を上回る速さで迫り上がる地形に対し、機体は接地したまま
+  斜面を引きずられて登る。実測で 200 秒間その状態が続いた
+- 場周飛行の計画は地形を考慮しない。山越えのような経路では時間内に完了しない
+- フライトディレクタのゲインは `light_single` 向け。機体を増やすたび調整が要る
+- 有限差分の勾配は、DEM のバイリニア補間がセル境界で微分不連続なため段階的に変わる
+
+---
+
+## [0.2.0-alpha.1 以降の未リリース分]
+
 ### 追加
 
 - **`flightsim-tilegen`** — Copernicus DEM の GeoTIFF から実行時タイルを焼く
@@ -150,6 +216,7 @@
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.2.0-alpha.1...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.3.0-alpha.1...HEAD
+[0.3.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.2.0-alpha.1...v0.3.0-alpha.1
 [0.2.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.1.0...v0.2.0-alpha.1
 [0.1.0]: https://github.com/Xenoah/flightsim-claude/releases/tag/v0.1.0

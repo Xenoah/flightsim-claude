@@ -55,6 +55,7 @@
 | `flightsim-render` | 大気散乱、雲、地形メッシュ生成、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
+| `flightsim-sim` | **地形と FDM の結線。** 接地平面の生成、固定ステップ駆動、ヘッドレス実行 | ✗ | architect |
 | `flightsim-app` | 全体統合、実行バイナリ | ✓ | orchestrator |
 | `flightsim-tilegen` | **オフライン CLI。** GeoTIFF → 実行時タイル `.fsdem` の焼き込み | ✗ | world |
 
@@ -63,9 +64,10 @@ GeoTIFF デコーダ（`tiff`）を抱えるのはこのツールだけ。**実�
 tilegen に依存してはならない**（デコーダが実行時に載ってしまう。ADR-0003）。
 
 **禁止事項（レビュー自動失格）**
-- `core` / `fdm` / `world` / `tilegen` の `Cargo.toml` に `bevy` を追加すること
-- `fdm` から `world` を参照すること（地形高度は呼び出し側が引数で渡す）
-- `core` / `fdm` / `world` から `tilegen` を参照すること
+- `core` / `fdm` / `world` / `sim` / `tilegen` の `Cargo.toml` に `bevy` を追加すること
+- `fdm` から `world` を参照すること（地形高度は `sim` が引数で渡す）
+- `core` / `fdm` / `world` から `sim` / `tilegen` を参照すること
+- Bevy 層（`app` / `render`）で地形と FDM の結線を再実装すること（`sim` を呼ぶ）
 - 単位付きでない生の `f32` / `f64` を公開 API の引数にすること（[§4](#4-単位と型)）
 
 ---
@@ -166,14 +168,14 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ | 50 |
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、3 点式着陸装置、接地摩擦・ブレーキ、RK4 + 剛性対応サブステップ | 103 |
 | `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ、実行時タイル形式の読み書き | 86 |
-| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI | 55 |
+| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI | 61 |
+| `flightsim-sim` | 接地平面の生成、決定論的フライトディレクタ、固定ステップ駆動、軌跡記録 | 44 |
 
 CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 / `cargo doc -D warnings` を回している。
 
 ### 未実装
 
 - **描画が一切ない。** M1 はヘッドレスの物理・地形基盤まで
-- **FDM とワールドの結線。** 焼いたタイルの標高を FDM へ渡すヘッドレス統合ランナーが無い
 - 推力線オフセット、乱流
 - 地形メッシュ生成（亀裂対策のスカート込み）
 - OSM（空港・建物）と地表画像の取り込み。tilegen が扱うのは標高のみ

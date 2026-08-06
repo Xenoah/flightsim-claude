@@ -9,15 +9,16 @@
 ## コマンド
 
 ```bash
-cargo test --workspace                                  # テスト（約 300 件、数秒）
+cargo test --workspace                                  # テスト（約 360 件、数秒）
 cargo clippy --workspace --all-targets -- -D warnings   # lint
 cargo fmt --all                                         # 整形
 bash scripts/check-architecture.sh                      # 依存規約の検査
 cargo run -p flightsim-fdm --example aero_trace         # 空力の内訳を時系列表示
 cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼き込み
+cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の上を飛ばす
 ```
 
-`core` / `fdm` / `world` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。
+`core` / `fdm` / `world` / `sim` / `tilegen` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。
 
 ベンチマークは未整備。性能を語る前に `cargo bench` を用意すること（測定なしに「速い」と書かない）。
 
@@ -25,8 +26,8 @@ cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼�
 
 CI で機械的に検査されるもの、および レビューで自動失格になるものです。
 
-1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-tilegen` に `bevy` を依存させない。** これらは純 Rust。Bevy は `render` / `input` / `ui` / `app` のみ
-2. **依存は一方向。** `core` ← `fdm`/`world` ← `render`/`input`/`ui` ← `app`。逆流も横断（`fdm` → `world`）も禁止。`tilegen` はオフライン専用で `world` の上に乗り、実行時クレートから参照してはならない
+1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` / `flightsim-tilegen` に `bevy` を依存させない。** これらは純 Rust。Bevy は `render` / `input` / `ui` / `app` のみ
+2. **依存は一方向。** `core` ← `fdm`/`world` ← `sim` ← `render`/`input`/`ui` ← `app`。逆流も横断（`fdm` → `world`）も禁止。地形と FDM の結線は `sim` にのみ置く（[ADR-0006](docs/adr/0006-simulation-integration-layer.md)）。`tilegen` はオフライン専用
 3. **世界座標は `f64` ECEF。** `f32` を位置の正として持たない（地表で約 76cm の量子化が起き、機体が振動する。[ADR-0002](docs/adr/0002-coordinate-system.md)）
 4. **座標変換は `flightsim-core` にのみ書く。** 他クレートで `sin`/`cos` を使った測地変換を書かない
 5. **公開 API の物理量は単位付き newtype。** 裸の `f64` を渡さない。ft/m・kt/(m/s)・deg/rad の取り違えは型で潰す
@@ -51,7 +52,7 @@ CI で機械的に検査されるもの、および レビューで自動失格�
 
 | エージェント | 担当 |
 |---|---|
-| `architect` | モジュール境界・データ設計・ADR |
+| `architect` | モジュール境界・データ設計・ADR、`flightsim-sim`（地形と FDM の結線・ヘッドレス実行） |
 | `simulation` | `flightsim-fdm`（物理・空力・大気） |
 | `world` | `flightsim-world`（地形・タイル・LOD）、`flightsim-tilegen`（焼き込み） |
 | `rendering` | `flightsim-render`（大気散乱・描画・floating origin） |

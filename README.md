@@ -2,7 +2,7 @@
 
 地球規模のフライトシミュレータ。Rust + Bevy、Windows 対象。
 
-**現状は M1（物理・地形の基盤）まで。描画はまだありません。** 何が動いて何が動かないかは
+**M1（物理・地形の基盤）は完了。実地形の上をヘッドレスで飛べます。描画はまだありません。** 何が動いて何が動かないかは
 [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
 
 ---
@@ -10,7 +10,7 @@
 ## 何ができるか（今）
 
 ```bash
-cargo test --workspace           # 約 300 件、数秒で完了
+cargo test --workspace           # 約 360 件、数秒で完了
 ```
 
 - **WGS84 測地系と `f64` ECEF 世界座標** — 地球全体で振動しない位置表現。描画用の
@@ -22,16 +22,20 @@ cargo test --workspace           # 約 300 件、数秒で完了
   サンプリング、幾何誤差ベースの LOD 選択、フレーム予算つきストリーミング
 - **実地形の焼き込み** — Copernicus DEM の GeoTIFF から実行時タイルを生成する
   オフライン CLI。日付変更線と極、投影座標系の誤読、nodata を扱う
+- **実地形の上をヘッドレスで飛べる** — 焼いたタイルから接地平面（標高と勾配）を作って
+  FDM へ渡し、離陸 → 上昇 → 巡航 → 旋回 → 進入 → 接地までを軌跡 CSV に出力する
 
 ```bash
 cargo run -p flightsim-fdm --example aero_trace   # 空力の内訳を時系列で表示
 
 cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif     --output data/tiles --min-level 8 --max-level 12
+
+cargo run -p flightsim-sim --bin flightsim-headless --     --tiles data/tiles --start 35.553,139.781 --output flight.csv
 ```
 
 ## 何がまだないか
 
-描画、FDM とワールドの結線、天候、複数機体、オンライン。
+描画、天候、複数機体、オンライン。
 [docs/ROADMAP.md](docs/ROADMAP.md) に段階と、後回しにした理由を書いています。
 
 ---
@@ -46,10 +50,11 @@ cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_
 | [ADR-0003](docs/adr/0003-terrain-data.md) | なぜオープンデータと自前パイプラインか |
 | [ADR-0004](docs/adr/0004-simulation-loop.md) | なぜ固定ステップ RK4 か |
 | [ADR-0005](docs/adr/0005-runtime-tile-format.md) | なぜ自前の `u16` 量子化タイル形式か |
+| [ADR-0006](docs/adr/0006-simulation-integration-layer.md) | なぜ結線を `flightsim-sim` に置くか |
 
 設計の要は 1 点に集約されます。
 
-> **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-tilegen` は Bevy に依存しない。**
+> **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` / `flightsim-tilegen` は Bevy に依存しない。**
 
 物理と地形が純 Rust であるおかげで、`cargo test` が GUI もアセットもなしに数秒で回ります。
 これは慣習ではなく [CI で検査される規約](scripts/check-architecture.sh) です。
