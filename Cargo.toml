@@ -5,10 +5,11 @@ members = [
     "crates/flightsim-fdm",
     "crates/flightsim-world",
     "crates/flightsim-tilegen",
+    "crates/flightsim-sim",
 ]
 
 [workspace.package]
-version = "0.2.0-alpha.1"
+version = "0.3.0-alpha.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -18,6 +19,7 @@ flightsim-core = { path = "crates/flightsim-core" }
 flightsim-fdm = { path = "crates/flightsim-fdm" }
 flightsim-world = { path = "crates/flightsim-world" }
 flightsim-tilegen = { path = "crates/flightsim-tilegen" }
+flightsim-sim = { path = "crates/flightsim-sim" }
 
 glam = "0.30"
 

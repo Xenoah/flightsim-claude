@@ -1,0 +1,30 @@
+[package]
+name = "flightsim-sim"
+description = "地形と飛行力学を結線し、固定ステップで回すヘッドレス統合層。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# fdm と world の上に乗る唯一の場所。ここに `bevy` を足すと CI が落ちる。
+# M2 の Bevy 層はこのクレートを呼ぶだけにすること（ADR-0006）。
+[dependencies]
+flightsim-core.workspace = true
+flightsim-fdm.workspace = true
+flightsim-world.workspace = true
+# RigidBodyState の角速度など、fdm の公開 API に現れる型を扱うため。
+glam.workspace = true
+clap = { version = "4", features = ["derive"] }
+
+# 焼く側と読む側が同じ形式に合意していることを、統合テストで実際に飛んで確かめる。
+# dev-dependency なので実行時の依存グラフには現れない
+# （check-architecture.sh は --edges normal で見ている）。
+[dev-dependencies]
+flightsim-tilegen.workspace = true
+
+[[bin]]
+name = "flightsim-headless"
+path = "src/main.rs"
+
+[lints]
+workspace = true
