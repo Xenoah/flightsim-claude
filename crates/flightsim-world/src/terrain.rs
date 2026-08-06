@@ -159,6 +159,16 @@ impl<T: TileSource + ?Sized> TileSource for Box<T> {
     }
 }
 
+/// 参照も供給元として扱えるようにする。
+///
+/// 1 つの供給元を複数の [`Terrain`] で共有したい場合（キャッシュ設定を変えて
+/// 比べる、シナリオを並行して回す）に、タイルを丸ごと複製せずに済む。
+impl<T: TileSource + ?Sized> TileSource for &T {
+    fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+        (**self).load(id)
+    }
+}
+
 /// メモリ上のタイル集合。テストと、将来のアーカイブ読み込み用。
 #[derive(Debug, Default)]
 pub struct MemoryTileSource {

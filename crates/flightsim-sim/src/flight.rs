@@ -31,6 +31,11 @@ use flightsim_fdm::{
 };
 use flightsim_world::{Terrain, TileSource};
 
+/// 車輪がこれ以上地面から離れていれば、確実に空中にいるとみなす高さ。
+///
+/// 脚の最大ストロークが 0.25 m なので、それを明確に上回る値にしてある。
+const AIRBORNE_CLEARANCE: Meters = Meters(0.5);
+
 /// 飛行のフェーズ。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -199,7 +204,19 @@ impl CircuitPlan {
     /// フェーズの遷移判定。
     fn next_phase(&self, phase: Phase, elapsed_in_phase: f64, sample: &Snapshot) -> Phase {
         match phase {
-            Phase::TakeoffRoll if sample.airspeed.get() >= self.rotate_speed.get() => Phase::Climb,
+            // 速度が回転速度に達したら引き起こす。
+            //
+            // それとは別に、**浮いてしまったら無条件に上昇へ移す**。零迎角でも
+            // 揚力係数は正なので、機体は引き起こさなくても速度だけで浮き上がる。
+            // 回転速度を高く設定しすぎた場合にそれが起き、実測では滑走のつもりのまま
+            // 146 m まで上昇していた。TakeoffRoll は翼を水平に固定し高度も見ないため、
+            // 空中にいるのに誰も機体を管理していない状態になる。
+            Phase::TakeoffRoll
+                if sample.airspeed.get() >= self.rotate_speed.get()
+                    || sample.wheel_clearance.get() > AIRBORNE_CLEARANCE.get() =>
+            {
+                Phase::Climb
+            }
             Phase::Climb if sample.agl.get() >= self.pattern_altitude_agl.get() => Phase::Cruise,
             Phase::Cruise if elapsed_in_phase >= self.cruise_duration.get() => Phase::Turn,
             Phase::Turn
