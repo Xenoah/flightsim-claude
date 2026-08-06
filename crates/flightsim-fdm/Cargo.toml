@@ -12,5 +12,18 @@ license.workspace = true
 flightsim-core.workspace = true
 glam.workspace = true
 
+# 単体テストのバイナリをベンチ対象から外す。
+# これが無いと `cargo bench -- --quick` のような引数が届かない。
+[lib]
+bench = false
+
+[dev-dependencies]
+criterion.workspace = true
+
+# harness = false: criterion が自前の main を持つため。
+[[bench]]
+name = "step"
+harness = false
+
 [lints]
 workspace = true

@@ -23,6 +23,10 @@ flightsim-sim = { path = "crates/flightsim-sim" }
 
 glam = "0.30"
 
+# ベンチ専用。実行時の依存グラフには現れない
+# （check-architecture.sh は --edges normal で見ている）。
+criterion = "0.8"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_debug_implementations = "warn"

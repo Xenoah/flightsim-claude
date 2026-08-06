@@ -44,6 +44,12 @@ jobs:
       - name: Doc tests
         run: cargo test --workspace --doc
 
+      # ベンチは実行しない（CI ランナーの性能は安定せず、数字に意味が無い）。
+      # ただしコンパイルは通しておく。**ビルドできないベンチは無価値**であり、
+      # 気付かないうちに腐るのがいちばんありがちな失敗。
+      - name: Benchmarks compile
+        run: cargo bench --workspace --no-run
+
   architecture:
     name: architecture rules
     runs-on: ubuntu-latest

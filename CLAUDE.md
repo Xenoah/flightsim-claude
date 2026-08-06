@@ -16,11 +16,13 @@ bash scripts/check-architecture.sh                      # 依存規約の検査
 cargo run -p flightsim-fdm --example aero_trace         # 空力の内訳を時系列表示
 cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼き込み
 cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の上を飛ばす
+cargo bench --workspace                                 # 性能測定（criterion）
 ```
 
 `core` / `fdm` / `world` / `sim` / `tilegen` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。
 
-ベンチマークは未整備。性能を語る前に `cargo bench` を用意すること（測定なしに「速い」と書かない）。
+性能について書くときは `cargo bench` の数字を添えること。**測定なしに「速い」「重い」と書かない。**
+実測値は [docs/HANDOFF.md](docs/HANDOFF.md) にまとめてある。
 
 ## 絶対に破ってはいけない規約
 
