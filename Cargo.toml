@@ -5,6 +5,7 @@ members = [
     "crates/flightsim-fdm",
     "crates/flightsim-world",
     "crates/flightsim-tilegen",
+    "crates/flightsim-assetgen",
     "crates/flightsim-sim",
     "crates/flightsim-render",
     "crates/flightsim-app",

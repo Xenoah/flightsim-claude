@@ -1,0 +1,15 @@
+[package]
+name = "flightsim-assetgen"
+description = "Meshy から機体の 3D モデルを取得するオフライン CLI。"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# オフラインのツール。実行時には動かないので Bevy には依存しない。
+[dependencies]
+ureq = { version = "3", features = ["json"] }
+serde_json = "1"
+
+[lints]
+workspace = true

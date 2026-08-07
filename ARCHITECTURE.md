@@ -58,6 +58,7 @@
 | `flightsim-sim` | **地形と FDM の結線。** 接地平面の生成、固定ステップ駆動、ヘッドレス実行 | ✗ | architect |
 | `flightsim-app` | 全体統合、実行バイナリ | ✓ | orchestrator |
 | `flightsim-tilegen` | **オフライン CLI。** GeoTIFF → 実行時タイル `.fsdem` の焼き込み | ✗ | world |
+| `flightsim-assetgen` | **オフライン CLI。** Meshy から機体 3D モデルを取得 | ✗ | rendering |
 
 `flightsim-tilegen` は実行時のグラフに乗らない。`world` の上に位置し、
 GeoTIFF デコーダ（`tiff`）を抱えるのはこのツールだけ。**実行時クレートが

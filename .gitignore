@@ -5,6 +5,9 @@
 /data/cache/
 /data/tiles/
 /assets/generated/
+# Meshy で生成した機体モデル。**権利の扱いがプランに依存する**ので、
+# 確認が済むまでコミットしない（ATTRIBUTION.md を参照）。
+/assets/aircraft/
 
 # API キー等。ADR-0003 のデータソースは無償だが、
 # 将来 Cesium ion 等を併用する場合の受け皿。

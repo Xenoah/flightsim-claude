@@ -29,7 +29,7 @@ jobs:
     env:
       HEADLESS: >-
         -p flightsim-core -p flightsim-fdm -p flightsim-world
-        -p flightsim-sim -p flightsim-tilegen
+        -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
 
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # winit の x11 バックエンドが要求するもの。
-      # 音声と glTF は feature を切ってあるので libasound2-dev は不要（ADR-0007）。
+      # 音声の feature は切ってあるので libasound2-dev は不要（ADR-0007）。
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |

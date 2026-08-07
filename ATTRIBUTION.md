@@ -51,6 +51,18 @@ CC BY 4.0。https://esa-worldcover.org/
 
 ---
 
+## 生成した 3D モデル
+
+`flightsim-assetgen` は [Meshy](https://www.meshy.ai/) の API でモデルを生成する。
+
+**生成物の権利と利用条件は Meshy の契約プランに従う。** 配布する前に、
+使用したプランの規約で商用利用・再配布が許されているかを確認すること。
+生成物をリポジトリに含める場合は、どのプランで生成したかをここに記録する。
+
+現時点でリポジトリに含めているモデルは無い（`assets/` は `.gitignore` 対象）。
+
+---
+
 ## ソフトウェア
 
 | 依存 | ライセンス | 使う場所 |
@@ -58,6 +70,9 @@ CC BY 4.0。https://esa-worldcover.org/
 | [glam](https://github.com/bitshifter/glam-rs) | MIT OR Apache-2.0 | 全体（線形代数） |
 | [tiff](https://github.com/image-rs/image-tiff) | MIT | `flightsim-tilegen`（GeoTIFF デコード） |
 | [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen`（CLI） |
+| [bevy](https://bevyengine.org/) | MIT OR Apache-2.0 | 描画層（[ADR-0007](docs/adr/0007-bevy-version.md) で 0.18.1 に固定） |
+| [ureq](https://github.com/algesten/ureq) | MIT OR Apache-2.0 | `flightsim-assetgen`（HTTP） |
+| [criterion](https://github.com/bheisler/criterion.rs) | MIT OR Apache-2.0 | ベンチ（dev-dependency） |
 
 `tiff` と `clap` はオフラインのタイル生成ツールのみが使い、実行時には載りません
 （[ADR-0003](docs/adr/0003-terrain-data.md)）。

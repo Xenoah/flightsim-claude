@@ -18,7 +18,7 @@ fail() {
 }
 
 # 検査対象のクレート。
-CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim)
+CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim flightsim-assetgen)
 
 # `cargo tree` の出力からパッケージ名の一覧を得る。
 # --edges normal で dev-dependencies と build-dependencies を除外する
