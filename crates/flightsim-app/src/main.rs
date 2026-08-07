@@ -62,6 +62,8 @@ struct Startup {
     screenshot: Option<PathBuf>,
     /// 撮るまでの待ち時間。地形の読み込みが進むのを待つ。
     screenshot_delay: f64,
+    /// 起動時の視点。実行中は `C` で切り替えられる。
+    view: ViewMode,
 }
 
 impl Default for Startup {
@@ -75,6 +77,7 @@ impl Default for Startup {
             max_level: 13,
             screenshot: None,
             screenshot_delay: 5.0,
+            view: ViewMode::default(),
         }
     }
 }
@@ -163,6 +166,20 @@ fn parse_arguments() -> Startup {
                     startup.max_level = value;
                 }
             }
+            "--view" => {
+                if let Some(name) = arguments.next() {
+                    startup.view = match name.to_lowercase().as_str() {
+                        "cockpit" => ViewMode::Cockpit,
+                        "chase" => ViewMode::Chase,
+                        "free" => ViewMode::Free,
+                        "tower" => ViewMode::Tower,
+                        other => {
+                            warn!("unknown view `{other}`; keeping the default");
+                            startup.view
+                        }
+                    };
+                }
+            }
             "--screenshot" => startup.screenshot = arguments.next().map(PathBuf::from),
             "--screenshot-delay" => {
                 if let Some(value) = arguments.next().and_then(|v| v.parse::<f64>().ok()) {
@@ -207,6 +224,7 @@ fn setup(
     mut commands: Commands,
     startup: Res<Startup>,
     config: Res<TerrainRenderConfig>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut media: ResMut<Assets<ScatteringMedium>>,
 ) {
@@ -235,19 +253,45 @@ fn setup(
         GroundSampler::default(),
     );
 
+    commands.insert_resource(startup.view);
+
     let camera_position = simulation.state().geodetic();
     commands.insert_resource(RenderOrigin::new(camera_position));
     commands.insert_resource(CameraWorldPosition(camera_position));
 
     // --- 機体 ---
 
-    commands.spawn((
-        Aircraft,
-        WorldPosition(simulation.state().position),
-        WorldOrientation(simulation.state().orientation),
-        Transform::default(),
-        Name::new("aircraft"),
-    ));
+    // パーツは機体軸で置く。親の Transform が機体軸 → 描画座標を担うので、
+    // 子はそのまま機体軸の座標でよい。
+    let parts: Vec<Entity> = flightsim_render::placeholder_parts(simulation.config())
+        .into_iter()
+        .map(|part| {
+            commands
+                .spawn((
+                    Mesh3d(meshes.add(part.mesh)),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: part.color,
+                        perceptual_roughness: 0.5,
+                        ..default()
+                    })),
+                    part.transform,
+                    Name::new(part.name),
+                ))
+                .id()
+        })
+        .collect();
+
+    commands
+        .spawn((
+            Aircraft,
+            WorldPosition(simulation.state().position),
+            WorldOrientation(simulation.state().orientation),
+            Transform::default(),
+            Visibility::default(),
+            Name::new("aircraft"),
+        ))
+        .add_children(&parts);
+
     commands.insert_resource(FlightSimulation(simulation));
 
     // --- 地形 ---

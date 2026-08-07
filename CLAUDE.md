@@ -9,8 +9,10 @@
 ## コマンド
 
 ```bash
-cargo test --workspace                                  # テスト（約 460 件）
-cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world -p flightsim-sim  # 純 Rust だけなら数秒
+# 純 Rust 側。数秒で終わる。物理や地形を触ったらまずこれ。
+cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world -p flightsim-sim -p flightsim-tilegen
+# 描画層。Bevy を含むので重い。並列度を落とすこと（下記）。
+cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 cargo clippy --workspace --all-targets -- -D warnings   # lint
 cargo fmt --all                                         # 整形
 bash scripts/check-architecture.sh                      # 依存規約の検査
@@ -22,6 +24,11 @@ cargo run -p flightsim-app --release -- --tiles data/tiles --start 35.55,139.78 
 ```
 
 `core` / `fdm` / `world` / `sim` / `tilegen` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。
+
+**`cargo test --workspace` は避けること。** Bevy を含む全クレートのテストバイナリを
+同時にビルドするとメモリを使い切り、`failed to mmap ... The paging file is too small`
+（os error 1455）で落ちる。**コードの問題に見えるが環境の問題。** 上の 2 グループに
+分けて回す（CI もこの分け方にしてある）。
 
 性能について書くときは `cargo bench` の数字を添えること。**測定なしに「速い」「重い」と書かない。**
 実測値は [docs/HANDOFF.md](docs/HANDOFF.md) にまとめてある。

@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 flightsim-core.workspace = true
+flightsim-fdm.workspace = true
 flightsim-world.workspace = true
 flightsim-sim.workspace = true
 bevy.workspace = true
