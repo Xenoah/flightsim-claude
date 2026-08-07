@@ -1,8 +1,8 @@
 //! 描画エンジンへ渡すローカル接平面。
 //!
-//! # [`FloatingOrigin`] との違い
+//! # [`FloatingOrigin`](crate::FloatingOrigin) との違い
 //!
-//! [`FloatingOrigin`] は ECEF の軸を保ったまま原点だけを移す。精度の問題は解けるが、
+//! [`FloatingOrigin`](crate::FloatingOrigin) は ECEF の軸を保ったまま原点だけを移す。精度の問題は解けるが、
 //! **軸の向きは地球の自転軸基準のまま**で、「上」がどの方向かは場所によって変わる。
 //!
 //! これは描画エンジンと噛み合わない。Bevy を含む多くのエンジンは
