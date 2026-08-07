@@ -2,7 +2,7 @@
 
 地球規模のフライトシミュレータ。Rust + Bevy、Windows 対象。
 
-**M1（物理・地形の基盤）は完了。実地形の上をヘッドレスで飛べます。描画はまだありません。** 何が動いて何が動かないかは
+**M2（描画）まで到達。実地形の上を飛ぶ様子が画面に出ます。** 何が動いて何が動かないかは
 [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
 
 ---
@@ -10,7 +10,7 @@
 ## 何ができるか（今）
 
 ```bash
-cargo test --workspace           # 約 360 件、数秒で完了
+cargo test --workspace           # 約 460 件
 ```
 
 - **WGS84 測地系と `f64` ECEF 世界座標** — 地球全体で振動しない位置表現。描画用の
@@ -53,6 +53,7 @@ cargo bench --workspace                           # 性能測定（criterion）
 | [ADR-0004](docs/adr/0004-simulation-loop.md) | なぜ固定ステップ RK4 か |
 | [ADR-0005](docs/adr/0005-runtime-tile-format.md) | なぜ自前の `u16` 量子化タイル形式か |
 | [ADR-0006](docs/adr/0006-simulation-integration-layer.md) | なぜ結線を `flightsim-sim` に置くか |
+| [ADR-0007](docs/adr/0007-bevy-version.md) | なぜ Bevy 0.18.1 か |
 
 設計の要は 1 点に集約されます。
 

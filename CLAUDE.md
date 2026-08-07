@@ -9,7 +9,8 @@
 ## コマンド
 
 ```bash
-cargo test --workspace                                  # テスト（約 360 件、数秒）
+cargo test --workspace                                  # テスト（約 460 件）
+cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world -p flightsim-sim  # 純 Rust だけなら数秒
 cargo clippy --workspace --all-targets -- -D warnings   # lint
 cargo fmt --all                                         # 整形
 bash scripts/check-architecture.sh                      # 依存規約の検査
@@ -17,6 +18,7 @@ cargo run -p flightsim-fdm --example aero_trace         # 空力の内訳を時�
 cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼き込み
 cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の上を飛ばす
 cargo bench --workspace                                 # 性能測定（criterion）
+cargo run -p flightsim-app --release -- --tiles data/tiles --start 35.55,139.78  # 起動
 ```
 
 `core` / `fdm` / `world` / `sim` / `tilegen` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。
@@ -28,7 +30,7 @@ cargo bench --workspace                                 # 性能測定（criteri
 
 CI で機械的に検査されるもの、および レビューで自動失格になるものです。
 
-1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` / `flightsim-tilegen` に `bevy` を依存させない。** これらは純 Rust。Bevy は `render` / `input` / `ui` / `app` のみ
+1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` / `flightsim-tilegen` に `bevy` を依存させない。** これらは純 Rust。Bevy は `render` / `input` / `ui` / `app` のみ（版は [ADR-0007](docs/adr/0007-bevy-version.md) で 0.18.1 に固定。**版上げは独立した PR で**）
 2. **依存は一方向。** `core` ← `fdm`/`world` ← `sim` ← `render`/`input`/`ui` ← `app`。逆流も横断（`fdm` → `world`）も禁止。地形と FDM の結線は `sim` にのみ置く（[ADR-0006](docs/adr/0006-simulation-integration-layer.md)）。`tilegen` はオフライン専用
 3. **世界座標は `f64` ECEF。** `f32` を位置の正として持たない（地表で約 76cm の量子化が起き、機体が振動する。[ADR-0002](docs/adr/0002-coordinate-system.md)）
 4. **座標変換は `flightsim-core` にのみ書く。** 他クレートで `sin`/`cos` を使った測地変換を書かない

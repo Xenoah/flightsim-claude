@@ -52,7 +52,7 @@
 | `flightsim-core` | WGS84 測地系、ECEF/ENU/NED 変換、単位型、シミュレーション時刻 | ✗ | architect |
 | `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、着陸装置、積分器 | ✗ | simulation |
 | `flightsim-world` | タイル分割、DEM、LOD 選択、ストリーミング、地形高度クエリ | ✗ | world |
-| `flightsim-render` | 大気散乱、雲、地形メッシュ生成、LOD 描画 | ✓ | rendering |
+| `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
 | `flightsim-sim` | **地形と FDM の結線。** 接地平面の生成、固定ステップ駆動、ヘッドレス実行 | ✗ | architect |
@@ -169,13 +169,17 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、3 点式着陸装置、接地摩擦・ブレーキ、RK4 + 剛性対応サブステップ | 103 |
 | `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ、実行時タイル形式の読み書き | 86 |
 | `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI | 61 |
-| `flightsim-sim` | 接地平面の生成、決定論的フライトディレクタ、固定ステップ駆動、軌跡記録 | 44 |
+| `flightsim-sim` | 接地平面の生成、決定論的フライトディレクタ、固定ステップ駆動、軌跡記録、逐次 API | 61 |
+| `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD ストリーミング | 10 |
+| `flightsim-input` | 舵のレート制御と中立復帰、視点モード、追従カメラ | 17 |
+| `flightsim-ui` | HUD、単位変換、表示の平滑化 | 8 |
 
 CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 / `cargo doc -D warnings` を回している。
 
 ### 未実装
 
-- **描画が一切ない。** M1 はヘッドレスの物理・地形基盤まで
+- 機体の 3D モデル。実体はあるがメッシュが無いので、外部視点では何も映らない
+- 雲、地表テクスチャ、空港の構造物
 - 推力線オフセット、乱流
 - 地形メッシュ生成（亀裂対策のスカート込み）
 - OSM（空港・建物）と地表画像の取り込み。tilegen が扱うのは標高のみ

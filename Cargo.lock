@@ -2097,7 +2097,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-app"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2111,7 +2111,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-core"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "criterion",
  "glam",
@@ -2119,7 +2119,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-fdm"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "criterion",
  "flightsim-core",
@@ -2128,7 +2128,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-input"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-render"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-sim"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "clap",
  "flightsim-core",
@@ -2160,7 +2160,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-tilegen"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "clap",
  "flightsim-core",
@@ -2170,7 +2170,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-ui"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2179,7 +2179,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-world"
-version = "0.3.0-alpha.1"
+version = "0.4.0-alpha.1"
 dependencies = [
  "criterion",
  "flightsim-core",
