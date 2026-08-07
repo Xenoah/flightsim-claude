@@ -1,0 +1,20 @@
+[package]
+name = "flightsim-render"
+description = "描画。地形メッシュの GPU 投入、floating origin、大気散乱。"
+version.workspace = true
+edition.workspace = true
+# ADR-0007: Bevy 0.18.1 の MSRV。純 Rust 側 (core/fdm/world/sim/tilegen) は
+# 1.85 のまま据え置き、古いツールチェーンで動く性質を維持する。
+rust-version = "1.89"
+license.workspace = true
+
+[dependencies]
+flightsim-core.workspace = true
+flightsim-world.workspace = true
+flightsim-sim.workspace = true
+bevy.workspace = true
+# fdm / core の公開 API に現れる f64 の型を扱うため。
+glam.workspace = true
+
+[lints]
+workspace = true

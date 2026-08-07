@@ -6,6 +6,10 @@ members = [
     "crates/flightsim-world",
     "crates/flightsim-tilegen",
     "crates/flightsim-sim",
+    "crates/flightsim-render",
+    "crates/flightsim-app",
+    "crates/flightsim-ui",
+    "crates/flightsim-input",
 ]
 
 [workspace.package]
@@ -20,12 +24,41 @@ flightsim-fdm = { path = "crates/flightsim-fdm" }
 flightsim-world = { path = "crates/flightsim-world" }
 flightsim-tilegen = { path = "crates/flightsim-tilegen" }
 flightsim-sim = { path = "crates/flightsim-sim" }
+flightsim-render = { path = "crates/flightsim-render" }
+flightsim-app = { path = "crates/flightsim-app" }
+flightsim-ui = { path = "crates/flightsim-ui" }
+flightsim-input = { path = "crates/flightsim-input" }
 
 glam = "0.30"
 
 # ベンチ専用。実行時の依存グラフには現れない
 # （check-architecture.sh は --edges normal で見ている）。
 criterion = "0.8"
+
+# ADR-0007: 0.19 は MSRV 1.95 で現行ツールチェーン (1.93) では解決すらされない。
+# feature は既定を切って明示列挙する。音声と glTF は入れない
+# （Linux CI が libasound2-dev を要求しなくなる）。
+bevy = { version = "0.18.1", default-features = false, features = [
+    "bevy_asset",
+    "bevy_log",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_window",
+    "bevy_winit",
+    "bevy_ui",
+    "bevy_ui_render",
+    "bevy_text",
+    "default_font",
+    # スクリーンショットの保存に要る。描画結果を目視で確かめる手段が無いと、
+    # 「動いてはいるが絵が出ていない」に気付けない。
+    "png",
+    "multi_threaded",
+    "tonemapping_luts",
+    "zstd_rust",
+    "x11",
+    "std",
+] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

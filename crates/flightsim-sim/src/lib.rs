@@ -29,7 +29,8 @@
 //! |---|---|
 //! | [`ground`] | 地形から接地平面（基準点・標高・勾配）を作る |
 //! | [`director`] | 決定論的な PD フライトディレクタ。回帰テストの駆動装置 |
-//! | [`flight`] | フェーズ遷移、固定ステップ駆動、軌跡の記録 |
+//! | [`flight`] | フェーズ遷移、固定ステップ駆動、軌跡の記録（バッチ実行） |
+//! | [`simulation`] | 1 描画フレームぶんだけ進める逐次 API。Bevy 層はこれを呼ぶ |
 //!
 //! ## 使い方
 //!
@@ -61,6 +62,7 @@
 pub mod director;
 pub mod flight;
 pub mod ground;
+pub mod simulation;
 
 pub use director::{DirectorGains, DirectorTargets, FlightDirector, VerticalTarget};
 pub use flight::{
@@ -68,3 +70,4 @@ pub use flight::{
     parked_state,
 };
 pub use ground::{GroundPlane, GroundSampler};
+pub use simulation::{InterpolatedState, Simulation, StepReport};

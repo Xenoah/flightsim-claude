@@ -1,0 +1,17 @@
+[package]
+name = "flightsim-ui"
+description = "HUD と計器。"
+version.workspace = true
+edition.workspace = true
+# ADR-0007: Bevy 0.18.1 の MSRV。純 Rust 側 (core/fdm/world/sim/tilegen) は
+# 1.85 のまま据え置き、古いツールチェーンで動く性質を維持する。
+rust-version = "1.89"
+license.workspace = true
+
+[dependencies]
+flightsim-core.workspace = true
+flightsim-fdm.workspace = true
+bevy.workspace = true
+
+[lints]
+workspace = true

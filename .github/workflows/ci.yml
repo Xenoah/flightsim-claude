@@ -11,8 +11,13 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
-  test:
-    name: test (${{ matrix.os }})
+  # 純 Rust 側（core / fdm / world / sim / tilegen）。
+  #
+  # Bevy に依存しないので数秒で終わる。**この速さは ADR-0001 の技術選定で
+  # 意図的に確保した性質**であり、描画層のビルドと混ぜて遅くしないよう分けてある。
+  # 物理や地形を壊したときに、Bevy のビルドを待たずに気付けることに価値がある。
+  core:
+    name: core (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -20,6 +25,11 @@ jobs:
         # Windows が対象プラットフォームなので必ず含める。
         # Linux も回すのは、プラットフォーム依存の思い込みを早期に検出するため。
         os: [windows-latest, ubuntu-latest]
+
+    env:
+      HEADLESS: >-
+        -p flightsim-core -p flightsim-fdm -p flightsim-world
+        -p flightsim-sim -p flightsim-tilegen
 
     steps:
       - uses: actions/checkout@v4
@@ -29,26 +39,67 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: core
 
       - name: Format
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy ${{ env.HEADLESS }} --all-targets -- -D warnings
 
-      # core / fdm / world は Bevy 非依存なので、GUI もアセットもなしに数秒で回る。
-      # これは ADR-0001 の技術選定で意図的に確保した性質。
       - name: Test
-        run: cargo test --workspace --all-targets
+        run: cargo test ${{ env.HEADLESS }} --all-targets
 
       - name: Doc tests
-        run: cargo test --workspace --doc
+        run: cargo test ${{ env.HEADLESS }} --doc
 
       # ベンチは実行しない（CI ランナーの性能は安定せず、数字に意味が無い）。
       # ただしコンパイルは通しておく。**ビルドできないベンチは無価値**であり、
       # 気付かないうちに腐るのがいちばんありがちな失敗。
       - name: Benchmarks compile
-        run: cargo bench --workspace --no-run
+        run: cargo bench ${{ env.HEADLESS }} --no-run
+
+  # 描画層（render / input / ui / app）。Bevy を含むので重い。
+  #
+  # 実行はしない。GPU もディスプレイも無いランナーで走らせても意味が無く、
+  # 落ちても原因が環境かコードか切り分けられない。**コンパイルとテストまで。**
+  render:
+    name: render (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    env:
+      RENDER: -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # winit の x11 バックエンドが要求するもの。
+      # 音声と glTF は feature を切ってあるので libasound2-dev は不要（ADR-0007）。
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: render
+
+      - name: Clippy
+        run: cargo clippy ${{ env.RENDER }} --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test ${{ env.RENDER }} --all-targets
 
   architecture:
     name: architecture rules
@@ -70,6 +121,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 

@@ -10,6 +10,8 @@ license.workspace = true
 # メッシュの「データ」までが担当で、GPU への投入は flightsim-render の責務。
 [dependencies]
 flightsim-core.workspace = true
+# メッシュ生成の幾何計算。core / fdm と同じ数学ライブラリを使う。
+glam.workspace = true
 
 # 単体テストのバイナリをベンチ対象から外す。
 # これが無いと `cargo bench -- --quick` のような引数が届かない。

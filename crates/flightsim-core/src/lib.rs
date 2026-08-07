@@ -24,12 +24,14 @@ pub mod fixed_step;
 pub mod frames;
 pub mod geodetic;
 pub mod origin;
+pub mod render_frame;
 pub mod units;
 
 pub use fixed_step::FixedStep;
 pub use frames::{Attitude, LocalFrame, Ned};
 pub use geodetic::{Ecef, Geodetic, wgs84};
 pub use origin::FloatingOrigin;
+pub use render_frame::RenderFrame;
 pub use units::{
     Degrees, Feet, FeetPerMinute, Kelvin, Kilograms, KilogramsPerCubicMeter, Knots, Meters,
     MetersPerSecond, Newtons, Pascals, Radians, Seconds, SquareMeters,
