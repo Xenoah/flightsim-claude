@@ -24,6 +24,7 @@
 )]
 
 use bevy::camera::Exposure;
+use bevy::camera::primitives::Aabb;
 use bevy::pbr::{Atmosphere, ScatteringMedium};
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
@@ -31,8 +32,8 @@ use flightsim_core::{Degrees, Geodetic, Meters, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
 use flightsim_input::{CameraRig, FlightsimInputPlugin, PilotControls, ViewMode};
 use flightsim_render::{
-    CameraWorldPosition, FlightsimRenderPlugin, RenderOrigin, RenderSet, SunDirection,
-    TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
+    CameraWorldPosition, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin, RenderSet,
+    SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
     terrain::{TerrainTile, despawn_tile, spawn_tile},
     update_terrain_selection,
 };
@@ -64,6 +65,12 @@ struct Startup {
     screenshot_delay: f64,
     /// 起動時の視点。実行中は `C` で切り替えられる。
     view: ViewMode,
+    /// 機体の 3D モデル。`assets/` からの相対パス。
+    ///
+    /// 省略すると箱を組み合わせたプレースホルダを使う。
+    model: Option<String>,
+    /// モデルの座標系を機体軸へ合わせる補正。
+    model_fit: ModelFit,
 }
 
 impl Default for Startup {
@@ -78,6 +85,8 @@ impl Default for Startup {
             screenshot: None,
             screenshot_delay: 5.0,
             view: ViewMode::default(),
+            model: None,
+            model_fit: ModelFit::default(),
         }
     }
 }
@@ -99,6 +108,13 @@ struct TerrainStreaming {
 /// 機体の実体につける印。
 #[derive(Component, Debug, Clone, Copy)]
 struct Aircraft;
+
+/// 読み込み待ちのモデル。寸法が分かった時点で倍率を決める。
+///
+/// glTF は非同期に読み込まれるので、spawn した瞬間には大きさが分からない。
+/// **固定倍率で決め打ちすると、モデルを差し替えるたびに手で直すことになる。**
+#[derive(Component, Debug, Clone, Copy)]
+struct PendingModelFit(ModelFit);
 
 fn main() {
     let startup = parse_arguments();
@@ -129,7 +145,10 @@ fn main() {
                 .before(RenderSet::Rebase),
         )
         .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
-        .add_systems(Update, (capture_screenshot, report_terrain))
+        .add_systems(
+            Update,
+            (capture_screenshot, report_terrain, fit_loaded_model),
+        )
         .run();
 }
 
@@ -180,6 +199,30 @@ fn parse_arguments() -> Startup {
                     };
                 }
             }
+            "--model" => startup.model = arguments.next(),
+            "--model-forward" | "--model-up" => {
+                let Some(text) = arguments.next() else {
+                    continue;
+                };
+                match ModelAxis::parse(&text) {
+                    Ok(axis) => {
+                        if flag == "--model-forward" {
+                            startup.model_fit.forward = axis;
+                        } else {
+                            startup.model_fit.up = axis;
+                        }
+                        // 平行になっていないか毎回検査する。黙って妙な向きにしない。
+                        if let Err(error) = ModelFit::new(
+                            startup.model_fit.forward,
+                            startup.model_fit.up,
+                            startup.model_fit.target_length,
+                        ) {
+                            warn!("{error}");
+                        }
+                    }
+                    Err(error) => warn!("{error}"),
+                }
+            }
             "--screenshot" => startup.screenshot = arguments.next().map(PathBuf::from),
             "--screenshot-delay" => {
                 if let Some(value) = arguments.next().and_then(|v| v.parse::<f64>().ok()) {
@@ -222,6 +265,7 @@ fn perspective() -> PerspectiveProjection {
 
 fn setup(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     startup: Res<Startup>,
     config: Res<TerrainRenderConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -261,25 +305,45 @@ fn setup(
 
     // --- 機体 ---
 
-    // パーツは機体軸で置く。親の Transform が機体軸 → 描画座標を担うので、
-    // 子はそのまま機体軸の座標でよい。
-    let parts: Vec<Entity> = flightsim_render::placeholder_parts(simulation.config())
-        .into_iter()
-        .map(|part| {
-            commands
-                .spawn((
-                    Mesh3d(meshes.add(part.mesh)),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: part.color,
-                        perceptual_roughness: 0.5,
-                        ..default()
-                    })),
-                    part.transform,
-                    Name::new(part.name),
-                ))
-                .id()
-        })
-        .collect();
+    // モデルがあれば glTF、無ければ箱のプレースホルダ。
+    // **どちらの場合も子は機体軸で置く。** 親の Transform が
+    // 機体軸 → 描画座標を担うので、子はそのままでよい。
+    let parts: Vec<Entity> = match &startup.model {
+        Some(path) => {
+            info!("aircraft model: assets/{path}");
+            vec![
+                commands
+                    .spawn((
+                        SceneRoot(
+                            asset_server.load(GltfAssetLabel::Scene(0).from_asset(path.clone())),
+                        ),
+                        // 回転は今すぐ決まるが、倍率はモデルの寸法が要る。
+                        // 読み込みが終わるまで待つ（`fit_loaded_model`）。
+                        Transform::from_rotation(startup.model_fit.rotation()),
+                        PendingModelFit(startup.model_fit),
+                        Name::new("aircraft model"),
+                    ))
+                    .id(),
+            ]
+        }
+        None => flightsim_render::placeholder_parts(simulation.config())
+            .into_iter()
+            .map(|part| {
+                commands
+                    .spawn((
+                        Mesh3d(meshes.add(part.mesh)),
+                        MeshMaterial3d(materials.add(StandardMaterial {
+                            base_color: part.color,
+                            perceptual_roughness: 0.5,
+                            ..default()
+                        })),
+                        part.transform,
+                        Name::new(part.name),
+                    ))
+                    .id()
+            })
+            .collect(),
+    };
 
     commands
         .spawn((
@@ -489,6 +553,52 @@ fn stream_terrain(
 ///
 /// 撮ったあとは自動終了しない。呼び出し側が止めること
 /// （終了処理まで自前で持つと、撮れなかったのか落ちたのかが分からなくなる）。
+/// 読み込みが終わったモデルの倍率を決める。
+///
+/// glTF の読み込みは非同期なので、子のメッシュが揃うまで寸法が分からない。
+/// 揃った時点で全体の AABB を測り、目標全長に合わせる。
+fn fit_loaded_model(
+    mut commands: Commands,
+    pending: Query<(Entity, &PendingModelFit)>,
+    children: Query<&Children>,
+    bounds: Query<(&Aabb, &GlobalTransform)>,
+    mut transforms: Query<&mut Transform>,
+) {
+    for (entity, fit) in &pending {
+        // 子孫のメッシュから全体の寸法を測る。
+        let mut min = Vec3::splat(f32::INFINITY);
+        let mut max = Vec3::splat(f32::NEG_INFINITY);
+        let mut found = false;
+
+        for descendant in children.iter_descendants(entity) {
+            let Ok((aabb, global)) = bounds.get(descendant) else {
+                continue;
+            };
+            // 親に付けた回転を打ち消して、モデル本来の寸法を測る。
+            let centre = global.translation();
+            let extent = global.rotation() * Vec3::from(aabb.half_extents) * global.scale();
+            min = min.min(centre - extent.abs());
+            max = max.max(centre + extent.abs());
+            found = true;
+        }
+
+        if !found {
+            // まだ読み込まれていない。次のフレームで再挑戦する。
+            continue;
+        }
+
+        let scale = fit.0.scale_for(max - min);
+        if let Ok(mut transform) = transforms.get_mut(entity) {
+            transform.scale = Vec3::splat(scale);
+        }
+        info!(
+            "aircraft model fitted: {:.2} m long → scale {scale:.4}",
+            (max - min).length()
+        );
+        commands.entity(entity).remove::<PendingModelFit>();
+    }
+}
+
 /// 地形の状況を定期的に報告する。
 ///
 /// **タイル数が 0 のままでも必ず出す。** 絵が出ないときに

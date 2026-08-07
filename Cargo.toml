@@ -40,6 +40,9 @@ criterion = "0.8"
 # （Linux CI が libasound2-dev を要求しなくなる）。
 bevy = { version = "0.18.1", default-features = false, features = [
     "bevy_asset",
+    # 機体モデルの読み込み。ADR-0007 では「必要になった時点で足す」と
+    # していたもので、ここがその時点。
+    "bevy_gltf",
     "bevy_log",
     "bevy_core_pipeline",
     "bevy_pbr",

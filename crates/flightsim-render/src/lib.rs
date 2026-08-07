@@ -42,9 +42,11 @@ use flightsim_world::{
 use std::collections::HashMap;
 
 pub mod aircraft;
+pub mod model;
 pub mod terrain;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
+pub use model::{ModelAxis, ModelFit, ModelFitError};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**
