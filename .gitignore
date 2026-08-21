@@ -9,8 +9,8 @@
 # 確認が済むまでコミットしない（ATTRIBUTION.md を参照）。
 /assets/aircraft/
 
-# API キー等。ADR-0003 のデータソースは無償だが、
-# 将来 Cesium ion 等を併用する場合の受け皿。
+# API キー。**中身を絶対にコミットしない。**
+# 書き方は .env.example を参照（そちらは追跡する）。
 .env
 /config/secrets.toml
 

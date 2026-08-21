@@ -9,14 +9,18 @@
 //!
 //! ## API キー
 //!
-//! `MESHY_API_KEY` 環境変数から読む。**引数では受け取らない。**
+//! リポジトリ直下の `.env` から読む。**引数では受け取らない。**
 //! コマンドライン引数はプロセス一覧やシェル履歴に残る。
 //!
-//! ```powershell
-//! setx MESHY_API_KEY "msy_..."   # 新しいシェルから見えるようになる
+//! ```text
+//! # .env（.gitignore 対象なのでコミットされない）
+//! MESHY_API_KEY=msy_...
 //! ```
 //!
-//! キーが無くても起動でき、何をすればよいかを言って終わる。
+//! 同名の環境変数があればそちらが優先される。一時的に別の鍵で試したいときに、
+//! ファイルを書き換えずに済むようにするため。
+//!
+//! キーが無くても起動でき、**どこを探したか**と**何をすればよいか**を言って終わる。
 //!
 //! ## 使い方
 //!
@@ -30,8 +34,10 @@
 //!     --output assets/aircraft/light_single.glb
 //! ```
 
+mod env_file;
 mod meshy;
 
+use env_file::{EnvFile, find_env_file};
 use meshy::{GenerationRequest, TaskStatus, redact};
 use std::io::Read;
 use std::path::PathBuf;
@@ -98,8 +104,13 @@ fn usage() -> String {
         "  --output <FILE>    where to write the .glb",
         "  --no-wait          submit and print the task id, do not wait",
         "",
-        &format!("The API key is read from {KEY_VARIABLE}. It is never accepted as an argument,"),
-        "because command lines show up in process listings and shell history.",
+        "The API key comes from a `.env` file at the repository root, or from an",
+        "environment variable of the same name (which takes precedence):",
+        "",
+        &format!("    {KEY_VARIABLE}=msy_..."),
+        "",
+        "It is never accepted as an argument, because command lines show up in",
+        "process listings and shell history.",
     ]
     .join("\n")
 }
@@ -142,32 +153,98 @@ fn parse_arguments() -> Result<Cli, String> {
     })
 }
 
-/// 環境変数から API キーを読む。
+/// API キーを読む。
+///
+/// 環境変数を先に見て、無ければ `.env` を探す。**環境変数が勝つ**のは、
+/// 一時的に別の鍵で試したいときにファイルを書き換えずに済むため。
 ///
 /// 無ければ**何をすればよいかを言って**失敗する。「キーがありません」だけでは
 /// どこに置けばいいのか分からない。
 fn api_key() -> Result<String, String> {
-    key_from(std::env::var(KEY_VARIABLE).ok())
+    if let Some(key) = std::env::var(KEY_VARIABLE)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    {
+        eprintln!("key source: {KEY_VARIABLE} environment variable");
+        return Ok(key);
+    }
+
+    let start = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let (found, searched) = find_env_file(&start);
+
+    let Some(path) = found else {
+        return Err(missing_key_message(&searched, None));
+    };
+
+    let parsed = EnvFile::read(&path)
+        .map_err(|error| format!("could not read {}: {error}", path.display()))?;
+
+    // 解釈できなかった行は黙って捨てない。「書いたのに効かない」の原因になる。
+    if !parsed.malformed.is_empty() {
+        eprintln!(
+            "warning: {} has unparseable line(s): {}",
+            path.display(),
+            parsed
+                .malformed
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        eprintln!("         expected `NAME=value` on each line");
+    }
+
+    match parsed.file.get(KEY_VARIABLE) {
+        Some(key) if !key.trim().is_empty() => {
+            eprintln!("key source: {}", path.display());
+            Ok(key.trim().to_owned())
+        }
+        // ファイルはあるが鍵が無い／空。**何が入っていたかを名前だけ出す。**
+        _ => Err(missing_key_message(&searched, Some((&path, &parsed.file)))),
+    }
 }
 
-/// 環境変数の値からキーを取り出す。
+/// 鍵が見つからなかったときの案内。
 ///
-/// 環境変数の読み取りと分けてあるのは、**環境を書き換えずにテストするため**。
-/// テスト中に環境変数を消す操作は `unsafe` で、ワークスペースが禁止している。
-fn key_from(raw: Option<String>) -> Result<String, String> {
-    match raw {
-        Some(key) if !key.trim().is_empty() => Ok(key.trim().to_owned()),
-        _ => Err(format!(
-            "{KEY_VARIABLE} is not set.\n\
-             \n\
-             Set it so that new shells inherit it:\n\
-             \n\
-             \x20   PowerShell:  setx {KEY_VARIABLE} \"msy_...\"\n\
-             \x20   bash:        export {KEY_VARIABLE}=msy_...   (add it to your profile)\n\
-             \n\
-             Setting it only in the current shell will not reach a freshly spawned process."
-        )),
+/// **探した場所と、ファイルに何が入っていたか（名前だけ）を出す。**
+/// それが無いと、置き場所が違うのか綴りが違うのか切り分けられない。
+fn missing_key_message(searched: &[PathBuf], found: Option<(&PathBuf, &EnvFile)>) -> String {
+    let mut message = format!("{KEY_VARIABLE} is not set.\n\n");
+
+    match found {
+        Some((path, file)) => {
+            message.push_str(&format!(
+                "{} exists but has no {KEY_VARIABLE}.\n",
+                path.display()
+            ));
+            if file.is_empty() {
+                message.push_str("It contains no assignments at all.\n");
+            } else {
+                message.push_str(&format!(
+                    "It defines: {}\n",
+                    file.keys().collect::<Vec<_>>().join(", ")
+                ));
+            }
+        }
+        None => {
+            message.push_str("No .env file was found. Looked in:\n");
+            for path in searched.iter().take(6) {
+                message.push_str(&format!("    {}\n", path.display()));
+            }
+        }
     }
+
+    message.push_str(&format!(
+        "\nPut the key in a `.env` file at the repository root:\n\
+         \n\
+         \x20   {KEY_VARIABLE}=msy_...\n\
+         \n\
+         `.env` is in .gitignore, so it will not be committed.\n\
+         An environment variable of the same name takes precedence if set.\n\
+         Setting it only in the current shell will not reach a freshly spawned process."
+    ));
+    message
 }
 
 fn agent() -> ureq::Agent {
@@ -372,6 +449,7 @@ mod tests {
         // 「キーがありません」だけでは、どこに置けばいいのか分からない。
         let text = usage();
         assert!(text.contains(KEY_VARIABLE), "{text}");
+        assert!(text.contains(".env"), "{text}");
         assert!(
             text.contains("never accepted as an argument"),
             "the reason should be stated: {text}"
@@ -379,31 +457,42 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_key_explains_how_to_set_it() {
-        // 実際にこの手順で詰まった。「新しいシェルから見えること」まで書く。
-        let error = key_from(None).expect_err("no key");
-        assert!(error.contains("setx"), "{error}");
-        assert!(error.contains("freshly spawned"), "{error}");
+    fn a_missing_env_file_says_where_it_looked() {
+        // 置き場所が違うのか綴りが違うのか、切り分けられる情報を出す。
+        let searched = vec![PathBuf::from("C:/a/b/.env"), PathBuf::from("C:/a/.env")];
+        let message = missing_key_message(&searched, None);
+        assert!(message.contains("C:/a/b/.env"), "{message}");
+        assert!(message.contains(".gitignore"), "{message}");
+        assert!(message.contains("freshly spawned"), "{message}");
     }
 
     #[test]
-    fn a_blank_key_counts_as_missing() {
-        // 空文字を設定して「設定した」と思い込む事故を防ぐ。
-        assert!(key_from(Some(String::new())).is_err());
-        assert!(key_from(Some("   ".to_owned())).is_err());
-    }
-
-    #[test]
-    fn surrounding_whitespace_is_trimmed() {
-        // setx や貼り付けで改行や空白が混ざることがある。
-        assert_eq!(
-            key_from(Some(
-                "  msy_abc 
-"
-                .to_owned()
-            )),
-            Ok("msy_abc".to_owned())
+    fn an_env_file_without_the_key_lists_what_it_does_have() {
+        // 綴り違いに気付けるようにする。**値は出さない。**
+        let parsed = EnvFile::parse(
+            "MESHY_KEY=msy_secret_value
+OTHER=1",
         );
+        let path = PathBuf::from("C:/repo/.env");
+        let message = missing_key_message(&[], Some((&path, &parsed.file)));
+
+        assert!(message.contains("MESHY_KEY"), "{message}");
+        assert!(message.contains("OTHER"), "{message}");
+        assert!(
+            !message.contains("secret_value"),
+            "the message leaked a value: {message}"
+        );
+    }
+
+    #[test]
+    fn an_empty_env_file_says_so() {
+        let parsed = EnvFile::parse(
+            "# nothing here
+",
+        );
+        let path = PathBuf::from("C:/repo/.env");
+        let message = missing_key_message(&[], Some((&path, &parsed.file)));
+        assert!(message.contains("no assignments"), "{message}");
     }
 
     #[test]
