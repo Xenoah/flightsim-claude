@@ -91,6 +91,7 @@ CI の Windows / Linux 双方でビルド環境の差異を持ち込む。
 | `std` | 標準ライブラリ |
 | `bevy_gltf` | 機体モデルの読み込み |
 | `png` | スクリーンショットの保存 |
+| `jpeg` | **モデルのテクスチャ。下記のとおり必須** |
 | `reflect_auto_register` | **反射の型登録。下記のとおり必須** |
 
 **入れていないもの**: 音声、アニメーション、gizmo、開発ツール。
@@ -125,6 +126,22 @@ scene contains the unregistered type `<Enable the debug feature to see the name>
 実際に Meshy から取得した `.glb` を読み込んで初めて出た。**合成データでは
 出ない種類の不具合**であり、外部データを実際に通すまで「動く」とは言えない
 ことの実例になっている。
+
+### 画像形式は、実際に来るものに合わせる
+
+同じ理由で `jpeg` も要る。Meshy はベースカラーを JPEG で返す。
+
+**無いとテクスチャが抜けるのではなく、glTF の読み込みが丸ごと失敗する。**
+
+```text
+WARN bevy_image::image: feature "jpeg" is not enabled
+ERROR bevy_asset::server: Failed to load asset 'aircraft/light_single.glb'
+      … invalid image mime type: image/jpeg
+```
+
+`png` だけ入れていたのは、スクリーンショットの保存に要ったから。
+**書き出す形式と読み込む形式は別物**で、前者だけ揃えても後者は通らない。
+別の供給元のモデルを入れるときは、その供給元が何を返すかを実際に見て足すこと。
 
 ## 帰結
 

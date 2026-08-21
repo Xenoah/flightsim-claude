@@ -64,6 +64,10 @@ bevy = { version = "0.18.1", default-features = false, features = [
     # スクリーンショットの保存に要る。描画結果を目視で確かめる手段が無いと、
     # 「動いてはいるが絵が出ていない」に気付けない。
     "png",
+    # **モデルのテクスチャに要る。** Meshy はベースカラーを JPEG で返す。
+    # 無いと glTF の読み込みが丸ごと失敗する（テクスチャが抜けるのではない）:
+    # `invalid image mime type: image/jpeg`。
+    "jpeg",
     "multi_threaded",
     "tonemapping_luts",
     "zstd_rust",
