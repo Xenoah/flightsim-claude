@@ -370,6 +370,17 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   正しく見える**ので、東京で試して初めて分かった
 - **光量と露出は組で決める。** `FULL_DAYLIGHT`（2 万 lux）と
   `Exposure::SUNLIGHT`（10 万 lux 級）は噛み合わず、空だけ明るく地面が真っ黒になる
+- **Bevy の feature を既定オフで列挙するなら `reflect_auto_register` を必ず入れる。**
+  0.18 は型登録を自動化していて、`GltfPlugin` は `register_type` を一度も呼ばない。
+  切れていると glTF シーンの生成で `scene contains the unregistered type` と
+  panic する。**コンパイルも clippy も描画層のテストも CI も全部通る**
+  （CI は GPU が無いので描画を実行しない）。実際に取得した `.glb` を読むまで
+  出なかった。詳細は [ADR-0007](adr/0007-bevy-version.md)
+- **合成データで通ることは、外部データで通ることを意味しない。** 上の件も、
+  glTF 経路のテストは全て合成データで書いてあり、全部緑のまま壊れていた
+- **ビルド済みの実行ファイルを直接叩くと、Bevy はアセットを実行ファイル基準で
+  探す**（`target/debug/assets/`）。`cargo run` を使うか `BEVY_ASSET_ROOT` を
+  指定する。`Path not found` はモデルの指定ミスに見えるが、これのことが多い
 - **Bevy の大気散乱は `world_position.y` を海抜高度として読む。** 描画座標を
   ECEF 相対にすると空の色が緯度経度で出鱈目になる。`RenderFrame` を使うこと
 

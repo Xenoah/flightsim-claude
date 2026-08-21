@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.0-alpha.2"
+version = "0.5.0-alpha.3"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -40,6 +40,13 @@ criterion = "0.8"
 # feature は既定を切って明示列挙する。音声と glTF は入れない
 # （Linux CI が libasound2-dev を要求しなくなる）。
 bevy = { version = "0.18.1", default-features = false, features = [
+    # **これが無いと glTF シーンの生成が実行時に panic する。**
+    # 0.18 は反射の型登録を自動化しており（inventory 経由）、その仕組み自体が
+    # この feature で入る。GltfPlugin は register_type を 1 つも呼ばないので、
+    # 切れていると `scene contains the unregistered type` で落ちる。
+    # bevy の default（3d）には入っているが、既定を切って列挙すると落ちる。
+    # **コンパイルは通り、実データの .glb を読むまで気付けない。**
+    "reflect_auto_register",
     "bevy_asset",
     # 機体モデルの読み込み。ADR-0007 では「必要になった時点で足す」と
     # していたもので、ここがその時点。

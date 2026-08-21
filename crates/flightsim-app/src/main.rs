@@ -34,6 +34,7 @@ use flightsim_input::{CameraRig, FlightsimInputPlugin, PilotControls, ViewMode};
 use flightsim_render::{
     CameraWorldPosition, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin, RenderSet,
     SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
+    extents_in_model_space,
     terrain::{TerrainTile, despawn_tile, spawn_tile},
     update_terrain_selection,
 };
@@ -559,41 +560,32 @@ fn stream_terrain(
 /// 揃った時点で全体の AABB を測り、目標全長に合わせる。
 fn fit_loaded_model(
     mut commands: Commands,
-    pending: Query<(Entity, &PendingModelFit)>,
+    pending: Query<(Entity, &PendingModelFit, &GlobalTransform)>,
     children: Query<&Children>,
     bounds: Query<(&Aabb, &GlobalTransform)>,
     mut transforms: Query<&mut Transform>,
 ) {
-    for (entity, fit) in &pending {
-        // 子孫のメッシュから全体の寸法を測る。
-        let mut min = Vec3::splat(f32::INFINITY);
-        let mut max = Vec3::splat(f32::NEG_INFINITY);
-        let mut found = false;
+    for (entity, fit, model_global) in &pending {
+        // **モデル自身の座標系で測る。** 描画フレームの軸のまま測ると、
+        // 得られるのは回転後の箱を包む箱で、方位によって倍率が変わる。
+        let into_model = model_global.affine().inverse();
+        let parts = children
+            .iter_descendants(entity)
+            .filter_map(|descendant| bounds.get(descendant).ok())
+            .map(|(aabb, global)| (*aabb, global.affine()));
 
-        for descendant in children.iter_descendants(entity) {
-            let Ok((aabb, global)) = bounds.get(descendant) else {
-                continue;
-            };
-            // 親に付けた回転を打ち消して、モデル本来の寸法を測る。
-            let centre = global.translation();
-            let extent = global.rotation() * Vec3::from(aabb.half_extents) * global.scale();
-            min = min.min(centre - extent.abs());
-            max = max.max(centre + extent.abs());
-            found = true;
-        }
-
-        if !found {
+        let Some(extents) = extents_in_model_space(into_model, parts) else {
             // まだ読み込まれていない。次のフレームで再挑戦する。
             continue;
-        }
+        };
 
-        let scale = fit.0.scale_for(max - min);
+        let scale = fit.0.scale_for(extents);
         if let Ok(mut transform) = transforms.get_mut(entity) {
             transform.scale = Vec3::splat(scale);
         }
         info!(
-            "aircraft model fitted: {:.2} m long → scale {scale:.4}",
-            (max - min).length()
+            "aircraft model fitted: {:.2} m along its length → scale {scale:.4}",
+            (extents * fit.0.forward.to_vec3()).length()
         );
         commands.entity(entity).remove::<PendingModelFit>();
     }

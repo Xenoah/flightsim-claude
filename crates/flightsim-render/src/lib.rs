@@ -46,7 +46,7 @@ pub mod model;
 pub mod terrain;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
-pub use model::{ModelAxis, ModelFit, ModelFitError};
+pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**

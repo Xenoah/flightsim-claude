@@ -17,6 +17,7 @@
 //! ここが最も間違えやすい。
 
 use bevy::camera::primitives::Aabb;
+use bevy::math::Affine3A;
 use bevy::prelude::*;
 use flightsim_core::Meters;
 
@@ -150,6 +151,10 @@ impl ModelFit {
     /// **モデルの前後方向の長さ**を基準にする。生成モデルは大きさがまちまちなので、
     /// 固定倍率では合わない。
     ///
+    /// `model_extents` は**モデル座標系**での寸法であること。描画フレームの軸で
+    /// 測った値を渡すと、機首方位に応じて倍率が変わる。測るには
+    /// [`extents_in_model_space`] を使う。
+    ///
     /// 寸法が取れない・ゼロの場合は等倍にする。**0 除算で倍率が無限大になると、
     /// 機体が画面を埋め尽くして原因が分からなくなる。**
     #[must_use]
@@ -179,9 +184,54 @@ impl ModelFit {
     }
 }
 
+/// 子孫のメッシュから、**モデル自身の座標系での**寸法を測る。
+///
+/// # なぜ描画フレームで測ってはいけないか
+///
+/// 機体は方位と姿勢に応じて回る。`GlobalTransform` のまま軸並行の境界を取ると、
+/// 得られるのは**回転後の箱を包む箱**であって、モデルの寸法ではない。
+/// これを [`ModelFit::scale_for`] に渡すと、**同じモデルが方位によって
+/// 違う大きさになる**（実測: 全長 1.333・翼幅 1.901 の機体で、方位 0° のとき
+/// 4.37 倍、50° のとき 3.70 倍、90° のとき 6.23 倍）。
+///
+/// `into_model` は「描画フレーム → モデル座標系」の変換、すなわちモデルを
+/// 載せているエンティティの `GlobalTransform` の逆。
+///
+/// 測る対象が一つも無ければ `None`。**まだ読み込まれていない場合と、
+/// 寸法が取れない場合を呼び出し側で区別できるようにする。**
+#[must_use]
+pub fn extents_in_model_space(
+    into_model: Affine3A,
+    parts: impl IntoIterator<Item = (Aabb, Affine3A)>,
+) -> Option<Vec3> {
+    let mut min = Vec3::splat(f32::INFINITY);
+    let mut max = Vec3::splat(f32::NEG_INFINITY);
+    let mut found = false;
+
+    for (aabb, global) in parts {
+        let local = into_model * global;
+        let centre = local.transform_point3(Vec3::from(aabb.center));
+
+        // 回転した箱を包む軸並行の箱。各軸の半径は |M| と半径ベクトルの積。
+        // 行列そのものの絶対値を取ること。回転後のベクトルの絶対値ではない。
+        let half = Vec3::from(aabb.half_extents);
+        let matrix = local.matrix3;
+        let extent = Vec3::from(matrix.x_axis).abs() * half.x
+            + Vec3::from(matrix.y_axis).abs() * half.y
+            + Vec3::from(matrix.z_axis).abs() * half.z;
+
+        min = min.min(centre - extent);
+        max = max.max(centre + extent);
+        found = true;
+    }
+
+    found.then(|| max - min)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::math::Vec3A;
 
     /// glTF の慣習（Y-up、-Z 前方）。
     fn gltf() -> ModelFit {
@@ -346,5 +396,95 @@ mod tests {
             .expect_err("not an axis")
             .to_string();
         assert!(message.contains("+x"), "{message}");
+    }
+
+    // --- 寸法の測り方 ---
+
+    /// Meshy から実際に取得した機体の寸法（モデル座標系）。
+    /// 全長 1.333（X）、全高 0.453（Y）、翼幅 1.901（Z）。
+    const REAL_MODEL: Vec3 = Vec3::new(1.333, 0.453, 1.901);
+
+    fn one_part(size: Vec3, placed_at: Affine3A) -> Vec<(Aabb, Affine3A)> {
+        vec![(
+            Aabb {
+                center: Vec3A::ZERO,
+                half_extents: (size * 0.5).into(),
+            },
+            placed_at,
+        )]
+    }
+
+    #[test]
+    fn the_measured_size_does_not_depend_on_where_the_aircraft_points() {
+        // **実際に踏んだ不具合。** 描画フレームの軸のまま測っていたため、
+        // 同じモデルが方位 0° で 4.37 倍、50° で 3.70 倍、90° で 6.23 倍になった。
+        let mut measured = Vec::new();
+        for heading_degrees in [0.0_f32, 50.0, 90.0, 217.0] {
+            let aircraft =
+                Affine3A::from_rotation_y(heading_degrees.to_radians()) * Affine3A::IDENTITY;
+            let extents =
+                extents_in_model_space(aircraft.inverse(), one_part(REAL_MODEL, aircraft))
+                    .expect("there is one part");
+            measured.push((heading_degrees, extents));
+        }
+
+        for (heading, extents) in &measured {
+            assert!(
+                (*extents - REAL_MODEL).abs().max_element() < 1e-3,
+                "at heading {heading}° the model measured {extents:?}, expected {REAL_MODEL:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_scale_that_follows_matches_the_target_length() {
+        // 測り方と倍率の噛み合わせまで見る。全長 1.333 を 8.3 m にする。
+        let fit = ModelFit::new(ModelAxis::NegativeX, ModelAxis::PositiveY, Meters(8.3))
+            .expect("axes are orthogonal");
+        let aircraft = Affine3A::from_rotation_y(50.0_f32.to_radians());
+
+        let extents = extents_in_model_space(aircraft.inverse(), one_part(REAL_MODEL, aircraft))
+            .expect("there is one part");
+        let scale = fit.scale_for(extents);
+
+        assert!(
+            (scale - 8.3 / 1.333).abs() < 0.01,
+            "expected about {:.3}, got {scale:.3}",
+            8.3 / 1.333
+        );
+    }
+
+    #[test]
+    fn nothing_to_measure_is_reported_rather_than_guessed() {
+        // 「まだ読み込まれていない」を寸法ゼロと取り違えると、
+        // 倍率が発散して機体が画面を埋め尽くす。
+        assert_eq!(extents_in_model_space(Affine3A::IDENTITY, []), None);
+    }
+
+    #[test]
+    fn parts_spread_apart_are_all_included() {
+        // 翼端は原点から離れた位置にある。中心だけ見ていると翼幅を取り落とす。
+        let wing_tip = Vec3::splat(0.1);
+        let parts = vec![
+            (
+                Aabb {
+                    center: Vec3A::new(-2.0, 0.0, 0.0),
+                    half_extents: (wing_tip * 0.5).into(),
+                },
+                Affine3A::IDENTITY,
+            ),
+            (
+                Aabb {
+                    center: Vec3A::new(2.0, 0.0, 0.0),
+                    half_extents: (wing_tip * 0.5).into(),
+                },
+                Affine3A::IDENTITY,
+            ),
+        ];
+        let extents = extents_in_model_space(Affine3A::IDENTITY, parts).expect("two parts");
+        assert!(
+            (extents.x - 4.1).abs() < 1e-4,
+            "expected 4.1 across, got {extents:?}"
+        );
     }
 }
