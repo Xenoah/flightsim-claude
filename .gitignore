@@ -5,9 +5,11 @@
 /data/cache/
 /data/tiles/
 /assets/generated/
-# Meshy で生成した機体モデル。**権利の扱いがプランに依存する**ので、
-# 確認が済むまでコミットしない（ATTRIBUTION.md を参照）。
-/assets/aircraft/
+# Meshy で生成した機体モデルのうち、同梱すると決めたものは追跡する
+# （有料プランで生成しており再配布可。ATTRIBUTION.md を参照）。
+# preview 段階の中間生成物は refine すれば作り直せるので入れない。
+/assets/aircraft/*
+!/assets/aircraft/light_single.glb
 
 # API キー。**中身を絶対にコミットしない。**
 # 書き方は .env.example を参照（そちらは追跡する）。

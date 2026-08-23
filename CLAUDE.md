@@ -21,7 +21,8 @@ cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼�
 cargo run -p flightsim-assetgen -- --help               # 機体モデルの取得（要 .env の MESHY_API_KEY）
 cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の上を飛ばす
 cargo bench --workspace                                 # 性能測定（criterion）
-cargo run -p flightsim-app --release -- --tiles data/tiles --start 35.55,139.78  # 起動
+cargo run -p flightsim-app --release                     # 起動（同梱の機体モデルが出る）
+cargo run -p flightsim-app --release -- --tiles data/tiles --start 35.55,139.78  # 実地形の上で
 ```
 
 `core` / `fdm` / `world` / `sim` / `tilegen` は Bevy 非依存なので、GUI もアセットもなしに数秒でテストが回ります。

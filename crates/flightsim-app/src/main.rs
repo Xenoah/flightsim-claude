@@ -49,6 +49,29 @@ use std::path::PathBuf;
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
 
+/// 同梱している機体モデル。`assets/` からの相対パス。
+///
+/// 引数を何も付けずに起動したときに使う。**箱のプレースホルダより、
+/// 実際の機体が出るほうが「動いている」と分かりやすい。**
+const BUNDLED_MODEL: &str = "aircraft/light_single.glb";
+
+/// 同梱モデルの軸（前、上）。
+///
+/// **glTF の慣習（-Z 前方）とは違う。** これを `ModelFit` の既定にしては
+/// いけない。他所から持ってきたモデルまで -X 前方として扱われてしまう。
+/// **同梱ぶん専用の実測値**として、ここにだけ置く。
+const BUNDLED_MODEL_AXES: (ModelAxis, ModelAxis) = (ModelAxis::NegativeX, ModelAxis::PositiveY);
+
+/// 引数の解釈中に出た指摘。
+///
+/// # なぜ溜めるのか
+///
+/// **`parse_arguments` は `LogPlugin` より前に走る。** そこで `warn!` を呼んでも
+/// 購読者がまだ居らず、**何も出ない**。実際、`--bogus-flag` を渡しても無言だった。
+/// 溜めておいて、ログが立ち上がってから出す。
+#[derive(Resource, Debug, Default, Clone)]
+struct StartupDiagnostics(Vec<String>);
+
 /// 起動時の設定。環境変数と引数から作る。
 #[derive(Resource, Debug, Clone)]
 struct Startup {
@@ -68,10 +91,13 @@ struct Startup {
     view: ViewMode,
     /// 機体の 3D モデル。`assets/` からの相対パス。
     ///
-    /// 省略すると箱を組み合わせたプレースホルダを使う。
+    /// `None` は箱のプレースホルダ（`--no-model`）。既定は同梱モデル。
     model: Option<String>,
     /// モデルの座標系を機体軸へ合わせる補正。
     model_fit: ModelFit,
+    /// 見つかった `assets/` の実体。**Bevy に渡したものと同じ**でなければ、
+    /// 「見つかった」と言った直後に `Path not found` が出る。
+    assets: Option<PathBuf>,
 }
 
 impl Default for Startup {
@@ -86,8 +112,14 @@ impl Default for Startup {
             screenshot: None,
             screenshot_delay: 5.0,
             view: ViewMode::default(),
-            model: None,
-            model_fit: ModelFit::default(),
+            // 既定は同梱モデル。軸も同梱ぶんの実測値に合わせる。
+            model: Some(BUNDLED_MODEL.to_owned()),
+            model_fit: ModelFit {
+                forward: BUNDLED_MODEL_AXES.0,
+                up: BUNDLED_MODEL_AXES.1,
+                ..ModelFit::default()
+            },
+            assets: None,
         }
     }
 }
@@ -118,10 +150,22 @@ struct Aircraft;
 struct PendingModelFit(ModelFit);
 
 fn main() {
-    let startup = parse_arguments();
+    let (mut startup, mut diagnostics) = parse_arguments();
+
+    // アセットの置き場所を先に決める。**Bevy の既定はこのリポジトリを指さない。**
+    let mut asset_plugin = AssetPlugin::default();
+    match assets_directory() {
+        Some(directory) => {
+            startup.assets = Some(directory.clone());
+            asset_plugin.file_path = directory.to_string_lossy().into_owned();
+        }
+        None => diagnostics
+            .0
+            .push("could not find an `assets/` directory; models will not load".to_owned()),
+    }
 
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
             primary_window: Some(Window {
                 title: "flightsim-claude".to_owned(),
                 ..default()
@@ -134,8 +178,10 @@ fn main() {
             FlightsimUiPlugin,
         ))
         .insert_resource(startup)
+        .insert_resource(diagnostics)
         .init_resource::<CameraRig>()
-        .add_systems(Startup, setup)
+        // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
+        .add_systems(Startup, (report_arguments, setup).chain())
         .add_systems(
             Update,
             (
@@ -156,8 +202,20 @@ fn main() {
 /// `--tiles <DIR>` と `--start <LAT,LON>` を読む。
 ///
 /// clap を入れるほどの規模ではない。増えたら入れる。
-fn parse_arguments() -> Startup {
+///
+/// **指摘は `warn!` せず溜めて返す。** この関数は `LogPlugin` より前に走るので、
+/// ここで出しても購読者が居らず何も表示されない（[`StartupDiagnostics`]）。
+fn parse_arguments() -> (Startup, StartupDiagnostics) {
     let mut startup = Startup::default();
+    let mut notes = Vec::new();
+
+    // モデル関連は最後にまとめて決める。**軸の既定が「どのモデルか」で変わる**ため、
+    // 引数を読んだ順に確定させられない。
+    let mut requested_model = None;
+    let mut placeholder = false;
+    let mut forward = None;
+    let mut up = None;
+
     let mut arguments = std::env::args().skip(1);
 
     while let Some(flag) = arguments.next() {
@@ -172,20 +230,26 @@ fn parse_arguments() -> Startup {
                     if let [latitude, longitude] = parts.as_slice() {
                         startup.start = Geodetic::from_degrees(*latitude, *longitude, 0.0);
                     } else {
-                        warn!("--start expects `lat,lon`; ignoring `{text}`");
+                        notes.push(format!("--start expects `lat,lon`; ignoring `{text}`"));
                     }
                 }
             }
-            "--heading" => {
-                if let Some(value) = arguments.next().and_then(|v| v.parse::<f64>().ok()) {
-                    startup.heading = Degrees(value).to_radians();
-                }
-            }
-            "--max-level" => {
-                if let Some(value) = arguments.next().and_then(|v| v.parse::<u8>().ok()) {
-                    startup.max_level = value;
-                }
-            }
+            "--heading" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) => startup.heading = Degrees(value).to_radians(),
+                    Err(_) => notes.push(format!("--heading expects degrees; ignoring `{text}`")),
+                },
+                None => notes.push("--heading needs a value".to_owned()),
+            },
+            "--max-level" => match arguments.next() {
+                Some(text) => match text.parse::<u8>() {
+                    Ok(value) => startup.max_level = value,
+                    Err(_) => {
+                        notes.push(format!("--max-level expects a number; ignoring `{text}`"))
+                    }
+                },
+                None => notes.push("--max-level needs a value".to_owned()),
+            },
             "--view" => {
                 if let Some(name) = arguments.next() {
                     startup.view = match name.to_lowercase().as_str() {
@@ -194,46 +258,158 @@ fn parse_arguments() -> Startup {
                         "free" => ViewMode::Free,
                         "tower" => ViewMode::Tower,
                         other => {
-                            warn!("unknown view `{other}`; keeping the default");
+                            notes.push(format!("unknown view `{other}`; keeping the default"));
                             startup.view
                         }
                     };
                 }
             }
-            "--model" => startup.model = arguments.next(),
+            "--model" => match arguments.next() {
+                Some(path) => requested_model = Some(path),
+                None => notes.push("--model needs a path".to_owned()),
+            },
+            // 箱のプレースホルダに戻す。同梱モデルが既定になったので、
+            // **戻す手段が無いと寸法の食い違いを比べられない。**
+            "--no-model" => placeholder = true,
             "--model-forward" | "--model-up" => {
                 let Some(text) = arguments.next() else {
+                    notes.push(format!("{flag} needs an axis"));
                     continue;
                 };
                 match ModelAxis::parse(&text) {
                     Ok(axis) => {
                         if flag == "--model-forward" {
-                            startup.model_fit.forward = axis;
+                            forward = Some(axis);
                         } else {
-                            startup.model_fit.up = axis;
-                        }
-                        // 平行になっていないか毎回検査する。黙って妙な向きにしない。
-                        if let Err(error) = ModelFit::new(
-                            startup.model_fit.forward,
-                            startup.model_fit.up,
-                            startup.model_fit.target_length,
-                        ) {
-                            warn!("{error}");
+                            up = Some(axis);
                         }
                     }
-                    Err(error) => warn!("{error}"),
+                    Err(error) => notes.push(error.to_string()),
                 }
             }
             "--screenshot" => startup.screenshot = arguments.next().map(PathBuf::from),
-            "--screenshot-delay" => {
-                if let Some(value) = arguments.next().and_then(|v| v.parse::<f64>().ok()) {
-                    startup.screenshot_delay = value;
-                }
-            }
-            other => warn!("unknown argument `{other}`"),
+            "--screenshot-delay" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) => startup.screenshot_delay = value,
+                    Err(_) => {
+                        notes.push(format!(
+                            "--screenshot-delay expects seconds; ignoring `{text}`"
+                        ));
+                    }
+                },
+                None => notes.push("--screenshot-delay needs a value".to_owned()),
+            },
+            other => notes.push(format!("unknown argument `{other}`")),
         }
     }
-    startup
+
+    let (model, fit) = resolve_model(requested_model, placeholder, forward, up, &mut notes);
+    startup.model = model;
+    startup.model_fit = fit;
+
+    (startup, StartupDiagnostics(notes))
+}
+
+/// どのモデルを、どの軸で使うかを決める。
+///
+/// - `--no-model` → プレースホルダ
+/// - `--model <path>` → そのモデル。軸の既定は **glTF の慣習**（-Z 前方）
+/// - どちらも無ければ同梱モデル。軸は [`BUNDLED_MODEL_AXES`]
+///
+/// **同梱モデルの軸を全体の既定にしない。** そうすると他所から持ってきた
+/// モデルまで -X 前方として扱われ、横を向いた理由が分からなくなる。
+///
+/// 前と上が平行になった場合は、その組を捨てて既定へ戻す。**黙って妙な向きに
+/// しない**（回転が一意に決まらず、機体が予測できない姿勢になる）。
+fn resolve_model(
+    requested: Option<String>,
+    placeholder: bool,
+    forward: Option<ModelAxis>,
+    up: Option<ModelAxis>,
+    notes: &mut Vec<String>,
+) -> (Option<String>, ModelFit) {
+    let fallback = ModelFit::default();
+
+    if placeholder {
+        if requested.is_some() {
+            notes.push("--no-model overrides --model".to_owned());
+        }
+        return (None, fallback);
+    }
+
+    let (path, default_axes) = match requested {
+        Some(path) => (path, (fallback.forward, fallback.up)),
+        None => (BUNDLED_MODEL.to_owned(), BUNDLED_MODEL_AXES),
+    };
+
+    let chosen = (
+        forward.unwrap_or(default_axes.0),
+        up.unwrap_or(default_axes.1),
+    );
+    let fit = match ModelFit::new(chosen.0, chosen.1, fallback.target_length) {
+        Ok(fit) => fit,
+        Err(error) => {
+            notes.push(format!("{error}; using the default axes instead"));
+            ModelFit::new(default_axes.0, default_axes.1, fallback.target_length)
+                .unwrap_or(fallback)
+        }
+    };
+    (Some(path), fit)
+}
+
+/// `assets/` の実体を探す。
+///
+/// # なぜ Bevy に任せられないのか
+///
+/// `bevy_asset` の起点は `BEVY_ASSET_ROOT` → `CARGO_MANIFEST_DIR` → 実行ファイルの隣、
+/// の順で決まる。**どれもこのリポジトリの `assets/` を指さないことがある。**
+///
+/// - `cargo run -p flightsim-app` では `CARGO_MANIFEST_DIR` が `crates/flightsim-app`
+///   になる。そこに `assets/` は無い。**文書に書いてあったこの起動方法は動いていなかった**
+/// - 実行ファイルを直接叩くと `target/debug/assets/` を見る
+///
+/// そこで候補それぞれから上へ辿り、実在する `assets/` を見つけて
+/// `AssetPlugin::file_path` に絶対パスで渡す。どこから起動しても同じ物を読む。
+fn assets_directory() -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(root) = std::env::var("BEVY_ASSET_ROOT") {
+        candidates.push(PathBuf::from(root));
+    }
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        candidates.push(PathBuf::from(manifest));
+    }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(directory) = exe.parent()
+    {
+        candidates.push(directory.to_path_buf());
+    }
+    candidates.push(PathBuf::from("."));
+
+    candidates.iter().find_map(|start| assets_above(start))
+}
+
+/// `start` から上へ辿って `assets/` を探す。
+///
+/// 探索を分けてあるのは、**ディレクトリを作れば検査できる**ようにするため。
+fn assets_above(start: &std::path::Path) -> Option<PathBuf> {
+    let mut current = Some(start);
+    while let Some(directory) = current {
+        let candidate = directory.join("assets");
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        current = directory.parent();
+    }
+    None
+}
+
+/// 引数の指摘を出す。
+///
+/// [`parse_arguments`] が溜めたものを、ログが立ち上がってから出す。
+fn report_arguments(diagnostics: Res<StartupDiagnostics>) {
+    for note in &diagnostics.0 {
+        warn!("{note}");
+    }
 }
 
 /// 供給元を 2 つ作る。シミュレーション用と描画用で別のキャッシュを持たせる。
@@ -309,9 +485,32 @@ fn setup(
     // モデルがあれば glTF、無ければ箱のプレースホルダ。
     // **どちらの場合も子は機体軸で置く。** 親の Transform が
     // 機体軸 → 描画座標を担うので、子はそのままでよい。
-    let parts: Vec<Entity> = match &startup.model {
-        Some(path) => {
-            info!("aircraft model: assets/{path}");
+    // 指定されたモデルが実在するか先に確かめる。**無いまま起動すると機体が
+    // 消え、「動いてはいるが絵が出ていない」状態になる。**
+    let model = startup.model.as_ref().and_then(|path| {
+        // **Bevy へ渡したのと同じ場所で確かめる。** 別の探索を書くと、
+        // 「見つかった」と言った直後に Bevy が Path not found を出す。
+        match startup
+            .assets
+            .as_ref()
+            .map(|directory| directory.join(path))
+        {
+            Some(file) if file.is_file() => Some((path.clone(), file)),
+            Some(file) => {
+                warn!("aircraft model was not found; using the placeholder");
+                warn!("  looked for: {}", file.display());
+                None
+            }
+            None => {
+                warn!("no `assets/` directory was found; using the placeholder");
+                None
+            }
+        }
+    });
+
+    let parts: Vec<Entity> = match &model {
+        Some((path, found)) => {
+            info!("aircraft model: {}", found.display());
             vec![
                 commands
                     .spawn((
@@ -670,4 +869,132 @@ fn publish_hud(
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- モデルと軸の決め方 ---
+
+    fn resolve(
+        requested: Option<&str>,
+        placeholder: bool,
+        forward: Option<ModelAxis>,
+        up: Option<ModelAxis>,
+    ) -> (Option<String>, ModelFit, Vec<String>) {
+        let mut notes = Vec::new();
+        let (model, fit) = resolve_model(
+            requested.map(ToOwned::to_owned),
+            placeholder,
+            forward,
+            up,
+            &mut notes,
+        );
+        (model, fit, notes)
+    }
+
+    #[test]
+    fn with_no_arguments_the_bundled_model_is_used_with_its_own_axes() {
+        // 同梱モデルは glTF の慣習と違う軸を持つ。既定で横を向いては困る。
+        let (model, fit, notes) = resolve(None, false, None, None);
+        assert_eq!(model.as_deref(), Some(BUNDLED_MODEL));
+        assert_eq!(fit.forward, BUNDLED_MODEL_AXES.0);
+        assert_eq!(fit.up, BUNDLED_MODEL_AXES.1);
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn another_model_falls_back_to_the_gltf_convention_not_the_bundled_axes() {
+        // **ここが肝。** 同梱モデルの軸を全体の既定にしてしまうと、他所から
+        // 持ってきたモデルまで -X 前方として扱われ、横を向いた理由が分からなくなる。
+        let (model, fit, _) = resolve(Some("other/plane.glb"), false, None, None);
+        assert_eq!(model.as_deref(), Some("other/plane.glb"));
+        assert_eq!(fit.forward, ModelFit::default().forward);
+        assert_eq!(fit.up, ModelFit::default().up);
+        assert_ne!(
+            fit.forward, BUNDLED_MODEL_AXES.0,
+            "the bundled model's axes leaked into an unrelated model"
+        );
+    }
+
+    #[test]
+    fn explicit_axes_win_over_both_defaults() {
+        let (_, fit, _) = resolve(
+            Some("other/plane.glb"),
+            false,
+            Some(ModelAxis::PositiveZ),
+            Some(ModelAxis::PositiveY),
+        );
+        assert_eq!(fit.forward, ModelAxis::PositiveZ);
+        assert_eq!(fit.up, ModelAxis::PositiveY);
+    }
+
+    #[test]
+    fn parallel_axes_are_rejected_rather_than_producing_an_arbitrary_rotation() {
+        // 前と上が平行だと回転が一意に決まらない。黙って妙な姿勢にしない。
+        let (_, fit, notes) = resolve(
+            None,
+            false,
+            Some(ModelAxis::PositiveX),
+            Some(ModelAxis::NegativeX),
+        );
+        assert_eq!(fit.forward, BUNDLED_MODEL_AXES.0, "should fall back");
+        assert!(
+            notes.iter().any(|note| note.contains("perpendicular")),
+            "the reason should be stated: {notes:?}"
+        );
+    }
+
+    #[test]
+    fn asking_for_the_placeholder_gives_no_model() {
+        let (model, _, notes) = resolve(None, true, None, None);
+        assert_eq!(model, None);
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn combining_no_model_with_a_model_says_which_one_won() {
+        // 黙って片方を捨てると、指定したモデルが出ない理由が分からない。
+        let (model, _, notes) = resolve(Some("other/plane.glb"), true, None, None);
+        assert_eq!(model, None);
+        assert!(!notes.is_empty(), "the conflict should be reported");
+    }
+
+    // --- assets/ の探索 ---
+
+    #[test]
+    fn the_assets_directory_is_found_from_a_subdirectory() {
+        // cargo run では CARGO_MANIFEST_DIR が crates/flightsim-app になる。
+        // **そこに assets/ は無い。** 上へ辿って見つけられること。
+        let root = std::env::temp_dir().join(format!(
+            "flightsim-assets-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let nested = root.join("crates/flightsim-app");
+        std::fs::create_dir_all(&nested).expect("temp dirs");
+        std::fs::create_dir_all(root.join("assets")).expect("assets dir");
+
+        let found = assets_above(&nested).expect("the assets/ above should be found");
+        assert_eq!(found, root.join("assets"));
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_tree_without_assets_reports_nothing_rather_than_guessing() {
+        // 無いのに在ると答えると、直後に Bevy が Path not found を出す。
+        let empty = std::env::temp_dir().join(format!(
+            "flightsim-empty-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(empty.join("a/b")).expect("temp dirs");
+        // 一時ディレクトリの上に assets/ が無いことが前提。あれば検査を飛ばす。
+        if assets_above(&empty).is_none() {
+            assert_eq!(assets_above(&empty.join("a/b")), None);
+        }
+        std::fs::remove_dir_all(&empty).ok();
+    }
 }

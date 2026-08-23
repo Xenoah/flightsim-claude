@@ -17,7 +17,7 @@
 # 純 Rust 側。456 件、数秒。**`--workspace` で回さないこと**（下記）
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。63 件
+# 描画層。Bevy を含むので重い。71 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 cargo bench --workspace                # 性能測定（criterion）
 bash scripts/check-architecture.sh     # 依存規約の検査
@@ -48,12 +48,16 @@ Bevy は [ADR-0007](adr/0007-bevy-version.md) で **0.18.1 に固定**。
 cargo run -p flightsim-tilegen -- --input dem.tif --output tiles --min-level 9 --max-level 13
 cargo run -p flightsim-sim --bin flightsim-headless -- --tiles tiles --start 35.553,139.781 --output flight.csv
 
-# 機体モデルを取る（要 .env の MESHY_API_KEY。書式は .env.example）
+# 起動。**引数なしで同梱の機体モデルが出る**（assets/aircraft/light_single.glb）
+cargo run -p flightsim-app --release
+cargo run -p flightsim-app --release -- --no-model    # 箱のプレースホルダに戻す
+
+# 別のモデルを取ってくる（要 .env の MESHY_API_KEY。書式は .env.example）
 cargo run -p flightsim-assetgen -- --prompt "a small white propeller aircraft" \
-    --output assets/aircraft/light_single.glb
+    --output assets/aircraft/other.glb
 
 # そのモデルで飛ぶ。**軸はモデルごとに違う。** 横を向いていたら -x/+y を変える
-cargo run -p flightsim-app --release -- --model aircraft/light_single.glb \
+cargo run -p flightsim-app --release -- --model aircraft/other.glb \
     --model-forward -x --model-up +y --view chase
 ```
 
@@ -403,9 +407,19 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   そこが実際に何を返すかを見てから足すこと
 - **合成データで通ることは、外部データで通ることを意味しない。** 上の 3 件とも、
   glTF 経路のテストは全て合成データで書いてあり、全部緑のまま壊れていた
-- **ビルド済みの実行ファイルを直接叩くと、Bevy はアセットを実行ファイル基準で
-  探す**（`target/debug/assets/`）。`cargo run` を使うか `BEVY_ASSET_ROOT` を
-  指定する。`Path not found` はモデルの指定ミスに見えるが、これのことが多い
+- **Bevy のアセット起点はこのリポジトリを指さない。** `BEVY_ASSET_ROOT` →
+  `CARGO_MANIFEST_DIR` → 実行ファイルの隣、の順で決まる。`cargo run -p flightsim-app`
+  では `CARGO_MANIFEST_DIR` が `crates/flightsim-app` になり、そこに `assets/` は無い。
+  **文書に書いてあった起動コマンドは一度も動いていなかった**（`BEVY_ASSET_ROOT` を
+  付けて試していたので気付かなかった）。今は `assets_directory()` が上へ辿って
+  実体を見つけ、`AssetPlugin::file_path` に絶対パスで渡している
+- **自前の存在確認を、フレームワークの解決先とずらさない。** 最初の修正で
+  `option_env!("CARGO_MANIFEST_DIR")`（コンパイル時）を見ていたため、
+  「見つかった」と言った直後に Bevy が `Path not found` を出した。
+  **同じ場所を見ること**
+- **`LogPlugin` より前の `warn!` は消える。** `parse_arguments` は `App::new()` の
+  前に走るので、そこでの警告は購読者が居らず何も出ない。`--bogus-flag` を渡しても
+  無言だった。指摘は溜めて、`Startup` スケジュールから出すこと
 - **Bevy の大気散乱は `world_position.y` を海抜高度として読む。** 描画座標を
   ECEF 相対にすると空の色が緯度経度で出鱈目になる。`RenderFrame` を使うこと
 

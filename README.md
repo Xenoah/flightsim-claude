@@ -13,7 +13,7 @@
 # 純 Rust 側。456 件、数秒
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。63 件
+# 描画層。Bevy を含むので重い。71 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 ```
 
@@ -33,7 +33,8 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
 - **実地形の上をヘッドレスで飛べる** — 焼いたタイルから接地平面（標高と勾配）を作って
   FDM へ渡し、離陸 → 上昇 → 巡航 → 旋回 → 進入 → 接地までを軌跡 CSV に出力する
 - **機体 3D モデルを読める** — glTF / glb を機体軸へ合わせる補正層つき。モデルごとに
-  違う「前」「上」の軸と大きさを引数で吸収するので、差し替えても描画コードを触らない
+  違う「前」「上」の軸と大きさを引数で吸収するので、差し替えても描画コードを触らない。
+  **テクスチャ付きの軽単発機を同梱**しているので、引数なしで起動すれば機体が出る
 - **機体モデルの取得** — Meshy の API から取ってくるオフライン CLI。API キーは `.env`
   から読み、**引数では受け取らない**（コマンドラインはプロセス一覧とシェル履歴に残る）
 
