@@ -17,7 +17,7 @@
 # 純 Rust 側。456 件、数秒。**`--workspace` で回さないこと**（下記）
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。71 件
+# 描画層。Bevy を含むので重い。73 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 cargo bench --workspace                # 性能測定（criterion）
 bash scripts/check-architecture.sh     # 依存規約の検査
@@ -394,6 +394,9 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   正しく見える**ので、東京で試して初めて分かった
 - **光量と露出は組で決める。** `FULL_DAYLIGHT`（2 万 lux）と
   `Exposure::SUNLIGHT`（10 万 lux 級）は噛み合わず、空だけ明るく地面が真っ黒になる
+- **コックピット視点では機体の外形を隠す。** 目線は胴体の内側にあるので、
+  外形を描くと視界が自分の機体で塞がる。プレースホルダの箱では気付きにくいが、
+  実モデルを既定にした瞬間に**起動直後の画がこれになった**。内装モデルは無い
 - **Bevy の feature を既定オフで列挙するなら `reflect_auto_register` を必ず入れる。**
   0.18 は型登録を自動化していて、`GltfPlugin` は `register_type` を一度も呼ばない。
   切れていると glTF シーンの生成で `scene contains the unregistered type` と

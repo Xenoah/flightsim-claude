@@ -142,6 +142,13 @@ struct TerrainStreaming {
 #[derive(Component, Debug, Clone, Copy)]
 struct Aircraft;
 
+/// 機体の**外形**につける印。プレースホルダでも glTF モデルでも付ける。
+///
+/// コックピット視点では目線が胴体の内側に入るので、外形をそのまま描くと
+/// **視界が自分の機体で塞がる**。内装モデルはまだ無いので、外形を隠す。
+#[derive(Component, Debug, Clone, Copy)]
+struct ExteriorModel;
+
 /// 読み込み待ちのモデル。寸法が分かった時点で倍率を決める。
 ///
 /// glTF は非同期に読み込まれるので、spawn した瞬間には大きさが分からない。
@@ -194,7 +201,12 @@ fn main() {
         .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
         .add_systems(
             Update,
-            (capture_screenshot, report_terrain, fit_loaded_model),
+            (
+                capture_screenshot,
+                report_terrain,
+                fit_loaded_model,
+                update_model_visibility,
+            ),
         )
         .run();
 }
@@ -403,6 +415,31 @@ fn assets_above(start: &std::path::Path) -> Option<PathBuf> {
     None
 }
 
+/// その視点で機体の外形を描くか。
+///
+/// コックピットからは自分の機体は見えない。**外形を描くと視界が塞がる。**
+const fn shows_exterior(mode: ViewMode) -> bool {
+    !matches!(mode, ViewMode::Cockpit)
+}
+
+/// 視点に応じて機体の外形を出し入れする。
+fn update_model_visibility(
+    mode: Res<ViewMode>,
+    mut models: Query<&mut Visibility, With<ExteriorModel>>,
+) {
+    let wanted = if shows_exterior(*mode) {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    for mut visibility in &mut models {
+        // 毎フレーム書き込むと変更検知が無駄に走る。
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+}
+
 /// 引数の指摘を出す。
 ///
 /// [`parse_arguments`] が溜めたものを、ログが立ち上がってから出す。
@@ -521,6 +558,8 @@ fn setup(
                         // 読み込みが終わるまで待つ（`fit_loaded_model`）。
                         Transform::from_rotation(startup.model_fit.rotation()),
                         PendingModelFit(startup.model_fit),
+                        ExteriorModel,
+                        Visibility::default(),
                         Name::new("aircraft model"),
                     ))
                     .id(),
@@ -537,6 +576,7 @@ fn setup(
                             perceptual_roughness: 0.5,
                             ..default()
                         })),
+                        ExteriorModel,
                         part.transform,
                         Name::new(part.name),
                     ))
@@ -959,6 +999,22 @@ mod tests {
         let (model, _, notes) = resolve(Some("other/plane.glb"), true, None, None);
         assert_eq!(model, None);
         assert!(!notes.is_empty(), "the conflict should be reported");
+    }
+
+    // --- 視点と外形 ---
+
+    #[test]
+    fn the_aircraft_is_hidden_from_the_cockpit() {
+        // 目線が胴体の内側に入るので、外形を描くと視界が自分の機体で塞がる。
+        assert!(!shows_exterior(ViewMode::Cockpit));
+    }
+
+    #[test]
+    fn every_outside_view_shows_the_aircraft() {
+        // 外から見ているのに機体が消えたら、飛んでいるのか分からない。
+        for mode in [ViewMode::Chase, ViewMode::Free, ViewMode::Tower] {
+            assert!(shows_exterior(mode), "{} hides the aircraft", mode.name());
+        }
     }
 
     // --- assets/ の探索 ---
