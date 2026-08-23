@@ -22,7 +22,9 @@
 //! `RigidBodyState` として取り回せないようにしている。
 
 use crate::ground::{GroundPlane, GroundSampler};
-use flightsim_core::{Attitude, Ecef, FixedStep, Geodetic, Meters, Seconds};
+use flightsim_core::{
+    Attitude, Ecef, FixedStep, Geodetic, Meters, MetersPerSecond, Radians, Seconds,
+};
 use flightsim_fdm::{
     AircraftConfig, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
     RigidBodyState,
@@ -44,6 +46,32 @@ pub struct InterpolatedState {
     pub geodetic: Geodetic,
     /// ローカル基準の姿勢角。
     pub attitude: Attitude,
+}
+
+/// 接地の記録。
+///
+/// # 何のためか
+///
+/// 着陸を**評価**するため。接地の瞬間の沈下率・接地点・姿勢が取れないと、
+/// 「うまく降りられたか」をプレイヤーに言えない。HUD の昇降率は表示の
+/// 瞬間の値であって、接地の瞬間の値ではない。
+///
+/// 値は**接地直前の空中の状態**から取る。接地後の状態では、脚のばねが
+/// すでに衝撃を吸収していて、沈下率が実際より穏やかに見える。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Touchdown {
+    /// 接地点。
+    pub position: Geodetic,
+    /// 接地時の降下率。**降下が正。** 上昇中の接地（バウンド）では負になる。
+    pub sink_rate: MetersPerSecond,
+    /// 接地時の対地速度（水平成分）。
+    pub ground_speed: MetersPerSecond,
+    /// 接地時のバンク角。
+    pub bank: Radians,
+    /// 接地時の機首方位。滑走路方位との揃いを見るのに使う。
+    pub heading: Radians,
+    /// シミュレーション開始からの時刻。
+    pub elapsed: Seconds,
 }
 
 /// 1 フレーム進めた結果の報告。
@@ -70,6 +98,14 @@ pub struct Simulation<S: TileSource> {
     previous: RigidBodyState,
     ground: GroundPlane,
     diverged: bool,
+    /// 車輪の最下点（機体基準）。接地判定に使う。
+    gear_height: Meters,
+    /// 空中にいるか。ヒステリシスつき（下記 `update_contact`）。
+    airborne: bool,
+    /// 最後に記録した接地。
+    last_touchdown: Option<Touchdown>,
+    /// 接地の通算回数。呼び出し側は前回読んだ値との差で「新しい接地」を知る。
+    touchdown_count: u32,
 }
 
 impl<S: TileSource> Simulation<S> {
@@ -84,6 +120,7 @@ impl<S: TileSource> Simulation<S> {
     ) -> Self {
         let ground = sampler.sample(&mut terrain, start);
         let state = crate::flight::parked_state(&config, start, ground.elevation, heading);
+        let gear_height = crate::flight::gear_height(&config);
         Self {
             dynamics: FlightDynamics::new(config, state),
             terrain,
@@ -92,6 +129,11 @@ impl<S: TileSource> Simulation<S> {
             previous: state,
             ground,
             diverged: false,
+            gear_height,
+            // 駐機から始まるので接地済み。spawn の瞬間を着陸として数えない。
+            airborne: false,
+            last_touchdown: None,
+            touchdown_count: 0,
         }
     }
 
@@ -104,6 +146,8 @@ impl<S: TileSource> Simulation<S> {
         sampler: GroundSampler,
     ) -> Self {
         let ground = sampler.sample(&mut terrain, state.geodetic());
+        let gear_height = crate::flight::gear_height(&config);
+        let clearance = state.altitude().get() - ground.elevation.get() - gear_height.get();
         Self {
             dynamics: FlightDynamics::new(config, state),
             terrain,
@@ -112,6 +156,11 @@ impl<S: TileSource> Simulation<S> {
             previous: state,
             ground,
             diverged: false,
+            gear_height,
+            // 空中から始まれば、最初の接地も着陸として数える。
+            airborne: clearance > crate::flight::AIRBORNE_CLEARANCE.get(),
+            last_touchdown: None,
+            touchdown_count: 0,
         }
     }
 
@@ -150,6 +199,7 @@ impl<S: TileSource> Simulation<S> {
             );
             self.dynamics
                 .step(self.fixed.fixed_dt(), controls, &environment);
+            self.update_contact();
         }
 
         if !self.dynamics.state().is_finite() {
@@ -161,6 +211,64 @@ impl<S: TileSource> Simulation<S> {
             diverged: self.diverged,
             terrain_missing,
         }
+    }
+
+    /// 接地状態を更新し、空中 → 接地の遷移を記録する。
+    ///
+    /// ヒステリシスを持たせている。接地の閾値（車輪隙間 0.05 m）と
+    /// 「確実に空中」の閾値（0.5 m）を分けないと、滑走中の凹凸や
+    /// 接地直後のバウンドで着陸が二重三重に数えられる。
+    fn update_contact(&mut self) {
+        /// 車輪の隙間がこれ以下なら接地とみなす。
+        const CONTACT_CLEARANCE: Meters = Meters(0.05);
+
+        let state = self.dynamics.state();
+        let clearance =
+            state.altitude().get() - self.ground.elevation.get() - self.gear_height.get();
+
+        if self.airborne {
+            if clearance <= CONTACT_CLEARANCE.get() {
+                self.airborne = false;
+                // **接地直前の空中の状態から取る。** 接地後では脚のばねが
+                // 衝撃を吸収していて、沈下率が実際より穏やかに見える。
+                let before = &self.previous;
+                let attitude = before.attitude();
+                self.last_touchdown = Some(Touchdown {
+                    position: state.geodetic(),
+                    // vertical_speed は上昇が正。降下を正にして返す。
+                    sink_rate: MetersPerSecond(-before.vertical_speed().get()),
+                    ground_speed: before.ground_speed(),
+                    bank: attitude.roll,
+                    heading: attitude.yaw,
+                    elapsed: self.fixed.elapsed(),
+                });
+                self.touchdown_count = self.touchdown_count.saturating_add(1);
+            }
+        } else if clearance > crate::flight::AIRBORNE_CLEARANCE.get() {
+            self.airborne = true;
+        }
+    }
+
+    /// 最後に記録した接地。
+    #[must_use]
+    pub const fn last_touchdown(&self) -> Option<&Touchdown> {
+        self.last_touchdown.as_ref()
+    }
+
+    /// 接地の通算回数。
+    ///
+    /// **前回読んだ値と比べて増えていたら新しい接地があった**、と読む。
+    /// 「今のフレームで接地したか」を bool で返すと、フレームを跨いで
+    /// 読み損ねたときに取りこぼす。
+    #[must_use]
+    pub const fn touchdown_count(&self) -> u32 {
+        self.touchdown_count
+    }
+
+    /// 車輪が地面に着いているか。
+    #[must_use]
+    pub const fn on_ground(&self) -> bool {
+        !self.airborne
     }
 
     /// 物理状態そのもの。**描画にはこれではなく [`Self::interpolated`] を使う。**

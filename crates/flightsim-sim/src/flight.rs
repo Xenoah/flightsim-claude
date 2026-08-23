@@ -34,7 +34,7 @@ use flightsim_world::{Terrain, TileSource};
 /// 車輪がこれ以上地面から離れていれば、確実に空中にいるとみなす高さ。
 ///
 /// 脚の最大ストロークが 0.25 m なので、それを明確に上回る値にしてある。
-const AIRBORNE_CLEARANCE: Meters = Meters(0.5);
+pub(crate) const AIRBORNE_CLEARANCE: Meters = Meters(0.5);
 
 /// 飛行のフェーズ。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
