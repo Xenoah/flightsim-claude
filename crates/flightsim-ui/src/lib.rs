@@ -19,6 +19,11 @@
 //!
 //! 描画フレームレートで数値を更新すると、下 1 桁が高速に入れ替わって
 //! 読み取れなくなる。[`HudSmoothing`] で更新間隔を落とす。
+//!
+//! ## 着陸評価
+//!
+//! ゲームループを閉じる仕上げ。接地の評価は
+//! [`LandingReport`] / [`evaluate_landing`] / [`format_landing_report`] にある。
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -27,6 +32,15 @@
 
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
+
+mod landing;
+
+pub use landing::{
+    LANDING_REPORT_DISPLAY_DURATION, LandingEvaluation, LandingGrade, LandingReport,
+    LandingReportDisplay, LandingReportState, LandingReportTimer, evaluate_landing,
+    format_landing_report, grade_for_sink_rate, spawn_landing_report_display,
+    update_landing_report_display,
+};
 
 /// HUD に出す値。アプリ側が毎フレーム詰める。
 #[derive(Resource, Debug, Clone, Copy, Default)]
@@ -137,7 +151,12 @@ impl Plugin for FlightsimUiPlugin {
         app.init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
             .add_systems(Startup, spawn_hud)
-            .add_systems(Update, update_hud);
+            .add_systems(Update, update_hud)
+            // 着陸評価。`LandingReport` 自体は着陸するまで存在しないので、
+            // ここでは `init_resource` しない（app が接地のたびに挿入する契約）。
+            .init_resource::<LandingReportState>()
+            .add_systems(Startup, spawn_landing_report_display)
+            .add_systems(Update, update_landing_report_display);
     }
 }
 
