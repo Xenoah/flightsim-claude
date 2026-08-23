@@ -53,6 +53,18 @@ pub struct TerrainMesh {
     pub normals: Vec<[f32; 3]>,
     /// タイル内の正規化座標。`u = 0` が西端、`v = 0` が北端。
     pub uvs: Vec<[f32; 2]>,
+    /// 各頂点の楕円体高 `m`。
+    ///
+    /// **地形の素性であって見た目ではない。** 描画側はこれと [`Self::slopes`]
+    /// から色を決めるが、どう塗るかを決めるのはここではない。
+    /// 生成時には手元にある値なので、描画側で ECEF から測地座標へ
+    /// 逆変換し直さずに済む。
+    pub elevations: Vec<f32>,
+    /// 各頂点の傾斜 `rad`。0 が水平、`PI/2` が垂直。
+    ///
+    /// 法線と「上」（楕円体法線）のなす角。**斜面を岩肌にするなど、
+    /// 高度だけでは決められない塗り分けに要る。**
+    pub slopes: Vec<f32>,
     /// 三角形リスト。反時計回りが表（wgpu の既定）。
     pub indices: Vec<u32>,
     /// スカートを除いた地形面の頂点数。デバッグ表示と検査用。
@@ -138,6 +150,7 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
     let vertex_count = (resolution as usize) * (resolution as usize);
     let mut positions = Vec::with_capacity(vertex_count);
     let mut uvs = Vec::with_capacity(vertex_count);
+    let mut elevations: Vec<f32> = Vec::with_capacity(uvs.capacity());
     // 法線は面法線の平均で求める。曲率のある地球でも素直に正しくなる。
     let mut normal_accumulator = vec![DVec3::ZERO; vertex_count];
     // 地心方向の単位ベクトル（スカートを垂らす向き）を頂点ごとに持つ。
@@ -157,6 +170,11 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
             let elevation = dem.elevation_at(position);
             let surface = Geodetic::new(position.latitude, position.longitude, elevation).to_ecef();
 
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "標高は数千 m。f32 の分解能は cm 未満"
+            )]
+            elevations.push(elevation.get() as f32);
             world_positions.push(surface.as_vec());
             // 楕円体の法線ではなく、地表点における「上」を測地座標から作る。
             up_vectors.push(local_up(position));
@@ -219,6 +237,25 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
         })
         .collect();
 
+    // 傾斜は法線と「上」のなす角。**高度だけでは崖と台地を区別できない。**
+    let mut slopes: Vec<f32> = normals
+        .iter()
+        .zip(&up_vectors)
+        .map(|(normal, up)| {
+            let normal = DVec3::new(
+                f64::from(normal[0]),
+                f64::from(normal[1]),
+                f64::from(normal[2]),
+            );
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "角度は [0, PI]。f32 で十分"
+            )]
+            let angle = normal.dot(*up).clamp(-1.0, 1.0).acos() as f32;
+            angle
+        })
+        .collect();
+
     // --- スカート ---
 
     let skirt_depth = options.skirt_depth.map_or_else(
@@ -236,6 +273,8 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
             &mut positions,
             &mut normals,
             &mut uvs,
+            &mut elevations,
+            &mut slopes,
             &mut indices,
         );
     }
@@ -245,6 +284,8 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
         positions,
         normals,
         uvs,
+        elevations,
+        slopes,
         indices,
         surface_vertex_count: vertex_count,
     }
@@ -312,6 +353,8 @@ fn append_skirt(
     positions: &mut Vec<[f32; 3]>,
     normals: &mut Vec<[f32; 3]>,
     uvs: &mut Vec<[f32; 2]>,
+    elevations: &mut Vec<f32>,
+    slopes: &mut Vec<f32>,
     indices: &mut Vec<u32>,
 ) {
     let last = resolution - 1;
@@ -333,6 +376,10 @@ fn append_skirt(
         // 法線は縁の頂点と揃える。スカートは隠すための面で、陰影を主張させない。
         normals.push(normals[index]);
         uvs.push(uvs[index]);
+        // 縁と同じ値を引き継ぐ。スカートは隠すための面なので、
+        // ここで色が変わると継ぎ目が目立つ。
+        elevations.push(elevations[index]);
+        slopes.push(slopes[index]);
     }
 
     let ring_length = u32::try_from(ring.len()).unwrap_or(u32::MAX);
@@ -732,6 +779,63 @@ mod tests {
             "the mesh origin sits at {} m rather than on the terrain",
             origin_geodetic.altitude
         );
+    }
+
+    #[test]
+    fn every_vertex_carries_an_elevation_and_a_slope() {
+        // 個数がずれると、描画側で頂点と色が食い違う。**スカートも含めて**揃うこと。
+        let id = TileId::new(9, 220, 100);
+        let mesh = build_mesh(id, &flat_tile(id, 120.0), &MeshOptions::default());
+
+        assert_eq!(mesh.elevations.len(), mesh.positions.len());
+        assert_eq!(mesh.slopes.len(), mesh.positions.len());
+        assert!(
+            mesh.positions.len() > mesh.surface_vertex_count,
+            "this tile should have a skirt, otherwise the check above is weaker than it looks"
+        );
+    }
+
+    #[test]
+    fn the_stored_elevation_matches_the_terrain() {
+        // 別経路で作った値がずれていないか、外側から確かめる。
+        let id = TileId::new(9, 220, 100);
+        let mesh = build_mesh(id, &flat_tile(id, 340.0), &MeshOptions::default());
+
+        for elevation in &mesh.elevations[..mesh.surface_vertex_count] {
+            assert!(
+                (elevation - 340.0).abs() < 0.05,
+                "a vertex of a 340 m plateau reports {elevation} m"
+            );
+        }
+    }
+
+    #[test]
+    fn a_flat_tile_has_no_slope() {
+        // 平らな地形で傾斜が出るなら、法線か「上」のどちらかが狂っている。
+        let id = TileId::new(9, 220, 100);
+        let mesh = build_mesh(id, &flat_tile(id, 500.0), &MeshOptions::default());
+
+        let steepest = mesh.slopes[..mesh.surface_vertex_count]
+            .iter()
+            .copied()
+            .fold(0.0_f32, f32::max);
+        assert!(
+            steepest < 0.02,
+            "a flat tile reports a slope of {:.2}°",
+            steepest.to_degrees()
+        );
+    }
+
+    #[test]
+    fn slopes_are_finite_everywhere() {
+        // NaN は全状態に伝播して原因特定が極めて困難になる。
+        let id = TileId::new(9, 220, 100);
+        let mesh = build_mesh(id, &flat_tile(id, 0.0), &MeshOptions::default());
+        assert!(
+            mesh.slopes.iter().all(|slope| slope.is_finite()),
+            "a slope came out NaN or infinite"
+        );
+        assert!(mesh.elevations.iter().all(|value| value.is_finite()));
     }
 
     #[test]

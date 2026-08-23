@@ -24,3 +24,6 @@
 # Windows
 Thumbs.db
 desktop.ini
+
+# 合成 DEM とそこから焼いたタイル。作り直せるのでコミットしない。
+/data/synthetic.tif

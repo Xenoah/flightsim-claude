@@ -10,10 +10,10 @@
 ## 何ができるか（今）
 
 ```bash
-# 純 Rust 側。456 件、数秒
+# 純 Rust 側。460 件、数秒
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。73 件
+# 描画層。Bevy を含むので重い。81 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 ```
 

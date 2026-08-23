@@ -14,10 +14,10 @@
 **実地形の上を、テクスチャ付きの機体モデルで飛べる。**
 
 ```bash
-# 純 Rust 側。456 件、数秒。**`--workspace` で回さないこと**（下記）
+# 純 Rust 側。460 件、数秒。**`--workspace` で回さないこと**（下記）
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。73 件
+# 描画層。Bevy を含むので重い。81 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 cargo bench --workspace                # 性能測定（criterion）
 bash scripts/check-architecture.sh     # 依存規約の検査
@@ -394,6 +394,14 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   正しく見える**ので、東京で試して初めて分かった
 - **光量と露出は組で決める。** `FULL_DAYLIGHT`（2 万 lux）と
   `Exposure::SUNLIGHT`（10 万 lux 級）は噛み合わず、空だけ明るく地面が真っ黒になる
+- **頂点色は線形 RGB。`Color::srgb` と同じ数値を渡すと明るく浅くなる。**
+  実際に取り違えて、同じ地点・同じ光で画面の色が (0.328, 0.347, 0.229) から
+  (0.509, 0.521, 0.374) に変わった。**目視では「そんなものか」で済んでしまい、
+  画素を測って初めて分かった。** 色を疑うときは平均画素値を測ること
+- **地形を見るのに実 DEM の入手は要らない。**
+  `cargo run -p flightsim-tilegen --example synthetic_dem` が合成 DEM を書く。
+  実在しない地形だが、**地形が映るか・LOD が切り替わるか・色が妥当か**は見える。
+  投影のずれや nodata や境界の崖は現れないので、**実データの代わりにはならない**
 - **コックピット視点では機体の外形を隠す。** 目線は胴体の内側にあるので、
   外形を描くと視界が自分の機体で塞がる。プレースホルダの箱では気付きにくいが、
   実モデルを既定にした瞬間に**起動直後の画がこれになった**。内装モデルは無い

@@ -182,6 +182,7 @@ pub fn to_bevy_mesh(source: &TerrainMesh) -> Mesh {
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, source.positions.clone())
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, source.normals.clone())
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, source.uvs.clone())
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, terrain_colors(source))
     .with_inserted_indices(Indices::U32(source.indices.clone()))
 }
 
@@ -304,10 +305,130 @@ pub fn mesh_options_for(_level: u8) -> MeshOptions {
 #[must_use]
 pub fn default_terrain_material() -> StandardMaterial {
     StandardMaterial {
-        base_color: Color::srgb(0.36, 0.42, 0.30),
+        // **白にすること。** 頂点色は base_color に乗算される。色を残すと
+        // 全体がその色に染まり、高度による塗り分けが潰れる。
+        base_color: Color::WHITE,
         perceptual_roughness: 0.95,
         metallic: 0.0,
         ..default()
+    }
+}
+
+/// 標高と傾斜から地表の色を決める。**返すのは sRGB。**
+///
+/// # これはテクスチャではない
+///
+/// **衛星画像ではない。** 高度と傾斜だけで塗り分けた、地形の起伏を読むための
+/// 色。実際の土地被覆（市街地・森林・農地）は反映されない。
+/// 画像を貼るのは、データ源とその権利を決めてからの別の作業。
+///
+/// # 塗り分けの根拠
+///
+/// 単色だと起伏が読めない。陰影だけでは太陽の向きに依存し、
+/// **逆光では地形が真っ平らに見える。**
+///
+/// - 傾斜が急なところは岩肌。**高度によらず**先に効かせる。崖に草を生やさない
+/// - 低地は緑、上がるにつれて褐色、さらに上は岩と雪
+/// - 雪線は緯度で変えていない。**合成地形でしか確かめていないため**、
+///   実データを通すまで根拠のない精緻化はしない
+///
+/// # 色空間
+///
+/// ここで返すのは **sRGB**。人が数値を見て色を思い浮かべられる空間で書く。
+/// GPU へ渡すのは線形なので、[`terrain_colors`] が変換する。
+///
+/// **一度これを取り違えた。** 同じ数値を線形として渡したところ、同じ地点・
+/// 同じ光で画面の色が (0.328, 0.347, 0.229) から (0.509, 0.521, 0.374) へ
+/// 明るく浅くなった。目で見ただけでは「そんなものか」で済んでしまい、
+/// **画素を測って初めて分かった。**
+#[must_use]
+pub fn terrain_color(elevation_metres: f32, slope_radians: f32) -> [f32; 4] {
+    // 高度による基本色。境目は線形に混ぜる。
+    const STOPS: [(f32, [f32; 3]); 5] = [
+        (0.0, [0.42, 0.50, 0.32]),    // 海岸の低地。やや黄みの緑
+        (300.0, [0.34, 0.45, 0.26]),  // 平野から丘陵の緑
+        (900.0, [0.45, 0.42, 0.30]),  // 森林限界あたり。褐色へ
+        (1800.0, [0.52, 0.48, 0.44]), // 岩
+        (2600.0, [0.92, 0.93, 0.95]), // 雪
+    ];
+
+    let elevation = if elevation_metres.is_finite() {
+        elevation_metres
+    } else {
+        0.0
+    };
+
+    let mut base = STOPS[STOPS.len() - 1].1;
+    if elevation <= STOPS[0].0 {
+        base = STOPS[0].1;
+    } else {
+        for pair in STOPS.windows(2) {
+            let (low_height, low_color) = pair[0];
+            let (high_height, high_color) = pair[1];
+            if elevation < high_height {
+                let span = high_height - low_height;
+                // STOPS は昇順の定数なので span > 0。0 除算は起きない。
+                let t = ((elevation - low_height) / span).clamp(0.0, 1.0);
+                base = [
+                    low_color[0] + (high_color[0] - low_color[0]) * t,
+                    low_color[1] + (high_color[1] - low_color[1]) * t,
+                    low_color[2] + (high_color[2] - low_color[2]) * t,
+                ];
+                break;
+            }
+        }
+    }
+
+    // 急斜面は岩肌。25° から効き始め、45° で完全に岩になる。
+    const ROCK: [f32; 3] = [0.46, 0.43, 0.40];
+    let slope = if slope_radians.is_finite() {
+        slope_radians
+    } else {
+        0.0
+    };
+    let rockiness = ((slope.to_degrees() - 25.0) / 20.0).clamp(0.0, 1.0);
+
+    [
+        base[0] + (ROCK[0] - base[0]) * rockiness,
+        base[1] + (ROCK[1] - base[1]) * rockiness,
+        base[2] + (ROCK[2] - base[2]) * rockiness,
+        1.0,
+    ]
+}
+
+/// メッシュの全頂点ぶんの色。**線形 RGB**。
+///
+/// `Mesh::ATTRIBUTE_COLOR` は線形として扱われる。[`terrain_color`] は
+/// sRGB を返すので、ここで変換する。**この変換を飛ばすと色が明るく浅くなる。**
+///
+/// 標高や傾斜が足りないメッシュでも落とさず、無い頂点は 0 として扱う。
+/// **頂点数と色の数がずれると描画が壊れる**ので、必ず `positions` に合わせる。
+#[must_use]
+pub fn terrain_colors(source: &TerrainMesh) -> Vec<[f32; 4]> {
+    (0..source.positions.len())
+        .map(|index| {
+            let elevation = source.elevations.get(index).copied().unwrap_or(0.0);
+            let slope = source.slopes.get(index).copied().unwrap_or(0.0);
+            let color = terrain_color(elevation, slope);
+            [
+                srgb_to_linear(color[0]),
+                srgb_to_linear(color[1]),
+                srgb_to_linear(color[2]),
+                color[3],
+            ]
+        })
+        .collect()
+}
+
+/// sRGB の 1 成分を線形へ。
+///
+/// 単純な 2.2 乗ではなく、暗部の直線部を含む正しい変換を使う。
+#[must_use]
+pub fn srgb_to_linear(value: f32) -> f32 {
+    if value <= 0.040_449_936 {
+        value / 12.92
+    } else {
+        ((value + 0.055) / 1.055).powf(2.4)
     }
 }
 
@@ -381,6 +502,135 @@ mod tests {
     use flightsim_core::{Degrees, Radians};
     use flightsim_world::dem::HeightGrid;
     use flightsim_world::{MemoryTileSource, build_mesh};
+
+    // --- 地表の色 ---
+
+    /// 明るさ。塗り分けの向きを見るのに使う。
+    fn luminance(color: [f32; 4]) -> f32 {
+        color[0] * 0.2126 + color[1] * 0.7152 + color[2] * 0.0722
+    }
+
+    #[test]
+    fn high_ground_is_brighter_than_low_ground() {
+        // 雪と岩は緑の低地より明るい。逆転していると起伏が読めなくなる。
+        let low = terrain_color(50.0, 0.0);
+        let high = terrain_color(3000.0, 0.0);
+        assert!(
+            luminance(high) > luminance(low) + 0.3,
+            "3000 m ({high:?}) should read much brighter than 50 m ({low:?})"
+        );
+    }
+
+    #[test]
+    fn low_ground_is_the_greenest() {
+        // 低地が緑でないと、平野と岩場の区別が付かない。
+        let low = terrain_color(50.0, 0.0);
+        assert!(
+            low[1] > low[0] && low[1] > low[2],
+            "the lowlands should be green, got {low:?}"
+        );
+    }
+
+    #[test]
+    fn the_colour_changes_gradually_with_height() {
+        // 段差があると等高線のような縞が出る。
+        let mut previous = terrain_color(0.0, 0.0);
+        let mut step = 10.0_f32;
+        while step <= 4000.0 {
+            let current = terrain_color(step, 0.0);
+            let jump = (0..3)
+                .map(|channel| (current[channel] - previous[channel]).abs())
+                .fold(0.0_f32, f32::max);
+            assert!(
+                jump < 0.03,
+                "the colour jumps by {jump:.3} at {step} m: {previous:?} -> {current:?}"
+            );
+            previous = current;
+            step += 10.0;
+        }
+    }
+
+    #[test]
+    fn a_cliff_is_rock_regardless_of_how_low_it_is() {
+        // **高度だけで塗ると崖に草が生える。** 傾斜を先に効かせること。
+        let meadow = terrain_color(100.0, 0.0);
+        let cliff = terrain_color(100.0, 60.0_f32.to_radians());
+        assert!(
+            cliff[0] > meadow[0] && cliff[1] < meadow[1],
+            "a 60° slope at 100 m should read as rock, got {cliff:?} against {meadow:?}"
+        );
+    }
+
+    #[test]
+    fn a_gentle_slope_is_left_alone() {
+        // 緩斜面まで岩にすると、平野が一様に灰色になる。
+        let flat = terrain_color(200.0, 0.0);
+        let gentle = terrain_color(200.0, 10.0_f32.to_radians());
+        for channel in 0..3 {
+            assert!(
+                (flat[channel] - gentle[channel]).abs() < 1e-6,
+                "a 10° slope should not be rocky yet: {gentle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_colours_handed_to_the_gpu_are_linear_not_srgb() {
+        // **一度これを取り違えて、同じ地点の色が明るく浅くなった。**
+        // 目視では気付けず、画素を測って初めて分かった。
+        assert!(
+            (srgb_to_linear(0.5) - 0.214).abs() < 0.002,
+            "sRGB 0.5 should be about 0.214 in linear, got {}",
+            srgb_to_linear(0.5)
+        );
+        // 端は動かない。ここがずれると黒と白が濁る。
+        assert!((srgb_to_linear(0.0)).abs() < 1e-9);
+        assert!((srgb_to_linear(1.0) - 1.0).abs() < 1e-6);
+        // 暗部は直線部を通る。2.2 乗で近似すると暗くなりすぎる。
+        assert!(srgb_to_linear(0.02) > 0.02_f32.powf(2.2));
+    }
+
+    #[test]
+    fn the_conversion_is_actually_applied_to_the_mesh() {
+        // 変換を書いても呼び忘れれば同じこと。**外から確かめる。**
+        let id = TileId::new(10, 500, 300);
+        let dem = DemTile::new(id.bounds(), HeightGrid::flat(33, 33, Meters(640.0)));
+        let source = build_mesh(id, &dem, &MeshOptions::default());
+        let colors = terrain_colors(&source);
+        assert_eq!(colors.len(), source.positions.len());
+
+        let authored = terrain_color(source.elevations[0], source.slopes[0]);
+        assert!(
+            (colors[0][0] - srgb_to_linear(authored[0])).abs() < 1e-6,
+            "the mesh colour {:?} is not the linear form of {authored:?}",
+            colors[0]
+        );
+        assert!(
+            colors.iter().all(|color| (color[3] - 1.0).abs() < 1e-6),
+            "the terrain must stay opaque"
+        );
+    }
+
+    #[test]
+    fn every_colour_is_opaque_and_inside_the_unit_range() {
+        // 範囲外の値は環境によって黒や白に飛ぶ。
+        for elevation in [-500.0, 0.0, 1234.0, 9000.0, f32::NAN, f32::INFINITY] {
+            for slope in [0.0, 0.5, 1.5, f32::NAN] {
+                let color = terrain_color(elevation, slope);
+                assert!(
+                    color.iter().all(|value| value.is_finite()),
+                    "terrain_color({elevation}, {slope}) = {color:?}"
+                );
+                assert!(
+                    (0.0..=1.0).contains(&color[0])
+                        && (0.0..=1.0).contains(&color[1])
+                        && (0.0..=1.0).contains(&color[2]),
+                    "terrain_color({elevation}, {slope}) = {color:?} is out of range"
+                );
+                assert!((color[3] - 1.0).abs() < 1e-6, "the terrain must be opaque");
+            }
+        }
+    }
 
     #[test]
     fn a_mesh_survives_the_trip_into_bevy() {
