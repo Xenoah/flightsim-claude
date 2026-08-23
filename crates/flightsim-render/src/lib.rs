@@ -43,6 +43,7 @@ use std::collections::HashMap;
 
 pub mod aircraft;
 pub mod model;
+pub mod runway;
 pub mod terrain;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};

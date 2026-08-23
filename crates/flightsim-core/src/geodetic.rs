@@ -110,6 +110,36 @@ impl Geodetic {
         wgs84::SEMI_MAJOR_AXIS * (1.0 - wgs84::ECCENTRICITY_SQ) / (w * w.sqrt())
     }
 
+    /// 北・東へメートルでずらした点を返す。高度は変えない。
+    ///
+    /// # 近似の範囲
+    ///
+    /// 曲率半径（子午線 M・卯酉線 N）による局所近似。**数 km までの近距離用**で、
+    /// 滑走路・空港・タイル内の配置に使う。100 km を超える測地線問題には使わない
+    /// （その用途が出たら Vincenty 等を別途入れる）。
+    ///
+    /// 極のごく近傍では東西の曲率半径の分母 cos(緯度) が 0 に近づく。
+    /// **NaN を作らないため**、緯度 ±89.99° を超える点では東方向のずれを
+    /// 無視する（滑走路を極点に置く用途は当面ない）。
+    #[must_use]
+    pub fn offset_by(self, north: Meters, east: Meters) -> Self {
+        let d_lat = north.get() / self.meridional_radius();
+
+        let cos_lat = self.latitude.cos();
+        // ±89.99° で cos ≈ 1.7e-4。これ未満は東西のずれを捨てて NaN を避ける。
+        let d_lon = if cos_lat.abs() > 1.7e-4 {
+            east.get() / (self.prime_vertical_radius() * cos_lat)
+        } else {
+            0.0
+        };
+
+        Self {
+            latitude: Radians(self.latitude.get() + d_lat),
+            longitude: Radians(self.longitude.get() + d_lon),
+            altitude: self.altitude,
+        }
+    }
+
     /// ECEF へ変換する（閉形式・厳密）。
     #[must_use]
     pub fn to_ecef(self) -> Ecef {
@@ -393,6 +423,61 @@ mod tests {
     }
 
     // --- 距離 ---
+
+    #[test]
+    fn a_metre_offset_matches_surveyed_degree_lengths() {
+        // 外部の既知値: 赤道での緯度 1° は 110 574 m、経度 1° は 111 320 m。
+        // （測地学の標準値。実装がこう返すから、ではない）
+        let equator = Geodetic::from_degrees(0.0, 0.0, 0.0);
+
+        let north = equator.offset_by(Meters(110_574.0), Meters(0.0));
+        assert!(
+            (north.latitude_degrees() - 1.0).abs() < 0.002,
+            "110 574 m north of the equator should be 1°, got {}",
+            north.latitude_degrees()
+        );
+
+        let east = equator.offset_by(Meters(0.0), Meters(111_320.0));
+        assert!(
+            (east.longitude_degrees() - 1.0).abs() < 0.002,
+            "111 320 m east on the equator should be 1°, got {}",
+            east.longitude_degrees()
+        );
+    }
+
+    #[test]
+    fn a_short_offset_round_trips_through_the_distance() {
+        // 比較先の great_circle_distance は平均半径の球面（haversine）。
+        // offset_by は楕円体の曲率半径を使うので、緯度 35° では両者が
+        // 約 0.06% 食い違う。**これは offset_by の誤差ではなく座標系の差**
+        // なので、許容は 0.1%（2.5 km で 2.5 m）とする。
+        let start = Geodetic::from_degrees(35.55, 139.78, 8.0);
+        let moved = start.offset_by(Meters(2000.0), Meters(1500.0));
+        let distance = start.great_circle_distance(moved);
+        assert!(
+            (distance.get() - 2500.0).abs() < 2.5,
+            "a 2000/1500 offset should be 2500 m away, got {distance}"
+        );
+    }
+
+    #[test]
+    fn offsets_near_the_pole_do_not_produce_nan() {
+        let pole = Geodetic::from_degrees(89.9999, 0.0, 0.0);
+        let moved = pole.offset_by(Meters(100.0), Meters(100.0));
+        assert!(
+            moved.latitude.get().is_finite()
+                && moved.longitude.get().is_finite()
+                && moved.altitude.get().is_finite(),
+            "an offset at the pole went non-finite"
+        );
+    }
+
+    #[test]
+    fn altitude_is_preserved_by_an_offset() {
+        let start = Geodetic::from_degrees(10.0, 20.0, 123.0);
+        let moved = start.offset_by(Meters(500.0), Meters(-300.0));
+        assert!((moved.altitude.get() - 123.0).abs() < 1e-9);
+    }
 
     #[test]
     fn great_circle_distance_matches_known_arc_lengths() {
