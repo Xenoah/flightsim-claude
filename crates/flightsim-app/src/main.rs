@@ -40,6 +40,7 @@ use flightsim_render::{
 };
 use flightsim_sim::{GroundSampler, Simulation};
 use flightsim_ui::{FlightsimUiPlugin, HudState};
+use flightsim_world::Runway;
 use flightsim_world::{
     DiskTileSource, LodSelector, MemoryTileSource, Terrain, TileCache, TileId, TileSource,
 };
@@ -95,6 +96,12 @@ struct Startup {
     model: Option<String>,
     /// モデルの座標系を機体軸へ合わせる補正。
     model_fit: ModelFit,
+    /// 指定すると、地面から この高さ [m] の空中に静止 spawn する。
+    ///
+    /// **着陸評価の結線を実際に確かめるための開発用。** 落下して接地する
+    /// までの数秒で、接地記録 → 評価 → 表示の経路が全部通る。手で
+    /// 飛ばさないと着陸できないのでは、この経路を検証できない。
+    drop_height: Option<f64>,
     /// 見つかった `assets/` の実体。**Bevy に渡したものと同じ**でなければ、
     /// 「見つかった」と言った直後に `Path not found` が出る。
     assets: Option<PathBuf>,
@@ -102,11 +109,14 @@ struct Startup {
 
 impl Default for Startup {
     fn default() -> Self {
+        // 既定は合成飛行場の滑走路上。**中心線に乗った状態で始まる**ので、
+        // スロットルを開ければそのまま離陸できる。以前の既定
+        // （35.553,139.781）は滑走路から横に 75 m 外れていた。
+        let runway = Runway::synthetic();
         Self {
             tiles: None,
-            // 羽田空港のあたり。地形が無ければ海面 0 m。
-            start: Geodetic::from_degrees(35.553, 139.781, 0.0),
-            heading: Degrees(50.0).to_radians(),
+            start: runway.takeoff_start(),
+            heading: runway.heading,
             min_level: 8,
             max_level: 13,
             screenshot: None,
@@ -119,6 +129,7 @@ impl Default for Startup {
                 up: BUNDLED_MODEL_AXES.1,
                 ..ModelFit::default()
             },
+            drop_height: None,
             assets: None,
         }
     }
@@ -127,6 +138,12 @@ impl Default for Startup {
 /// シミュレーション本体。
 #[derive(Resource)]
 struct FlightSimulation(Simulation<BoxedSource>);
+
+/// 着陸評価に使う滑走路。
+///
+/// 現状は合成飛行場ひとつ。空港データベースが入ったら差し替える。
+#[derive(Resource, Debug, Clone)]
+struct ActiveRunway(Runway);
 
 /// 地形描画の作業用状態。
 #[derive(Resource)]
@@ -206,6 +223,7 @@ fn main() {
                 report_terrain,
                 fit_loaded_model,
                 update_model_visibility,
+                report_landings.after(advance_simulation),
             ),
         )
         .run();
@@ -299,6 +317,15 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                     Err(error) => notes.push(error.to_string()),
                 }
             }
+            "--drop" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) if value > 0.0 => startup.drop_height = Some(value),
+                    _ => notes.push(format!(
+                        "--drop expects metres above ground; ignoring `{text}`"
+                    )),
+                },
+                None => notes.push("--drop needs a height in metres".to_owned()),
+            },
             "--screenshot" => startup.screenshot = arguments.next().map(PathBuf::from),
             "--screenshot-delay" => match arguments.next() {
                 Some(text) => match text.parse::<f64>() {
@@ -440,6 +467,56 @@ fn update_model_visibility(
     }
 }
 
+/// 新しい接地を着陸評価へ流す。
+///
+/// `touchdown_count` の増分で「新しい接地」を検出する。bool の
+/// 「今のフレームで接地したか」だと、読み損ねたフレームで取りこぼす。
+fn report_landings(
+    mut commands: Commands,
+    simulation: Res<FlightSimulation>,
+    runway: Res<ActiveRunway>,
+    mut seen: Local<u32>,
+) {
+    let count = simulation.0.touchdown_count();
+    if count == *seen {
+        return;
+    }
+    *seen = count;
+
+    let Some(touchdown) = simulation.0.last_touchdown() else {
+        return;
+    };
+
+    // 滑走路方位との差。反対向きの着陸（逆進入）も正しい着陸なので、
+    // 正方位と逆方位の近いほうを取る。
+    let error_to = |target: flightsim_core::Radians| {
+        let mut difference =
+            (touchdown.heading.get() - target.get()) % (2.0 * std::f64::consts::PI);
+        if difference > std::f64::consts::PI {
+            difference -= 2.0 * std::f64::consts::PI;
+        }
+        if difference < -std::f64::consts::PI {
+            difference += 2.0 * std::f64::consts::PI;
+        }
+        difference
+    };
+    let forward = error_to(runway.0.heading);
+    let reverse = error_to(runway.0.reciprocal_heading());
+    let heading_error = if forward.abs() <= reverse.abs() {
+        forward
+    } else {
+        reverse
+    };
+
+    commands.insert_resource(flightsim_ui::LandingReport {
+        sink_rate: touchdown.sink_rate,
+        ground_speed: touchdown.ground_speed,
+        bank: touchdown.bank,
+        on_runway: Some(runway.0.contains(touchdown.position)),
+        heading_error: Some(flightsim_core::Radians(heading_error)),
+    });
+}
+
 /// 引数の指摘を出す。
 ///
 /// [`parse_arguments`] が溜めたものを、ログが立ち上がってから出す。
@@ -503,15 +580,75 @@ fn setup(
         64 * 1024 * 1024,
         startup.min_level..=startup.max_level,
     );
-    let simulation = Simulation::parked(
-        AircraftConfig::light_single(),
-        startup.start,
-        startup.heading,
-        terrain,
-        GroundSampler::default(),
-    );
+    let simulation = match startup.drop_height {
+        // 開発用: 空中に静止 spawn して落とす。接地記録 → 評価 → 表示の
+        // 経路を、手で飛ばさずに通すため。
+        Some(height) => {
+            let sampler = GroundSampler::default();
+            let mut probe = Terrain::new(
+                make_source(&startup),
+                8 * 1024 * 1024,
+                startup.min_level..=startup.max_level,
+            );
+            let ground = sampler.sample(&mut probe, startup.start);
+            let state = flightsim_fdm::RigidBodyState::from_geodetic(
+                Geodetic::new(
+                    startup.start.latitude,
+                    startup.start.longitude,
+                    Meters(ground.elevation.get() + height),
+                ),
+                flightsim_core::Attitude::new(
+                    flightsim_core::Radians::ZERO,
+                    flightsim_core::Radians::ZERO,
+                    startup.heading,
+                ),
+                flightsim_core::Ned::new(0.0, 0.0, 0.0),
+            );
+            Simulation::from_state(
+                AircraftConfig::light_single(),
+                state,
+                terrain,
+                GroundSampler::default(),
+            )
+        }
+        None => Simulation::parked(
+            AircraftConfig::light_single(),
+            startup.start,
+            startup.heading,
+            terrain,
+            GroundSampler::default(),
+        ),
+    };
 
     commands.insert_resource(startup.view);
+
+    // --- 滑走路 ---
+
+    // 見た目は**実際の地面の高さ**に置く。地形タイルがあれば彫られた 8 m、
+    // 無ければ海面 0 m。着陸評価（contains / offsets）は高度を見ないので、
+    // 見た目の高さを地面へ合わせても評価はずれない。
+    let runway = Runway::synthetic();
+    let ground_elevation = simulation.ground().elevation;
+    let visual_threshold = Geodetic::new(
+        runway.threshold.latitude,
+        runway.threshold.longitude,
+        ground_elevation,
+    );
+    let (runway_mesh, runway_origin) = flightsim_render::runway::runway_mesh(
+        visual_threshold,
+        runway.heading,
+        runway.length,
+        runway.width,
+    );
+    commands.spawn((
+        flightsim_render::terrain_mesh_bundle(
+            meshes.add(runway_mesh),
+            materials.add(flightsim_render::default_terrain_material()),
+            runway_origin,
+        ),
+        Name::new("runway"),
+    ));
+    commands.insert_resource(ActiveRunway(runway));
 
     let camera_position = simulation.state().geodetic();
     commands.insert_resource(RenderOrigin::new(camera_position));
