@@ -15,6 +15,10 @@ use crate::{
 ///
 /// 主ばねを単に頭打ちにするとハードランディングで地面を抜ける。ストロークを超えた分だけ
 /// 高剛性の二次ばねを働かせ、位置のクランプを使わずに底付きへ対処する。
+///
+/// **バンプストップの行程も有限**（[`LandingGearLeg::bottom_stop_travel`]）。
+/// 使い切った先で弾性力は一定になる。青天井の線形ばねにすると、深いめり込みが
+/// 深さの 2 乗のエネルギーとして蓄えられ、伸びるときにそれが機体へ返る。
 const BOTTOM_OUT_STIFFNESS_MULTIPLIER: f64 = 6.0;
 
 /// ばね固有振動の 1 サブステップあたり位相上限 `rad`。
@@ -66,6 +70,50 @@ fn vertical_to_normal_distance_scale(environment: &Environment) -> f64 {
     let north = environment.ground_slope().north();
     let east = environment.ground_slope().east();
     1.0 / (1.0 + north * north + east * east).sqrt()
+}
+
+/// 1 本の脚が地面から受ける法線方向の力 `N`。
+///
+/// `penetration` は接地点の地面へのめり込み量 `m`、`penetration_rate` はその増加率 `m/s`
+/// （正が圧縮、負が伸長）。
+///
+/// # 3 つの性質
+///
+/// 1. **地面は脚を引っ張らない。** 結果は常に非負。
+/// 2. **弾性力は有限。** 主ばね行程 + バンプストップ行程を使い切った先では一定になる。
+/// 3. **伸長速度に上限がある。** 接地点が `max_recoil_speed` より速く離れようとすると
+///    弾性力が抜ける。これがないと、深くめり込んだ状態から脚が伸びる間に
+///    蓄えたエネルギーを一気に返し、機体を跳ね上げて裏返す。
+///
+/// 3 が効くのは「めり込んだ状態で初期化された」場合で、そのめり込みは機体の運動で
+/// 生じたものではないため、蓄えられている弾性エネルギーは**そもそも物理的な裏付けがない**。
+/// 実機のオレオもリコイル弁で戻りを絞っており、跳ね返らないのが正しい挙動になる。
+///
+/// なお、抜けるのは弾性項だけで減衰項は残る。減衰項は伸長中は負なので、
+/// 非負クランプと合わせて「離れるときは力ゼロ」に収束する。
+fn normal_force(leg: &crate::LandingGearLeg, penetration: f64, penetration_rate: f64) -> f64 {
+    // 壊れた状態から NaN / Inf を撒かない。ここで止めないと全状態へ伝播する。
+    // 速度が非有限なら機体はすでに発散しており、力を足しても意味がない。
+    if !penetration.is_finite() || !penetration_rate.is_finite() {
+        return 0.0;
+    }
+
+    let main_stroke = penetration.min(leg.max_stroke().get());
+    let bottom_stop_stroke =
+        (penetration - leg.max_stroke().get()).clamp(0.0, leg.bottom_stop_travel().get());
+    let elastic_force = leg.spring_rate().get()
+        * (main_stroke + BOTTOM_OUT_STIFFNESS_MULTIPLIER * bottom_stop_stroke);
+
+    // 伸長速度が上限に達するまで線形に弾性力を落とす。段差にすると
+    // RK4 の中間評価で力が飛び、サブステップ数を増やしても収束しない。
+    //
+    // `f64::clamp` は NaN を素通りさせるが、`penetration_rate` の有限性は上で確認済み、
+    // `max_recoil_speed` は構築時に有限な正値だと保証されているので、ここで NaN にはならない。
+    let recoil_speed = (-penetration_rate).max(0.0);
+    let recoil_fade = (1.0 - recoil_speed / leg.max_recoil_speed().get()).clamp(0.0, 1.0);
+
+    let damping_force = leg.damping_coefficient().get() * penetration_rate;
+    (elastic_force * recoil_fade + damping_force).max(0.0)
 }
 
 /// 全脚の接地荷重を機体軸で合算する。
@@ -120,14 +168,7 @@ pub(crate) fn loads(
             state.velocity + state.orientation * state.angular_velocity.cross(contact_body);
         let penetration_rate = -contact_velocity.dot(ground_normal);
 
-        let main_stroke = penetration.min(leg.max_stroke().get());
-        let bottomed_stroke = (penetration - leg.max_stroke().get()).max(0.0);
-        let elastic_force = leg.spring_rate().get()
-            * (main_stroke + BOTTOM_OUT_STIFFNESS_MULTIPLIER * bottomed_stroke);
-        let damping_force = leg.damping_coefficient().get() * penetration_rate;
-
-        // 反発中は減衰がばね力を弱めるが、地面が脚を引っ張ることはない。
-        let normal_force = (elastic_force + damping_force).max(0.0);
+        let normal_force = normal_force(leg, penetration, penetration_rate);
         if !normal_force.is_finite() || normal_force <= 0.0 {
             continue;
         }
@@ -296,21 +337,102 @@ mod tests {
             "damping must not make the ground pull a rebounding aircraft downward"
         );
 
-        let bottomed = state_at_altitude(0.5, Ned::default());
-        let bottomed_load = loads(
+        // バンプストップの途中。主ばね全ストローク + 超過分 × 剛性倍率。
+        let leg = config.landing_gear.legs()[0];
+        let part_way = leg.max_stroke().get() + leg.bottom_stop_travel().get() * 0.5;
+        let bottoming = state_at_altitude(1.0 - part_way, Ned::default());
+        let bottoming_load = loads(
             &config.landing_gear,
-            &bottomed,
+            &bottoming,
             ControlInputs::neutral(),
             &environment,
-            &bottomed.local_frame(),
+            &bottoming.local_frame(),
         );
-        let expected_bottomed = 3.0 * 120_000.0 * (0.25 + BOTTOM_OUT_STIFFNESS_MULTIPLIER * 0.25);
+        let expected_bottoming = 3.0
+            * 120_000.0
+            * (leg.max_stroke().get()
+                + BOTTOM_OUT_STIFFNESS_MULTIPLIER * leg.bottom_stop_travel().get() * 0.5);
         assert!(
-            (bottomed_load.force_body.z + expected_bottomed).abs() < 1.0,
+            (bottoming_load.force_body.z + expected_bottoming).abs() < 1.0,
             "bottom-stop force was {}, expected {}",
-            bottomed_load.force_body.z,
-            -expected_bottomed
+            bottoming_load.force_body.z,
+            -expected_bottoming
         );
+
+        // 行程を使い切った先では弾性力が一定になる。**青天井の線形ばねにしないこと。**
+        // 深さの 2 乗でエネルギーが溜まり、脚が伸びるときに機体を裏返す仕事に化ける。
+        let saturated = 3.0
+            * 120_000.0
+            * (leg.max_stroke().get()
+                + BOTTOM_OUT_STIFFNESS_MULTIPLIER * leg.bottom_stop_travel().get());
+        for depth in [
+            leg.max_stroke().get() + leg.bottom_stop_travel().get(),
+            0.5,
+            5.0,
+            500.0,
+        ] {
+            let deep = state_at_altitude(1.0 - depth, Ned::default());
+            let deep_load = loads(
+                &config.landing_gear,
+                &deep,
+                ControlInputs::neutral(),
+                &environment,
+                &deep.local_frame(),
+            );
+            assert!(
+                (deep_load.force_body.z + saturated).abs() < 1.0,
+                "elastic force at {depth} m of penetration was {}, expected the saturated {}",
+                deep_load.force_body.z,
+                -saturated
+            );
+        }
+    }
+
+    #[test]
+    fn the_elastic_force_fades_out_above_the_recoil_speed_limit() {
+        // 深くめり込んだ状態から脚が伸びるとき、蓄えた弾性エネルギーが一気に返ると
+        // 機体が跳ね上がる。伸長速度が上限を超えたら弾性項を止める。
+        let leg = AircraftConfig::light_single().landing_gear.legs()[0];
+        let deep = 1.0;
+        let limit = leg.max_recoil_speed().get();
+
+        let static_force = normal_force(&leg, deep, 0.0);
+        assert!(static_force > 0.0);
+
+        // 上限のちょうど半分の伸長速度で、弾性項は半分になる（減衰項ぶん更に下がる）。
+        let half = normal_force(&leg, deep, -limit * 0.5);
+        assert!(half < static_force * 0.5 + 1.0e-9);
+        assert!(half > 0.0, "the gear must still push while it is recoiling");
+
+        // 上限に達したら押し返さない。負にもならない（地面は脚を引かない）。
+        for speed in [limit, limit * 2.0, 1.0e6] {
+            let faded = normal_force(&leg, deep, -speed);
+            assert!(
+                faded == 0.0,
+                "the gear kept pushing at {speed} m/s of recoil: {faded} N"
+            );
+        }
+
+        // 圧縮側は変わっていないこと。
+        let compressing = normal_force(&leg, 0.02, 1.0);
+        assert!(
+            (compressing - (120_000.0 * 0.02 + 13_000.0)).abs() < 1.0e-6,
+            "compression-side force changed: {compressing}"
+        );
+    }
+
+    #[test]
+    fn a_non_finite_penetration_rate_does_not_produce_a_non_finite_force() {
+        // NaN は全状態へ伝播する。ここで止める。
+        let leg = AircraftConfig::light_single().landing_gear.legs()[0];
+        for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let force = normal_force(&leg, 0.1, rate);
+            assert!(
+                force.is_finite(),
+                "penetration rate {rate} produced {force}"
+            );
+            assert!(force >= 0.0);
+        }
     }
 
     #[test]

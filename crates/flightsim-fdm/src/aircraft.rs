@@ -55,6 +55,17 @@ impl DampingCoefficient {
 }
 
 /// 1 本の着陸脚。
+///
+/// # ストロークは有限であること
+///
+/// 主ばねの `max_stroke` を超えた分にはバンプストップが働くが、**そのバンプストップにも
+/// 有限の行程 [`Self::bottom_stop_travel`] がある**。行程を使い切った先では弾性力が
+/// 頭打ちになり、それ以上めり込んでも力は増えない。
+///
+/// 実装上ここが重要なのは、深いめり込みが**弾性エネルギーとして蓄えられてしまう**ため。
+/// 脚が伸びるときにそれが全部返ってくると機体は跳ね上がる。青天井の線形ばねだと
+/// エネルギーが深さの 2 乗で増えるので、初期化のわずかな幾何誤差が機体を裏返すだけの
+/// 仕事に化ける（傾斜地に水平姿勢で置かれた機体で実際に起きた）。
 #[derive(Debug, Clone, Copy)]
 pub struct LandingGearLeg {
     /// 脚を伸ばし切った状態の接地点。
@@ -62,19 +73,23 @@ pub struct LandingGearLeg {
     spring_rate: SpringRate,
     damping_coefficient: DampingCoefficient,
     max_stroke: Meters,
+    bottom_stop_travel: Meters,
+    max_recoil_speed: MetersPerSecond,
 }
 
 impl LandingGearLeg {
     /// # Panics
     ///
-    /// 接地点または脚の物理量が有限でない場合、ばね定数・最大ストロークが正でない場合、
-    /// 減衰係数が負の場合にパニックする。
+    /// 接地点または脚の物理量が有限でない場合、ばね定数・最大ストローク・
+    /// バンプストップ行程・最大伸長速度が正でない場合、減衰係数が負の場合にパニックする。
     #[must_use]
     pub fn new(
         contact_point: BodyPoint,
         spring_rate: SpringRate,
         damping_coefficient: DampingCoefficient,
         max_stroke: Meters,
+        bottom_stop_travel: Meters,
+        max_recoil_speed: MetersPerSecond,
     ) -> Self {
         assert!(
             contact_point.is_finite(),
@@ -92,12 +107,22 @@ impl LandingGearLeg {
             max_stroke.is_finite() && max_stroke.get() > 0.0,
             "gear maximum stroke must be finite and positive"
         );
+        assert!(
+            bottom_stop_travel.is_finite() && bottom_stop_travel.get() > 0.0,
+            "gear bottom-stop travel must be finite and positive"
+        );
+        assert!(
+            max_recoil_speed.is_finite() && max_recoil_speed.get() > 0.0,
+            "gear maximum recoil speed must be finite and positive"
+        );
 
         Self {
             contact_point,
             spring_rate,
             damping_coefficient,
             max_stroke,
+            bottom_stop_travel,
+            max_recoil_speed,
         }
     }
 
@@ -119,6 +144,28 @@ impl LandingGearLeg {
     #[must_use]
     pub const fn max_stroke(&self) -> Meters {
         self.max_stroke
+    }
+
+    /// 主ばねが底付きした後、バンプストップが潰れるまでの行程。
+    ///
+    /// タイヤの圧壊と脚構造のたわみに相当する。ここを使い切ると弾性力は一定になる。
+    #[must_use]
+    pub const fn bottom_stop_travel(&self) -> Meters {
+        self.bottom_stop_travel
+    }
+
+    /// 脚が伸びる（接地点が地面から離れる）速度の上限。
+    ///
+    /// 実機のオレオはリコイル弁で戻り流量を絞っており、圧縮より伸長の方がはるかに
+    /// 遅い。跳ね返りを抑えるための設計であって、後付けの安全弁ではない。
+    ///
+    /// **モデルとしてはこれが「接地が機体へ注入できるエネルギーの上限」になる。**
+    /// 接地点が離れる速度が `v` を超えないので、注入される運動エネルギーは
+    /// `0.5 · m_eff · v²` を超えない。めり込み量に依存しないのが要点で、
+    /// 初期化の幾何誤差がどれだけ大きくても機体は跳ね上がらない。
+    #[must_use]
+    pub const fn max_recoil_speed(&self) -> MetersPerSecond {
+        self.max_recoil_speed
     }
 }
 
@@ -183,6 +230,12 @@ impl LandingGearConfig {
                 SpringRate(120_000.0),
                 DampingCoefficient(13_000.0),
                 Meters(0.25),
+                // タイヤの圧壊 + 脚構造のたわみ。ここまでで弾性力は
+                // 120 kN/m × (0.25 + 6 × 0.05) = 66 kN（機体重量の約 6.5 倍）に頭打ちになる。
+                Meters(0.05),
+                // 全圧縮からの伸長速度。66 kN を返しきるのに約 1.3 秒かかる勘定で、
+                // 実機のリコイル弁付きオレオと同程度に「戻りが遅い」。
+                MetersPerSecond(0.5),
             )
         };
 
@@ -597,6 +650,36 @@ mod tests {
             SpringRate(f64::NAN),
             DampingCoefficient(1.0),
             Meters(0.2),
+            Meters(0.05),
+            MetersPerSecond(0.5),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "gear bottom-stop travel must be finite and positive")]
+    fn a_zero_bottom_stop_travel_is_rejected() {
+        // 0 を許すと弾性力が主ばねの頭打ちで終わり、ハードランディングで地面を抜ける。
+        let _ = LandingGearLeg::new(
+            BodyPoint::new(Meters(0.0), Meters(0.0), Meters(1.0)),
+            SpringRate(120_000.0),
+            DampingCoefficient(1.0),
+            Meters(0.2),
+            Meters::ZERO,
+            MetersPerSecond(0.5),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "gear maximum recoil speed must be finite and positive")]
+    fn a_zero_recoil_speed_is_rejected() {
+        // 0 だと弾性力が常に消え、機体が地面へ沈み続ける。ゼロ除算にもなる。
+        let _ = LandingGearLeg::new(
+            BodyPoint::new(Meters(0.0), Meters(0.0), Meters(1.0)),
+            SpringRate(120_000.0),
+            DampingCoefficient(1.0),
+            Meters(0.2),
+            Meters(0.05),
+            MetersPerSecond(0.0),
         );
     }
 
