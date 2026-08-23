@@ -119,7 +119,8 @@ impl<S: TileSource> Simulation<S> {
         sampler: GroundSampler,
     ) -> Self {
         let ground = sampler.sample(&mut terrain, start);
-        let state = crate::flight::parked_state(&config, start, ground.elevation, heading);
+        let state =
+            crate::flight::parked_state(&config, start, ground.elevation, ground.slope, heading);
         let gear_height = crate::flight::gear_height(&config);
         Self {
             dynamics: FlightDynamics::new(config, state),

@@ -26,7 +26,7 @@ use crate::director::{DirectorTargets, FlightDirector, VerticalTarget};
 use crate::ground::{GroundPlane, GroundSampler};
 use flightsim_core::{Attitude, Geodetic, Meters, MetersPerSecond, Ned, Radians, Seconds};
 use flightsim_fdm::{
-    AircraftConfig, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
+    AircraftConfig, ControlInputs, Environment, FlightDynamics, GroundSlope, RECOMMENDED_FIXED_DT,
     RigidBodyState,
 };
 use flightsim_world::{Terrain, TileSource};
@@ -396,18 +396,56 @@ pub fn gear_height(config: &AircraftConfig) -> Meters {
 ///
 /// 脚を伸ばし切った高さに置く。自重で数センチ沈んで落ち着くが、
 /// 静的釣り合いを呼び出し側で解くより素直で、脚の内部モデルに依存しない。
+///
+/// # 勾配を無視しない
+///
+/// 水平姿勢のまま「基準点の標高 + 脚の高さ」に置くと、傾斜地では
+/// 上り側の車輪が最初から地面に入る（15° 斜面で前脚 0.43 m）。
+/// めり込みは脚のばねに偽のエネルギーとして蓄えられ、かつては機体を
+/// 背面まで一回転させた（fdm 側の力の上界で転倒は塞いだが、
+/// **そもそもめり込ませないのが正しい**）。
+///
+/// どの脚も地面に入らない高さまで、勾配に応じて持ち上げる。
+/// 姿勢は水平のまま——実機も斜面では脚の伸縮で姿勢が付くが、
+/// それは spawn 直後の沈み込みで物理が解く。
 #[must_use]
 pub fn parked_state(
     config: &AircraftConfig,
     position: Geodetic,
     ground_elevation: Meters,
+    slope: GroundSlope,
     heading: Radians,
 ) -> RigidBodyState {
+    let (sin, cos) = heading.get().sin_cos();
+
+    // 各脚の接地点で「その脚の直下の地面」がどれだけ高いかを見て、
+    // いちばん厳しい脚が地面に触れる高さへ重心を置く。
+    let clearance_needed = config
+        .landing_gear
+        .legs()
+        .iter()
+        .map(|leg| {
+            let body = leg.contact_point().as_vec();
+            // 機体軸 (x=前, y=右) を方位で NED の水平面へ回す。
+            let north = body.x * cos - body.y * sin;
+            let east = body.x * sin + body.y * cos;
+            let ground_rise = slope.north() * north + slope.east() * east;
+            // z は下向き正。脚の下端 + その位置の地面の持ち上がり。
+            body.z + ground_rise
+        })
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    let clearance_needed = if clearance_needed.is_finite() {
+        clearance_needed.max(0.0)
+    } else {
+        gear_height(config).get()
+    };
+
     RigidBodyState::from_geodetic(
         Geodetic::new(
             position.latitude,
             position.longitude,
-            Meters(ground_elevation.get() + gear_height(config).get()),
+            Meters(ground_elevation.get() + clearance_needed),
         ),
         Attitude::new(Radians::ZERO, Radians::ZERO, heading),
         Ned::new(0.0, 0.0, 0.0),
@@ -438,7 +476,13 @@ pub fn fly<S: TileSource>(
     let initial_ground = sampler.sample(terrain, start);
     let mut dynamics = FlightDynamics::new(
         config.clone(),
-        parked_state(config, start, initial_ground.elevation, plan.runway_heading),
+        parked_state(
+            config,
+            start,
+            initial_ground.elevation,
+            initial_ground.slope,
+            plan.runway_heading,
+        ),
     );
 
     let mut samples = Vec::new();
