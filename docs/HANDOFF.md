@@ -1,7 +1,7 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-07（M2 = 描画層まで到達）
+更新: 2026-08-23（v0.5.0-alpha.3 = 実データの glTF を通した）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
@@ -10,14 +10,24 @@
 
 ## 1. 現状を 30 秒で
 
-地球規模フライトシミュレータ。Rust + Bevy、Windows 対象。**v0.1.0 時点で描画は一切ない。**
+地球規模フライトシミュレータ。Rust + Bevy、Windows 対象。
+**実地形の上を、テクスチャ付きの機体モデルで飛べる。**
 
 ```bash
-cargo test --workspace                 # 384 件、数秒
+# 純 Rust 側。456 件、数秒。**`--workspace` で回さないこと**（下記）
+cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
+# 描画層。Bevy を含むので重い。63 件
+cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 cargo bench --workspace                # 性能測定（criterion）
 bash scripts/check-architecture.sh     # 依存規約の検査
 cargo run -p flightsim-fdm --example aero_trace
 ```
+
+**`cargo test --workspace` はこのマシンでは通らない。** Bevy を含む全クレートの
+テストバイナリを同時にビルドするとメモリを使い切り、
+`failed to mmap ... The paging file is too small`（os error 1455）で落ちる。
+**コードの問題に見えるが環境の問題。** CI も上の 2 グループに分けてある。
 
 | クレート | 状態 |
 |---|---|
@@ -25,16 +35,26 @@ cargo run -p flightsim-fdm --example aero_trace
 | `flightsim-fdm` | 3 点式着陸装置で離着陸できる。実地形との結線は未実装 |
 | `flightsim-world` | タイル・DEM・LOD・ストリーミング・実行時タイル形式の読み書き |
 | `flightsim-tilegen` | オフライン CLI。Copernicus DEM の GeoTIFF から `.fsdem` を焼ける |
+| `flightsim-assetgen` | オフライン CLI。Meshy から機体モデルを取る。鍵は `.env` から読む |
 | `flightsim-sim` | 地形と FDM の結線。ヘッドレス実行と逐次 API |
-| `flightsim-render` / `input` / `ui` / `app` | Bevy 描画層。**画が出る** |
+| `flightsim-render` / `input` / `ui` / `app` | Bevy 描画層。**画が出る**。glTF の機体モデルを読める |
 
 **M2 まで到達した。** 実地形の上を飛ぶ様子が画面に出る。
+機体は箱のプレースホルダと glTF モデルのどちらでも動く（`--model` で切り替え）。
 Bevy は [ADR-0007](adr/0007-bevy-version.md) で **0.18.1 に固定**。
 **版上げは独立した PR で行うこと**（API 変更がまとまって来るため、他と混ぜると切り分け不能）。
 
 ```bash
 cargo run -p flightsim-tilegen -- --input dem.tif --output tiles --min-level 9 --max-level 13
 cargo run -p flightsim-sim --bin flightsim-headless -- --tiles tiles --start 35.553,139.781 --output flight.csv
+
+# 機体モデルを取る（要 .env の MESHY_API_KEY。書式は .env.example）
+cargo run -p flightsim-assetgen -- --prompt "a small white propeller aircraft" \
+    --output assets/aircraft/light_single.glb
+
+# そのモデルで飛ぶ。**軸はモデルごとに違う。** 横を向いていたら -x/+y を変える
+cargo run -p flightsim-app --release -- --model aircraft/light_single.glb \
+    --model-forward -x --model-up +y --view chase
 ```
 
 読む順番: [README.md](../README.md) → [ARCHITECTURE.md](../ARCHITECTURE.md) → [docs/adr/](adr/)
