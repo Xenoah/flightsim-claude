@@ -15,6 +15,7 @@
 //!
 //! | モジュール | 役割 |
 //! |---|---|
+//! | [`airport`] | 飛行場の幾何。滑走路の位置・向き・矩形上の判定 |
 //! | [`tile`] | 地理座標系クアッドツリー。タイル ID と範囲、隣接関係 |
 //! | [`dem`] | 標高格子とバイリニアサンプリング、幾何誤差の算出 |
 //! | [`dem::io`] | 実行時タイル形式 `.fsdem` の読み書き（ADR-0005） |
@@ -57,6 +58,7 @@
 //! assert!(to_load.len() <= scheduler.max_loads_per_frame());
 //! ```
 
+pub mod airport;
 pub mod dem;
 pub mod lod;
 pub mod mesh;
@@ -64,6 +66,7 @@ pub mod streaming;
 pub mod terrain;
 pub mod tile;
 
+pub use airport::{Runway, RunwayOffsets};
 pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};
 pub use lod::{LodSelection, LodSelector};
