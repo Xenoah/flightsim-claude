@@ -302,7 +302,17 @@ impl SunLighting {
     ///    **日没直前の日陰が真昼と同じ明るさで残る**
     #[must_use]
     pub fn ambient(&self, elevation: Radians) -> GlobalAmbientLight {
-        let day = daylight_fraction(elevation) * skylight_fraction(elevation);
+        // **2 つの係数は役割が違う。単純に掛けると薄明が消える。**
+        //
+        // `skylight_fraction` は地平線で 0 になるので、そのまま掛けると
+        // 日没の瞬間に夜の下限へ落ちる。`daylight_fraction` が -6°..+6° を
+        // 覆うよう作られているのに、その区間が丸ごと潰れていた
+        // （実測: 高度 -0.18° で既に夜と同じ 1500、地形の画素値 3〜7/255）。
+        //
+        // 薄明の幅は `daylight_fraction` が決め、`skylight_fraction` は
+        // 「太陽が高いほど明るい」を地平線より上で足すだけにする。
+        // 下限 0.3 は、地平線上の太陽でも天空光が消えないことを表す。
+        let day = daylight_fraction(elevation) * (0.3 + 0.7 * skylight_fraction(elevation));
         let brightness = self.night_ambient + (self.daylight_ambient - self.night_ambient) * day;
 
         let night = self.night_tint.to_linear();

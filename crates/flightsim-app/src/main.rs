@@ -253,6 +253,7 @@ fn main() {
                 update_model_visibility,
                 report_landings.after(advance_simulation),
                 adjust_time_rate,
+                toggle_tutorial,
             ),
         )
         .run();
@@ -563,6 +564,22 @@ fn update_model_visibility(
         if *visibility != wanted {
             *visibility = wanted;
         }
+    }
+}
+
+/// `H` でチュートリアルの表示を切り替える。
+///
+/// 時間加速と同じく、キー入力（`flightsim-input`）と表示状態
+/// （`flightsim-ui`）は同階層で直接依存できないため app に置く。
+///
+/// **上級者の邪魔をしないための逃げ道。** 状態機械は裏で動き続けるので、
+/// 戻したときは古い段階ではなく今の段階が出る。
+fn toggle_tutorial(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut visibility: ResMut<flightsim_ui::TutorialVisibility>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyH) {
+        visibility.toggle();
     }
 }
 

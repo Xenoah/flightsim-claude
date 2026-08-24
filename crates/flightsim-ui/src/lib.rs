@@ -24,6 +24,12 @@
 //!
 //! ゲームループを閉じる仕上げ。接地の評価は
 //! [`LandingReport`] / [`evaluate_landing`] / [`format_landing_report`] にある。
+//!
+//! ## チュートリアル導線
+//!
+//! 「初見のプレイヤーは離陸できない」が最大の離脱要因。今なにをすべきかを
+//! `HudState` から判定して画面中央上に指し示す。状態機械は
+//! [`TutorialStage`] / [`TutorialProgress`] にあり、Bevy に依存しない。
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -34,12 +40,17 @@ use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
 
 mod landing;
+mod tutorial;
 
 pub use landing::{
     LANDING_REPORT_DISPLAY_DURATION, LandingEvaluation, LandingGrade, LandingReport,
     LandingReportDisplay, LandingReportState, LandingReportTimer, evaluate_landing,
     format_landing_report, grade_for_sink_rate, spawn_landing_report_display,
     update_landing_report_display,
+};
+pub use tutorial::{
+    TutorialProgress, TutorialPrompt, TutorialStage, TutorialState, TutorialVisibility,
+    spawn_tutorial_prompt, update_tutorial_prompt,
 };
 
 /// HUD に出す値。アプリ側が毎フレーム詰める。
@@ -182,7 +193,14 @@ impl Plugin for FlightsimUiPlugin {
             // ここでは `init_resource` しない（app が接地のたびに挿入する契約）。
             .init_resource::<LandingReportState>()
             .add_systems(Startup, spawn_landing_report_display)
-            .add_systems(Update, update_landing_report_display);
+            .add_systems(Update, update_landing_report_display)
+            // チュートリアル導線。既定は表示（`TutorialVisibility::default()`）。
+            // 実際の `H` キー割り当ては input 担当が
+            // `ResMut<TutorialVisibility>::toggle` を呼べば繋がる。
+            .init_resource::<TutorialState>()
+            .init_resource::<TutorialVisibility>()
+            .add_systems(Startup, spawn_tutorial_prompt)
+            .add_systems(Update, update_tutorial_prompt);
     }
 }
 
@@ -294,6 +312,8 @@ pub fn help_text() -> String {
         "F/G ............... flaps out / in",
         "Space ............. wheel brakes",
         "C ................. change view",
+        "H ................. hide / show the guide",
+        ", / . ............. time faster / slower",
         "",
         "Takeoff: throttle to full, hold S at about 60 kt.",
     ]
