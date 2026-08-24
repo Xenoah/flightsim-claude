@@ -252,6 +252,7 @@ fn main() {
                 fit_loaded_model,
                 update_model_visibility,
                 report_landings.after(advance_simulation),
+                adjust_time_rate,
             ),
         )
         .run();
@@ -562,6 +563,29 @@ fn update_model_visibility(
         if *visibility != wanted {
             *visibility = wanted;
         }
+    }
+}
+
+/// 時間加速をキーで変える。
+///
+/// # なぜ app に置くのか
+///
+/// 時刻は `flightsim-render` の `TimeOfDay` が持ち、キー入力は
+/// `flightsim-input` が扱う。**この 2 つは同階層なので直接依存できない**
+/// （CLAUDE.md 規約 2 の横断禁止）。両方を知っているのは app だけ。
+///
+/// `,` で遅く、`.` で速く。日の出を待つのに実時間を使わせない。
+fn adjust_time_rate(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut clock: ResMut<flightsim_render::TimeOfDay>,
+) {
+    if keyboard.just_pressed(KeyCode::Period) {
+        clock.rate = clock.rate.faster();
+        info!("time rate: {}x", clock.rate.0);
+    }
+    if keyboard.just_pressed(KeyCode::Comma) {
+        clock.rate = clock.rate.slower();
+        info!("time rate: {}x", clock.rate.0);
     }
 }
 
