@@ -10,60 +10,22 @@
 
 ## 1. 現状を 30 秒で
 
-地球規模フライトシミュレータ。Rust + Bevy、Windows 対象。
-**実地形の上を、テクスチャ付きの機体モデルで飛べる。**
+**M2 達成（2026-08-24）。ゲームとして一周する。** 引数なしで起動すると
+合成飛行場の滑走路中心線上から始まり、離陸して戻って降りると着陸が
+5 段階で評価される。ゲームパッド対応（キーボードと軸ごとに共存）。
 
 ```bash
-# 純 Rust 側。460 件、数秒。**`--workspace` で回さないこと**（下記）
-cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
-    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。81 件
-cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
-cargo bench --workspace                # 性能測定（criterion）
-bash scripts/check-architecture.sh     # 依存規約の検査
-cargo run -p flightsim-fdm --example aero_trace
+cargo run -p flightsim-app --release -- --tiles data/tiles   # 滑走路から
+cargo run -p flightsim-tilegen --example synthetic_dem -- data/synthetic.tif
+cargo run -p flightsim-tilegen -- --input data/synthetic.tif --output data/tiles     --min-level 8 --max-level 12                             # タイルが無ければ先に焼く
 ```
 
-**`cargo test --workspace` はこのマシンでは通らない。** Bevy を含む全クレートの
-テストバイナリを同時にビルドするとメモリを使い切り、
-`failed to mmap ... The paging file is too small`（os error 1455）で落ちる。
-**コードの問題に見えるが環境の問題。** CI も上の 2 グループに分けてある。
+- 機体はテクスチャ付き glb を同梱（引数なしで出る）。`--no-model` で箱に戻す
+- 着陸評価は右上に 10 秒表示。滑走路外は Normal 止まり
+- 検証用 `--drop 15` で空中から落とし、評価表示の経路を通せる
+- M2 の受け入れテストは `crates/flightsim-sim/tests/airport_circuit.rs`
 
-| クレート | 状態 |
-|---|---|
-| `flightsim-core` | 完成。座標系・単位・floating origin・固定ステップ |
-| `flightsim-fdm` | 3 点式着陸装置で離着陸できる。実地形との結線は未実装 |
-| `flightsim-world` | タイル・DEM・LOD・ストリーミング・実行時タイル形式の読み書き |
-| `flightsim-tilegen` | オフライン CLI。Copernicus DEM の GeoTIFF から `.fsdem` を焼ける |
-| `flightsim-assetgen` | オフライン CLI。Meshy から機体モデルを取る。鍵は `.env` から読む |
-| `flightsim-sim` | 地形と FDM の結線。ヘッドレス実行と逐次 API |
-| `flightsim-render` / `input` / `ui` / `app` | Bevy 描画層。**画が出る**。glTF の機体モデルを読める |
-
-**M2 まで到達した。** 実地形の上を飛ぶ様子が画面に出る。
-機体は箱のプレースホルダと glTF モデルのどちらでも動く（`--model` で切り替え）。
-Bevy は [ADR-0007](adr/0007-bevy-version.md) で **0.18.1 に固定**。
-**版上げは独立した PR で行うこと**（API 変更がまとまって来るため、他と混ぜると切り分け不能）。
-
-```bash
-cargo run -p flightsim-tilegen -- --input dem.tif --output tiles --min-level 9 --max-level 13
-cargo run -p flightsim-sim --bin flightsim-headless -- --tiles tiles --start 35.553,139.781 --output flight.csv
-
-# 起動。**引数なしで同梱の機体モデルが出る**（assets/aircraft/light_single.glb）
-cargo run -p flightsim-app --release
-cargo run -p flightsim-app --release -- --no-model    # 箱のプレースホルダに戻す
-
-# 別のモデルを取ってくる（要 .env の MESHY_API_KEY。書式は .env.example）
-cargo run -p flightsim-assetgen -- --prompt "a small white propeller aircraft" \
-    --output assets/aircraft/other.glb
-
-# そのモデルで飛ぶ。**軸はモデルごとに違う。** 横を向いていたら -x/+y を変える
-cargo run -p flightsim-app --release -- --model aircraft/other.glb \
-    --model-forward -x --model-up +y --view chase
-```
-
-読む順番: [README.md](../README.md) → [ARCHITECTURE.md](../ARCHITECTURE.md) → [docs/adr/](adr/)
-
----
+次の大きな塊は M3（空港データ・計器・天候・時刻）。ROADMAP を参照。
 
 ## 2. 破ってはいけない制約
 

@@ -25,8 +25,10 @@ use flightsim_core::{Radians, Seconds};
 use flightsim_fdm::ControlInputs;
 
 pub mod camera;
+pub mod gamepad;
 
 pub use camera::{CameraRig, ViewMode};
+pub use gamepad::{AxisCurve, GamepadAxisMappings, PilotGamepad};
 
 /// 1 本の操縦軸。キーボード入力を連続量へ変える。
 ///
@@ -146,6 +148,26 @@ impl RampAxis {
             next.clamp(0.0, 1.0)
         };
     }
+
+    /// アナログ入力で 1 フレーム進める。実機のスロットルレバーと同じ操作感。
+    ///
+    /// `rate_fraction` は `[-1, 1]`（正で増加、負で減少、0 で保持)。トリガーを
+    /// 離すと `rate_fraction` は 0 になり、**現在値をそのまま保持する**。
+    /// [`Self::set_absolute`] のように瞬時値を書き込むわけではない —
+    /// トリガーの押し込み量を「動かす速さ」として扱う。
+    pub fn update_analog(&mut self, dt: Seconds, rate_fraction: f64) {
+        let rate_fraction = if rate_fraction.is_nan() {
+            0.0
+        } else {
+            rate_fraction.clamp(-1.0, 1.0)
+        };
+        let next = self.value + self.rate * dt.get() * rate_fraction;
+        self.value = if next.is_nan() {
+            0.0
+        } else {
+            next.clamp(0.0, 1.0)
+        };
+    }
 }
 
 /// `[-1, 1]` に収め、NaN を 0 に潰す。
@@ -214,6 +236,80 @@ impl PilotControls {
         self.brakes = f64::from(u8::from(keys.brakes));
     }
 
+    /// キー状態とゲームパッドの両方から 1 フレームぶん進める。
+    ///
+    /// # キーボードとの共存
+    ///
+    /// **軸ごとに**「ゲームパッドのその軸に触れているか」を見る。触れていれば
+    /// ゲームパッドの値をそのまま使い(ジョイスティックは絶対位置がそのまま
+    /// 舵角)、触れていなければキーボードのレート制御に委ねる。これにより、
+    /// 「ゲームパッドを繋いだらキーボードが死ぬ」も「一方のチャンネルを
+    /// 動かしたらもう一方が巻き込まれる」も起きない。ブレーキだけは論理和で
+    /// 合成する(踏んでいる間だけ有効という on/off な性質上、競合しないため)。
+    ///
+    /// `gamepad` が `None`(未接続)なら [`Self::update`] と完全に同じ結果になる。
+    pub fn update_with_gamepad(
+        &mut self,
+        dt: Seconds,
+        keys: PilotKeys,
+        gamepad: Option<PilotGamepad>,
+        mappings: &GamepadAxisMappings,
+    ) {
+        let gp = gamepad.unwrap_or_default();
+
+        if gamepad.is_some() && gamepad::is_axis_touched(gp.left_stick_x, mappings.aileron.deadzone)
+        {
+            self.aileron
+                .set_absolute(mappings.aileron.apply(gp.left_stick_x));
+        } else {
+            self.aileron.update(dt, keys.roll_right, keys.roll_left);
+        }
+
+        // スティック手前(奥へ倒すほど正という Bevy の軸規約で `y < 0`)に引く
+        // と機首が上がる、という航空機の慣習をここで固定する。符号のテストは
+        // `elevator_sign_matches_pulling_the_stick_back` にある。
+        if gamepad.is_some()
+            && gamepad::is_axis_touched(gp.left_stick_y, mappings.elevator.deadzone)
+        {
+            self.elevator
+                .set_absolute(mappings.elevator.apply(-gp.left_stick_y));
+        } else {
+            self.elevator.update(dt, keys.pitch_up, keys.pitch_down);
+        }
+
+        if gamepad.is_some() && gamepad::is_axis_touched(gp.right_stick_x, mappings.rudder.deadzone)
+        {
+            self.rudder
+                .set_absolute(mappings.rudder.apply(gp.right_stick_x));
+        } else {
+            self.rudder.update(dt, keys.yaw_right, keys.yaw_left);
+        }
+
+        // スロットルは瞬時値ではなく保持値。トリガーの押し込み量を
+        // 「動かす速さ」として使う(実機のスロットルレバーと同じ操作感)。
+        let trigger_touched = gamepad.is_some()
+            && (gamepad::is_axis_touched(gp.right_trigger, mappings.throttle.deadzone)
+                || gamepad::is_axis_touched(gp.left_trigger, mappings.throttle.deadzone));
+        if trigger_touched {
+            let increase = mappings.throttle.apply(gp.right_trigger).max(0.0);
+            let decrease = mappings.throttle.apply(gp.left_trigger).max(0.0);
+            self.throttle.update_analog(dt, increase - decrease);
+        } else {
+            self.throttle
+                .update(dt, keys.throttle_up, keys.throttle_down);
+        }
+
+        // フラップはどちらのボタンかを押していたらゲームパッドを優先する。
+        if gamepad.is_some() && (gp.flaps_extend || gp.flaps_retract) {
+            self.flaps.update(dt, gp.flaps_extend, gp.flaps_retract);
+        } else {
+            self.flaps.update(dt, keys.flaps_extend, keys.flaps_retract);
+        }
+
+        // ブレーキは on/off なので、どちらかが踏んでいれば効く。
+        self.brakes = f64::from(u8::from(keys.brakes || gp.brakes));
+    }
+
     /// FDM へ渡す形にする。
     #[must_use]
     pub fn to_control_inputs(self) -> ControlInputs {
@@ -244,13 +340,48 @@ impl Plugin for FlightsimInputPlugin {
         app.init_resource::<PilotControls>()
             .init_resource::<LookAround>()
             .init_resource::<ViewMode>()
+            .init_resource::<GamepadSettings>()
             .add_systems(Update, (read_pilot_keys, cycle_view_mode));
     }
 }
 
-/// キーボードを読んで [`PilotControls`] を更新する。
+/// ゲームパッドのデッドゾーンと感度カーブ。
+///
+/// [`GamepadAxisMappings`] は Bevy 非依存の純データなので、
+/// リソースにするための包みだけをこちら側に置く。
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct GamepadSettings(pub GamepadAxisMappings);
+
+/// 接続中のゲームパッドから 1 フレームぶんの生入力を読む。
+///
+/// 複数繋がっている場合は最初の 1 台。**未接続なら `None`** を返し、
+/// 呼び出し側はキーボードだけで更新する。
+fn read_gamepad(gamepads: &Query<&Gamepad>) -> Option<PilotGamepad> {
+    let gamepad = gamepads.iter().next()?;
+    let axis = |axis: GamepadAxis| f64::from(gamepad.get(axis).unwrap_or(0.0));
+    let trigger = |button: GamepadButton| f64::from(gamepad.get(button).unwrap_or(0.0));
+
+    Some(PilotGamepad {
+        left_stick_x: axis(GamepadAxis::LeftStickX),
+        left_stick_y: axis(GamepadAxis::LeftStickY),
+        right_stick_x: axis(GamepadAxis::RightStickX),
+        right_trigger: trigger(GamepadButton::RightTrigger2),
+        left_trigger: trigger(GamepadButton::LeftTrigger2),
+        // フラップは下げる方向が「出す」。十字キーの下 = 出す、が直感に合う。
+        flaps_extend: gamepad.pressed(GamepadButton::DPadDown),
+        flaps_retract: gamepad.pressed(GamepadButton::DPadUp),
+        brakes: gamepad.pressed(GamepadButton::South),
+    })
+}
+
+/// キーボードとゲームパッドを読んで [`PilotControls`] を更新する。
+///
+/// 軸ごとに「ゲームパッドに触れているか」で使い分ける
+/// （[`PilotControls::update_with_gamepad`]）。
 pub fn read_pilot_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+    settings: Res<GamepadSettings>,
     time: Res<Time>,
     mut controls: ResMut<PilotControls>,
 ) {
@@ -268,12 +399,24 @@ pub fn read_pilot_keys(
         flaps_retract: keyboard.pressed(KeyCode::KeyG),
         brakes: keyboard.pressed(KeyCode::Space),
     };
-    controls.update(Seconds(f64::from(time.delta_secs())), keys);
+    controls.update_with_gamepad(
+        Seconds(f64::from(time.delta_secs())),
+        keys,
+        read_gamepad(&gamepads),
+        &settings.0,
+    );
 }
 
-/// `C` キーで視点を切り替える。
-pub fn cycle_view_mode(keyboard: Res<ButtonInput<KeyCode>>, mut mode: ResMut<ViewMode>) {
-    if keyboard.just_pressed(KeyCode::KeyC) {
+/// `C` キーまたはゲームパッドの北ボタン（Y/△）で視点を切り替える。
+pub fn cycle_view_mode(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<&Gamepad>,
+    mut mode: ResMut<ViewMode>,
+) {
+    let pad_pressed = gamepads
+        .iter()
+        .any(|gamepad| gamepad.just_pressed(GamepadButton::North));
+    if keyboard.just_pressed(KeyCode::KeyC) || pad_pressed {
         *mode = mode.next();
     }
 }
@@ -288,6 +431,178 @@ mod tests {
         for _ in 0..frames {
             axis.update(FRAME, positive, negative);
         }
+    }
+
+    // --- ゲームパッドとの合成 ---
+
+    fn quiet_keys() -> PilotKeys {
+        PilotKeys::default()
+    }
+
+    #[test]
+    fn elevator_sign_matches_pulling_the_stick_back() {
+        // スティックを手前（Bevy の軸規約で y < 0）に引くと機首上げ。
+        // ここを逆にすると、着陸のフレアで機首が下がる。
+        let mut controls = PilotControls::default();
+        let pad = PilotGamepad {
+            left_stick_y: -1.0,
+            ..PilotGamepad::default()
+        };
+        controls.update_with_gamepad(
+            FRAME,
+            quiet_keys(),
+            Some(pad),
+            &GamepadAxisMappings::default(),
+        );
+        assert!(
+            controls.to_control_inputs().elevator() > 0.9,
+            "pulling the stick back must pitch the nose up"
+        );
+    }
+
+    #[test]
+    fn an_untouched_pad_leaves_the_keyboard_in_charge() {
+        // 「ゲームパッドを繋いだらキーボードが死ぬ」を防ぐ。
+        let mut with_pad = PilotControls::default();
+        let mut without_pad = PilotControls::default();
+        let keys = PilotKeys {
+            roll_right: true,
+            throttle_up: true,
+            ..PilotKeys::default()
+        };
+
+        for _ in 0..30 {
+            with_pad.update_with_gamepad(
+                FRAME,
+                keys,
+                // 繋がってはいるが、どの軸もデッドゾーン内。
+                Some(PilotGamepad {
+                    left_stick_x: 0.05,
+                    ..PilotGamepad::default()
+                }),
+                &GamepadAxisMappings::default(),
+            );
+            without_pad.update(FRAME, keys);
+        }
+
+        let a = with_pad.to_control_inputs();
+        let b = without_pad.to_control_inputs();
+        assert!(
+            (a.aileron() - b.aileron()).abs() < 1e-12
+                && (a.throttle() - b.throttle()).abs() < 1e-12,
+            "an idle gamepad changed the keyboard behaviour"
+        );
+        assert!(a.aileron() > 0.0, "the keyboard input must still act");
+    }
+
+    #[test]
+    fn touching_one_axis_does_not_capture_the_others() {
+        // エルロンをスティックで取り、ラダーはキーボードのまま。
+        let mut controls = PilotControls::default();
+        let keys = PilotKeys {
+            yaw_right: true,
+            ..PilotKeys::default()
+        };
+        let pad = PilotGamepad {
+            left_stick_x: 0.8,
+            ..PilotGamepad::default()
+        };
+        for _ in 0..30 {
+            controls.update_with_gamepad(FRAME, keys, Some(pad), &GamepadAxisMappings::default());
+        }
+        let inputs = controls.to_control_inputs();
+        assert!(inputs.aileron() > 0.5, "the stick should drive the aileron");
+        assert!(
+            inputs.rudder() > 0.0,
+            "the keyboard rudder must keep working while the stick rolls"
+        );
+    }
+
+    #[test]
+    fn releasing_the_trigger_holds_the_throttle() {
+        // 実機のスロットルレバーと同じ。離しても戻らない。
+        let mut controls = PilotControls::default();
+        let mappings = GamepadAxisMappings::default();
+
+        // 3 秒間 右トリガーを全開（レート 0.25/s なので 0.75 まで開く）。
+        for _ in 0..180 {
+            controls.update_with_gamepad(
+                FRAME,
+                quiet_keys(),
+                Some(PilotGamepad {
+                    right_trigger: 1.0,
+                    ..PilotGamepad::default()
+                }),
+                &mappings,
+            );
+        }
+        let held = controls.to_control_inputs().throttle();
+        assert!(
+            held > 0.6,
+            "three seconds of full trigger should open the throttle"
+        );
+
+        // 離して 2 秒。値が保持されること。
+        for _ in 0..120 {
+            controls.update_with_gamepad(
+                FRAME,
+                quiet_keys(),
+                Some(PilotGamepad::default()),
+                &mappings,
+            );
+        }
+        let after = controls.to_control_inputs().throttle();
+        assert!(
+            (after - held).abs() < 1e-9,
+            "the throttle crept from {held} to {after} after releasing the trigger"
+        );
+    }
+
+    #[test]
+    fn brakes_from_either_source_work() {
+        let mut controls = PilotControls::default();
+        controls.update_with_gamepad(
+            FRAME,
+            quiet_keys(),
+            Some(PilotGamepad {
+                brakes: true,
+                ..PilotGamepad::default()
+            }),
+            &GamepadAxisMappings::default(),
+        );
+        assert!(controls.to_control_inputs().brakes() > 0.5);
+
+        let mut keyboard_only = PilotControls::default();
+        keyboard_only.update_with_gamepad(
+            FRAME,
+            PilotKeys {
+                brakes: true,
+                ..PilotKeys::default()
+            },
+            Some(PilotGamepad::default()),
+            &GamepadAxisMappings::default(),
+        );
+        assert!(keyboard_only.to_control_inputs().brakes() > 0.5);
+    }
+
+    #[test]
+    fn no_gamepad_behaves_exactly_like_the_keyboard_path() {
+        let keys = PilotKeys {
+            pitch_up: true,
+            throttle_up: true,
+            ..PilotKeys::default()
+        };
+        let mut via_gamepad_api = PilotControls::default();
+        let mut plain = PilotControls::default();
+        for _ in 0..60 {
+            via_gamepad_api.update_with_gamepad(FRAME, keys, None, &GamepadAxisMappings::default());
+            plain.update(FRAME, keys);
+        }
+        assert_eq!(
+            via_gamepad_api.to_control_inputs(),
+            plain.to_control_inputs(),
+            "with no gamepad connected the two paths must be identical"
+        );
     }
 
     // --- キーボードの舵 ---
