@@ -30,6 +30,7 @@ use flightsim_fdm::{
     RigidBodyState,
 };
 use flightsim_world::{Terrain, TileSource};
+use glam::{DMat3, DQuat, DVec3};
 
 /// 車輪がこれ以上地面から離れていれば、確実に空中にいるとみなす高さ。
 ///
@@ -397,17 +398,19 @@ pub fn gear_height(config: &AircraftConfig) -> Meters {
 /// 脚を伸ばし切った高さに置く。自重で数センチ沈んで落ち着くが、
 /// 静的釣り合いを呼び出し側で解くより素直で、脚の内部モデルに依存しない。
 ///
-/// # 勾配を無視しない
+/// # 姿勢を斜面に合わせる
 ///
-/// 水平姿勢のまま「基準点の標高 + 脚の高さ」に置くと、傾斜地では
-/// 上り側の車輪が最初から地面に入る（15° 斜面で前脚 0.43 m）。
-/// めり込みは脚のばねに偽のエネルギーとして蓄えられ、かつては機体を
-/// 背面まで一回転させた（fdm 側の力の上界で転倒は塞いだが、
-/// **そもそもめり込ませないのが正しい**）。
+/// 傾斜地では、水平姿勢のどの置き方にも欠陥がある:
 ///
-/// どの脚も地面に入らない高さまで、勾配に応じて持ち上げる。
-/// 姿勢は水平のまま——実機も斜面では脚の伸縮で姿勢が付くが、
-/// それは spawn 直後の沈み込みで物理が解く。
+/// - 「基準点の標高 + 脚の高さ」に置く → 上り側の車輪が最初から地面に入る
+///   （15° 斜面で前脚 0.43 m）。めり込みが脚のばねに偽のエネルギーとして
+///   蓄えられ、機体を背面まで一回転させた
+/// - どの脚も入らない高さへ持ち上げる → 反対側の脚が浮き（25° 斜面で
+///   約 1.5 m）、**落下エネルギー約 7.6 kJ が転倒障壁 2.9 kJ を上回って
+///   やはり裏返る**。実際に CI がこれを捕まえた
+///
+/// 実機が斜面に駐機したときと同じく、**機体を斜面に沿って傾け、全脚を
+/// 同時に接地させる**。落下もめり込みも起きない。
 #[must_use]
 pub fn parked_state(
     config: &AircraftConfig,
@@ -416,22 +419,21 @@ pub fn parked_state(
     slope: GroundSlope,
     heading: Radians,
 ) -> RigidBodyState {
-    let (sin, cos) = heading.get().sin_cos();
+    let attitude = attitude_on_slope(slope, heading);
 
-    // 各脚の接地点で「その脚の直下の地面」がどれだけ高いかを見て、
-    // いちばん厳しい脚が地面に触れる高さへ重心を置く。
+    // 傾けた姿勢で各脚の接地点がどこへ来るかを見て、
+    // いちばん厳しい脚がちょうど地面に触れる高さへ重心を置く。
+    // 姿勢が斜面に沿っていれば、全脚の値はほぼ一致する。
+    let rotation = attitude.to_quaternion();
     let clearance_needed = config
         .landing_gear
         .legs()
         .iter()
         .map(|leg| {
-            let body = leg.contact_point().as_vec();
-            // 機体軸 (x=前, y=右) を方位で NED の水平面へ回す。
-            let north = body.x * cos - body.y * sin;
-            let east = body.x * sin + body.y * cos;
-            let ground_rise = slope.north() * north + slope.east() * east;
+            let ned = rotation * leg.contact_point().as_vec();
+            let ground_rise = slope.north() * ned.x + slope.east() * ned.y;
             // z は下向き正。脚の下端 + その位置の地面の持ち上がり。
-            body.z + ground_rise
+            ned.z + ground_rise
         })
         .fold(f64::NEG_INFINITY, f64::max);
 
@@ -447,9 +449,35 @@ pub fn parked_state(
             position.longitude,
             Meters(ground_elevation.get() + clearance_needed),
         ),
-        Attitude::new(Radians::ZERO, Radians::ZERO, heading),
+        attitude,
         Ned::new(0.0, 0.0, 0.0),
     )
+}
+
+/// 指定方位で斜面に沿って立つ姿勢。
+///
+/// 機体の下方向（体軸 Z）を斜面の法線に合わせ、機首は方位の水平方向を
+/// 斜面に投影した向きにする。NED（x=北, y=東, z=下）は右手系なので
+/// `y = z × x` で右翼方向が決まる。
+fn attitude_on_slope(slope: GroundSlope, heading: Radians) -> Attitude {
+    // 地面 z_down = -(sn·北 + se·東) の下向き法線。勾配が非有限なら水平。
+    let (north, east) = if slope.is_finite() {
+        (slope.north(), slope.east())
+    } else {
+        (0.0, 0.0)
+    };
+    let body_down = DVec3::new(north, east, 1.0).normalize();
+
+    let (sin, cos) = heading.get().sin_cos();
+    let level_forward = DVec3::new(cos, sin, 0.0);
+    // 方位の水平方向を斜面へ投影。法線が水平に近い勾配は
+    // GroundSampler 側で上限が掛かるため、ここでは縮退しない。
+    let forward = (level_forward - body_down * level_forward.dot(body_down)).normalize();
+    let right = body_down.cross(forward);
+
+    // 列 = 機体軸を NED で表したもの。体軸 → NED の回転。
+    let rotation = DQuat::from_mat3(&DMat3::from_cols(forward, right, body_down)).normalize();
+    Attitude::from_quaternion(rotation)
 }
 
 /// 地形の上を飛ばして軌跡を返す。
