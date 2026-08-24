@@ -93,6 +93,7 @@ CI の Windows / Linux 双方でビルド環境の差異を持ち込む。
 | `png` | スクリーンショットの保存 |
 | `jpeg` | **モデルのテクスチャ。下記のとおり必須** |
 | `reflect_auto_register` | **反射の型登録。下記のとおり必須** |
+| `bevy_gilrs` | ゲームパッド。**Linux CI に `libudev-dev` が要る** |
 
 **入れていないもの**: 音声、アニメーション、gizmo、開発ツール。
 必要になった時点で足す。既定のまま全部入れると、使いもしない依存の
@@ -155,7 +156,9 @@ ERROR bevy_asset::server: Failed to load asset 'aircraft/light_single.glb'
   （Bevy 非依存の規約が効いている）
 - Bevy の版上げは**独立した PR** として扱う。他の変更と混ぜない。
   API 変更がまとまって来るため、混ぜると原因の切り分けができなくなる
-- Linux CI に winit のシステム依存（`libxkbcommon-dev` 等）が要る
+- Linux CI に winit のシステム依存（`libxkbcommon-dev` 等）と、
+  ゲームパッド（gilrs → libudev-sys）の `libudev-dev` が要る。
+  後者は **cargo doc でも要る**（build.rs が pkg-config を叩く）
 
 **得られる保証**
 
