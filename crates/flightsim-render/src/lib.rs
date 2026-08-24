@@ -14,9 +14,10 @@
 //! ```text
 //!   1. カメラ位置から RenderFrame を打ち直す（必要なら）
 //!   2. WorldPosition / WorldOrientation → Transform を更新
-//!   3. LOD を選ぶ
-//!   4. 予算内でタイルを読み、メッシュを作って spawn
-//!   5. 選ばれなくなったタイルを despawn
+//!   3. 時刻を進め、太陽の位置と光量を決める
+//!   4. LOD を選ぶ
+//!   5. 予算内でタイルを読み、メッシュを作って spawn
+//!   6. 選ばれなくなったタイルを despawn
 //! ```
 //!
 //! この手順は `flightsim-sim` の `tests/render_rehearsal.rs` が Bevy 抜きで
@@ -27,6 +28,20 @@
 //! 描画は [`RenderFrame`] のローカル接平面（X = 東、Y = 上、Z = 南）を使う。
 //! ECEF 相対ではない。Bevy の大気散乱が `world_position.y` を海抜高度として
 //! 読むため（ADR-0007）。
+//!
+//! ## 時刻と太陽
+//!
+//! [`TimeOfDay`] が唯一の入力で、[`SunDirection`] はそこからの派生値
+//! （[`daylight`] と [`sun`]）。**壁時計時間は見ない。**
+//!
+//! 上位（`app`）がやることは 2 つだけ。
+//!
+//! 1. 太陽の光源を [`sun_light_bundle`] で spawn する
+//!    （[`SunLight`] の印が付いていない光源は時刻に追随しない）
+//! 2. 開始時刻を決めたければ [`TimeOfDay`] を `insert_resource` する。
+//!    既定でも [`TimeOfDay::default`] が入る
+//!
+//! 絵を目で確かめるには `cargo run -p flightsim-render --example sun_clock`。
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -42,12 +57,18 @@ use flightsim_world::{
 use std::collections::HashMap;
 
 pub mod aircraft;
+pub mod daylight;
 pub mod model;
 pub mod runway;
+pub mod sun;
 pub mod terrain;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
+pub use daylight::{
+    SunIlluminancePolicy, SunLight, SunLighting, TimeOfDay, TimeRate, direct_normal_illuminance,
+};
 pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
+pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**
@@ -83,6 +104,10 @@ impl Default for CameraWorldPosition {
 }
 
 /// 太陽の向き（ローカル NED 基準の方位と仰角）。
+///
+/// **時刻から導かれる派生値。** [`daylight::update_sun_direction`] が
+/// [`TimeOfDay`] とカメラ位置から毎フレーム計算して上書きする。
+/// ここを直接書き換えても次のフレームで戻る。時刻のほうを動かすこと。
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct SunDirection {
     /// 真方位。
@@ -95,8 +120,18 @@ impl Default for SunDirection {
     fn default() -> Self {
         Self {
             // 南南西・仰角 45°。地形の陰影が出やすい向き。
+            // 最初のフレームで時刻から計算した値に置き換わる。
             azimuth: flightsim_core::Degrees(200.0).to_radians(),
             elevation: flightsim_core::Degrees(45.0).to_radians(),
+        }
+    }
+}
+
+impl From<SolarPosition> for SunDirection {
+    fn from(position: SolarPosition) -> Self {
+        Self {
+            azimuth: position.azimuth,
+            elevation: position.elevation,
         }
     }
 }
@@ -111,6 +146,8 @@ pub enum RenderSet {
     Rebase,
     /// 世界座標 → `Transform`。
     Transforms,
+    /// 時刻の進行と太陽の位置・光量。
+    Sun,
     /// 地形の LOD 選択・ストリーミング・spawn。
     Terrain,
 }
@@ -123,17 +160,46 @@ impl Plugin for FlightsimRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraWorldPosition>()
             .init_resource::<SunDirection>()
+            .init_resource::<TimeOfDay>()
+            .init_resource::<SunLighting>()
+            // `LightPlugin` も同じことをする。**どちらが先でも同じ値**になるよう
+            // `init_resource` で入れること（`insert_resource` だと上書きし合う）。
+            .init_resource::<bevy::light::GlobalAmbientLight>()
             .init_resource::<TerrainTiles>()
             .init_resource::<TerrainRenderConfig>()
+            // **背景は黒でなければならない。**
+            //
+            // 大気散乱は「散乱光 + 背景 × 透過率」を書く。bevy の既定の背景は
+            // sRGB (43, 44, 47) の暗い灰色で、これが透過率ごしに空へ滲む。
+            // 実測すると、太陽をどこへ動かしても、照度を 0 にしてさえ、
+            // 空の平均画素が (40.3, 35.3, 27.9) から動かなかった。
+            // **夜が来ない原因がこれだった。** 散乱の計算ではなく背景の色。
+            //
+            // `init_resource` では駄目。`CameraPlugin` が既定値を先に入れるので、
+            // ここは上書きする必要がある。
+            .insert_resource(ClearColor(Color::BLACK))
             .configure_sets(
                 Update,
-                (RenderSet::Rebase, RenderSet::Transforms, RenderSet::Terrain).chain(),
+                (
+                    RenderSet::Rebase,
+                    RenderSet::Transforms,
+                    RenderSet::Sun,
+                    RenderSet::Terrain,
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
                 (
                     rebase_render_origin.in_set(RenderSet::Rebase),
                     apply_world_positions.in_set(RenderSet::Transforms),
+                    (
+                        daylight::advance_time_of_day,
+                        daylight::update_sun_direction,
+                        daylight::apply_sun_light,
+                    )
+                        .chain()
+                        .in_set(RenderSet::Sun),
                 ),
             );
     }
@@ -206,6 +272,27 @@ pub fn sun_light_direction(sun: SunDirection) -> Vec3 {
     // 描画座標は X = 東、Y = 上、Z = 南。光の進む向きは太陽方向の逆。
     let to_sun = Vec3::new(east as f32, up as f32, -north as f32);
     -to_sun.normalize()
+}
+
+/// 太陽の平行光源を spawn するときの構成要素。
+///
+/// **`SunLight` の印を必ず付けること。** 付いていない `DirectionalLight` は
+/// [`daylight::apply_sun_light`] が触らないので、時刻を進めても向きが変わらない。
+///
+/// 影を落とすのは 1 つだけにすること。平行光源ごとにカスケードシャドウマップを
+/// 持つので、増やすと素直に重くなる。
+#[must_use]
+pub fn sun_light_bundle(lighting: &SunLighting, sun: SunDirection) -> impl Bundle {
+    (
+        SunLight,
+        DirectionalLight {
+            illuminance: lighting.illuminance(sun.elevation),
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::default().looking_to(sun_light_direction(sun), Vec3::Y),
+        Name::new("sun"),
+    )
 }
 
 /// LOD 選択とストリーミングの結果。

@@ -98,6 +98,13 @@ struct Startup {
     model_fit: ModelFit,
     /// 定常風。`--wind <方位>/<ノット>` で指定する（航空の慣習で from）。
     wind: flightsim_sim::Wind,
+    /// 開始時刻（地方平均太陽時）。`None` なら render 側の既定。
+    ///
+    /// **地方平均太陽時にするのは、経度がどこでも「9 時なら朝」だから。**
+    /// UTC で指定させると、飛ぶ場所によって同じ時刻が昼にも夜にもなる。
+    start_hour: Option<(u8, u8)>,
+    /// 時間加速の倍率。
+    time_rate: f64,
     /// 指定すると、地面から この高さ（m）の空中に静止 spawn する。
     ///
     /// **着陸評価の結線を実際に確かめるための開発用。** 落下して接地する
@@ -132,6 +139,8 @@ impl Default for Startup {
                 ..ModelFit::default()
             },
             wind: flightsim_sim::Wind::CALM,
+            start_hour: None,
+            time_rate: 1.0,
             drop_height: None,
             assets: None,
         }
@@ -191,6 +200,21 @@ fn main() {
             .push("could not find an `assets/` directory; models will not load".to_owned()),
     }
 
+    // 時刻は地方平均太陽時で受ける。**経度がどこでも「9 時なら朝」**になる。
+    let clock = {
+        let mut clock = startup.start_hour.map_or_else(
+            flightsim_render::TimeOfDay::default,
+            |(hour, minute)| {
+                flightsim_render::TimeOfDay::at_local_mean_solar_time(
+                    flightsim_render::UtcDateTime::new(2026, 6, 21, hour, minute, 0.0),
+                    startup.start.longitude,
+                )
+            },
+        );
+        clock.rate = flightsim_render::TimeRate(startup.time_rate);
+        clock
+    };
+
     App::new()
         .add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
             primary_window: Some(Window {
@@ -204,6 +228,7 @@ fn main() {
             FlightsimInputPlugin,
             FlightsimUiPlugin,
         ))
+        .insert_resource(clock)
         .insert_resource(startup)
         .insert_resource(diagnostics)
         .init_resource::<CameraRig>()
@@ -328,6 +353,23 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                 },
                 None => notes.push("--wind needs `<bearing>/<knots>`, e.g. 270/10".to_owned()),
             },
+            // 地方平均太陽時。`--time 05:30` で日の出前から始まる。
+            "--time" => match arguments.next() {
+                Some(text) => match parse_clock(&text) {
+                    Ok(clock) => startup.start_hour = Some(clock),
+                    Err(message) => notes.push(message),
+                },
+                None => notes.push("--time needs `HH:MM`".to_owned()),
+            },
+            "--time-rate" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) if value.is_finite() && value >= 0.0 => startup.time_rate = value,
+                    _ => notes.push(format!(
+                        "--time-rate expects a non-negative number, got `{text}`"
+                    )),
+                },
+                None => notes.push("--time-rate needs a multiplier".to_owned()),
+            },
             "--drop" => match arguments.next() {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value > 0.0 => startup.drop_height = Some(value),
@@ -358,6 +400,25 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
     startup.model_fit = fit;
 
     (startup, StartupDiagnostics(notes))
+}
+
+/// `05:30` のような時刻を読む。
+fn parse_clock(text: &str) -> Result<(u8, u8), String> {
+    let Some((hour, minute)) = text.split_once(':') else {
+        return Err(format!("--time expects `HH:MM`, got `{text}`"));
+    };
+    let hour: u8 = hour
+        .trim()
+        .parse()
+        .map_err(|_| format!("--time hour `{hour}` is not a number"))?;
+    let minute: u8 = minute
+        .trim()
+        .parse()
+        .map_err(|_| format!("--time minute `{minute}` is not a number"))?;
+    if hour > 23 || minute > 59 {
+        return Err(format!("--time `{text}` is not a valid clock time"));
+    }
+    Ok((hour, minute))
 }
 
 /// `270/10` のような風の指定を読む。
@@ -591,6 +652,10 @@ fn perspective() -> PerspectiveProjection {
     }
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Bevy の Startup system は必要なリソースを引数で受け取るしかない。分割すると初期化の順序を自分で管理することになり、かえって壊れやすい"
+)]
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -599,6 +664,8 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut media: ResMut<Assets<ScatteringMedium>>,
+    lighting: Res<flightsim_render::SunLighting>,
+    sun: Res<SunDirection>,
 ) {
     match &startup.tiles {
         Some(path) => info!("terrain: {}", path.display()),
@@ -793,7 +860,6 @@ fn setup(
 
     // --- カメラと空 ---
 
-    let sun = SunDirection::default();
     commands.spawn((
         Camera3d::default(),
         Projection::Perspective(perspective()),
@@ -807,18 +873,9 @@ fn setup(
         Name::new("camera"),
     ));
 
-    commands.spawn((
-        DirectionalLight {
-            // `Exposure::SUNLIGHT` は直射日光（10 万 lux 級）に合わせた露出。
-            // ここを `FULL_DAYLIGHT`（2 万 lux）にすると 5 倍暗く、
-            // **空だけ明るくて地面が真っ黒**という絵になる。実際にそうなった。
-            illuminance: bevy::light::light_consts::lux::RAW_SUNLIGHT,
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::default().looking_to(flightsim_render::sun_light_direction(sun), Vec3::Y),
-        Name::new("sun"),
-    ));
+    // 太陽。**`SunLight` の印が要る。** これが無いと向きと照度が時刻に
+    // 追随しない（光源だけ固定のまま空だけ動く、という絵になる）。
+    commands.spawn(flightsim_render::sun_light_bundle(&lighting, *sun));
 }
 
 /// 1 描画フレームぶんシミュレーションを進める。
