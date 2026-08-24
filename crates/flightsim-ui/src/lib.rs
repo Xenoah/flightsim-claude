@@ -57,6 +57,10 @@ pub struct HudState {
     pub on_ground: bool,
     pub terrain_available: bool,
     pub view_mode: &'static str,
+    /// 風がどちら**から**吹くか（真方位）。航空の慣習に合わせる。
+    pub wind_from: Radians,
+    /// 風速。0 なら `calm` と表示する。
+    pub wind_speed: MetersPerSecond,
 }
 
 /// 表示の平滑化。
@@ -236,6 +240,7 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
          BNK  {:>5.1} deg\n\
          THR  {:>5.0} %\n\
          FLP  {:>5.0} %\n\
+         WND  {}\n\
          VIEW {}{terrain}",
         values.airspeed.get(),
         values.altitude.get(),
@@ -246,8 +251,25 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         values.roll_degrees,
         state.throttle * 100.0,
         state.flaps * 100.0,
+        format_wind(state.wind_from, state.wind_speed),
         state.view_mode,
     )
+}
+
+/// 風の表示。航空の慣習（from / 速度、例: `270 / 10 kt`）。
+///
+/// 無風は `calm`。METAR と同じ言い方にしておくと、後で実況気象を
+/// 入れたときに表示を変えずに済む。
+#[must_use]
+pub fn format_wind(from: Radians, speed: MetersPerSecond) -> String {
+    let knots = speed.to_knots().get();
+    let bearing = from.wrap_positive().to_degrees().get();
+    // **方位と速度の両方を検査する。** 速度だけ見ていると、方位が NaN の
+    // ときに `NaN / 10 kt` が画面に出る（テストが実際に捕まえた）。
+    if !knots.is_finite() || !bearing.is_finite() || knots < 1.0 {
+        return "calm".to_owned();
+    }
+    format!("{bearing:03.0} / {knots:.0} kt")
 }
 
 /// HUD を更新する。
@@ -266,6 +288,7 @@ pub fn update_hud(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use flightsim_core::Degrees;
 
     fn cruising() -> HudState {
         HudState {
@@ -281,7 +304,63 @@ mod tests {
             on_ground: false,
             terrain_available: true,
             view_mode: "COCKPIT",
+            wind_from: Radians(0.0),
+            wind_speed: MetersPerSecond(0.0),
         }
+    }
+
+    // --- 風の表示 ---
+
+    #[test]
+    fn calm_air_is_written_as_calm() {
+        // 「000 / 0 kt」より「calm」のほうが読み手に速い。METAR も同じ。
+        assert_eq!(format_wind(Radians(0.0), MetersPerSecond(0.0)), "calm");
+        // 1 kt 未満は無風扱い。0.4 kt を「0 kt」と出すと嘘になる。
+        assert_eq!(format_wind(Radians(1.0), MetersPerSecond(0.2)), "calm");
+    }
+
+    #[test]
+    fn wind_is_written_the_way_pilots_say_it() {
+        // 270° から 10 kt（5.144 m/s）。3 桁ゼロ詰めは航空の慣習。
+        let text = format_wind(Degrees(270.0).to_radians(), MetersPerSecond(5.144));
+        assert_eq!(text, "270 / 10 kt");
+    }
+
+    #[test]
+    fn a_northerly_wind_reads_as_360_not_000() {
+        // 方位 0 は 360 と書くのが慣習だが、ここでは wrap_positive の
+        // 結果をそのまま出す。**どちらにせよ 3 桁になること**を固定する。
+        let text = format_wind(Degrees(5.0).to_radians(), MetersPerSecond(10.0));
+        assert!(text.starts_with("005"), "{text}");
+    }
+
+    #[test]
+    fn a_negative_bearing_is_normalised() {
+        // -90° は 270°。生の負値を画面に出さない。
+        let text = format_wind(Degrees(-90.0).to_radians(), MetersPerSecond(10.0));
+        assert!(text.starts_with("270"), "{text}");
+    }
+
+    #[test]
+    fn non_finite_wind_does_not_reach_the_screen() {
+        assert_eq!(format_wind(Radians(f64::NAN), MetersPerSecond(5.0)), "calm");
+        assert_eq!(format_wind(Radians(0.0), MetersPerSecond(f64::NAN)), "calm");
+        assert_eq!(
+            format_wind(Radians(0.0), MetersPerSecond(f64::INFINITY)),
+            "calm"
+        );
+    }
+
+    #[test]
+    fn the_hud_shows_the_wind_line() {
+        let mut state = cruising();
+        state.wind_from = Degrees(270.0).to_radians();
+        state.wind_speed = MetersPerSecond(5.144);
+        let mut smoothing = HudSmoothing::default();
+        let values = smoothing.update(Seconds(1.0), &state);
+        let text = format_hud(values, &state);
+        assert!(text.contains("WND"), "{text}");
+        assert!(text.contains("270 / 10 kt"), "{text}");
     }
 
     // --- 単位 ---

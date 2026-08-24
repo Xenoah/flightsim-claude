@@ -96,6 +96,8 @@ struct Startup {
     model: Option<String>,
     /// モデルの座標系を機体軸へ合わせる補正。
     model_fit: ModelFit,
+    /// 定常風。`--wind <方位>/<ノット>` で指定する（航空の慣習で from）。
+    wind: flightsim_sim::Wind,
     /// 指定すると、地面から この高さ（m）の空中に静止 spawn する。
     ///
     /// **着陸評価の結線を実際に確かめるための開発用。** 落下して接地する
@@ -129,6 +131,7 @@ impl Default for Startup {
                 up: BUNDLED_MODEL_AXES.1,
                 ..ModelFit::default()
             },
+            wind: flightsim_sim::Wind::CALM,
             drop_height: None,
             assets: None,
         }
@@ -317,6 +320,14 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                     Err(error) => notes.push(error.to_string()),
                 }
             }
+            // 航空の慣習に合わせて `270/10`（西から 10 kt）。
+            "--wind" => match arguments.next() {
+                Some(text) => match parse_wind(&text) {
+                    Ok(wind) => startup.wind = wind,
+                    Err(message) => notes.push(message),
+                },
+                None => notes.push("--wind needs `<bearing>/<knots>`, e.g. 270/10".to_owned()),
+            },
             "--drop" => match arguments.next() {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value > 0.0 => startup.drop_height = Some(value),
@@ -347,6 +358,32 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
     startup.model_fit = fit;
 
     (startup, StartupDiagnostics(notes))
+}
+
+/// `270/10` のような風の指定を読む。
+///
+/// 航空の慣習どおり「どちら**から**吹くか」と**ノット**で受ける。
+/// 内部は SI なので、ここで一度だけ変換する（CLAUDE.md の単位規約）。
+fn parse_wind(text: &str) -> Result<flightsim_sim::Wind, String> {
+    let Some((bearing, knots)) = text.split_once('/') else {
+        return Err(format!("--wind expects `<bearing>/<knots>`, got `{text}`"));
+    };
+    let bearing: f64 = bearing
+        .trim()
+        .parse()
+        .map_err(|_| format!("--wind bearing `{bearing}` is not a number"))?;
+    let knots: f64 = knots
+        .trim()
+        .parse()
+        .map_err(|_| format!("--wind speed `{knots}` is not a number"))?;
+
+    if !bearing.is_finite() || !knots.is_finite() || knots < 0.0 {
+        return Err(format!("--wind `{text}` is out of range"));
+    }
+    Ok(flightsim_sim::Wind {
+        from: Degrees(bearing).to_radians(),
+        speed: flightsim_core::Knots(knots).to_meters_per_second(),
+    })
 }
 
 /// どのモデルを、どの軸で使うかを決める。
@@ -619,6 +656,9 @@ fn setup(
             GroundSampler::default(),
         ),
     };
+
+    let mut simulation = simulation;
+    simulation.set_wind(startup.wind);
 
     commands.insert_resource(startup.view);
 
@@ -1032,7 +1072,9 @@ fn publish_hud(
     let agl = simulation.0.agl();
 
     *hud = HudState {
-        airspeed: flightsim_core::MetersPerSecond(state.body_velocity().length()),
+        // **対地速度ではなく対気速度。** 風が入ると両者は一致せず、
+        // 失速も揚力も対気速度で決まる。
+        airspeed: simulation.0.airspeed(),
         altitude: state.altitude(),
         agl,
         vertical_speed: state.vertical_speed(),
@@ -1045,6 +1087,8 @@ fn publish_hud(
         on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
+        wind_from: simulation.0.wind().from,
+        wind_speed: simulation.0.wind().speed,
     };
 }
 

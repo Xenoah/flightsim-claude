@@ -23,10 +23,10 @@
 
 use crate::ground::{GroundPlane, GroundSampler};
 use flightsim_core::{
-    Attitude, Ecef, FixedStep, Geodetic, Meters, MetersPerSecond, Radians, Seconds,
+    Attitude, Ecef, FixedStep, Geodetic, Meters, MetersPerSecond, Ned, Radians, Seconds,
 };
 use flightsim_fdm::{
-    AircraftConfig, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
+    AircraftConfig, Atmosphere, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
     RigidBodyState,
 };
 use flightsim_world::{Terrain, TileSource};
@@ -46,6 +46,42 @@ pub struct InterpolatedState {
     pub geodetic: Geodetic,
     /// ローカル基準の姿勢角。
     pub attitude: Attitude,
+}
+
+/// 定常風。
+///
+/// 航空の慣習どおり「どちら**から**吹くか」で持つ（270/10 = 西から 10 kt）。
+/// METAR も管制も風をこの向きで言う。NED ベクトルへの変換はここが引き受け、
+/// **符号の取り違え（from/to の逆転）をこの型の外に漏らさない。**
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Wind {
+    /// 風が吹いてくる真方位。
+    pub from: Radians,
+    /// 風速。
+    pub speed: MetersPerSecond,
+}
+
+impl Wind {
+    /// 無風。
+    pub const CALM: Self = Self {
+        from: Radians::ZERO,
+        speed: MetersPerSecond(0.0),
+    };
+
+    /// NED の風ベクトル（空気が動いていく向き）。
+    ///
+    /// 270°（西）**から** 10 m/s は、空気が**東へ** 10 m/s 動くこと。
+    #[must_use]
+    pub fn to_ned(self) -> Ned {
+        let speed = if self.speed.get().is_finite() {
+            self.speed.get().max(0.0)
+        } else {
+            0.0
+        };
+        let (sin, cos) = self.from.get().sin_cos();
+        // from の反対向きへ動く: to = from + 180° なので成分は符号反転。
+        Ned::new(-cos * speed, -sin * speed, 0.0)
+    }
 }
 
 /// 接地の記録。
@@ -98,6 +134,8 @@ pub struct Simulation<S: TileSource> {
     previous: RigidBodyState,
     ground: GroundPlane,
     diverged: bool,
+    /// 定常風。
+    wind: Wind,
     /// 車輪の最下点（機体基準）。接地判定に使う。
     gear_height: Meters,
     /// 空中にいるか。ヒステリシスつき（下記 `update_contact`）。
@@ -130,6 +168,7 @@ impl<S: TileSource> Simulation<S> {
             previous: state,
             ground,
             diverged: false,
+            wind: Wind::CALM,
             gear_height,
             // 駐機から始まるので接地済み。spawn の瞬間を着陸として数えない。
             airborne: false,
@@ -157,6 +196,7 @@ impl<S: TileSource> Simulation<S> {
             previous: state,
             ground,
             diverged: false,
+            wind: Wind::CALM,
             gear_height,
             // 空中から始まれば、最初の接地も着陸として数える。
             airborne: clearance > crate::flight::AIRBORNE_CLEARANCE.get(),
@@ -192,8 +232,15 @@ impl<S: TileSource> Simulation<S> {
             self.ground = self.sampler.sample(&mut self.terrain, state.geodetic());
             terrain_missing |= !self.ground.from_terrain;
 
-            // 接地平面は 1 ステップの間固定される（ADR-0004）。
-            let environment = Environment::still_air().with_ground_plane(
+            // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
+            // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
+            // 擬似乱数列で、ここではなく Wind の生成側で行う）。
+            let environment = Environment::with_wind_ned(
+                Atmosphere::standard(),
+                state.geodetic(),
+                self.wind.to_ned(),
+            )
+            .with_ground_plane(
                 self.ground.reference,
                 self.ground.elevation,
                 self.ground.slope,
@@ -248,6 +295,29 @@ impl<S: TileSource> Simulation<S> {
         } else if clearance > crate::flight::AIRBORNE_CLEARANCE.get() {
             self.airborne = true;
         }
+    }
+
+    /// 真対気速度。
+    ///
+    /// **対地速度ではない。** 風が入ると両者は一致しない
+    /// （向かい風 10 m/s の中を対地 30 m/s で走れば対気は 40 m/s）。
+    /// 失速も揚力も対気速度で決まるので、計器に出すのはこちら。
+    #[must_use]
+    pub fn airspeed(&self) -> MetersPerSecond {
+        let wind = flightsim_core::LocalFrame::new(self.dynamics.state().geodetic())
+            .ned_to_ecef_vector(self.wind.to_ned());
+        MetersPerSecond((self.dynamics.state().velocity - wind).length())
+    }
+
+    /// 定常風を設定する。
+    pub const fn set_wind(&mut self, wind: Wind) {
+        self.wind = wind;
+    }
+
+    /// 現在の定常風。
+    #[must_use]
+    pub const fn wind(&self) -> Wind {
+        self.wind
     }
 
     /// 最後に記録した接地。
