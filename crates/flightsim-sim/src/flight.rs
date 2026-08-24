@@ -365,11 +365,18 @@ pub struct SimulationOptions {
     pub max_duration: Seconds,
     /// 軌跡を記録する間隔。
     pub sample_interval: Seconds,
+    /// 定常風。既定は無風。
+    ///
+    /// **自動操縦は風を知らない。** 方位を保つ制御しか持たないので、
+    /// 横風では風下へ流される。それが正しい挙動で、
+    /// 偏流修正はプレイヤー（または将来の誘導）の仕事。
+    pub wind: crate::simulation::Wind,
 }
 
 impl Default for SimulationOptions {
     fn default() -> Self {
         Self {
+            wind: crate::simulation::Wind::CALM,
             dt: RECOMMENDED_FIXED_DT,
             max_duration: Seconds(600.0),
             sample_interval: Seconds(0.5),
@@ -533,7 +540,7 @@ pub fn fly<S: TileSource>(
             steps_without_terrain += 1;
         }
 
-        let snapshot = observe(&state, &ground, gear);
+        let snapshot = observe(&state, &ground, gear, options.wind);
         let targets = plan.targets(phase);
         let controls = director.control(&state, snapshot.agl, targets);
 
@@ -543,11 +550,12 @@ pub fn fly<S: TileSource>(
         }
 
         // 接地平面は 1 ステップの間固定される（ADR-0004）。
-        let environment = Environment::still_air().with_ground_plane(
-            ground.reference,
-            ground.elevation,
-            ground.slope,
-        );
+        let environment = Environment::with_wind_ned(
+            flightsim_fdm::Atmosphere::standard(),
+            state.geodetic(),
+            options.wind.to_ned(),
+        )
+        .with_ground_plane(ground.reference, ground.elevation, ground.slope);
         dynamics.step(options.dt, controls, &environment);
         time += options.dt.get();
 
@@ -562,7 +570,7 @@ pub fn fly<S: TileSource>(
     let state = *dynamics.state();
     if state.is_finite() {
         let ground = sampler.sample(terrain, state.geodetic());
-        let snapshot = observe(&state, &ground, gear);
+        let snapshot = observe(&state, &ground, gear, options.wind);
         let controls = director.control(&state, snapshot.agl, plan.targets(phase));
         samples.push(record(time, phase, &state, &ground, &snapshot, controls));
     } else {
@@ -578,10 +586,21 @@ pub fn fly<S: TileSource>(
     }
 }
 
-fn observe(state: &RigidBodyState, ground: &GroundPlane, gear: f64) -> Snapshot {
+/// 現在の状態から、自動操縦が見る観測量を作る。
+///
+/// **対気速度は風を差し引いて計算する。** 対地速度で回転や進入速度を
+/// 判断すると、向かい風の中で必要以上に加速してから浮くことになる。
+fn observe(
+    state: &RigidBodyState,
+    ground: &GroundPlane,
+    gear: f64,
+    wind: crate::simulation::Wind,
+) -> Snapshot {
     let agl = state.altitude().get() - ground.elevation.get();
+    let wind_ecef =
+        flightsim_core::LocalFrame::new(state.geodetic()).ned_to_ecef_vector(wind.to_ned());
     Snapshot {
-        airspeed: MetersPerSecond(state.body_velocity().length()),
+        airspeed: MetersPerSecond((state.velocity - wind_ecef).length()),
         agl: Meters(agl),
         wheel_clearance: Meters(agl - gear),
         heading: state.attitude().yaw,

@@ -9,9 +9,9 @@
 //! ここで確かめるのは、滑走路から離陸し、旋回し、空港の周辺に無事に
 //! 降りられること。滑走路上への精密着陸はプレイヤーの腕の見せ所。
 
-use flightsim_core::{Degrees, Meters, Radians, Seconds};
+use flightsim_core::{Degrees, Meters, MetersPerSecond, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
-use flightsim_sim::{CircuitPlan, GroundSampler, Phase, SimulationOptions, fly};
+use flightsim_sim::{CircuitPlan, GroundSampler, Phase, SimulationOptions, Wind, fly};
 use flightsim_world::{MemoryTileSource, Runway, Terrain};
 
 #[test]
@@ -98,5 +98,118 @@ fn a_circuit_from_the_synthetic_runway_completes() {
                 && sample.airspeed.get().is_finite()
                 && sample.agl.get().is_finite()),
         "the trajectory contains non-finite states"
+    );
+}
+
+#[test]
+fn the_circuit_still_completes_in_a_crosswind() {
+    // **横風でも一周できること。** 自動操縦は偏流修正を持たないので
+    // 風下へ流されるが、それでも離陸・上昇・旋回・進入・接地の
+    // フェーズを全部通り、機体が壊れずに止まること。
+    // ここが崩れると、風を入れたせいでゲームが成立しなくなる。
+    let runway = Runway::synthetic();
+    let config = AircraftConfig::light_single();
+    let mut terrain = Terrain::new(MemoryTileSource::new(), 8 * 1024 * 1024, 8..=12);
+
+    let plan = CircuitPlan {
+        runway_heading: runway.heading,
+        outbound_heading: Radians(runway.heading.get() - Degrees(90.0).to_radians().get()),
+        ..CircuitPlan::default()
+    };
+
+    // 滑走路方位 50° に対して 140°（真横）から 6 m/s。
+    let trajectory = fly(
+        &config,
+        &plan,
+        runway.takeoff_start(),
+        &mut terrain,
+        &GroundSampler::default(),
+        &SimulationOptions {
+            max_duration: Seconds(600.0),
+            wind: Wind {
+                from: Radians(runway.heading.get() + Degrees(90.0).to_radians().get()),
+                speed: MetersPerSecond(6.0),
+            },
+            ..SimulationOptions::default()
+        },
+    );
+
+    assert!(!trajectory.diverged, "the crosswind flight diverged");
+
+    let phases = trajectory.phases_visited();
+    for expected in [
+        Phase::TakeoffRoll,
+        Phase::Climb,
+        Phase::Approach,
+        Phase::Flare,
+        Phase::Rollout,
+    ] {
+        assert!(
+            phases.contains(&expected),
+            "the crosswind circuit never reached {expected:?}; visited {phases:?}"
+        );
+    }
+
+    let last = trajectory.samples.last().expect("samples");
+    assert!(
+        last.wheel_clearance.get() < 0.5,
+        "the aircraft never settled, {} above the ground",
+        last.wheel_clearance
+    );
+    assert!(
+        trajectory
+            .samples
+            .iter()
+            .all(|sample| sample.airspeed.get().is_finite() && sample.agl.get().is_finite()),
+        "the crosswind trajectory contains non-finite states"
+    );
+}
+
+#[test]
+fn a_headwind_shortens_the_takeoff_roll() {
+    // 外部の真値: 向かい風は離陸滑走距離を縮める。対気速度が先に立つため。
+    // **これが逆なら風の符号が間違っている。**
+    let runway = Runway::synthetic();
+    let config = AircraftConfig::light_single();
+    let plan = CircuitPlan {
+        runway_heading: runway.heading,
+        outbound_heading: Radians(runway.heading.get() - Degrees(90.0).to_radians().get()),
+        ..CircuitPlan::default()
+    };
+
+    let roll_distance = |wind: Wind| {
+        let mut terrain = Terrain::new(MemoryTileSource::new(), 8 * 1024 * 1024, 8..=12);
+        let trajectory = fly(
+            &config,
+            &plan,
+            runway.takeoff_start(),
+            &mut terrain,
+            &GroundSampler::default(),
+            &SimulationOptions {
+                max_duration: Seconds(120.0),
+                wind,
+                ..SimulationOptions::default()
+            },
+        );
+        // 離陸滑走を抜けた最初のサンプルまでの移動距離。
+        let start = trajectory.samples.first().expect("samples").position;
+        trajectory
+            .samples
+            .iter()
+            .find(|sample| sample.phase != Phase::TakeoffRoll)
+            .map(|sample| start.great_circle_distance(sample.position).get())
+            .expect("the aircraft should leave the takeoff roll")
+    };
+
+    // 滑走路方位そのものから吹く = 真向かい風。
+    let headwind = roll_distance(Wind {
+        from: runway.heading,
+        speed: MetersPerSecond(8.0),
+    });
+    let calm = roll_distance(Wind::CALM);
+
+    assert!(
+        headwind < calm * 0.9,
+        "an 8 m/s headwind should shorten the roll from {calm:.0} m, got {headwind:.0} m"
     );
 }

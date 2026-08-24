@@ -271,6 +271,7 @@ fn a_sample_interval_finer_than_the_step_records_every_step() {
             dt: Seconds(1.0 / 120.0),
             max_duration: Seconds(2.0),
             sample_interval: Seconds(1.0 / 10_000.0),
+            ..SimulationOptions::default()
         },
     );
 
