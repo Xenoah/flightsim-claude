@@ -61,6 +61,24 @@ pub struct HudState {
     pub wind_from: Radians,
     /// 風速。0 なら `calm` と表示する。
     pub wind_speed: MetersPerSecond,
+    /// この飛行の積み上げ。
+    pub log: FlightSummary,
+}
+
+/// 画面に出す飛行の積み上げ。
+///
+/// `flightsim-sim` の記録をそのまま持たないのは、**ui が sim に依存しない**
+/// ため（依存は一方向。CLAUDE.md 規約 2）。app が詰め替える。
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct FlightSummary {
+    /// 空中にいた時間の合計。
+    pub airborne_time: Seconds,
+    /// 飛んだ距離の累積。
+    pub distance: Meters,
+    /// 到達した最高の対地高度。
+    pub peak_agl: Meters,
+    /// 接地の回数。
+    pub landings: u32,
 }
 
 /// 表示の平滑化。
@@ -146,6 +164,10 @@ pub struct HudText;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HudHelp;
 
+/// 飛行記録のテキストにつける印。
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HudLog;
+
 /// HUD のプラグイン。
 #[derive(Debug, Default)]
 pub struct FlightsimUiPlugin;
@@ -155,7 +177,7 @@ impl Plugin for FlightsimUiPlugin {
         app.init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
             .add_systems(Startup, spawn_hud)
-            .add_systems(Update, update_hud)
+            .add_systems(Update, (update_hud, update_flight_log_display))
             // 着陸評価。`LandingReport` 自体は着陸するまで存在しないので、
             // ここでは `init_resource` しない（app が接地のたびに挿入する契約）。
             .init_resource::<LandingReportState>()
@@ -199,6 +221,66 @@ pub fn spawn_hud(mut commands: Commands) {
         },
         HudHelp,
     ));
+
+    // 飛行の積み上げ。右下に控えめに置く。**着陸評価（右上）と
+    // 計器（左上）と操作説明（左下）のどれにも重ならない場所。**
+    commands.spawn((
+        Text::new(""),
+        TextFont {
+            font_size: 14.0,
+            ..default()
+        },
+        TextColor(Color::srgba(0.85, 0.9, 0.85, 0.7)),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            right: Val::Px(12.0),
+            ..default()
+        },
+        HudLog,
+    ));
+}
+
+/// 飛行記録の表示。
+///
+/// 時間は分秒、距離は海里（航空の慣習）、高度はフィート。
+/// 単位変換は `flightsim_core::units` を通す。
+#[must_use]
+pub fn format_flight_log(log: FlightSummary) -> String {
+    let seconds = if log.airborne_time.get().is_finite() {
+        log.airborne_time.get().max(0.0)
+    } else {
+        0.0
+    };
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "1 回の飛行は現実的に u64 の秒数に収まる"
+    )]
+    let total = seconds as u64;
+
+    let distance = if log.distance.get().is_finite() {
+        log.distance.get().max(0.0)
+    } else {
+        0.0
+    };
+    let nautical_miles = Meters(distance).to_nautical_miles().get();
+
+    let peak = if log.peak_agl.get().is_finite() {
+        log.peak_agl.to_feet().get()
+    } else {
+        0.0
+    };
+
+    format!(
+        "AIRBORNE {:02}:{:02}
+DISTANCE {nautical_miles:>6.1} nm
+PEAK AGL {peak:>6.0} ft
+LANDINGS {:>6}",
+        total / 60,
+        total % 60,
+        log.landings
+    )
 }
 
 /// 操作説明。
@@ -285,6 +367,13 @@ pub fn update_hud(
     }
 }
 
+/// 飛行記録の表示を更新する。
+pub fn update_flight_log_display(state: Res<HudState>, mut query: Query<&mut Text, With<HudLog>>) {
+    for mut text in &mut query {
+        **text = format_flight_log(state.log);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,7 +395,83 @@ mod tests {
             view_mode: "COCKPIT",
             wind_from: Radians(0.0),
             wind_speed: MetersPerSecond(0.0),
+            log: FlightSummary::default(),
         }
+    }
+
+    // --- 字形 ---
+
+    #[test]
+    fn nothing_on_screen_uses_glyphs_the_default_font_lacks() {
+        // **実機で豆腐が出た。** 着陸評価の見出しが `banked 74°` を出し、
+        // Bevy の既定フォントに `°` の字形が無くて □ になった。
+        // 画面に出る文字列は ASCII に保つ（日本語 UI を入れるなら
+        // フォントを同梱してから）。
+        let mut state = cruising();
+        state.wind_from = Degrees(270.0).to_radians();
+        state.wind_speed = MetersPerSecond(5.144);
+        let mut smoothing = HudSmoothing::default();
+        let values = smoothing.update(Seconds(1.0), &state);
+
+        let screens = [
+            format_hud(values, &state),
+            format_flight_log(FlightSummary::default()),
+            help_text(),
+            format_wind(Degrees(270.0).to_radians(), MetersPerSecond(5.144)),
+        ];
+        for screen in screens {
+            assert!(
+                screen.is_ascii(),
+                "a non-ASCII glyph reached the screen: {screen:?}"
+            );
+        }
+    }
+
+    // --- 飛行記録 ---
+
+    #[test]
+    fn an_untouched_log_reads_as_zero() {
+        let text = format_flight_log(FlightSummary::default());
+        assert!(text.contains("00:00"), "{text}");
+        assert!(text.contains("LANDINGS"), "{text}");
+    }
+
+    #[test]
+    fn the_log_uses_aviation_units() {
+        // 1 海里 = 1852 m、1000 ft = 304.8 m。既知の換算値と突き合わせる。
+        let text = format_flight_log(FlightSummary {
+            airborne_time: Seconds(125.0),
+            distance: Meters(1852.0 * 12.5),
+            peak_agl: Meters(304.8),
+            landings: 3,
+        });
+        assert!(text.contains("02:05"), "125 s should read 02:05: {text}");
+        assert!(text.contains("12.5 nm"), "{text}");
+        assert!(text.contains("1000 ft"), "{text}");
+        assert!(text.contains('3'), "{text}");
+    }
+
+    #[test]
+    fn an_hour_long_flight_still_reads_as_minutes() {
+        // 60 分を超えても壊れないこと（60:00 と出る。時間表記は要らない）。
+        let text = format_flight_log(FlightSummary {
+            airborne_time: Seconds(3661.0),
+            ..FlightSummary::default()
+        });
+        assert!(text.contains("61:01"), "{text}");
+    }
+
+    #[test]
+    fn non_finite_log_values_do_not_reach_the_screen() {
+        // NaN が記録に混ざっても「NaN nm」を出さない。
+        let text = format_flight_log(FlightSummary {
+            airborne_time: Seconds(f64::NAN),
+            distance: Meters(f64::INFINITY),
+            peak_agl: Meters(f64::NAN),
+            landings: 0,
+        });
+        assert!(!text.contains("NaN"), "{text}");
+        assert!(!text.contains("inf"), "{text}");
     }
 
     // --- 風の表示 ---

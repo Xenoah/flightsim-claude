@@ -34,5 +34,5 @@ pub use origin::FloatingOrigin;
 pub use render_frame::RenderFrame;
 pub use units::{
     Degrees, Feet, FeetPerMinute, Kelvin, Kilograms, KilogramsPerCubicMeter, Knots, Meters,
-    MetersPerSecond, Newtons, Pascals, Radians, Seconds, SquareMeters,
+    MetersPerSecond, NauticalMiles, Newtons, Pascals, Radians, Seconds, SquareMeters,
 };

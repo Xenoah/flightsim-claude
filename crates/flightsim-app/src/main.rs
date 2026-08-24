@@ -1089,6 +1089,17 @@ fn publish_hud(
         view_mode: mode.name(),
         wind_from: simulation.0.wind().from,
         wind_speed: simulation.0.wind().speed,
+        log: {
+            // sim の記録を ui の型へ詰め替える。**ui は sim に依存しない**
+            // ので（依存は一方向）、変換はここが引き受ける。
+            let log = simulation.0.log();
+            flightsim_ui::FlightSummary {
+                airborne_time: log.airborne_time,
+                distance: log.distance,
+                peak_agl: log.peak_agl,
+                landings: log.landings,
+            }
+        },
     };
 }
 

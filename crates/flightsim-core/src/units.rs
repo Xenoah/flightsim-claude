@@ -186,11 +186,31 @@ define_unit!(
     "m^2"
 );
 
+define_unit!(
+    /// 海里。航法の距離表示に使う慣習単位。境界でのみ用いる。
+    NauticalMiles,
+    "nm"
+);
+
 impl Meters {
     #[inline]
     #[must_use]
     pub fn to_feet(self) -> Feet {
         Feet(self.0 / METERS_PER_FOOT)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn to_nautical_miles(self) -> NauticalMiles {
+        NauticalMiles(self.0 / METERS_PER_NAUTICAL_MILE)
+    }
+}
+
+impl NauticalMiles {
+    #[inline]
+    #[must_use]
+    pub fn to_meters(self) -> Meters {
+        Meters(self.0 * METERS_PER_NAUTICAL_MILE)
     }
 }
 
@@ -574,5 +594,21 @@ mod tests {
         // 同種の量どうしの除算は無次元。
         assert_close!(a / b, 4.0, 0.0);
         assert_close!([a, b].into_iter().sum::<Meters>().get(), 125.0, 0.0);
+    }
+    #[test]
+    fn a_nautical_mile_is_the_internationally_agreed_1852_metres() {
+        // 1929 年の国際協定値。定義そのものなので厳密に一致すべき。
+        assert!((NauticalMiles(1.0).to_meters().get() - 1852.0).abs() < 1e-9);
+        assert!((Meters(1852.0).to_nautical_miles().get() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_knot_is_one_nautical_mile_per_hour() {
+        // 2 つの換算が同じ定義から出ていること。片方だけ直される事故を防ぐ。
+        let one_knot_for_an_hour = Knots(1.0).to_meters_per_second().get() * 3600.0;
+        assert!(
+            (one_knot_for_an_hour - NauticalMiles(1.0).to_meters().get()).abs() < 1e-6,
+            "a knot must be exactly one nautical mile per hour"
+        );
     }
 }

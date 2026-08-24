@@ -110,6 +110,29 @@ pub struct Touchdown {
     pub elapsed: Seconds,
 }
 
+/// 飛行の記録。
+///
+/// # なぜ要るのか
+///
+/// 1 回の着陸の良し悪しだけでは「今日の飛行はどうだったか」が言えない。
+/// **プレイヤーが続けたくなるには、積み上がるものが要る。**
+///
+/// 距離は大円距離の**累積**であって、出発点からの直線距離ではない。
+/// 場周を 1 周すれば出発点に戻るが、飛んだ距離は 0 ではない。
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct FlightLog {
+    /// 空中にいた時間の合計。
+    pub airborne_time: Seconds,
+    /// 飛んだ距離の累積。
+    pub distance: Meters,
+    /// 到達した最高の対地高度。
+    pub peak_agl: Meters,
+    /// 記録した最高の対気速度。
+    pub peak_airspeed: MetersPerSecond,
+    /// 接地の回数。
+    pub landings: u32,
+}
+
 /// 1 フレーム進めた結果の報告。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct StepReport {
@@ -136,6 +159,10 @@ pub struct Simulation<S: TileSource> {
     diverged: bool,
     /// 定常風。
     wind: Wind,
+    /// 飛行の記録。
+    log: FlightLog,
+    /// 距離の累積に使う直前の位置。
+    previous_position: Geodetic,
     /// 車輪の最下点（機体基準）。接地判定に使う。
     gear_height: Meters,
     /// 空中にいるか。ヒステリシスつき（下記 `update_contact`）。
@@ -169,6 +196,8 @@ impl<S: TileSource> Simulation<S> {
             ground,
             diverged: false,
             wind: Wind::CALM,
+            log: FlightLog::default(),
+            previous_position: state.geodetic(),
             gear_height,
             // 駐機から始まるので接地済み。spawn の瞬間を着陸として数えない。
             airborne: false,
@@ -197,6 +226,8 @@ impl<S: TileSource> Simulation<S> {
             ground,
             diverged: false,
             wind: Wind::CALM,
+            log: FlightLog::default(),
+            previous_position: state.geodetic(),
             gear_height,
             // 空中から始まれば、最初の接地も着陸として数える。
             airborne: clearance > crate::flight::AIRBORNE_CLEARANCE.get(),
@@ -248,6 +279,7 @@ impl<S: TileSource> Simulation<S> {
             self.dynamics
                 .step(self.fixed.fixed_dt(), controls, &environment);
             self.update_contact();
+            self.update_log();
         }
 
         if !self.dynamics.state().is_finite() {
@@ -291,10 +323,47 @@ impl<S: TileSource> Simulation<S> {
                     elapsed: self.fixed.elapsed(),
                 });
                 self.touchdown_count = self.touchdown_count.saturating_add(1);
+                self.log.landings = self.touchdown_count;
             }
         } else if clearance > crate::flight::AIRBORNE_CLEARANCE.get() {
             self.airborne = true;
         }
+    }
+
+    /// 1 ステップぶん記録を更新する。
+    ///
+    /// **非有限値を記録に混ぜない。** 一度混ざると以降の最大値が
+    /// 全部 NaN になり、記録が読めなくなる。
+    fn update_log(&mut self) {
+        let state = self.dynamics.state();
+        let position = state.geodetic();
+
+        let step = self.previous_position.great_circle_distance(position).get();
+        if step.is_finite() {
+            self.log.distance = Meters(self.log.distance.get() + step);
+        }
+        self.previous_position = position;
+
+        if self.airborne {
+            self.log.airborne_time =
+                Seconds(self.log.airborne_time.get() + self.fixed.fixed_dt().get());
+        }
+
+        let agl = state.altitude().get() - self.ground.elevation.get();
+        if agl.is_finite() && agl > self.log.peak_agl.get() {
+            self.log.peak_agl = Meters(agl);
+        }
+
+        let airspeed = self.airspeed().get();
+        if airspeed.is_finite() && airspeed > self.log.peak_airspeed.get() {
+            self.log.peak_airspeed = MetersPerSecond(airspeed);
+        }
+    }
+
+    /// 飛行の記録。
+    #[must_use]
+    pub const fn log(&self) -> FlightLog {
+        self.log
     }
 
     /// 真対気速度。

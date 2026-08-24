@@ -187,7 +187,10 @@ pub fn evaluate_landing(report: LandingReport) -> LandingEvaluation {
         notes.push("off runway".to_string());
     }
     if hard_bank {
-        notes.push(format!("banked {:.0}\u{b0}", bank_degrees.abs()));
+        // **`°`（U+00B0）を使わない。** Bevy の既定フォントに字形が無く、
+        // 画面には豆腐が出る（実機のスクリーンショットで確認した）。
+        // HUD の他の行と同じく `deg` と綴る。
+        notes.push(format!("banked {:.0} deg", bank_degrees.abs()));
     }
     let headline = if notes.is_empty() {
         grade.headline().to_string()
@@ -645,5 +648,29 @@ mod tests {
         let evaluation = evaluate_landing(greased_on_runway());
         let text = format_landing_report(&evaluation);
         assert_eq!(text.lines().next(), Some(evaluation.headline.as_str()));
+    }
+
+    #[test]
+    fn the_landing_report_stays_ascii() {
+        // 実機で `banked 74°` の `°` が豆腐になった。
+        // 全段階・全ペナルティの組み合わせで ASCII を保つこと。
+        for sink in [0.1, 0.5, 1.5, 2.5, 5.0] {
+            for bank in [0.0, 0.2, -0.3] {
+                for on_runway in [None, Some(true), Some(false)] {
+                    let evaluation = evaluate_landing(LandingReport {
+                        sink_rate: MetersPerSecond(sink),
+                        ground_speed: MetersPerSecond(30.0),
+                        bank: Radians(bank),
+                        on_runway,
+                        heading_error: Some(Radians(0.15)),
+                    });
+                    let text = format_landing_report(&evaluation);
+                    assert!(
+                        text.is_ascii(),
+                        "a non-ASCII glyph reached the landing report: {text:?}"
+                    );
+                }
+            }
+        }
     }
 }

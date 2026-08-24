@@ -70,4 +70,4 @@ pub use flight::{
     parked_state,
 };
 pub use ground::{GroundPlane, GroundSampler};
-pub use simulation::{InterpolatedState, Simulation, StepReport, Touchdown, Wind};
+pub use simulation::{FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind};
