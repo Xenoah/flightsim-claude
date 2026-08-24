@@ -80,12 +80,15 @@ jobs:
 
       # winit の x11 バックエンドが要求するもの。
       # 音声の feature は切ってあるので libasound2-dev は不要（ADR-0007）。
+      # libudev-dev はゲームパッド（bevy_gilrs → libudev-sys）が要求する。
+      # 無いとコンパイルではなく build.rs の pkg-config が落ちる。
+      # cargo doc でも build.rs は走るので、docs ジョブにも要る。
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -126,7 +129,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
