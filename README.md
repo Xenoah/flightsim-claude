@@ -13,7 +13,7 @@
 # 純 Rust 側。525 件、数秒
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。183 件
+# 描画層。Bevy を含むので重い。216 件
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 ```
 
@@ -45,6 +45,8 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   キーボードが死ぬ、はない）
 - **風** — `--wind 270/10`（方位/ノット）。空力が相対速度で効くので横風着陸が成立する。
   向かい風で離陸滑走が実際に短くなることをテストで固定
+- **チュートリアル導線** — 「今なにをすべきか」を画面中央上に 1〜2 行で出す。
+  一度着陸したら二度と出ず、`H` でいつでも消せる。**上級者の邪魔をしない**
 - **時刻と太陽位置** — `--time 05:30`（地方平均太陽時）と `--time-rate 60`。
   天文計算（Meeus / NOAA と同じ低精度式）で日の出・南中・日没が正しい位置に来る。
   夏至の東京の南中高度 77.75°、分点の日の出は真東、極の白夜と極夜まで一致する
