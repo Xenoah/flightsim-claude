@@ -23,6 +23,7 @@ cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の�
 cargo bench --workspace                                 # 性能測定（criterion）
 cargo run -p flightsim-app --release                     # 起動（同梱の機体モデルが出る）
 cargo run -p flightsim-app --release -- --wind 270/10 --time 05:30 --time-rate 60  # 横風・夜明け
+cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate      # 着陸練習
 cargo run -p flightsim-app --release -- --tiles data/tiles --start 35.55,139.78  # 実地形の上で
 ```
 
