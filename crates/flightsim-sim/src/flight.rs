@@ -29,7 +29,7 @@ use flightsim_fdm::{
     AircraftConfig, ControlInputs, Environment, FlightDynamics, GroundSlope, RECOMMENDED_FIXED_DT,
     RigidBodyState,
 };
-use flightsim_world::{Terrain, TileSource};
+use flightsim_world::{Runway, Terrain, TileSource};
 use glam::{DMat3, DQuat, DVec3};
 
 /// 車輪がこれ以上地面から離れていれば、確実に空中にいるとみなす高さ。
@@ -485,6 +485,74 @@ fn attitude_on_slope(slope: GroundSlope, heading: Radians) -> Attitude {
     // 列 = 機体軸を NED で表したもの。体軸 → NED の回転。
     let rotation = DQuat::from_mat3(&DMat3::from_cols(forward, right, body_down)).normalize();
     Attitude::from_quaternion(rotation)
+}
+
+/// 最終進入の途中から始める状態を作る。
+///
+/// # なぜ要るのか
+///
+/// **着陸だけを練習したいのに、毎回場周を一周させるのは辛い。**
+/// ゲームとしての核が着陸の腕なら、そこへすぐ入れる道が要る。
+///
+/// 滑走路の末端から `distance` 手前、標準的な 3 度の進入角に乗った高さで、
+/// 中心線に正対して進入速度で降下している状態を返す。
+///
+/// # 引数
+///
+/// * `distance` — 末端までの距離。負や非有限は 1 海里へ丸める
+/// * `glideslope` — 進入角。実機の標準は 3 度
+/// * `speed` — 進入対気速度。無風なら対地速度と同じ
+#[must_use]
+pub fn approach_state(
+    runway: &Runway,
+    distance: Meters,
+    glideslope: Radians,
+    speed: MetersPerSecond,
+) -> RigidBodyState {
+    // 手前 = 進行方向の負側。
+    let distance = if distance.get().is_finite() && distance.get() > 0.0 {
+        distance.get()
+    } else {
+        1852.0
+    };
+    let glideslope = if glideslope.get().is_finite() {
+        glideslope.get().clamp(0.0, core::f64::consts::FRAC_PI_4)
+    } else {
+        3.0_f64.to_radians()
+    };
+    let speed = if speed.get().is_finite() && speed.get() > 0.0 {
+        speed.get()
+    } else {
+        35.0
+    };
+
+    let ground_point = runway.point_at(Meters(-distance), Meters::ZERO);
+    // 3 度の進入角なら、末端から 1 海里で約 97 m（320 ft）上。
+    let height = distance * glideslope.tan();
+    let position = Geodetic::new(
+        ground_point.latitude,
+        ground_point.longitude,
+        Meters(runway.elevation.get() + height),
+    );
+
+    // 速度は機首方位へ、進入角ぶん下向き。
+    let (sin_heading, cos_heading) = runway.heading.get().sin_cos();
+    let horizontal = speed * glideslope.cos();
+    let velocity = Ned::new(
+        horizontal * cos_heading,
+        horizontal * sin_heading,
+        // NED の down は正。降下しているので正。
+        speed * glideslope.sin(),
+    );
+
+    // 姿勢は水平・中心線に正対。**ピッチを進入角に合わせない。**
+    // 実機の進入は機首上げで、経路角とピッチは一致しない（迎角のぶん違う）。
+    // ここで経路角をそのままピッチにすると、機首下げで進入することになる。
+    RigidBodyState::from_geodetic(
+        position,
+        Attitude::new(Radians::ZERO, Radians::ZERO, runway.heading),
+        velocity,
+    )
 }
 
 /// 地形の上を飛ばして軌跡を返す。

@@ -47,6 +47,15 @@ use flightsim_world::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// 進入練習を始めるときのスロットル。
+///
+/// 進入速度を保つのに要る出力。**0 で始めると突っ込む**ので、
+/// 練習モードでは操縦入力も進入の形に揃える。
+const APPROACH_THROTTLE: f64 = 0.45;
+
+/// 進入練習を始めるときのフラップ。実機の進入形態に倣って全開。
+const APPROACH_FLAPS: f64 = 1.0;
+
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
 
@@ -111,6 +120,11 @@ struct Startup {
     /// までの数秒で、接地記録 → 評価 → 表示の経路が全部通る。手で
     /// 飛ばさないと着陸できないのでは、この経路を検証できない。
     drop_height: Option<f64>,
+    /// 指定すると、最終進入の途中（末端から この海里）から始める。
+    ///
+    /// **着陸だけを練習したいのに毎回場周を一周させるのは辛い。**
+    /// ゲームの核が着陸の腕なら、そこへすぐ入れる道が要る。
+    approach: Option<f64>,
     /// 見つかった `assets/` の実体。**Bevy に渡したものと同じ**でなければ、
     /// 「見つかった」と言った直後に `Path not found` が出る。
     assets: Option<PathBuf>,
@@ -142,6 +156,7 @@ impl Default for Startup {
             start_hour: None,
             time_rate: 1.0,
             drop_height: None,
+            approach: None,
             assets: None,
         }
     }
@@ -372,6 +387,18 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                 },
                 None => notes.push("--time-rate needs a multiplier".to_owned()),
             },
+            // 着陸練習。`--approach` だけなら 1 海里、値を付ければその距離。
+            "--approach" => {
+                let distance = arguments
+                    .next()
+                    .and_then(|text| text.parse::<f64>().ok())
+                    .unwrap_or(1.0);
+                if distance.is_finite() && distance > 0.0 {
+                    startup.approach = Some(distance);
+                } else {
+                    notes.push(format!("--approach expects miles out, got `{distance}`"));
+                }
+            }
             "--drop" => match arguments.next() {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value > 0.0 => startup.drop_height = Some(value),
@@ -725,44 +752,76 @@ fn setup(
         64 * 1024 * 1024,
         startup.min_level..=startup.max_level,
     );
-    let simulation = match startup.drop_height {
-        // 開発用: 空中に静止 spawn して落とす。接地記録 → 評価 → 表示の
-        // 経路を、手で飛ばさずに通すため。
-        Some(height) => {
-            let sampler = GroundSampler::default();
-            let mut probe = Terrain::new(
-                make_source(&startup),
-                8 * 1024 * 1024,
-                startup.min_level..=startup.max_level,
-            );
-            let ground = sampler.sample(&mut probe, startup.start);
-            let state = flightsim_fdm::RigidBodyState::from_geodetic(
-                Geodetic::new(
-                    startup.start.latitude,
-                    startup.start.longitude,
-                    Meters(ground.elevation.get() + height),
-                ),
-                flightsim_core::Attitude::new(
-                    flightsim_core::Radians::ZERO,
-                    flightsim_core::Radians::ZERO,
-                    startup.heading,
-                ),
-                flightsim_core::Ned::new(0.0, 0.0, 0.0),
-            );
-            Simulation::from_state(
-                AircraftConfig::light_single(),
-                state,
-                terrain,
-                GroundSampler::default(),
-            )
-        }
-        None => Simulation::parked(
+    // 着陸練習。滑走路の手前・進入角に乗った状態から始める。
+    //
+    // **操縦入力も進入の形に合わせる。** 状態だけ空中に置いてスロットルを
+    // 0 のままにすると、始まった瞬間から失速へ向かって突っ込む
+    // （実測 -1685 ft/min）。練習にならない。
+    if startup.approach.is_some() {
+        let mut controls = PilotControls::default();
+        controls.throttle.set_absolute(APPROACH_THROTTLE);
+        controls.flaps.set_absolute(APPROACH_FLAPS);
+        commands.insert_resource(controls);
+
+        // チュートリアルは離陸から始まる流れを案内する。進入練習では
+        // **「戻ってきて降下しろ」と誤った指示を出す**ので黙らせる。
+        // `H` でいつでも戻せる。
+        commands.insert_resource(flightsim_ui::TutorialVisibility(false));
+    }
+
+    let simulation = if let Some(miles) = startup.approach {
+        let state = flightsim_sim::approach_state(
+            &Runway::synthetic(),
+            flightsim_core::NauticalMiles(miles).to_meters(),
+            Degrees(3.0).to_radians(),
+            flightsim_core::MetersPerSecond(35.0),
+        );
+        Simulation::from_state(
             AircraftConfig::light_single(),
-            startup.start,
-            startup.heading,
+            state,
             terrain,
             GroundSampler::default(),
-        ),
+        )
+    } else {
+        match startup.drop_height {
+            // 開発用: 空中に静止 spawn して落とす。接地記録 → 評価 → 表示の
+            // 経路を、手で飛ばさずに通すため。
+            Some(height) => {
+                let sampler = GroundSampler::default();
+                let mut probe = Terrain::new(
+                    make_source(&startup),
+                    8 * 1024 * 1024,
+                    startup.min_level..=startup.max_level,
+                );
+                let ground = sampler.sample(&mut probe, startup.start);
+                let state = flightsim_fdm::RigidBodyState::from_geodetic(
+                    Geodetic::new(
+                        startup.start.latitude,
+                        startup.start.longitude,
+                        Meters(ground.elevation.get() + height),
+                    ),
+                    flightsim_core::Attitude::new(
+                        flightsim_core::Radians::ZERO,
+                        flightsim_core::Radians::ZERO,
+                        startup.heading,
+                    ),
+                    flightsim_core::Ned::new(0.0, 0.0, 0.0),
+                );
+                Simulation::from_state(
+                    AircraftConfig::light_single(),
+                    state,
+                    terrain,
+                    GroundSampler::default(),
+                )
+            }
+            None => Simulation::parked(
+                AircraftConfig::light_single(),
+                startup.start,
+                startup.heading,
+                terrain,
+                GroundSampler::default(),
+            ),
+        }
     };
 
     let mut simulation = simulation;

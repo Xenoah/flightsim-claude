@@ -66,8 +66,8 @@ pub mod simulation;
 
 pub use director::{DirectorGains, DirectorTargets, FlightDirector, VerticalTarget};
 pub use flight::{
-    CircuitPlan, Phase, SimulationOptions, Trajectory, TrajectorySample, fly, gear_height,
-    parked_state,
+    CircuitPlan, Phase, SimulationOptions, Trajectory, TrajectorySample, approach_state, fly,
+    gear_height, parked_state,
 };
 pub use ground::{GroundPlane, GroundSampler};
 pub use simulation::{FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind};
