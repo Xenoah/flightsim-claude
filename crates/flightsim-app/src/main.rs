@@ -107,6 +107,8 @@ struct Startup {
     model_fit: ModelFit,
     /// 定常風。`--wind <方位>/<ノット>` で指定する（航空の慣習で from）。
     wind: flightsim_sim::Wind,
+    /// 乱流。`--turbulence light|moderate|severe` で指定する。
+    turbulence: flightsim_fdm::Turbulence,
     /// 開始時刻（地方平均太陽時）。`None` なら render 側の既定。
     ///
     /// **地方平均太陽時にするのは、経度がどこでも「9 時なら朝」だから。**
@@ -153,6 +155,7 @@ impl Default for Startup {
                 ..ModelFit::default()
             },
             wind: flightsim_sim::Wind::CALM,
+            turbulence: flightsim_fdm::Turbulence::CALM,
             start_hour: None,
             time_rate: 1.0,
             drop_height: None,
@@ -369,6 +372,20 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                     Err(message) => notes.push(message),
                 },
                 None => notes.push("--wind needs `<bearing>/<knots>`, e.g. 270/10".to_owned()),
+            },
+            "--turbulence" => match arguments.next() {
+                Some(text) => match text.to_lowercase().as_str() {
+                    // 種は固定。**同じ指定なら毎回同じ大気**になり、
+                    // 「さっきの着陸が難しかったのは運か腕か」を切り分けられる。
+                    "calm" | "none" => startup.turbulence = flightsim_fdm::Turbulence::CALM,
+                    "light" => startup.turbulence = flightsim_fdm::Turbulence::light(1),
+                    "moderate" => startup.turbulence = flightsim_fdm::Turbulence::moderate(1),
+                    "severe" => startup.turbulence = flightsim_fdm::Turbulence::severe(1),
+                    other => notes.push(format!(
+                        "unknown turbulence `{other}`; expected calm, light, moderate or severe"
+                    )),
+                },
+                None => notes.push("--turbulence needs a level".to_owned()),
             },
             // 地方平均太陽時。`--time 05:30` で日の出前から始まる。
             "--time" => match arguments.next() {
@@ -826,6 +843,7 @@ fn setup(
 
     let mut simulation = simulation;
     simulation.set_wind(startup.wind);
+    simulation.set_turbulence(startup.turbulence);
 
     commands.insert_resource(startup.view);
 

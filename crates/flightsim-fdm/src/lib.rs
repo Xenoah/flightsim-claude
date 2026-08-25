@@ -44,6 +44,7 @@ pub mod controls;
 pub mod gravity;
 mod landing_gear;
 pub mod state;
+pub mod turbulence;
 
 pub use aero::{AeroAngles, AeroCoefficientSet, aero_angles};
 pub use aircraft::{
@@ -53,6 +54,7 @@ pub use aircraft::{
 pub use atmosphere::{Atmosphere, AtmosphereSample};
 pub use controls::ControlInputs;
 pub use state::{RigidBodyState, StateDerivative};
+pub use turbulence::Turbulence;
 
 use flightsim_core::{Geodetic, LocalFrame, Meters, Seconds};
 use glam::DVec3;

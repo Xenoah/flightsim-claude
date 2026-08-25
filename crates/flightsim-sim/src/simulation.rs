@@ -27,7 +27,7 @@ use flightsim_core::{
 };
 use flightsim_fdm::{
     AircraftConfig, Atmosphere, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
-    RigidBodyState,
+    RigidBodyState, Turbulence,
 };
 use flightsim_world::{Terrain, TileSource};
 use glam::DQuat;
@@ -159,6 +159,8 @@ pub struct Simulation<S: TileSource> {
     diverged: bool,
     /// 定常風。
     wind: Wind,
+    /// 乱流。既定は無乱流で、既存の呼び出しの挙動は変わらない。
+    turbulence: Turbulence,
     /// 飛行の記録。
     log: FlightLog,
     /// 距離の累積に使う直前の位置。
@@ -196,6 +198,7 @@ impl<S: TileSource> Simulation<S> {
             ground,
             diverged: false,
             wind: Wind::CALM,
+            turbulence: Turbulence::CALM,
             log: FlightLog::default(),
             previous_position: state.geodetic(),
             gear_height,
@@ -226,6 +229,7 @@ impl<S: TileSource> Simulation<S> {
             ground,
             diverged: false,
             wind: Wind::CALM,
+            turbulence: Turbulence::CALM,
             log: FlightLog::default(),
             previous_position: state.geodetic(),
             gear_height,
@@ -266,11 +270,14 @@ impl<S: TileSource> Simulation<S> {
             // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
             // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
             // 擬似乱数列で、ここではなく Wind の生成側で行う）。
+            // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
+            // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
             let environment = Environment::with_wind_ned(
                 Atmosphere::standard(),
                 state.geodetic(),
                 self.wind.to_ned(),
             )
+            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
             .with_ground_plane(
                 self.ground.reference,
                 self.ground.elevation,
@@ -376,6 +383,17 @@ impl<S: TileSource> Simulation<S> {
         let wind = flightsim_core::LocalFrame::new(self.dynamics.state().geodetic())
             .ned_to_ecef_vector(self.wind.to_ned());
         MetersPerSecond((self.dynamics.state().velocity - wind).length())
+    }
+
+    /// 乱流を設定する。
+    pub const fn set_turbulence(&mut self, turbulence: Turbulence) {
+        self.turbulence = turbulence;
+    }
+
+    /// 現在の乱流。
+    #[must_use]
+    pub const fn turbulence(&self) -> Turbulence {
+        self.turbulence
     }
 
     /// 定常風を設定する。
