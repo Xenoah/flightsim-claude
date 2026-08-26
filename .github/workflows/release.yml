@@ -241,7 +241,10 @@ jobs:
               -WorkingDirectory $packageRoot `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 
-            $deadline = [DateTime]::UtcNow.AddSeconds(60)
+            # Bevy can keep the screenshot open briefly after logging the save on
+            # Windows. Observe both application-level proofs while it is alive,
+            # then validate the PNG bytes only after stopping the process.
+            $deadline = [DateTime]::UtcNow.AddSeconds(90)
             $ready = $false
             while ([DateTime]::UtcNow -lt $deadline) {
               $process.Refresh()
@@ -249,8 +252,8 @@ jobs:
                 throw "application exited before the smoke proof (status $($process.ExitCode))"
               }
               $logText = Read-SmokeLogs
-              if ((Test-CompletePng $screenshot) -and
-                  $logText.Contains('aircraft model fitted:')) {
+              if ($logText.Contains('aircraft model fitted:') -and
+                  $logText.Contains('Screenshot saved to')) {
                 $ready = $true
                 break
               }
@@ -258,21 +261,8 @@ jobs:
             }
 
             if (-not $ready) {
-              throw 'application did not render a complete PNG and load the bundled model in time'
+              throw 'application did not report a screenshot and bundled-model load in time'
             }
-            $logText = Read-SmokeLogs
-            $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
-            # PowerShell's -match is case-insensitive by default. Use -cmatch
-            # for the tracing level so warning text containing lowercase
-            # "error" does not turn a successful smoke run into a failure.
-            $hasFatalLog =
-              ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
-              ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
-              ($plainLog -match '(?im)Failed to load asset|unregistered type')
-            if ($hasFatalLog) {
-              throw 'application logged an error during the Windows smoke run'
-            }
-            Write-Host 'software-D3D12 Windows bundle smoke passed'
           } finally {
             if ($null -ne $process) {
               $process.Refresh()
@@ -289,6 +279,26 @@ jobs:
               Get-Content -LiteralPath $log | Select-Object -Last 80
             }
           }
+
+          # Validate after process termination so an encoder-held file handle cannot
+          # turn a complete screenshot into a false negative. The first alpha.5 run
+          # produced a valid 1280x720 PNG with IEND but exposed precisely this race.
+          if (-not (Test-CompletePng $screenshot)) {
+            throw 'application screenshot is missing or not a complete PNG'
+          }
+          $logText = Read-SmokeLogs
+          $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
+          # PowerShell's -match is case-insensitive by default. Use -cmatch
+          # for the tracing level so warning text containing lowercase
+          # "error" does not turn a successful smoke run into a failure.
+          $hasFatalLog =
+            ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
+            ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
+            ($plainLog -match '(?im)Failed to load asset|unregistered type')
+          if ($hasFatalLog) {
+            throw 'application logged an error during the Windows smoke run'
+          }
+          Write-Host 'software-D3D12 Windows bundle smoke passed'
 
       - name: Upload Windows smoke screenshot and log
         if: always()

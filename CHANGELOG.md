@@ -24,6 +24,8 @@
   ライセンスを zip に収録し、SHA-256 checksum とともに GitHub prerelease へ添付する
 - 配布 zip を新規ディレクトリへ展開し、Windows の D3D12 フォールバックで
   同梱 glTF 読み込みと完全な PNG 生成を確認してから公開する
+- Windows では実行中の画像ファイルが一時的に読めない場合があるため、モデル読込と
+  画像保存のログを待ってプロセスを停止してから、PNG の署名と終端を検査する
 - 再実行時は既存 release を更新し、同名 zip を置き換える。途中失敗後も再実行可能
 - ソースを実行する build job は読み取り権限だけを持ち、`contents: write` は checkout を
   行わない publish job に限定。job 間で zip の SHA-256 を照合する
