@@ -261,7 +261,15 @@ jobs:
               throw 'application did not render a complete PNG and load the bundled model in time'
             }
             $logText = Read-SmokeLogs
-            if ($logText -match '(?im)(^|\s)(ERROR|panic)(\s|:|$)|Failed to load asset|unregistered type') {
+            $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
+            # PowerShell's -match is case-insensitive by default. Use -cmatch
+            # for the tracing level so warning text containing lowercase
+            # "error" does not turn a successful smoke run into a failure.
+            $hasFatalLog =
+              ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
+              ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
+              ($plainLog -match '(?im)Failed to load asset|unregistered type')
+            if ($hasFatalLog) {
               throw 'application logged an error during the Windows smoke run'
             }
             Write-Host 'software-D3D12 Windows bundle smoke passed'
