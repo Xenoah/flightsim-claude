@@ -37,70 +37,37 @@ jobs:
           [[ "$HEAD_REF" == agent/* ]]
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
 
-          # A branch name is untrusted event data and may contain slashes or
-          # other URL-significant bytes. Encode it as one API path component.
-          encoded_ref="$(python3 - <<'PY'
-          import os
-          import urllib.parse
+          # Git's explicit force-with-lease makes the expected SHA check and
+          # deletion one atomic server-side ref update. A GET followed by a
+          # REST DELETE has a race where newly pushed work can be deleted.
+          repository_dir="$RUNNER_TEMP/ref-cleanup.git"
+          error_log="$RUNNER_TEMP/ref-cleanup-ls-remote.err"
+          git init --bare "$repository_dir" >/dev/null
+          git -C "$repository_dir" remote add origin "https://github.com/$REPOSITORY.git"
+          gh auth setup-git
 
-          print(urllib.parse.quote(os.environ["HEAD_REF"], safe=""))
-          PY
-          )"
-          get_url="$GITHUB_API_URL/repos/$REPOSITORY/git/ref/heads/$encoded_ref"
-          delete_url="$GITHUB_API_URL/repos/$REPOSITORY/git/refs/heads/$encoded_ref"
-          response_file="$(mktemp)"
-          delete_response="$(mktemp)"
-          trap 'rm -f "$response_file" "$delete_response"' EXIT
-
-          status="$(curl --silent --show-error \
-            --output "$response_file" --write-out '%{http_code}' \
-            --header 'Accept: application/vnd.github+json' \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "$get_url")"
-
+          set +e
+          remote_line="$(git -C "$repository_dir" ls-remote --exit-code --heads             origin "refs/heads/$HEAD_REF" 2>"$error_log")"
+          status=$?
+          set -e
           case "$status" in
-            200) ;;
-            404)
+            0) ;;
+            2)
               echo "merged head ref is already absent"
               exit 0
               ;;
             *)
-              echo "failed to read merged head ref (HTTP $status)" >&2
-              exit 1
+              cat "$error_log" >&2
+              exit "$status"
               ;;
           esac
 
-          current_sha="$(python3 - "$response_file" <<'PY'
-          import json
-          import pathlib
-          import re
-          import sys
-
-          value = json.loads(pathlib.Path(sys.argv[1]).read_text())["object"]["sha"]
-          if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
-              raise SystemExit("GitHub returned an invalid ref SHA")
-          print(value)
-          PY
-          )"
-
-          if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
+          remote_sha="$(cut -f1 <<<"$remote_line")"
+          [[ "$remote_sha" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$remote_sha" != "$EXPECTED_SHA" ]]; then
             echo "head ref changed after the merged PR; refusing to delete it" >&2
             exit 1
           fi
 
-          delete_status="$(curl --silent --show-error --request DELETE \
-            --output "$delete_response" --write-out '%{http_code}' \
-            --header 'Accept: application/vnd.github+json' \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "$delete_url")"
-
-          case "$delete_status" in
-            204) echo "deleted the unchanged merged agent branch" ;;
-            404) echo "merged head ref disappeared before deletion" ;;
-            *)
-              echo "failed to delete merged head ref (HTTP $delete_status)" >&2
-              exit 1
-              ;;
-          esac
+          git -C "$repository_dir" push --porcelain             --force-with-lease="refs/heads/$HEAD_REF:$EXPECTED_SHA"             origin ":refs/heads/$HEAD_REF"
+          echo "deleted the unchanged merged agent branch at $EXPECTED_SHA"
