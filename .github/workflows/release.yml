@@ -241,27 +241,42 @@ jobs:
               -WorkingDirectory $packageRoot `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 
-            # Bevy can keep the screenshot open briefly after logging the save on
-            # Windows. Observe both application-level proofs while it is alive,
-            # then validate the PNG bytes only after stopping the process.
+            # Start-Process keeps redirected stdout/stderr buffered until the child
+            # exits on this runner. Use the screenshot file itself only as a wake-up
+            # signal, then validate its bytes and every log proof after termination.
             $deadline = [DateTime]::UtcNow.AddSeconds(90)
             $ready = $false
+            $lastScreenshotLength = -1
+            $stableLengthPolls = 0
             while ([DateTime]::UtcNow -lt $deadline) {
               $process.Refresh()
               if ($process.HasExited) {
                 throw "application exited before the smoke proof (status $($process.ExitCode))"
               }
-              $logText = Read-SmokeLogs
-              if ($logText.Contains('aircraft model fitted:') -and
-                  $logText.Contains('Screenshot saved to')) {
-                $ready = $true
-                break
+              if (Test-Path -LiteralPath $screenshot -PathType Leaf) {
+                try {
+                  $length = (Get-Item -LiteralPath $screenshot).Length
+                  if ($length -gt 24 -and $length -eq $lastScreenshotLength) {
+                    $stableLengthPolls += 1
+                  } else {
+                    $stableLengthPolls = 0
+                    $lastScreenshotLength = $length
+                  }
+                  # Observe the same non-empty size three polls in a row. File
+                  # existence alone can precede the encoder's final IEND write.
+                  if ($stableLengthPolls -ge 2) {
+                    $ready = $true
+                    break
+                  }
+                } catch {
+                  # The encoder can briefly hold the file while finishing the PNG.
+                }
               }
               Start-Sleep -Seconds 1
             }
 
             if (-not $ready) {
-              throw 'application did not report a screenshot and bundled-model load in time'
+              throw 'application did not create a non-empty screenshot in time'
             }
           } finally {
             if ($null -ne $process) {
@@ -272,6 +287,10 @@ jobs:
               if (-not $process.WaitForExit(10000)) {
                 throw 'application process did not terminate after the smoke run'
               }
+              # The timed overload only waits for process termination. The
+              # parameterless call additionally drains Start-Process' redirected
+              # stdout/stderr before Read-SmokeLogs inspects their final markers.
+              $process.WaitForExit()
             }
             $combinedLog = Read-SmokeLogs
             [System.IO.File]::WriteAllText($log, $combinedLog)
@@ -287,6 +306,11 @@ jobs:
             throw 'application screenshot is missing or not a complete PNG'
           }
           $logText = Read-SmokeLogs
+          foreach ($proof in @('aircraft model fitted:', 'Screenshot saved to')) {
+            if (-not $logText.Contains($proof)) {
+              throw "application log is missing the smoke proof: $proof"
+            }
+          }
           $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
           # PowerShell's -match is case-insensitive by default. Use -cmatch
           # for the tracing level so warning text containing lowercase
