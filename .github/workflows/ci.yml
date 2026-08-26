@@ -244,7 +244,24 @@ jobs:
             exit 1
           fi
 
-          if grep -Eiq '(^|[[:space:]])(ERROR|panic)([[:space:]:]|$)|Failed to load asset|unregistered type' "$log"; then
+          # ANSI 色コードを除いてから、ログレベルの大文字 ERROR と実際の
+          # panic / asset failure だけを検出する。警告本文の "error setting
+          # XSETTINGS" のような小文字 error は起動失敗ではない。
+          if python3 - "$log" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          text = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          plain = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+          fatal = (
+              re.search(r"(?:^|\s)ERROR(?:\s|:|$)", plain, re.MULTILINE)
+              or re.search(r"(?:thread .+ panicked at|panic(?:ked)? at)", plain, re.IGNORECASE)
+              or re.search(r"Failed to load asset|unregistered type", plain, re.IGNORECASE)
+          )
+          raise SystemExit(0 if fatal else 1)
+          PY
+          then
             echo "application logged an error during the smoke run" >&2
             cat "$log"
             exit 1
