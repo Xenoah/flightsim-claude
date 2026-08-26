@@ -80,6 +80,8 @@ impl Phase {
 /// 既定値は `AircraftConfig::light_single` 向け。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CircuitPlan {
+    /// 精密進入に使う滑走路。`None` なら従来どおり方位だけで飛ぶ。
+    pub runway: Option<Runway>,
     /// 滑走路の方位（真方位）。離陸と上昇の進行方向。
     pub runway_heading: Radians,
     /// 引き起こしを始める対気速度。
@@ -94,6 +96,14 @@ pub struct CircuitPlan {
     pub cruise_duration: Seconds,
     /// 旋回後の方位。
     pub outbound_heading: Radians,
+    /// 精密進入で向かう最終進入フィックスの、末端手前からの距離。
+    pub final_approach_distance: Meters,
+    /// 最終進入フィックスを捕捉したとみなす半径。
+    pub approach_capture_radius: Meters,
+    /// 中心線捕捉で前方を見る距離。短すぎると蛇行し、長すぎると収束が遅い。
+    pub guidance_lookahead: Meters,
+    /// 接地点として狙う、進入端からの距離。
+    pub touchdown_aim: Meters,
     /// 進入時の目標対気速度。
     pub approach_speed: MetersPerSecond,
     /// 進入時の降下率（正が降下）。
@@ -116,6 +126,7 @@ pub struct CircuitPlan {
 impl Default for CircuitPlan {
     fn default() -> Self {
         Self {
+            runway: None,
             runway_heading: Radians::ZERO,
             rotate_speed: MetersPerSecond(30.0),
             climb_pitch: Radians(8.0_f64.to_radians()),
@@ -123,6 +134,10 @@ impl Default for CircuitPlan {
             cruise_speed: MetersPerSecond(50.0),
             cruise_duration: Seconds(40.0),
             outbound_heading: Radians(90.0_f64.to_radians()),
+            final_approach_distance: Meters(6_000.0),
+            approach_capture_radius: Meters(250.0),
+            guidance_lookahead: Meters(70.0),
+            touchdown_aim: Meters(300.0),
             approach_speed: MetersPerSecond(35.0),
             approach_descent: MetersPerSecond(3.0),
             approach_flaps: 1.0,
@@ -135,9 +150,25 @@ impl Default for CircuitPlan {
 }
 
 impl CircuitPlan {
+    /// 実滑走路へ戻る精密な場周計画を作る。
+    #[must_use]
+    pub fn for_runway(runway: Runway) -> Self {
+        let runway_heading = finite_heading(runway.heading, Radians::ZERO);
+        Self {
+            runway: Some(runway),
+            runway_heading,
+            // 左場周。精密誘導では最終進入フィックスへ向かうまでの初期目標として使う。
+            outbound_heading: Radians(runway_heading.get() - core::f64::consts::FRAC_PI_2)
+                .wrap_positive(),
+            // 35 m/s で標準 3° の進入角に相当する降下率。
+            approach_descent: MetersPerSecond(1.83),
+            ..Self::default()
+        }
+    }
+
     /// フェーズに対応するディレクタへの指示。
     #[must_use]
-    fn targets(&self, phase: Phase) -> DirectorTargets {
+    fn targets(&self, phase: Phase, position: Geodetic) -> DirectorTargets {
         let base = DirectorTargets {
             vertical: VerticalTarget::Pitch(Radians::ZERO),
             heading: self.runway_heading,
@@ -166,12 +197,16 @@ impl CircuitPlan {
             },
             Phase::Turn => DirectorTargets {
                 vertical: VerticalTarget::AltitudeAgl(self.pattern_altitude_agl),
-                heading: self.outbound_heading,
+                heading: self.runway.map_or(self.outbound_heading, |runway| {
+                    self.heading_to_final_fix(runway, position)
+                }),
                 ..base
             },
             Phase::Approach => DirectorTargets {
                 vertical: VerticalTarget::DescentRate(self.approach_descent),
-                heading: self.outbound_heading,
+                heading: self.runway.map_or(self.outbound_heading, |runway| {
+                    self.centerline_heading(runway, position)
+                }),
                 airspeed: self.approach_speed,
                 flaps: self.approach_flaps,
                 ..base
@@ -179,14 +214,18 @@ impl CircuitPlan {
             // フレアはスロットルを絞り、低い沈下率を保つ。
             Phase::Flare => DirectorTargets {
                 vertical: VerticalTarget::DescentRate(self.flare_descent),
-                heading: self.outbound_heading,
+                heading: self.runway.map_or(self.outbound_heading, |runway| {
+                    self.centerline_heading(runway, position)
+                }),
                 airspeed: self.approach_speed,
                 flaps: self.approach_flaps,
                 throttle_override: Some(0.0),
                 ..base
             },
             Phase::Rollout => DirectorTargets {
-                heading: self.outbound_heading,
+                heading: self.runway.map_or(self.outbound_heading, |runway| {
+                    finite_heading(runway.heading, self.runway_heading)
+                }),
                 flaps: self.approach_flaps,
                 brakes: 1.0,
                 throttle_override: Some(0.0),
@@ -200,6 +239,43 @@ impl CircuitPlan {
                 ..base
             },
         }
+    }
+
+    /// 現在位置から最終進入フィックスへ向く真方位。
+    fn heading_to_final_fix(&self, runway: Runway, position: Geodetic) -> Radians {
+        let distance = finite_positive(self.final_approach_distance, Meters(6_000.0));
+        heading_to_runway_point(&runway, position, Meters(-distance.get()), Meters::ZERO)
+    }
+
+    /// 前方注視点を使って滑走路中心線を捕捉する真方位。
+    fn centerline_heading(&self, runway: Runway, position: Geodetic) -> Radians {
+        let offsets = runway.offsets(position);
+        if !offsets.is_finite() {
+            return finite_heading(runway.heading, self.runway_heading);
+        }
+
+        let lookahead = finite_positive(self.guidance_lookahead, Meters(70.0));
+        let touchdown = finite_non_negative(self.touchdown_aim, Meters(300.0));
+        // 現在位置より必ず前に注視点を置く。末端手前では接地点までを見て、
+        // 滑走路上へ入った後は機体と一緒に前へ送るため、中心線を保ち続ける。
+        let target_longitudinal = Meters(
+            touchdown
+                .get()
+                .max(offsets.longitudinal.get() + lookahead.get()),
+        );
+        heading_to_runway_point(&runway, position, target_longitudinal, Meters::ZERO)
+    }
+
+    fn final_fix_distance(&self, runway: Runway, position: Geodetic) -> Meters {
+        let offsets = runway.offsets(position);
+        if !offsets.is_finite() {
+            return Meters(f64::INFINITY);
+        }
+        let distance = finite_positive(self.final_approach_distance, Meters(6_000.0));
+        Meters(
+            ((offsets.longitudinal.get() + distance.get()).powi(2) + offsets.lateral.get().powi(2))
+                .sqrt(),
+        )
     }
 
     /// フェーズの遷移判定。
@@ -220,15 +296,28 @@ impl CircuitPlan {
             }
             Phase::Climb if sample.agl.get() >= self.pattern_altitude_agl.get() => Phase::Cruise,
             Phase::Cruise if elapsed_in_phase >= self.cruise_duration.get() => Phase::Turn,
-            Phase::Turn
-                if sample
+            Phase::Turn => {
+                if let Some(runway) = self.runway {
+                    let capture = finite_positive(self.approach_capture_radius, Meters(250.0));
+                    // 出発後は滑走路の反対側からフィックスに入るため、
+                    // 捕捉時の機首はまだ滑走路方位と一致しない。捕捉後に
+                    // 中心線の前方注視点へ旋回させる。
+                    if self.final_fix_distance(runway, sample.position).get() <= capture.get() {
+                        Phase::Approach
+                    } else {
+                        Phase::Turn
+                    }
+                } else if sample
                     .heading
                     .shortest_difference_to(self.outbound_heading)
                     .get()
                     .abs()
-                    < 5.0_f64.to_radians() =>
-            {
-                Phase::Approach
+                    < 5.0_f64.to_radians()
+                {
+                    Phase::Approach
+                } else {
+                    Phase::Turn
+                }
             }
             Phase::Approach if sample.wheel_clearance.get() <= self.flare_clearance.get() => {
                 Phase::Flare
@@ -245,10 +334,59 @@ impl CircuitPlan {
 /// 1 ステップ分の観測量。フェーズ判定と記録の両方で使う。
 #[derive(Debug, Clone, Copy)]
 struct Snapshot {
+    position: Geodetic,
     airspeed: MetersPerSecond,
     agl: Meters,
     wheel_clearance: Meters,
     heading: Radians,
+}
+
+fn finite_positive(value: Meters, fallback: Meters) -> Meters {
+    if value.get().is_finite() && value.get() > 0.0 {
+        value
+    } else {
+        fallback
+    }
+}
+
+fn finite_non_negative(value: Meters, fallback: Meters) -> Meters {
+    if value.get().is_finite() && value.get() >= 0.0 {
+        value
+    } else {
+        fallback
+    }
+}
+
+fn finite_heading(value: Radians, fallback: Radians) -> Radians {
+    if value.is_finite() {
+        value.wrap_positive()
+    } else if fallback.is_finite() {
+        fallback.wrap_positive()
+    } else {
+        Radians::ZERO
+    }
+}
+
+/// 滑走路ローカル座標上の点へ向く真方位。
+///
+/// 測地変換は [`Runway::offsets`] に閉じ込め、ここでは航法上の二次元ベクトルだけを扱う。
+fn heading_to_runway_point(
+    runway: &Runway,
+    position: Geodetic,
+    target_longitudinal: Meters,
+    target_lateral: Meters,
+) -> Radians {
+    let offsets = runway.offsets(position);
+    let forward = target_longitudinal.get() - offsets.longitudinal.get();
+    let right = target_lateral.get() - offsets.lateral.get();
+    if !offsets.is_finite()
+        || !forward.is_finite()
+        || !right.is_finite()
+        || (forward.abs() < 1.0e-9 && right.abs() < 1.0e-9)
+    {
+        return finite_heading(runway.heading, Radians::ZERO);
+    }
+    Radians(runway.heading.get() + right.atan2(forward)).wrap_positive()
 }
 
 /// 軌跡の 1 点。
@@ -609,7 +747,7 @@ pub fn fly<S: TileSource>(
         }
 
         let snapshot = observe(&state, &ground, gear, options.wind);
-        let targets = plan.targets(phase);
+        let targets = plan.targets(phase, state.geodetic());
         let controls = director.control(&state, snapshot.agl, targets);
 
         if time >= next_sample_at {
@@ -639,7 +777,8 @@ pub fn fly<S: TileSource>(
     if state.is_finite() {
         let ground = sampler.sample(terrain, state.geodetic());
         let snapshot = observe(&state, &ground, gear, options.wind);
-        let controls = director.control(&state, snapshot.agl, plan.targets(phase));
+        let controls =
+            director.control(&state, snapshot.agl, plan.targets(phase, state.geodetic()));
         samples.push(record(time, phase, &state, &ground, &snapshot, controls));
     } else {
         diverged = true;
@@ -668,6 +807,7 @@ fn observe(
     let wind_ecef =
         flightsim_core::LocalFrame::new(state.geodetic()).ned_to_ecef_vector(wind.to_ned());
     Snapshot {
+        position: state.geodetic(),
         airspeed: MetersPerSecond((state.velocity - wind_ecef).length()),
         agl: Meters(agl),
         wheel_clearance: Meters(agl - gear),
@@ -696,5 +836,127 @@ fn record(
         vertical_speed: state.vertical_speed(),
         controls,
         terrain_available: ground.from_terrain,
+    }
+}
+
+#[cfg(test)]
+mod guidance_tests {
+    use super::*;
+    use flightsim_core::Degrees;
+
+    fn angular_error(actual: Radians, expected: Radians) -> f64 {
+        actual.shortest_difference_to(expected).get().abs()
+    }
+
+    #[test]
+    fn a_point_on_the_extended_centerline_commands_runway_heading() {
+        let runway = Runway::synthetic();
+        let position = runway.point_at(Meters(-3_000.0), Meters::ZERO);
+        let heading = heading_to_runway_point(&runway, position, Meters(300.0), Meters::ZERO);
+        assert!(angular_error(heading, runway.heading) < 1.0e-9);
+    }
+
+    #[test]
+    fn an_aircraft_right_of_centerline_is_commanded_left() {
+        let runway = Runway::synthetic();
+        let position = runway.point_at(Meters(-1_000.0), Meters(200.0));
+        let heading = heading_to_runway_point(&runway, position, Meters(300.0), Meters::ZERO);
+        let correction = runway.heading.shortest_difference_to(heading).get();
+        assert!(
+            correction < 0.0,
+            "correction was {} deg",
+            correction.to_degrees()
+        );
+        // 外部の平面幾何: atan2(-200, 1300) = -8.746°。
+        assert!((correction.to_degrees() + 8.746).abs() < 0.01);
+    }
+
+    #[test]
+    fn an_aircraft_left_of_centerline_is_commanded_right() {
+        let runway = Runway::synthetic();
+        let position = runway.point_at(Meters(-1_000.0), Meters(-200.0));
+        let heading = heading_to_runway_point(&runway, position, Meters(300.0), Meters::ZERO);
+        assert!(runway.heading.shortest_difference_to(heading).get() > 0.0);
+    }
+
+    #[test]
+    fn guidance_wraps_cleanly_across_north() {
+        let runway = Runway::from_degrees(35.0, 139.0, 350.0, 2_500.0, 45.0, 0.0);
+        let position = runway.point_at(Meters(-1_000.0), Meters(-500.0));
+        let heading = heading_to_runway_point(&runway, position, Meters(300.0), Meters::ZERO);
+        assert!((0.0..core::f64::consts::TAU).contains(&heading.get()));
+        assert!(runway.heading.shortest_difference_to(heading).get() > 0.0);
+    }
+
+    #[test]
+    fn non_finite_guidance_falls_back_to_runway_heading() {
+        let runway = Runway::synthetic();
+        let invalid = Geodetic::new(Radians(f64::NAN), Radians(f64::INFINITY), Meters(f64::NAN));
+        let heading = heading_to_runway_point(&runway, invalid, Meters(f64::NAN), Meters::ZERO);
+        assert_eq!(heading, runway.heading.wrap_positive());
+    }
+
+    #[test]
+    fn non_finite_runway_heading_falls_back_to_north() {
+        let runway = Runway::new(
+            Runway::synthetic().threshold,
+            Radians(f64::NAN),
+            Meters(2_500.0),
+            Meters(45.0),
+            Meters(8.0),
+        );
+        let plan = CircuitPlan::for_runway(runway);
+        let heading = plan.centerline_heading(runway, runway.threshold);
+        assert_eq!(plan.runway_heading, Radians::ZERO);
+        assert_eq!(heading, Radians::ZERO);
+        assert!(
+            plan.targets(Phase::Rollout, runway.threshold)
+                .heading
+                .is_finite()
+        );
+    }
+
+    #[test]
+    fn runway_plan_captures_the_final_fix_before_descending() {
+        let runway = Runway::synthetic();
+        let plan = CircuitPlan::for_runway(runway);
+        let position = runway.point_at(Meters(-plan.final_approach_distance.get()), Meters::ZERO);
+        let sample = Snapshot {
+            position,
+            airspeed: MetersPerSecond(35.0),
+            agl: Meters(100.0),
+            wheel_clearance: Meters(99.0),
+            heading: runway.heading,
+        };
+        assert_eq!(plan.next_phase(Phase::Turn, 0.0, &sample), Phase::Approach);
+
+        let far = Snapshot {
+            position: runway.point_at(Meters(-9_000.0), Meters::ZERO),
+            ..sample
+        };
+        assert_eq!(plan.next_phase(Phase::Turn, 0.0, &far), Phase::Turn);
+    }
+
+    #[test]
+    fn centerline_lookahead_uses_finite_defaults_for_bad_configuration() {
+        let runway = Runway::synthetic();
+        let plan = CircuitPlan {
+            runway: Some(runway),
+            guidance_lookahead: Meters(f64::NAN),
+            touchdown_aim: Meters(f64::NEG_INFINITY),
+            ..CircuitPlan::for_runway(runway)
+        };
+        let position = runway.point_at(Meters(-1_000.0), Meters(100.0));
+        let heading = plan.centerline_heading(runway, position);
+        assert!(heading.is_finite());
+        assert!(runway.heading.shortest_difference_to(heading).get() < 0.0);
+    }
+
+    #[test]
+    fn constructor_uses_a_left_hand_pattern_and_normalises_it() {
+        let runway = Runway::from_degrees(0.0, 0.0, 10.0, 2_000.0, 45.0, 0.0);
+        let plan = CircuitPlan::for_runway(runway);
+        assert_eq!(plan.runway, Some(runway));
+        assert!(angular_error(plan.outbound_heading, Degrees(280.0).to_radians()) < 1.0e-12);
     }
 }
