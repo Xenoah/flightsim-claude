@@ -294,7 +294,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: windows-smoke-${{ github.event.workflow_run.head_sha }}
+          name: windows-smoke-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/flightsim-windows-smoke.png
             ${{ runner.temp }}/flightsim-windows-smoke.log
@@ -304,7 +304,7 @@ jobs:
       - name: Upload the verified bundle for publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: windows-release
+          name: windows-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-artifact/
           if-no-files-found: error
           retention-days: 7
@@ -323,7 +323,7 @@ jobs:
       # リポジトリコードを実行しない。
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: windows-release
+          name: windows-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-artifact
 
       - name: Verify release metadata and archive digest
@@ -421,22 +421,37 @@ jobs:
           EXPECTED_SHA: 590177a7d51550eb66470a76ec3fa819b61a84ae
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
+          HEAD_REF: agent/landing-gear-prerelease
         run: |
           set -euo pipefail
-          get_endpoint="repos/$REPOSITORY/git/ref/heads/agent/landing-gear-prerelease"
-          delete_endpoint="repos/$REPOSITORY/git/refs/heads/agent/landing-gear-prerelease"
-          error_log="$RUNNER_TEMP/legacy-branch-get.err"
+          repository_dir="$RUNNER_TEMP/legacy-ref-cleanup.git"
+          error_log="$RUNNER_TEMP/legacy-ref-ls-remote.err"
+          git init --bare "$repository_dir" >/dev/null
+          git -C "$repository_dir" remote add origin "https://github.com/$REPOSITORY.git"
+          gh auth setup-git
 
-          if current_sha="$(gh api "$get_endpoint" --jq '.object.sha' 2>"$error_log")"; then
-            if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
-              echo "ref now points to $current_sha; refusing to delete new work" >&2
-              exit 1
-            fi
-            gh api --method DELETE "$delete_endpoint"
-            echo "deleted refs/heads/agent/landing-gear-prerelease at $current_sha"
-          elif grep -Eq '\(HTTP 404\)|HTTP/[0-9.]+ 404' "$error_log"; then
-            echo "refs/heads/agent/landing-gear-prerelease is already absent"
-          else
-            cat "$error_log" >&2
+          set +e
+          remote_line="$(git -C "$repository_dir" ls-remote --exit-code --heads             origin "refs/heads/$HEAD_REF" 2>"$error_log")"
+          status=$?
+          set -e
+          case "$status" in
+            0) ;;
+            2)
+              echo "refs/heads/$HEAD_REF is already absent"
+              exit 0
+              ;;
+            *)
+              cat "$error_log" >&2
+              exit "$status"
+              ;;
+          esac
+
+          remote_sha="$(cut -f1 <<<"$remote_line")"
+          [[ "$remote_sha" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$remote_sha" != "$EXPECTED_SHA" ]]; then
+            echo "ref now points to $remote_sha; refusing to delete new work" >&2
             exit 1
           fi
+
+          git -C "$repository_dir" push --porcelain             --force-with-lease="refs/heads/$HEAD_REF:$EXPECTED_SHA"             origin ":refs/heads/$HEAD_REF"
+          echo "deleted refs/heads/$HEAD_REF at $EXPECTED_SHA"
