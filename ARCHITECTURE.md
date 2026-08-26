@@ -171,7 +171,7 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 | `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路 |
 | `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI |
 | `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
-| `flightsim-sim` | 地形と FDM の結線、固定ステップ、フライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
+| `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
 | `flightsim-render` | 地形・滑走路メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、glTF の軸・倍率補正 |
 | `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
 | `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価 |
@@ -193,7 +193,6 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 ### 実装済みだが検証を残すもの
 
 - ゲームパッドは純関数とキーボード共存をテスト済みだが、物理デバイスでの符号・感度は未確認
-- 回帰テスト用フライトディレクタは滑走路への精密な横方向誘導を持たない
 - 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整
 - 実 Copernicus DEM での夜間・高高度表示は目視未検証
 - CI の描画スモークは CPU Vulkan、Windows 配布スモークは D3D12 フォールバックを使う。
