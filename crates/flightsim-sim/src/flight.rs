@@ -153,11 +153,12 @@ impl CircuitPlan {
     /// 実滑走路へ戻る精密な場周計画を作る。
     #[must_use]
     pub fn for_runway(runway: Runway) -> Self {
+        let runway_heading = finite_heading(runway.heading, Radians::ZERO);
         Self {
             runway: Some(runway),
-            runway_heading: runway.heading,
+            runway_heading,
             // 左場周。精密誘導では最終進入フィックスへ向かうまでの初期目標として使う。
-            outbound_heading: Radians(runway.heading.get() - core::f64::consts::FRAC_PI_2)
+            outbound_heading: Radians(runway_heading.get() - core::f64::consts::FRAC_PI_2)
                 .wrap_positive(),
             // 35 m/s で標準 3° の進入角に相当する降下率。
             approach_descent: MetersPerSecond(1.83),
@@ -222,9 +223,9 @@ impl CircuitPlan {
                 ..base
             },
             Phase::Rollout => DirectorTargets {
-                heading: self
-                    .runway
-                    .map_or(self.outbound_heading, |runway| runway.heading),
+                heading: self.runway.map_or(self.outbound_heading, |runway| {
+                    finite_heading(runway.heading, self.runway_heading)
+                }),
                 flaps: self.approach_flaps,
                 brakes: 1.0,
                 throttle_override: Some(0.0),
@@ -250,7 +251,7 @@ impl CircuitPlan {
     fn centerline_heading(&self, runway: Runway, position: Geodetic) -> Radians {
         let offsets = runway.offsets(position);
         if !offsets.is_finite() {
-            return runway.heading.wrap_positive();
+            return finite_heading(runway.heading, self.runway_heading);
         }
 
         let lookahead = finite_positive(self.guidance_lookahead, Meters(70.0));
@@ -356,6 +357,16 @@ fn finite_non_negative(value: Meters, fallback: Meters) -> Meters {
     }
 }
 
+fn finite_heading(value: Radians, fallback: Radians) -> Radians {
+    if value.is_finite() {
+        value.wrap_positive()
+    } else if fallback.is_finite() {
+        fallback.wrap_positive()
+    } else {
+        Radians::ZERO
+    }
+}
+
 /// 滑走路ローカル座標上の点へ向く真方位。
 ///
 /// 測地変換は [`Runway::offsets`] に閉じ込め、ここでは航法上の二次元ベクトルだけを扱う。
@@ -373,7 +384,7 @@ fn heading_to_runway_point(
         || !right.is_finite()
         || (forward.abs() < 1.0e-9 && right.abs() < 1.0e-9)
     {
-        return runway.heading.wrap_positive();
+        return finite_heading(runway.heading, Radians::ZERO);
     }
     Radians(runway.heading.get() + right.atan2(forward)).wrap_positive()
 }
@@ -883,6 +894,26 @@ mod guidance_tests {
         let invalid = Geodetic::new(Radians(f64::NAN), Radians(f64::INFINITY), Meters(f64::NAN));
         let heading = heading_to_runway_point(&runway, invalid, Meters(f64::NAN), Meters::ZERO);
         assert_eq!(heading, runway.heading.wrap_positive());
+    }
+
+    #[test]
+    fn non_finite_runway_heading_falls_back_to_north() {
+        let runway = Runway::new(
+            Runway::synthetic().threshold,
+            Radians(f64::NAN),
+            Meters(2_500.0),
+            Meters(45.0),
+            Meters(8.0),
+        );
+        let plan = CircuitPlan::for_runway(runway);
+        let heading = plan.centerline_heading(runway, runway.threshold);
+        assert_eq!(plan.runway_heading, Radians::ZERO);
+        assert_eq!(heading, Radians::ZERO);
+        assert!(
+            plan.targets(Phase::Rollout, runway.threshold)
+                .heading
+                .is_finite()
+        );
     }
 
     #[test]
