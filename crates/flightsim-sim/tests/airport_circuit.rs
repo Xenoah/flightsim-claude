@@ -5,9 +5,8 @@
 //! 滑走路の contains / offsets は高度を見ないので、この単純化で
 //! 「空港周辺に降りたか」の判定は損なわれない。
 //!
-//! **自動操縦は滑走路へ戻る横方向誘導を持たない**（M3 の空港運用側）。
-//! ここで確かめるのは、滑走路から離陸し、旋回し、空港の周辺に無事に
-//! 降りられること。滑走路上への精密着陸はプレイヤーの腕の見せ所。
+//! 自動操縦は滑走路の延長中心線を捕捉し、無風と横風の両方で
+//! 滑走路矩形内に接地する。これを数値で回帰検査する。
 
 use flightsim_core::{Degrees, Meters, MetersPerSecond, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
@@ -22,12 +21,7 @@ fn a_circuit_from_the_synthetic_runway_completes() {
     // 平地（標高 0）。滑走路の contains は高度非依存。
     let mut terrain = Terrain::new(MemoryTileSource::new(), 8 * 1024 * 1024, 8..=12);
 
-    let plan = CircuitPlan {
-        runway_heading: runway.heading,
-        // 左場周: 離陸方位から 90° 左へ。
-        outbound_heading: Radians(runway.heading.get() - Degrees(90.0).to_radians().get()),
-        ..CircuitPlan::default()
-    };
+    let plan = CircuitPlan::for_runway(runway);
 
     let trajectory = fly(
         &config,
@@ -36,7 +30,7 @@ fn a_circuit_from_the_synthetic_runway_completes() {
         &mut terrain,
         &GroundSampler::default(),
         &SimulationOptions {
-            max_duration: Seconds(600.0),
+            max_duration: Seconds(900.0),
             ..SimulationOptions::default()
         },
     );
@@ -66,7 +60,9 @@ fn a_circuit_from_the_synthetic_runway_completes() {
         trajectory.peak_agl()
     );
 
-    // 空港の周辺に降りたこと。場周 1 周ぶんの半径として 10 km を上限にする。
+    assert_touchdown_on_runway(&trajectory, runway);
+
+    // ロールアウト後も空港の周辺に残ったこと。
     let last = trajectory
         .samples
         .last()
@@ -102,66 +98,87 @@ fn a_circuit_from_the_synthetic_runway_completes() {
 }
 
 #[test]
-fn the_circuit_still_completes_in_a_crosswind() {
-    // **横風でも一周できること。** 自動操縦は偏流修正を持たないので
-    // 風下へ流されるが、それでも離陸・上昇・旋回・進入・接地の
-    // フェーズを全部通り、機体が壊れずに止まること。
-    // ここが崩れると、風を入れたせいでゲームが成立しなくなる。
+fn the_circuit_still_completes_in_crosswinds_from_both_sides() {
+    // **左右どちらの横風でも一周できること。** 方位を中心線の
+    // 前方注視点へ更新し続けることで偏流を修正し、滑走路内に接地させる。
     let runway = Runway::synthetic();
     let config = AircraftConfig::light_single();
-    let mut terrain = Terrain::new(MemoryTileSource::new(), 8 * 1024 * 1024, 8..=12);
+    let plan = CircuitPlan::for_runway(runway);
 
-    let plan = CircuitPlan {
-        runway_heading: runway.heading,
-        outbound_heading: Radians(runway.heading.get() - Degrees(90.0).to_radians().get()),
-        ..CircuitPlan::default()
-    };
-
-    // 滑走路方位 50° に対して 140°（真横）から 6 m/s。
-    let trajectory = fly(
-        &config,
-        &plan,
-        runway.takeoff_start(),
-        &mut terrain,
-        &GroundSampler::default(),
-        &SimulationOptions {
-            max_duration: Seconds(600.0),
-            wind: Wind {
-                from: Radians(runway.heading.get() + Degrees(90.0).to_radians().get()),
-                speed: MetersPerSecond(6.0),
+    for side in [-90.0_f64, 90.0] {
+        let mut terrain = Terrain::new(MemoryTileSource::new(), 8 * 1024 * 1024, 8..=12);
+        let trajectory = fly(
+            &config,
+            &plan,
+            runway.takeoff_start(),
+            &mut terrain,
+            &GroundSampler::default(),
+            &SimulationOptions {
+                max_duration: Seconds(900.0),
+                // 滑走路の左または右、真横から 6 m/s。
+                wind: Wind {
+                    from: Radians(runway.heading.get() + Degrees(side).to_radians().get()),
+                    speed: MetersPerSecond(6.0),
+                },
+                ..SimulationOptions::default()
             },
-            ..SimulationOptions::default()
-        },
-    );
+        );
 
-    assert!(!trajectory.diverged, "the crosswind flight diverged");
-
-    let phases = trajectory.phases_visited();
-    for expected in [
-        Phase::TakeoffRoll,
-        Phase::Climb,
-        Phase::Approach,
-        Phase::Flare,
-        Phase::Rollout,
-    ] {
         assert!(
-            phases.contains(&expected),
-            "the crosswind circuit never reached {expected:?}; visited {phases:?}"
+            !trajectory.diverged,
+            "the {side:+.0}° crosswind flight diverged"
+        );
+
+        let phases = trajectory.phases_visited();
+        for expected in [
+            Phase::TakeoffRoll,
+            Phase::Climb,
+            Phase::Approach,
+            Phase::Flare,
+            Phase::Rollout,
+        ] {
+            assert!(
+                phases.contains(&expected),
+                "the {side:+.0}° crosswind circuit never reached {expected:?}; visited {phases:?}"
+            );
+        }
+
+        let last = trajectory.samples.last().expect("samples");
+        assert!(
+            last.wheel_clearance.get() < 0.5,
+            "the {side:+.0}° crosswind aircraft never settled, {} above the ground",
+            last.wheel_clearance
+        );
+        assert_touchdown_on_runway(&trajectory, runway);
+        assert!(
+            trajectory
+                .samples
+                .iter()
+                .all(|sample| sample.airspeed.get().is_finite() && sample.agl.get().is_finite()),
+            "the {side:+.0}° crosswind trajectory contains non-finite states"
         );
     }
+}
 
-    let last = trajectory.samples.last().expect("samples");
+fn assert_touchdown_on_runway(trajectory: &flightsim_sim::Trajectory, runway: Runway) {
+    let touchdown = trajectory
+        .samples
+        .iter()
+        .find(|sample| sample.phase == Phase::Rollout)
+        .expect("the flight should enter rollout");
+    let offsets = runway.offsets(touchdown.position);
     assert!(
-        last.wheel_clearance.get() < 0.5,
-        "the aircraft never settled, {} above the ground",
-        last.wheel_clearance
+        runway.contains(touchdown.position),
+        "touchdown missed the runway: longitudinal {:.1} m, lateral {:.1} m (width {:.1} m)",
+        offsets.longitudinal.get(),
+        offsets.lateral.get(),
+        runway.width.get()
     );
     assert!(
-        trajectory
-            .samples
-            .iter()
-            .all(|sample| sample.airspeed.get().is_finite() && sample.agl.get().is_finite()),
-        "the crosswind trajectory contains non-finite states"
+        offsets.lateral.get().abs() <= runway.width.get() * 0.35,
+        "touchdown left too little edge margin: lateral {:.1} m for width {:.1} m",
+        offsets.lateral.get(),
+        runway.width.get()
     );
 }
 
