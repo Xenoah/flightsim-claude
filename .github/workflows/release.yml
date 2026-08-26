@@ -287,6 +287,10 @@ jobs:
               if (-not $process.WaitForExit(10000)) {
                 throw 'application process did not terminate after the smoke run'
               }
+              # The timed overload only waits for process termination. The
+              # parameterless call additionally drains Start-Process' redirected
+              # stdout/stderr before Read-SmokeLogs inspects their final markers.
+              $process.WaitForExit()
             }
             $combinedLog = Read-SmokeLogs
             [System.IO.File]::WriteAllText($log, $combinedLog)
