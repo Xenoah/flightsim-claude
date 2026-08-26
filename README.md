@@ -2,18 +2,19 @@
 
 地球規模のフライトシミュレータ。Rust + Bevy、Windows 対象。
 
-**M2（描画）まで到達。実地形の上を飛ぶ様子が画面に出ます。** 何が動いて何が動かないかは
-[ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
+**M2（離陸→場周→着陸のゲームループ）を達成し、M3 を実装中です。** 実地形・機体・
+滑走路・時刻・風・乱流が描画され、着陸練習と 5 段階評価まで遊べます。検証済みの範囲と
+未検証事項は [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
 
 ---
 
 ## 何ができるか（今）
 
 ```bash
-# 純 Rust 側。548 件、数秒
+# 純 Rust 側。数秒
 cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen
-# 描画層。Bevy を含むので重い。216 件
+# 描画層。Bevy を含むので重い
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
 ```
 
@@ -73,9 +74,27 @@ cargo run -p flightsim-sim --bin flightsim-headless --     --tiles data/tiles --
 cargo bench --workspace                           # 性能測定（criterion）
 ```
 
-## 何がまだないか
+### Windows で起動する
 
-描画、天候、複数機体、オンライン。
+`v0.6.0-alpha.5` 以降の [Releases](https://github.com/Xenoah/flightsim-claude/releases) には
+`flightsim-claude-v<version>-windows-x86_64.zip` が付きます。展開後、`assets/` を
+`flightsim-app.exe` と同じフォルダに置いたまま実行してください。これは開発途中の
+prerelease です。
+
+## 未実装・未検証
+
+- 計器盤とコックピット内装、OSM 空港データ、METAR・視程、雲、夜間の滑走路灯・
+  コックピット照明、難易度設定
+- HOTAS と軸の再割り当て、追加機体、リプレイ、ライブ交通、オンライン共有ワールド
+- ゲームパッドは変換ロジックとキーボード共存を自動テスト済みですが、実機での符号・
+  感度確認は未実施
+- フライトディレクタは回帰テスト用で、滑走路へ精密に戻す横方向誘導はありません
+- 乱流は数値・決定論を検証済みですが、操縦感の調整は未実施。実 DEM の夜間・高高度も
+  目視未検証です
+- CI は Mesa の CPU Vulkan で 1 枚描画し、Windows 配布 zip もクリーンな
+  展開先から D3D12 ソフトウェアアダプタで起動します。アプリ結線と同梱アセットは
+  検査しますが、実 GPU・ベンダードライバ・FPS は保証しません
+
 [docs/ROADMAP.md](docs/ROADMAP.md) に段階と、後回しにした理由を書いています。
 
 ---
@@ -145,4 +164,4 @@ OpenStreetMap と ESA WorldCover は帰属表示が**法的に必須**です。
 
 ## ライセンス
 
-MIT OR Apache-2.0
+[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE)

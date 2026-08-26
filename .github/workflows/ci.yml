@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# CI はソースを読むだけ。リリース権限は、成功した main の CI を受ける
+# release.yml にだけ与える。
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   # 警告をエラーとして扱う。警告の蓄積を許すと、本当に見るべき指摘が埋もれる。
@@ -34,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.93.0
         with:
           components: rustfmt, clippy
 
@@ -62,8 +67,8 @@ jobs:
 
   # 描画層（render / input / ui / app）。Bevy を含むので重い。
   #
-  # 実行はしない。GPU もディスプレイも無いランナーで走らせても意味が無く、
-  # 落ちても原因が環境かコードか切り分けられない。**コンパイルとテストまで。**
+  # この matrix はコンパイルとテストまで。アプリの実起動は下の app-smoke で
+  # ソフトウェア Vulkan に固定して行い、環境差を切り分ける。
   render:
     name: render (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -90,7 +95,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.93.0
         with:
           components: clippy
 
@@ -110,7 +115,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.93.0
       - uses: Swatinem/rust-cache@v2
 
       # 設計規約を人間の注意力ではなく機械で守る。
@@ -131,7 +136,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.93.0
       - uses: Swatinem/rust-cache@v2
 
       # 壊れたドキュメントリンクは、設計意図が読まれなくなる原因になる。
@@ -139,3 +144,122 @@ jobs:
         run: cargo doc --workspace --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: -D warnings
+
+  # Mesa の CPU Vulkan 実装（lavapipe）で実際にアプリを立ち上げ、同梱 glTF を読み、
+  # 1 枚描画する。これは winit / wgpu / アセット解決 / Bevy の plugin 結線を通す
+  # 起動スモークであり、物理 GPU、Windows ドライバ、FPS は保証しない。
+  app-smoke:
+    name: app smoke (software Vulkan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install software-rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev \
+            mesa-vulkan-drivers vulkan-tools xvfb xauth
+
+      - uses: dtolnay/rust-toolchain@1.93.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: app-smoke
+
+      - name: Build the application
+        run: cargo build --locked --release -p flightsim-app
+
+      - name: Start, load the bundled model, and render one screenshot
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          software_icd="$(find /usr/share/vulkan/icd.d -maxdepth 1 \
+            -type f -name '*lvp*.json' -print -quit)"
+          if [[ -z "$software_icd" ]]; then
+            echo "lavapipe Vulkan ICD was not installed" >&2
+            exit 1
+          fi
+
+          screenshot="$RUNNER_TEMP/flightsim-smoke.png"
+          log="$RUNNER_TEMP/flightsim-smoke.log"
+
+          xvfb-run -a env \
+            WGPU_BACKEND=vulkan \
+            LIBGL_ALWAYS_SOFTWARE=1 \
+            VK_ICD_FILENAMES="$software_icd" \
+            target/release/flightsim-app \
+              --screenshot "$screenshot" --screenshot-delay 5 \
+              >"$log" 2>&1 &
+          app_pid=$!
+
+          cleanup() {
+            if kill -0 "$app_pid" 2>/dev/null; then
+              kill "$app_pid" 2>/dev/null || true
+              wait "$app_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          complete_png() {
+            python3 - "$screenshot" <<'PY'
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          if not path.is_file():
+              raise SystemExit(1)
+          data = path.read_bytes()
+          valid = (
+              len(data) > 24
+              and data.startswith(b"\x89PNG\r\n\x1a\n")
+              and data.endswith(b"\x00\x00\x00\x00IEND\xaeB\x60\x82")
+          )
+          raise SystemExit(0 if valid else 1)
+          PY
+          }
+
+          ready=false
+          for _ in $(seq 1 60); do
+            if complete_png && grep -q "aircraft model fitted:" "$log"; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              status=0
+              wait "$app_pid" || status=$?
+              echo "application exited before the smoke proof (status $status)" >&2
+              cat "$log"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [[ "$ready" != true ]]; then
+            echo "application did not render a complete PNG and load the bundled model in time" >&2
+            cat "$log"
+            exit 1
+          fi
+
+          if grep -Eiq '(^|[[:space:]])(ERROR|panic)([[:space:]:]|$)|Failed to load asset|unregistered type' "$log"; then
+            echo "application logged an error during the smoke run" >&2
+            cat "$log"
+            exit 1
+          fi
+
+          echo "software-rendered application smoke passed"
+          tail -n 40 "$log"
+
+      - name: Upload smoke screenshot and log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/flightsim-smoke.png
+            ${{ runner.temp }}/flightsim-smoke.log
+          if-no-files-found: warn
+          retention-days: 7

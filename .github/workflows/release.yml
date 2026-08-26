@@ -1,0 +1,434 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# ビルド側は読み取りだけ。contents: write は、ソースを実行しない publish
+# ジョブだけに限定する。
+permissions:
+  contents: read
+
+concurrency:
+  # 異なる main commit が近接して完了しても、同じ version/tag を並行操作しない。
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  build_windows:
+    name: build Windows bundle
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      bundle: ${{ steps.version.outputs.bundle }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      # workflow_run は既定ブランチを checkout し得るため、CI が検査した SHA を
+      # 明示する。認証情報は build.rs から読めないよう永続化しない。
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install the tested Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal
+          rustup default 1.93.0
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Detect and validate the workspace version
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $metadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          $package = @($metadata.packages | Where-Object { $_.name -eq 'flightsim-app' })
+          if ($package.Count -ne 1) {
+            throw "cargo metadata did not return exactly one flightsim-app package"
+          }
+
+          $version = [string]$package[0].version
+          if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+            throw "workspace version is not SemVer: $version"
+          }
+
+          $workspaceVersions = @(
+            $metadata.packages |
+              Where-Object { $_.name -like 'flightsim-*' } |
+              ForEach-Object { [string]$_.version } |
+              Sort-Object -Unique
+          )
+          if ($workspaceVersions.Count -ne 1 -or $workspaceVersions[0] -ne $version) {
+            throw "workspace packages do not share one version: $($workspaceVersions -join ', ')"
+          }
+
+          $tag = "v$version"
+          $bundle = "flightsim-claude-$tag-windows-x86_64.zip"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "bundle=$bundle" >> $env:GITHUB_OUTPUT
+
+      - name: Build the Windows application
+        shell: pwsh
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p flightsim-app
+
+      - name: Assemble and verify the release bundle
+        shell: pwsh
+        env:
+          BUNDLE: ${{ steps.version.outputs.bundle }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $staging = Join-Path $env:RUNNER_TEMP "flightsim-claude-$env:TAG-windows-x86_64"
+          $artifact = Join-Path $env:GITHUB_WORKSPACE 'release-artifact'
+          New-Item -ItemType Directory -Force -Path $staging, $artifact | Out-Null
+
+          $executable = Join-Path $env:GITHUB_WORKSPACE 'target/x86_64-pc-windows-msvc/release/flightsim-app.exe'
+          $required = @(
+            $executable,
+            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/light_single.glb'),
+            (Join-Path $env:GITHUB_WORKSPACE 'README.md'),
+            (Join-Path $env:GITHUB_WORKSPACE 'CHANGELOG.md'),
+            (Join-Path $env:GITHUB_WORKSPACE 'ATTRIBUTION.md'),
+            (Join-Path $env:GITHUB_WORKSPACE 'LICENSE-MIT'),
+            (Join-Path $env:GITHUB_WORKSPACE 'LICENSE-APACHE')
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "required release file is missing: $path"
+            }
+          }
+
+          Copy-Item -LiteralPath $executable -Destination $staging
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'assets') `
+            -Destination (Join-Path $staging 'assets') -Recurse
+          foreach ($name in @('README.md', 'CHANGELOG.md', 'ATTRIBUTION.md', 'LICENSE-MIT', 'LICENSE-APACHE')) {
+            Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $name) -Destination $staging
+          }
+
+          $zip = Join-Path $artifact $env:BUNDLE
+          Compress-Archive -LiteralPath $staging -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or (Get-Item $zip).Length -eq 0) {
+            throw "release archive was not created"
+          }
+
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+            foreach ($suffix in @(
+              '/flightsim-app.exe',
+              '/assets/aircraft/light_single.glb',
+              '/README.md',
+              '/CHANGELOG.md',
+              '/ATTRIBUTION.md',
+              '/LICENSE-MIT',
+              '/LICENSE-APACHE'
+            )) {
+              if (-not ($names | Where-Object { $_.EndsWith($suffix) })) {
+                throw "release archive is missing $suffix"
+              }
+            }
+          } finally {
+            $archive.Dispose()
+          }
+
+          $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          $checksumPath = Join-Path $artifact "$($env:BUNDLE).sha256"
+          "$sha256  $env:BUNDLE" | Set-Content -Encoding ascii -NoNewline `
+            $checksumPath
+          @{
+            bundle = $env:BUNDLE
+            sha256 = $sha256
+            source_sha = $env:SOURCE_SHA
+            tag = $env:TAG
+            version = $env:VERSION
+          } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifact 'release-metadata.json')
+
+      # Run the archive users will download, from a fresh extraction directory.
+      # D3D12's fallback adapter (WARP) is a software startup check, not evidence
+      # for a physical GPU, vendor driver, or frame-rate target.
+      - name: Start the extracted Windows bundle with software D3D12
+        shell: pwsh
+        env:
+          BUNDLE: ${{ steps.version.outputs.bundle }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:GITHUB_WORKSPACE "release-artifact/$env:BUNDLE"
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'flightsim-windows-extracted'
+          $screenshot = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.png'
+          $stdout = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.stdout.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.stderr.log'
+          $log = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.log'
+
+          New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
+          Expand-Archive -LiteralPath $archive -DestinationPath $smokeRoot
+          $packageDirectories = @(Get-ChildItem -LiteralPath $smokeRoot -Directory)
+          if ($packageDirectories.Count -ne 1) {
+            throw 'release archive must contain exactly one top-level directory'
+          }
+
+          $packageRoot = $packageDirectories[0].FullName
+          $executable = Join-Path $packageRoot 'flightsim-app.exe'
+          $model = Join-Path $packageRoot 'assets/aircraft/light_single.glb'
+          foreach ($path in @($executable, $model)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "extracted release file is missing: $path"
+            }
+          }
+
+          function Test-CompletePng([string] $Path) {
+            try {
+              if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+                return $false
+              }
+              $bytes = [System.IO.File]::ReadAllBytes($Path)
+              $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
+              $ending = [byte[]](0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130)
+              if ($bytes.Length -le 24) {
+                return $false
+              }
+              for ($index = 0; $index -lt $signature.Length; $index++) {
+                if ($bytes[$index] -ne $signature[$index]) {
+                  return $false
+                }
+              }
+              $offset = $bytes.Length - $ending.Length
+              for ($index = 0; $index -lt $ending.Length; $index++) {
+                if ($bytes[$offset + $index] -ne $ending[$index]) {
+                  return $false
+                }
+              }
+              return $true
+            } catch {
+              return $false
+            }
+          }
+
+          function Read-SmokeLogs {
+            $parts = @()
+            foreach ($path in @($stdout, $stderr)) {
+              if (Test-Path -LiteralPath $path -PathType Leaf) {
+                try {
+                  $parts += [System.IO.File]::ReadAllText($path)
+                } catch {
+                  # The process can briefly hold the redirected file while writing.
+                }
+              }
+            }
+            return [string]::Join([Environment]::NewLine, $parts)
+          }
+
+          $env:WGPU_BACKEND = 'dx12'
+          $env:WGPU_FORCE_FALLBACK_ADAPTER = '1'
+          $process = $null
+          try {
+            $quotedScreenshot = '"' + $screenshot + '"'
+            $process = Start-Process -FilePath $executable `
+              -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5') `
+              -WorkingDirectory $packageRoot `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+
+            $deadline = [DateTime]::UtcNow.AddSeconds(60)
+            $ready = $false
+            while ([DateTime]::UtcNow -lt $deadline) {
+              $process.Refresh()
+              if ($process.HasExited) {
+                throw "application exited before the smoke proof (status $($process.ExitCode))"
+              }
+              $logText = Read-SmokeLogs
+              if ((Test-CompletePng $screenshot) -and
+                  $logText.Contains('aircraft model fitted:')) {
+                $ready = $true
+                break
+              }
+              Start-Sleep -Seconds 1
+            }
+
+            if (-not $ready) {
+              throw 'application did not render a complete PNG and load the bundled model in time'
+            }
+            $logText = Read-SmokeLogs
+            if ($logText -match '(?im)(^|\s)(ERROR|panic)(\s|:|$)|Failed to load asset|unregistered type') {
+              throw 'application logged an error during the Windows smoke run'
+            }
+            Write-Host 'software-D3D12 Windows bundle smoke passed'
+          } finally {
+            if ($null -ne $process) {
+              $process.Refresh()
+              if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              }
+              if (-not $process.WaitForExit(10000)) {
+                throw 'application process did not terminate after the smoke run'
+              }
+            }
+            $combinedLog = Read-SmokeLogs
+            [System.IO.File]::WriteAllText($log, $combinedLog)
+            if (Test-Path -LiteralPath $log -PathType Leaf) {
+              Get-Content -LiteralPath $log | Select-Object -Last 80
+            }
+          }
+
+      - name: Upload Windows smoke screenshot and log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-smoke-${{ github.event.workflow_run.head_sha }}
+          path: |
+            ${{ runner.temp }}/flightsim-windows-smoke.png
+            ${{ runner.temp }}/flightsim-windows-smoke.log
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload the verified bundle for publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-release
+          path: release-artifact/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: tag and publish prerelease
+    needs: build_windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      # このジョブではリポジトリを checkout せず、検証済み artifact 以外の
+      # リポジトリコードを実行しない。
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: windows-release
+          path: release-artifact
+
+      - name: Verify release metadata and archive digest
+        shell: bash
+        env:
+          EXPECTED_BUNDLE: ${{ needs.build_windows.outputs.bundle }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_TAG: ${{ needs.build_windows.outputs.tag }}
+          EXPECTED_VERSION: ${{ needs.build_windows.outputs.version }}
+        run: |
+          set -euo pipefail
+          metadata=release-artifact/release-metadata.json
+          test -f "$metadata"
+
+          bundle="$(jq -er '.bundle' "$metadata")"
+          source_sha="$(jq -er '.source_sha' "$metadata")"
+          tag="$(jq -er '.tag' "$metadata")"
+          version="$(jq -er '.version' "$metadata")"
+          expected_digest="$(jq -er '.sha256' "$metadata")"
+          checksum="release-artifact/$bundle.sha256"
+
+          [[ "$bundle" == "$EXPECTED_BUNDLE" ]]
+          [[ "$source_sha" == "$EXPECTED_SHA" ]]
+          [[ "$tag" == "$EXPECTED_TAG" ]]
+          [[ "$version" == "$EXPECTED_VERSION" ]]
+          [[ "$tag" == "v$version" ]]
+          [[ "$bundle" =~ ^flightsim-claude-v[0-9A-Za-z.+-]+-windows-x86_64\.zip$ ]]
+          [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
+          test -f "release-artifact/$bundle"
+          test -f "$checksum"
+
+          actual_digest="$(sha256sum "release-artifact/$bundle" | cut -d' ' -f1)"
+          [[ "$actual_digest" == "$expected_digest" ]]
+          (cd release-artifact && sha256sum --check "$bundle.sha256")
+
+      - name: Create the tag if absent and publish idempotently
+        shell: bash
+        env:
+          BUNDLE: ${{ needs.build_windows.outputs.bundle }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ needs.build_windows.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          tag_error="$RUNNER_TEMP/release-tag-get.err"
+          tag_endpoint="repos/$REPOSITORY/git/ref/tags/$TAG"
+          if gh api "$tag_endpoint" --silent 2>"$tag_error"; then
+            # Prove that an exact tag ref exists before resolving it to a commit;
+            # the commits endpoint alone could otherwise resolve a same-named branch.
+            tag_commit="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
+            if [[ "$tag_commit" != "$SOURCE_SHA" ]]; then
+              echo "$TAG already points to $tag_commit, not $SOURCE_SHA" >&2
+              exit 1
+            fi
+          elif grep -Eq '\(HTTP 404\)|HTTP/[0-9.]+ 404' "$tag_error"; then
+            gh api --method POST "repos/$REPOSITORY/git/refs" \
+              -f ref="refs/tags/$TAG" -f sha="$SOURCE_SHA" >/dev/null
+          else
+            cat "$tag_error" >&2
+            exit 1
+          fi
+
+          archive="release-artifact/$BUNDLE"
+          checksum="$archive.sha256"
+          if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$REPOSITORY" \
+              --title "$TAG" --prerelease
+            gh release upload "$TAG" "$archive" "$checksum" --repo "$REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$archive" "$checksum" --repo "$REPOSITORY" \
+              --verify-tag --target "$SOURCE_SHA" --title "$TAG" \
+              --generate-notes --prerelease
+          fi
+
+  cleanup_merged_branch:
+    name: remove merged legacy branch once
+    needs: [build_windows, publish]
+    if: >-
+      needs.publish.result == 'success' &&
+      needs.build_windows.outputs.version == '0.6.0-alpha.5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      # この ref は内容が main に取り込まれたことを確認済み。alpha.5 のときだけ、
+      # 既知の旧 SHA のままなら削除する。後日同名 branch が再利用されていたら、
+      # 新しい作業を消さずに失敗させる。
+      - name: Delete the known merged branch if it still exists
+        shell: bash
+        env:
+          EXPECTED_SHA: 590177a7d51550eb66470a76ec3fa819b61a84ae
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          get_endpoint="repos/$REPOSITORY/git/ref/heads/agent/landing-gear-prerelease"
+          delete_endpoint="repos/$REPOSITORY/git/refs/heads/agent/landing-gear-prerelease"
+          error_log="$RUNNER_TEMP/legacy-branch-get.err"
+
+          if current_sha="$(gh api "$get_endpoint" --jq '.object.sha' 2>"$error_log")"; then
+            if [[ "$current_sha" != "$EXPECTED_SHA" ]]; then
+              echo "ref now points to $current_sha; refusing to delete new work" >&2
+              exit 1
+            fi
+            gh api --method DELETE "$delete_endpoint"
+            echo "deleted refs/heads/agent/landing-gear-prerelease at $current_sha"
+          elif grep -Eq '\(HTTP 404\)|HTTP/[0-9.]+ 404' "$error_log"; then
+            echo "refs/heads/agent/landing-gear-prerelease is already absent"
+          else
+            cat "$error_log" >&2
+            exit 1
+          fi
