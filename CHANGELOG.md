@@ -9,6 +9,55 @@
 
 ---
 
+## [0.6.0-alpha.5] — 2026-08-26
+
+**現状を正しく読めて、Windows ではソースビルドなしに起動できる配布基盤を追加した。**
+
+### 追加 — Windows prerelease の自動配布
+
+- `main` の push 由来の CI が成功した場合だけ、CI が検査した SHA を Rust 1.93.0 と
+  lockfile 固定で Windows x86_64 向けにビルドする
+- CI の全 Rust job も 1.93.0 へ固定し、リリースと同じ toolchain で検査する
+- Cargo metadata から workspace version を取得し、`v<version>` タグが無い場合だけ作成。
+  既存タグが別の commit を指す場合は上書きせず失敗する
+- `flightsim-app.exe`、同梱 `assets/`、README、変更履歴、帰属表示、MIT / Apache-2.0
+  ライセンスを zip に収録し、SHA-256 checksum とともに GitHub prerelease へ添付する
+- 配布 zip を新規ディレクトリへ展開し、Windows の D3D12 フォールバックで
+  同梱 glTF 読み込みと完全な PNG 生成を確認してから公開する
+- 再実行時は既存 release を更新し、同名 zip を置き換える。途中失敗後も再実行可能
+- ソースを実行する build job は読み取り権限だけを持ち、`contents: write` は checkout を
+  行わない publish job に限定。job 間で zip の SHA-256 を照合する
+- alpha.5 公開後に、取り込み済みの旧 `agent/landing-gear-prerelease` ref を 1 回だけ整理。
+  既知の SHA と一致する場合だけ削除し、既に無ければ成功、同名 branch が再利用されて
+  いれば新しい作業を消さずに失敗する
+- 以降の same-repository `agent/` branch は PR merge 時に自動整理する。PR head SHA と
+  現在の ref が一致する場合だけ削除し、PR のコードは checkout も実行もしない
+
+### 追加 — アプリ起動スモーク
+
+Linux CI で Mesa/lavapipe の CPU Vulkan と Xvfb を使い、アプリを実際に起動する。
+同梱 glTF の読み込み完了と、完全な PNG スクリーンショット 1 枚を確認し、ログに
+asset load error や panic があれば失敗する。成否にかかわらず、取得できた PNG とログは
+CI artifact として 7 日間残す。
+
+これは winit / wgpu / Bevy plugin / アセット解決の結線を検査するもので、
+**物理 GPU、Windows ドライバ、FPS を保証するテストではない。**
+
+### 修正 — 進捗文書の同期
+
+- README の「描画と天候が無い」という現状と矛盾する記述を修正
+- `ARCHITECTURE.md §7` を、機体 glTF、地形メッシュ、滑走路、乱流、時刻、
+  チュートリアル、着陸評価まで入った現実の実装へ同期
+- ROADMAP の M1 統合残件、プロペラ・乱流・地形メッシュの未完了表示を修正し、
+  M1 / M2 完了、M3 進行中を明示
+- HANDOFF に Windows 配布経路、ソフトウェア描画スモーク、確認済みの制限と
+  実 GPU などの未検証事項を記録
+
+Rust テスト数は 764 件（純 Rust 548 / Bevy 層 216）で変更なし。CI はこれらに
+ソフトウェア描画スモークを加えた 7 ジョブ構成。
+
+---
+
 ## [0.6.0-alpha.4] — 2026-08-24
 
 **着陸を練習できるようになり、空気が揺れるようになった。**
@@ -786,7 +835,18 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.3.0-alpha.1...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.5...HEAD
+[0.6.0-alpha.5]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.4...v0.6.0-alpha.5
+[0.6.0-alpha.4]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.3...v0.6.0-alpha.4
+[0.6.0-alpha.3]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.2...v0.6.0-alpha.3
+[0.6.0-alpha.2]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.1...v0.6.0-alpha.2
+[0.6.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.5.0-alpha.5...v0.6.0-alpha.1
+[0.5.0-alpha.5]: https://github.com/Xenoah/flightsim-claude/compare/v0.5.0-alpha.4...v0.5.0-alpha.5
+[0.5.0-alpha.4]: https://github.com/Xenoah/flightsim-claude/compare/v0.5.0-alpha.3...v0.5.0-alpha.4
+[0.5.0-alpha.3]: https://github.com/Xenoah/flightsim-claude/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
+[0.5.0-alpha.2]: https://github.com/Xenoah/flightsim-claude/compare/v0.5.0-alpha.1...v0.5.0-alpha.2
+[0.5.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.4.0-alpha.1...v0.5.0-alpha.1
+[0.4.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.3.0-alpha.1...v0.4.0-alpha.1
 [0.3.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.2.0-alpha.1...v0.3.0-alpha.1
 [0.2.0-alpha.1]: https://github.com/Xenoah/flightsim-claude/compare/v0.1.0...v0.2.0-alpha.1
 [0.1.0]: https://github.com/Xenoah/flightsim-claude/releases/tag/v0.1.0

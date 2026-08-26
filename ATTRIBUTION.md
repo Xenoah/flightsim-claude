@@ -90,4 +90,4 @@ CC BY 4.0。https://esa-worldcover.org/
 `tiff` と `clap` はオフラインのタイル生成ツールのみが使い、実行時には載りません
 （[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
-本プロジェクト自体は MIT OR Apache-2.0 です。
+本プロジェクト自体は [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) です。

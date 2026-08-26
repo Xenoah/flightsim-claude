@@ -14,7 +14,7 @@
 |---|---|---|
 | 地球規模の座標精度 | `f32` で ECEF を扱うと地表で約 0.5m 量子化し、機体が振動する | 世界座標は **`f64` ECEF 固定**。描画直前に **floating origin** で `f32` ローカル座標へ落とす（[ADR-0002](docs/adr/0002-coordinate-system.md)） |
 | 時間ステップの安定性 | 可変 dt で剛体積分すると失速・接地時に発散する | FDM は **固定 dt の内部サブステップ + RK4**。描画フレームレートから完全に分離（[ADR-0004](docs/adr/0004-simulation-loop.md)） |
-| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world` はエンジン非依存の純 Rust**。Bevy は `render`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
+| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world`/`sim`/`tilegen` はエンジン非依存の純 Rust**。Bevy は `render`/`input`/`ui`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
 
 3番目が今回の技術選定の実利そのもの。`cargo test -p flightsim-fdm` が GUI もアセットもなしに数秒で回るからこそ、QA エージェントが回帰網を維持できる。**この境界を壊す PR はレビューで落とす。**
 
@@ -162,28 +162,41 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 
 **この節はマイルストーンごとに更新する。** 実装済みでないものを「ある」と書かないこと。
 
-### 実装済み（テストで検証済み）
+### 実装済み
 
-| クレート | 内容 | テスト数 |
-|---|---|---:|
-| `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ | 50 |
-| `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF 剛体、空力係数、失速、3 点式着陸装置、接地摩擦・ブレーキ、RK4 + 剛性対応サブステップ | 103 |
-| `flightsim-world` | 地理座標系クアッドツリー、DEM サンプリング、SSE-LOD、ストリーミング、LRU キャッシュ、実行時タイル形式の読み書き | 86 |
-| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI | 61 |
-| `flightsim-sim` | 接地平面の生成、決定論的フライトディレクタ、固定ステップ駆動、軌跡記録、逐次 API | 61 |
-| `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD ストリーミング | 10 |
-| `flightsim-input` | 舵のレート制御と中立復帰、視点モード、追従カメラ | 17 |
-| `flightsim-ui` | HUD、単位変換、表示の平滑化 | 8 |
+| クレート | 内容 |
+|---|---|
+| `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ、描画座標フレーム |
+| `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF、失速、プロペラ推力、3 点式着陸装置、接地摩擦・ブレーキ、RK4、定常風と決定論的乱流 |
+| `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路 |
+| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI |
+| `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
+| `flightsim-sim` | 地形と FDM の結線、固定ステップ、フライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
+| `flightsim-render` | 地形・滑走路メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、glTF の軸・倍率補正 |
+| `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
+| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価 |
+| `flightsim-app` | 上記の統合、合成飛行場、風・乱流・時刻・着陸練習・スクリーンショットの CLI |
 
-CI で `cargo test` / `clippy -D warnings` / `fmt --check` / 依存規約検査 / `cargo doc -D warnings` を回している。
+ワークスペースの全テストを CI の Windows / Linux で実行する。さらに
+`clippy -D warnings`、`fmt --check`、依存規約検査、
+`cargo doc -D warnings` に加え、Linux の Mesa/lavapipe で同梱 glTF を読み、
+スクリーンショットを 1 枚描画する起動スモークを行う。リリース時は Windows zip を
+新規ディレクトリに展開し、D3D12 のフォールバックアダプタで同じ検査を行う。
 
 ### 未実装
 
-- 機体の 3D モデル。実体はあるがメッシュが無いので、外部視点では何も映らない
-- 雲、地表テクスチャ、空港の構造物
-- 推力線オフセット、乱流
-- 地形メッシュ生成（亀裂対策のスカート込み）
-- OSM（空港・建物）と地表画像の取り込み。tilegen が扱うのは標高のみ
-- 天候、ライブ交通、オンライン共有ワールド、複数機体、コックピット操作
+- 計器盤、コックピット内装、夜間の滑走路灯・コックピット照明
+- OSM の空港・建物、地表画像、METAR・視程、雲。tilegen が扱う実データは標高のみ
+- 難易度設定、HOTAS と軸の再割り当て、推力線オフセット
+- 追加機体、リプレイ、ライブ交通、オンライン共有ワールド
+
+### 実装済みだが検証を残すもの
+
+- ゲームパッドは純関数とキーボード共存をテスト済みだが、物理デバイスでの符号・感度は未確認
+- 回帰テスト用フライトディレクタは滑走路への精密な横方向誘導を持たない
+- 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整
+- 実 Copernicus DEM での夜間・高高度表示は目視未検証
+- CI の描画スモークは CPU Vulkan、Windows 配布スモークは D3D12 フォールバックを使う。
+  実 GPU、ベンダードライバ、性能は保証しない
 
 詳細は [docs/ROADMAP.md](docs/ROADMAP.md)。

@@ -1,7 +1,7 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-24（v0.6.0-alpha.4 = M2 達成 + M3 の天候・時刻・チュートリアル）
+更新: 2026-08-26（v0.6.0-alpha.5 = 現状文書の同期 + Windows prerelease 自動配布）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
@@ -39,13 +39,18 @@ cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 
 
 - 機体はテクスチャ付き glb を同梱（引数なしで出る）。`--no-model` で箱に戻る
 - M2 の受け入れテストは `crates/flightsim-sim/tests/airport_circuit.rs`
-- テスト 764 件（純 Rust 側 548 / 描画層 216）。CI は 6 ジョブ全緑
+- ワークスペースの全テストを Windows / Linux の CI で実行する。
+  加えて lint・ドキュメント・依存規約・ソフトウェア Vulkan 起動を検査する
+- `v0.6.0-alpha.5` 以降は、成功した `main` の CI 後に Windows x86_64 の zip を
+  prerelease へ自動添付する。実行ファイル、`assets/`、README、変更履歴、帰属・
+  ライセンス文を同梱する
 
 ## 2. 破ってはいけない制約
 
 **CI が機械的に検査する。** 破ると `scripts/check-architecture.sh` が落ちる。
 
-1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` に `bevy` を依存させない。**
+1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` /
+   `flightsim-tilegen` に `bevy` を依存させない。**
    これらが GUI なしにテストできることが技術選定の根拠そのもの（[ADR-0001](adr/0001-engine-selection.md)）。
    Bevy を使えるのは `render` / `input` / `ui` / `app` だけ。
 2. **依存は一方向。** `core` ← `fdm`/`world` ← 上位。
@@ -63,7 +68,8 @@ CI が検査しないが、レビューで落とす規約:
 ## 3. 次のタスク
 
 M1（ヘッドレスで妥当に飛ぶ）と M2（1 空港周辺で離陸→旋回→着陸）は達成済み。
-**いま M3 の途中。** 残っているのは次の 3 つで、上から順に価値が高いと考えている。
+**いま M3 の途中。** 主要タスクは次の 3 つで、上から順に価値が高い。
+夜間照明・HOTAS・追加の天候は [ROADMAP](ROADMAP.md) に分けて記録している。
 
 ### TASK-A: 計器盤（`flightsim-ui`）— 未着手・最優先
 
@@ -101,6 +107,40 @@ OSM の `aeroway=runway` から実空港を取り込めば、飛べる場所が�
 
 チュートリアルの `TutorialVisibility` と、風・乱流の強さが既に外から
 設定できるので、束ねるだけで形になる。着陸評価の閾値も難易度で変えられる。
+
+### 確認済みの制限と未検証事項
+
+ここの本文は申し送りのスナップショット。着手可否と完了状態は
+[GitHub Issues](../../../issues) が正本で、文書同期は [Issue #15](../../../issues/15) で追跡する。
+
+- ゲームパッドの変換ロジックとキーボード共存はテスト済みだが、
+  実機の符号・感度は未確認（[Issue #2](../../../issues/2)）
+- 夜間の滑走路灯とコックピット照明は未実装（[Issue #3](../../../issues/3)）
+- フライトディレクタは回帰テストの駆動装置で、
+  滑走路へ精密に戻す横方向誘導は持たない（[Issue #4](../../../issues/4)）
+- 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整（[Issue #5](../../../issues/5)）
+- 実 Copernicus DEM を使った夜間・高高度の見え方は未確認（[Issue #6](../../../issues/6)）
+- CI の起動スモークは Mesa/lavapipe の CPU Vulkan で同梱 glTF と 1 枚の描画を
+  確認する（[Issue #8](../../../issues/8)）。Windows zip もクリーンな展開先から
+  D3D12 フォールバックで検査するが、実 GPU、ベンダードライバ、性能は保証しない
+- HOTAS・軸再割り当て（[Issue #9](../../../issues/9)）、追加機体（[Issue #10](../../../issues/10)）、
+  雲（[Issue #11](../../../issues/11)）、リプレイ（[Issue #12](../../../issues/12)）、
+  交通（[Issue #13](../../../issues/13)）、オンライン（[Issue #14](../../../issues/14)）は未着手
+
+### リリース経路
+
+`.github/workflows/release.yml` は `main` の **push 由来の CI が成功した場合だけ**動く
+（[Issue #7](../../../issues/7)）。
+CI が検査した SHA を Windows で `--locked --release` ビルドし、Cargo metadata から
+workspace version を読み、`v<version>` タグが無いときだけ作る。同名タグが別 SHA を
+指していれば失敗する。zip を新規ディレクトリへ展開し、同梱モデルの読み込みと
+完全な PNG を Windows 上で確認してから公開する。release と zip のアップロードは
+再実行しても同じ結果になる。
+
+書き込み権限は、ソースを checkout も実行もしない publish job だけが持つ。
+build job は読み取り権限で、両 job 間の zip は SHA-256 を照合する。
+`agent/` branch の same-repository PR が merge された場合は、PR の head SHA から
+ref が変わっていないことを確認し、PR コードを checkout せずに branch を整理する。
 
 ---
 
@@ -525,9 +565,13 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 - 1 タスク 1 PR。**`main` に直接コミットしない**
 - 変更を出す前に必ず全部通す:
   ```bash
-  cargo fmt --all
+  cargo fmt --all --check
   cargo clippy --workspace --all-targets -- -D warnings
-  cargo test --workspace
+  cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --all-targets
+  cargo test -j 2 -p flightsim-render -p flightsim-input \
+    -p flightsim-ui -p flightsim-app --all-targets
+  RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
   bash scripts/check-architecture.sh
   ```
 - 設計判断をしたら [docs/adr/](adr/) に記録する。**却下した案とコストも書く**
@@ -536,6 +580,6 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 - 落ちているテストは「落ちている」と報告する。確認したことと推測を区別する
 
 エージェント別の詳細な指示は [.claude/agents/](../.claude/agents/) にある。
-TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 は `architect` 担当で完了。
-次の TASK-4（Bevy 統合）は `rendering` と `input-camera` の担当。
-`flightsim-sim` の公開 API を先に読むこと。
+TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 と M2 の Bevy 統合は完了。
+現在は M3。最優先は TASK-A（計器盤）で、次が TASK-B（OSM 空港）、
+TASK-C（難易度設定）。結線を触る場合は `flightsim-sim` の公開 API を先に読むこと。
