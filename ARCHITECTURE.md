@@ -172,7 +172,7 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 | `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI |
 | `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
 | `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
-| `flightsim-render` | 地形・滑走路メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、glTF の軸・倍率補正 |
+| `flightsim-render` | 地形・滑走路・滑走路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、glTF の軸・倍率補正 |
 | `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
 | `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価 |
 | `flightsim-app` | 上記の統合、合成飛行場、風・乱流・時刻・着陸練習・スクリーンショットの CLI |
@@ -185,7 +185,7 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 
 ### 未実装
 
-- 計器盤、コックピット内装、夜間の滑走路灯・コックピット照明
+- 計器盤、コックピット内装、コックピット照明（滑走路灯は実装済み）
 - OSM の空港・建物、地表画像、METAR・視程、雲。tilegen が扱う実データは標高のみ
 - 難易度設定、HOTAS と軸の再割り当て、推力線オフセット
 - 追加機体、リプレイ、ライブ交通、オンライン共有ワールド

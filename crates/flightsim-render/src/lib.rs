@@ -60,6 +60,7 @@ pub mod aircraft;
 pub mod daylight;
 pub mod model;
 pub mod runway;
+pub mod runway_lights;
 pub mod sun;
 pub mod terrain;
 

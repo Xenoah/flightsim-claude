@@ -272,6 +272,7 @@ fn main() {
                 report_landings.after(advance_simulation),
                 adjust_time_rate,
                 toggle_tutorial,
+                update_runway_lights,
             ),
         )
         .run();
@@ -611,6 +612,38 @@ fn update_model_visibility(
     }
 }
 
+/// 太陽高度に応じて滑走路灯を点け消しする。
+///
+/// 材質の `emissive` を直接動かす。**灯火ごとにエンティティを持たない**
+/// （色ごとに 1 枚へ束ねてある）ので、触る材質は 3 つだけ。
+fn update_runway_lights(
+    sun: Res<SunDirection>,
+    lights: Query<(
+        &MeshMaterial3d<StandardMaterial>,
+        &flightsim_render::runway_lights::RunwayLights,
+    )>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut previous: Local<Option<f32>>,
+) {
+    let fraction = flightsim_render::runway_lights::light_intensity_fraction(sun.elevation);
+
+    // 変わっていなければ何もしない。毎フレーム材質を書き換えると
+    // GPU への再アップロードが走る。
+    if previous.is_some_and(|value| (value - fraction).abs() < 1e-4) {
+        return;
+    }
+    *previous = Some(fraction);
+
+    for (handle, marker) in &lights {
+        let Some(material) = materials.get_mut(&handle.0) else {
+            continue;
+        };
+        // **現在値から逆算しない。** 一度 0 にすると二度と戻らないうえ、
+        // 誤差が溜まる。常に「基準色 × 比率」で計算する。
+        material.emissive = marker.emissive_at(fraction);
+    }
+}
+
 /// `H` でチュートリアルの表示を切り替える。
 ///
 /// 時間加速と同じく、キー入力（`flightsim-input`）と表示状態
@@ -873,6 +906,26 @@ fn setup(
         ),
         Name::new("runway"),
     ));
+    // 滑走路灯。**夜に降りるには滑走路の側が光る必要がある。**
+    // 太陽高度に応じて `update_runway_lights` が明るさを動かす。
+    let (light_groups, light_origin) = flightsim_render::runway_lights::runway_light_meshes(
+        visual_threshold,
+        runway.heading,
+        runway.length,
+        runway.width,
+    );
+    for group in light_groups {
+        commands.spawn((
+            flightsim_render::terrain_mesh_bundle(
+                meshes.add(group.mesh),
+                materials.add(group.material),
+                light_origin,
+            ),
+            group.marker,
+            Name::new("runway lights"),
+        ));
+    }
+
     commands.insert_resource(ActiveRunway(runway));
 
     let camera_position = simulation.state().geodetic();
