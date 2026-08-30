@@ -39,6 +39,7 @@
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
 
+pub mod instruments;
 mod landing;
 mod tutorial;
 
@@ -200,7 +201,16 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<TutorialState>()
             .init_resource::<TutorialVisibility>()
             .add_systems(Startup, spawn_tutorial_prompt)
-            .add_systems(Update, update_tutorial_prompt);
+            .add_systems(Update, update_tutorial_prompt)
+            // 計器盤。コックピット視点のときだけ出る。
+            .add_systems(Startup, instruments::spawn_instrument_panel)
+            .add_systems(
+                Update,
+                (
+                    instruments::update_instrument_visibility,
+                    instruments::update_instruments,
+                ),
+            );
     }
 }
 
