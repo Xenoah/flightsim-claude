@@ -32,7 +32,7 @@ use bevy::camera::primitives::Aabb;
 use bevy::pbr::{Atmosphere, ScatteringMedium};
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
-use flightsim_core::{Degrees, Geodetic, Meters, Radians, Seconds};
+use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Meters, Ned, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
 use flightsim_input::{CameraRig, FlightsimInputPlugin, PilotControls, ViewMode};
 use flightsim_render::{
@@ -45,8 +45,8 @@ use flightsim_render::{
 use flightsim_sim::{GroundSampler, Simulation};
 use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
 use flightsim_world::{
-    AirportDatabase, AirportTaxiway, DiskTileSource, LodSelector, MemoryTileSource, Runway,
-    Terrain, TileCache, TileId, TileSource,
+    AirportApron, AirportDatabase, AirportGroundLight, AirportHoldingPosition, AirportTaxiway,
+    DiskTileSource, LodSelector, MemoryTileSource, Runway, Terrain, TileCache, TileId, TileSource,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -131,6 +131,12 @@ struct Startup {
     runway: Runway,
     /// Active runway の周囲にある OSM 誘導路。起動時に一度だけ地域 DB から絞る。
     taxiways: Vec<AirportTaxiway>,
+    /// Active runway の周囲にある OSM エプロン。
+    aprons: Vec<AirportApron>,
+    /// Active runway の周囲にある OSM 待機位置。
+    holding_positions: Vec<AirportHoldingPosition>,
+    /// Active runway の周囲にある OSM 明示灯火。
+    ground_lights: Vec<AirportGroundLight>,
     runway_source: RunwaySource,
     min_level: u8,
     max_level: u8,
@@ -193,6 +199,9 @@ impl Default for Startup {
             heading_was_explicit: false,
             runway,
             taxiways: Vec::new(),
+            aprons: Vec::new(),
+            holding_positions: Vec::new(),
+            ground_lights: Vec::new(),
             runway_source: RunwaySource::Synthetic,
             min_level: 8,
             max_level: 13,
@@ -334,7 +343,7 @@ fn main() {
                 report_landings.after(advance_simulation),
                 adjust_time_rate,
                 toggle_tutorial,
-                update_runway_lights,
+                update_airport_lights,
             ),
         )
         .run();
@@ -694,9 +703,30 @@ fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> O
         .filter(|taxiway| taxiway_is_near_runway(taxiway, runway, ACTIVE_AIRPORT_RADIUS))
         .cloned()
         .collect();
+    let aprons = database
+        .aprons()
+        .iter()
+        .filter(|apron| apron_is_near_runway(apron, runway, ACTIVE_AIRPORT_RADIUS))
+        .cloned()
+        .collect();
+    let holding_positions = database
+        .holding_positions()
+        .iter()
+        .filter(|holding| point_is_near_runway(holding.position(), runway, ACTIVE_AIRPORT_RADIUS))
+        .cloned()
+        .collect();
+    let ground_lights = database
+        .ground_lights()
+        .iter()
+        .filter(|light| point_is_near_runway(light.position(), runway, ACTIVE_AIRPORT_RADIUS))
+        .copied()
+        .collect();
 
     startup.runway = runway;
     startup.taxiways = taxiways;
+    startup.aprons = aprons;
+    startup.holding_positions = holding_positions;
+    startup.ground_lights = ground_lights;
     startup.runway_source = RunwaySource::OpenStreetMap {
         way_id: source_way_id,
     };
@@ -713,10 +743,93 @@ fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> O
 /// 空港 relation が無くても、active runway 周辺だけを描画対象へ絞る。
 fn taxiway_is_near_runway(taxiway: &AirportTaxiway, runway: Runway, radius: Meters) -> bool {
     let centre = runway.center().to_ecef();
-    taxiway
-        .points()
+    let points = taxiway.points();
+    points
         .iter()
         .any(|point| centre.distance_to(point.to_ecef()).get() <= radius.get())
+        || points.windows(2).any(|segment| {
+            point_to_segment_distance(
+                centre.as_vec(),
+                segment[0].to_ecef().as_vec(),
+                segment[1].to_ecef().as_vec(),
+            ) <= radius.get()
+        })
+}
+
+/// 面の頂点がすべて外でも、面自体が探索円を横切れば active airport に含める。
+fn apron_is_near_runway(apron: &AirportApron, runway: Runway, radius: Meters) -> bool {
+    let centre = runway.center().to_ecef().as_vec();
+    apron.triangles().iter().any(|triangle| {
+        point_to_triangle_distance(
+            centre,
+            triangle[0].to_ecef().as_vec(),
+            triangle[1].to_ecef().as_vec(),
+            triangle[2].to_ecef().as_vec(),
+        ) <= radius.get()
+    })
+}
+
+fn point_is_near_runway(point: Geodetic, runway: Runway, radius: Meters) -> bool {
+    runway.center().to_ecef().distance_to(point.to_ecef()).get() <= radius.get()
+}
+
+fn point_to_segment_distance(
+    point: bevy::math::DVec3,
+    start: bevy::math::DVec3,
+    end: bevy::math::DVec3,
+) -> f64 {
+    let segment = end - start;
+    let length_squared = segment.length_squared();
+    if !length_squared.is_finite() || length_squared <= f64::EPSILON {
+        return point.distance(start);
+    }
+    let fraction = ((point - start).dot(segment) / length_squared).clamp(0.0, 1.0);
+    point.distance(start + segment * fraction)
+}
+
+/// 点と三角形の最短距離。射影が面内なら面まで、外なら三辺までを返す。
+fn point_to_triangle_distance(
+    point: bevy::math::DVec3,
+    a: bevy::math::DVec3,
+    b: bevy::math::DVec3,
+    c: bevy::math::DVec3,
+) -> f64 {
+    let ab = b - a;
+    let ac = c - a;
+    let normal = ab.cross(ac);
+    let normal_squared = normal.length_squared();
+    if normal_squared.is_finite() && normal_squared > f64::EPSILON {
+        let projected = point - normal * ((point - a).dot(normal) / normal_squared);
+        let dot_00 = ab.dot(ab);
+        let dot_01 = ab.dot(ac);
+        let dot_11 = ac.dot(ac);
+        let relative = projected - a;
+        let denominator = dot_00 * dot_11 - dot_01 * dot_01;
+        if denominator.abs() > f64::EPSILON {
+            let u = (dot_11 * relative.dot(ab) - dot_01 * relative.dot(ac)) / denominator;
+            let v = (dot_00 * relative.dot(ac) - dot_01 * relative.dot(ab)) / denominator;
+            let tolerance = 1.0e-10;
+            if u >= -tolerance && v >= -tolerance && u + v <= 1.0 + tolerance {
+                return point.distance(projected);
+            }
+        }
+    }
+
+    point_to_segment_distance(point, a, b)
+        .min(point_to_segment_distance(point, b, c))
+        .min(point_to_segment_distance(point, c, a))
+}
+
+/// 測地点から指定方位の右へ移した位置。
+///
+/// 方位から NED への変換は `flightsim-core` の [`Attitude`] に集約し、app で
+/// 測地変換を再実装しない。
+fn point_right_of_heading(point: Geodetic, heading: Radians, distance: Meters) -> Geodetic {
+    let body_to_ned = Attitude::new(Radians::ZERO, Radians::ZERO, heading).to_quaternion();
+    let right_ned = body_to_ned * bevy::math::DVec3::Y * distance.get();
+    LocalFrame::new(point)
+        .ned_to_ecef_position(Ned(right_ned))
+        .to_geodetic()
 }
 
 /// `05:30` のような時刻を読む。
@@ -882,15 +995,15 @@ fn update_model_visibility(
     }
 }
 
-/// 太陽高度に応じて滑走路灯を点け消しする。
+/// 太陽高度に応じて滑走路灯・誘導路灯・警戒灯を点け消しする。
 ///
 /// 材質の `emissive` を直接動かす。**灯火ごとにエンティティを持たない**
-/// （色ごとに 1 枚へ束ねてある）ので、触る材質は 3 つだけ。
-fn update_runway_lights(
+/// （色と chunk ごとに束ねてある）ので、灯火数に比例する entity 更新は起こらない。
+fn update_airport_lights(
     sun: Res<SunDirection>,
     lights: Query<(
         &MeshMaterial3d<StandardMaterial>,
-        &flightsim_render::runway_lights::RunwayLights,
+        &flightsim_render::runway_lights::AirportLights,
     )>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut previous: Local<Option<f32>>,
@@ -1172,11 +1285,55 @@ fn setup(
 
     // --- 空港面 ---
 
+    // エプロンは誘導路より低い lift で先に置く。三角形の各頂点で DEM を引くため、
+    // 大きな面も平らな板にはならず地形へ追従する。
+    let airport_surface_material = materials.add(flightsim_render::default_terrain_material());
+    let mut rendered_aprons = 0_usize;
+    for apron in &startup.aprons {
+        let mut surface_triangles = Vec::new();
+        if surface_triangles
+            .try_reserve_exact(apron.triangles().len())
+            .is_err()
+        {
+            warn!(
+                "apron: could not allocate OSM feature {}",
+                apron.source_id()
+            );
+            continue;
+        }
+        for triangle in apron.triangles() {
+            surface_triangles.push(triangle.map(|point| {
+                let elevation = airport_sampler.sample(&mut airport_probe, point).elevation;
+                Geodetic::new(point.latitude, point.longitude, elevation)
+            }));
+        }
+        let (mesh, origin) =
+            match flightsim_render::apron::apron_mesh(&surface_triangles, apron.surface()) {
+                Ok(result) => result,
+                Err(error) => {
+                    warn!(
+                        "apron: skipped invalid OSM feature {} ({error})",
+                        apron.source_id()
+                    );
+                    continue;
+                }
+            };
+        commands.spawn((
+            flightsim_render::terrain_mesh_bundle(
+                meshes.add(mesh),
+                airport_surface_material.clone(),
+                origin,
+            ),
+            Name::new(format!("apron OSM feature {}", apron.source_id())),
+        ));
+        rendered_aprons += 1;
+    }
+
     // 誘導路は各 OSM node で DEM を引く。滑走路標高を全 way へ固定すると、長い
     // 誘導路の端が斜面へ埋まる。中心線 way ごとに 1 mesh へまとめるため、entity 数は
     // node 数ではなく way 数に抑えられる。
-    let taxiway_material = materials.add(flightsim_render::default_terrain_material());
     let mut rendered_taxiways = 0_usize;
+    let mut procedural_lights = Vec::new();
     for taxiway in &startup.taxiways {
         let surface_points: Vec<Geodetic> = taxiway
             .points()
@@ -1198,15 +1355,187 @@ fn setup(
         commands.spawn((
             flightsim_render::terrain_mesh_bundle(
                 meshes.add(mesh),
-                taxiway_material.clone(),
+                airport_surface_material.clone(),
                 origin,
             ),
             Name::new(format!("taxiway OSM way {}", taxiway.source_way_id)),
         ));
         rendered_taxiways += 1;
+
+        match flightsim_render::taxiway_lights::procedural_taxiway_light_layout(
+            &surface_points,
+            taxiway.width,
+            taxiway.lighting(),
+        ) {
+            Ok(layout) => {
+                if procedural_lights.try_reserve(layout.len()).is_err() {
+                    warn!(
+                        "taxiway lights: could not allocate fallback for OSM way {}",
+                        taxiway.source_way_id
+                    );
+                } else {
+                    procedural_lights.extend(layout);
+                }
+            }
+            Err(error) => warn!(
+                "taxiway lights: skipped fallback for OSM way {} ({error})",
+                taxiway.source_way_id
+            ),
+        }
+    }
+
+    // 待機位置の路面標示と物理標識。標識は中心線上へ立てず、進行方向の右側へ
+    // 逃がして正面を中心線へ向ける。
+    let mut rendered_markings = 0_usize;
+    let mut rendered_signs = 0_usize;
+    for holding in &startup.holding_positions {
+        let centre_elevation = airport_sampler
+            .sample(&mut airport_probe, holding.position())
+            .elevation;
+        let centre = Geodetic::new(
+            holding.position().latitude,
+            holding.position().longitude,
+            centre_elevation,
+        );
+        match flightsim_render::holding_position::holding_position_mesh(
+            centre,
+            holding.heading(),
+            holding.width(),
+            holding.runway_side(),
+        ) {
+            Ok(Some((mesh, origin))) => {
+                commands.spawn((
+                    flightsim_render::terrain_mesh_bundle(
+                        meshes.add(mesh),
+                        airport_surface_material.clone(),
+                        origin,
+                    ),
+                    Name::new(format!(
+                        "holding marking OSM feature {}",
+                        holding.source_id()
+                    )),
+                ));
+                rendered_markings += 1;
+            }
+            Ok(None) => {}
+            Err(error) => warn!(
+                "holding marking: skipped OSM feature {} ({error})",
+                holding.source_id()
+            ),
+        }
+
+        let Some(holding_ref) = holding.reference() else {
+            continue;
+        };
+        let Some(taxiway_ref) = holding.related_taxiway().and_then(|source_way_id| {
+            startup
+                .taxiways
+                .iter()
+                .find(|taxiway| taxiway.source_way_id == source_way_id)
+                .and_then(AirportTaxiway::reference)
+        }) else {
+            continue;
+        };
+        let sign_centre = point_right_of_heading(
+            holding.position(),
+            holding.heading(),
+            Meters(holding.width().get() * 0.5 + 2.0),
+        );
+        let sign_elevation = airport_sampler
+            .sample(&mut airport_probe, sign_centre)
+            .elevation;
+        let sign_position =
+            Geodetic::new(sign_centre.latitude, sign_centre.longitude, sign_elevation);
+        let sign_facing =
+            Radians(holding.heading().get() - core::f64::consts::FRAC_PI_2).wrap_positive();
+        let taxiway_ref = taxiway_ref.to_ascii_uppercase();
+        let holding_ref = holding_ref.to_ascii_uppercase();
+        match flightsim_render::taxiway_sign::holding_position_sign_mesh(
+            sign_position,
+            sign_facing,
+            &taxiway_ref,
+            &holding_ref,
+        ) {
+            Ok(Some((mesh, origin))) => {
+                commands.spawn((
+                    flightsim_render::terrain_mesh_bundle(
+                        meshes.add(mesh),
+                        airport_surface_material.clone(),
+                        origin,
+                    ),
+                    Name::new(format!("holding sign OSM feature {}", holding.source_id())),
+                ));
+                rendered_signs += 1;
+            }
+            Ok(None) => warn!(
+                "holding sign: unsupported ref on OSM feature {}",
+                holding.source_id()
+            ),
+            Err(error) => warn!(
+                "holding sign: skipped OSM feature {} ({error})",
+                holding.source_id()
+            ),
+        }
+    }
+
+    // 明示 OSM 灯火を正とし、変換時に不足 channel だけ残した metadata から
+    // 決定論的な fallback を足す。どちらも色別の少数 mesh に束ねる。
+    let mut airport_ground_lights = Vec::new();
+    if airport_ground_lights
+        .try_reserve_exact(startup.ground_lights.len() + procedural_lights.len())
+        .is_err()
+    {
+        warn!("airport lights: could not allocate ground-light layout");
+    } else {
+        for light in &startup.ground_lights {
+            let elevation = airport_sampler
+                .sample(&mut airport_probe, light.position())
+                .elevation;
+            airport_ground_lights.push((
+                Geodetic::new(
+                    light.position().latitude,
+                    light.position().longitude,
+                    elevation,
+                ),
+                light.kind(),
+            ));
+        }
+        airport_ground_lights.extend(procedural_lights);
+    }
+    let mut rendered_light_groups = 0_usize;
+    for (chunk_index, chunk) in airport_ground_lights
+        .chunks(flightsim_render::taxiway_lights::MAX_GROUND_LIGHTS)
+        .enumerate()
+    {
+        match flightsim_render::taxiway_lights::ground_light_meshes(chunk) {
+            Ok(Some((groups, origin))) => {
+                for group in groups {
+                    commands.spawn((
+                        flightsim_render::terrain_mesh_bundle(
+                            meshes.add(group.mesh),
+                            materials.add(group.material),
+                            origin,
+                        ),
+                        group.marker,
+                        Name::new(format!("airport ground lights {chunk_index}")),
+                    ));
+                    rendered_light_groups += 1;
+                }
+            }
+            Ok(None) => {}
+            Err(error) => warn!("airport lights: skipped chunk {chunk_index} ({error})"),
+        }
     }
     if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. }) {
-        info!("taxiways: {rendered_taxiways} OpenStreetMap ways");
+        info!(
+            "airport ground: {rendered_aprons} aprons, {rendered_taxiways} taxiways, \
+             {rendered_markings} holding markings, {rendered_signs} signs, \
+             {} explicit + {} fallback lights in {rendered_light_groups} groups",
+            startup.ground_lights.len(),
+            airport_ground_lights
+                .len()
+                .saturating_sub(startup.ground_lights.len())
+        );
     }
 
     // 見た目も進入・評価と同じ滑走路、同じ DEM 標高へ置く。
@@ -1226,7 +1555,7 @@ fn setup(
         Name::new("runway"),
     ));
     // 滑走路灯。**夜に降りるには滑走路の側が光る必要がある。**
-    // 太陽高度に応じて `update_runway_lights` が明るさを動かす。
+    // 太陽高度に応じて `update_airport_lights` が明るさを動かす。
     let (light_groups, light_origin) = flightsim_render::runway_lights::runway_light_meshes(
         visual_threshold,
         runway.heading,
@@ -1870,6 +2199,147 @@ mod tests {
             selected.runway,
             Meters(exact_radius.get() - 0.01)
         ));
+    }
+
+    #[test]
+    fn a_long_taxiway_crossing_the_airport_is_selected_even_if_both_ends_are_outside() {
+        let (_, selected) = airport_database_for_app_tests();
+        let centre = selected.runway.center();
+        let taxiway = AirportTaxiway::from_points(
+            300,
+            vec![
+                centre.offset_by(Meters(-20_000.0), Meters::ZERO),
+                centre.offset_by(Meters(20_000.0), Meters::ZERO),
+            ],
+            Meters(20.0),
+        )
+        .expect("valid crossing taxiway");
+
+        assert!(taxiway.points().iter().all(|point| {
+            selected
+                .runway
+                .center()
+                .to_ecef()
+                .distance_to(point.to_ecef())
+                .get()
+                > ACTIVE_AIRPORT_RADIUS.get()
+        }));
+        assert!(taxiway_is_near_runway(
+            &taxiway,
+            selected.runway,
+            ACTIVE_AIRPORT_RADIUS
+        ));
+    }
+
+    #[test]
+    fn an_apron_covering_the_airport_is_selected_even_if_every_vertex_is_outside() {
+        let (_, selected) = airport_database_for_app_tests();
+        let centre = selected.runway.center();
+        let triangle = [
+            centre.offset_by(Meters(-16_000.0), Meters(-16_000.0)),
+            centre.offset_by(Meters(-16_000.0), Meters(16_000.0)),
+            centre.offset_by(Meters(16_000.0), Meters::ZERO),
+        ];
+        let apron = AirportApron::new(
+            flightsim_world::AirportSourceKind::Way,
+            500,
+            flightsim_world::AirportSurface::Concrete,
+            vec![triangle],
+        )
+        .expect("valid crossing apron");
+
+        assert!(triangle.iter().all(|point| {
+            centre.to_ecef().distance_to(point.to_ecef()).get() > ACTIVE_AIRPORT_RADIUS.get()
+        }));
+        assert!(apron_is_near_runway(
+            &apron,
+            selected.runway,
+            ACTIVE_AIRPORT_RADIUS
+        ));
+    }
+
+    #[test]
+    fn ground_features_are_filtered_with_the_selected_airport() {
+        let (_, selected) = airport_database_for_app_tests();
+        let centre = selected.runway.center();
+        let near_apron = AirportApron::new(
+            flightsim_world::AirportSourceKind::Way,
+            500,
+            flightsim_world::AirportSurface::Asphalt,
+            vec![[
+                centre,
+                centre.offset_by(Meters(10.0), Meters::ZERO),
+                centre.offset_by(Meters::ZERO, Meters(10.0)),
+            ]],
+        )
+        .expect("valid nearby apron");
+        let far_origin = Geodetic::from_degrees(36.0, 140.0, 0.0);
+        let far_apron = AirportApron::new(
+            flightsim_world::AirportSourceKind::Way,
+            501,
+            flightsim_world::AirportSurface::Asphalt,
+            vec![[
+                far_origin,
+                far_origin.offset_by(Meters(10.0), Meters::ZERO),
+                far_origin.offset_by(Meters::ZERO, Meters(10.0)),
+            ]],
+        )
+        .expect("valid distant apron");
+        let near_holding = AirportHoldingPosition::new(
+            flightsim_world::AirportSourceKind::Node,
+            600,
+            centre,
+            flightsim_world::HoldingPositionType::Runway,
+            Radians::ZERO,
+            Meters(20.0),
+            Some("A".to_owned()),
+            None,
+            flightsim_world::RunwaySide::Forward,
+        )
+        .expect("valid nearby holding position");
+        let far_holding = AirportHoldingPosition::new(
+            flightsim_world::AirportSourceKind::Node,
+            601,
+            far_origin,
+            flightsim_world::HoldingPositionType::Runway,
+            Radians::ZERO,
+            Meters(20.0),
+            None,
+            None,
+            flightsim_world::RunwaySide::Forward,
+        )
+        .expect("valid distant holding position");
+        let near_light = AirportGroundLight::new(
+            flightsim_world::AirportSourceKind::Node,
+            700,
+            centre,
+            flightsim_world::GroundLightKind::RunwayGuard,
+        )
+        .expect("valid nearby light");
+        let far_light = AirportGroundLight::new(
+            flightsim_world::AirportSourceKind::Node,
+            701,
+            far_origin,
+            flightsim_world::GroundLightKind::TaxiwayEdge,
+        )
+        .expect("valid distant light");
+        let database = AirportDatabase::with_ground_features(
+            vec![selected],
+            Vec::new(),
+            vec![far_apron, near_apron],
+            vec![far_holding, near_holding],
+            vec![far_light, near_light],
+        )
+        .expect("valid ground-feature database");
+        let mut startup = Startup::default();
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(startup.aprons.len(), 1);
+        assert_eq!(startup.aprons[0].source_id(), 500);
+        assert_eq!(startup.holding_positions.len(), 1);
+        assert_eq!(startup.holding_positions[0].source_id(), 600);
+        assert_eq!(startup.ground_lights.len(), 1);
+        assert_eq!(startup.ground_lights[0].source_id(), 700);
     }
 
     #[test]

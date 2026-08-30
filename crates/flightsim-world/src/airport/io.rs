@@ -20,6 +20,8 @@ pub const MAGIC: [u8; 4] = *b"FSAP";
 pub const FORMAT_VERSION: u16 = 1;
 /// 誘導路の折れ線 segment を含む現在のフォーマット版。
 pub const FORMAT_VERSION_V2: u16 = 2;
+/// Section-directory based format with ground features and string metadata.
+pub const FORMAT_VERSION_V3: u16 = 3;
 
 /// ヘッダのバイト数。
 pub const HEADER_LEN: usize = 24;
@@ -44,6 +46,13 @@ pub const FILE_EXTENSION: &str = "fsairports";
 
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+mod v3;
+pub use v3::{
+    AirportApron, AirportGroundLight, AirportHoldingPosition, AirportSourceKind, AirportSurface,
+    GroundFeatureGeometryError, GroundLightKind, HoldingPositionType, RunwaySide, TaxiwayLighting,
+    TaxiwayMetadata,
+};
 
 fn fnv1a(bytes: &[u8]) -> u64 {
     let mut hash = FNV_OFFSET_BASIS;
@@ -262,6 +271,7 @@ pub struct AirportTaxiway {
     pub width: Meters,
     points: Vec<Geodetic>,
     point_degrees: Vec<(f64, f64)>,
+    metadata: TaxiwayMetadata,
 }
 
 impl AirportTaxiway {
@@ -289,10 +299,45 @@ impl AirportTaxiway {
         Self::from_degree_points(source_way_id, point_degrees, width)
     }
 
+    /// Builds a taxiway carrying FSAP v3 reference, surface, and lighting metadata.
+    pub fn from_points_with_metadata(
+        source_way_id: i64,
+        points: Vec<Geodetic>,
+        width: Meters,
+        metadata: TaxiwayMetadata,
+    ) -> Result<Self, TaxiwayGeometryError> {
+        let mut point_degrees = Vec::new();
+        point_degrees.try_reserve_exact(points.len()).map_err(|_| {
+            TaxiwayGeometryError::AllocationFailed {
+                requested: points.len(),
+            }
+        })?;
+        point_degrees.extend(
+            points
+                .into_iter()
+                .map(|point| (point.latitude_degrees(), point.longitude_degrees())),
+        );
+        Self::from_degree_points_with_metadata(source_way_id, point_degrees, width, metadata)
+    }
+
     fn from_degree_points(
         source_way_id: i64,
         point_degrees: Vec<(f64, f64)>,
         width: Meters,
+    ) -> Result<Self, TaxiwayGeometryError> {
+        Self::from_degree_points_with_metadata(
+            source_way_id,
+            point_degrees,
+            width,
+            TaxiwayMetadata::default(),
+        )
+    }
+
+    pub(super) fn from_degree_points_with_metadata(
+        source_way_id: i64,
+        point_degrees: Vec<(f64, f64)>,
+        width: Meters,
+        metadata: TaxiwayMetadata,
     ) -> Result<Self, TaxiwayGeometryError> {
         validate_taxiway_geometry(&point_degrees, width)?;
         let mut points = Vec::new();
@@ -311,12 +356,33 @@ impl AirportTaxiway {
             width,
             points,
             point_degrees,
+            metadata,
         })
     }
 
     #[must_use]
     pub fn points(&self) -> &[Geodetic] {
         &self.points
+    }
+
+    #[must_use]
+    pub const fn metadata(&self) -> &TaxiwayMetadata {
+        &self.metadata
+    }
+
+    #[must_use]
+    pub fn reference(&self) -> Option<&str> {
+        self.metadata.reference()
+    }
+
+    #[must_use]
+    pub const fn surface(&self) -> AirportSurface {
+        self.metadata.surface()
+    }
+
+    #[must_use]
+    pub const fn lighting(&self) -> TaxiwayLighting {
+        self.metadata.lighting()
     }
 
     fn validate_for_storage(&self) -> Result<(), TaxiwayGeometryError> {
@@ -423,6 +489,9 @@ pub enum AirportDatabaseError {
     DuplicateTaxiwayWayId {
         source_way_id: i64,
     },
+    DuplicateRunwayWayId {
+        source_way_id: i64,
+    },
     InvalidRunway {
         record_index: usize,
         source_way_id: i64,
@@ -436,6 +505,30 @@ pub enum AirportDatabaseError {
     InvalidV2Record {
         record_index: usize,
         message: &'static str,
+    },
+    InvalidV3 {
+        section_kind: u16,
+        record_index: usize,
+        message: &'static str,
+    },
+    InvalidGroundFeature {
+        source_id: i64,
+        source: GroundFeatureGeometryError,
+    },
+    DuplicateGroundFeature {
+        section_kind: u16,
+        source_kind: AirportSourceKind,
+        source_id: i64,
+    },
+    OrphanTaxiwayReference {
+        source_way_id: i64,
+    },
+    MetadataRequiresV3 {
+        source_way_id: i64,
+    },
+    StringBytesExceedLimit {
+        found: usize,
+        maximum: usize,
     },
 }
 
@@ -492,6 +585,10 @@ impl core::fmt::Display for AirportDatabaseError {
                 formatter,
                 "airport database has more than one taxiway for OSM way {source_way_id}"
             ),
+            Self::DuplicateRunwayWayId { source_way_id } => write!(
+                formatter,
+                "FSAP v3 database has more than one runway for OSM way {source_way_id}"
+            ),
             Self::InvalidRunway {
                 record_index,
                 source_way_id,
@@ -515,6 +612,37 @@ impl core::fmt::Display for AirportDatabaseError {
                 formatter,
                 "FSAP v2 record {record_index} is invalid: {message}"
             ),
+            Self::InvalidV3 {
+                section_kind,
+                record_index,
+                message,
+            } => write!(
+                formatter,
+                "FSAP v3 section {section_kind} record {record_index} is invalid: {message}"
+            ),
+            Self::InvalidGroundFeature { source_id, source } => {
+                write!(formatter, "ground feature {source_id} is invalid: {source}")
+            }
+            Self::DuplicateGroundFeature {
+                section_kind,
+                source_kind,
+                source_id,
+            } => write!(
+                formatter,
+                "FSAP v3 section {section_kind} contains duplicate {source_kind:?} {source_id}"
+            ),
+            Self::OrphanTaxiwayReference { source_way_id } => write!(
+                formatter,
+                "ground feature references missing taxiway OSM way {source_way_id}"
+            ),
+            Self::MetadataRequiresV3 { source_way_id } => write!(
+                formatter,
+                "taxiway OSM way {source_way_id} has metadata that cannot be written as FSAP v2"
+            ),
+            Self::StringBytesExceedLimit { found, maximum } => write!(
+                formatter,
+                "FSAP v3 string table has {found} bytes; limit is {maximum}"
+            ),
         }
     }
 }
@@ -525,6 +653,7 @@ impl std::error::Error for AirportDatabaseError {
             Self::Io(error) => Some(error),
             Self::InvalidRunway { source, .. } => Some(source),
             Self::InvalidTaxiway { source, .. } => Some(source),
+            Self::InvalidGroundFeature { source, .. } => Some(source),
             _ => None,
         }
     }
@@ -541,6 +670,9 @@ impl From<std::io::Error> for AirportDatabaseError {
 pub struct AirportDatabase {
     runways: Vec<AirportRunway>,
     taxiways: Vec<AirportTaxiway>,
+    aprons: Vec<AirportApron>,
+    holding_positions: Vec<AirportHoldingPosition>,
+    ground_lights: Vec<AirportGroundLight>,
     format_version: u16,
 }
 
@@ -578,6 +710,9 @@ impl AirportDatabase {
         Ok(Self {
             runways,
             taxiways: Vec::new(),
+            aprons: Vec::new(),
+            holding_positions: Vec::new(),
+            ground_lights: Vec::new(),
             format_version: FORMAT_VERSION,
         })
     }
@@ -613,6 +748,11 @@ impl AirportDatabase {
                     source,
                 }
             })?;
+            if !taxiway.metadata.is_default() {
+                return Err(AirportDatabaseError::MetadataRequiresV3 {
+                    source_way_id: taxiway.source_way_id,
+                });
+            }
         }
         runways.sort_unstable_by(compare_runways);
         taxiways.sort_unstable_by_key(|taxiway| taxiway.source_way_id);
@@ -627,6 +767,9 @@ impl AirportDatabase {
         Ok(Self {
             runways,
             taxiways,
+            aprons: Vec::new(),
+            holding_positions: Vec::new(),
+            ground_lights: Vec::new(),
             format_version: FORMAT_VERSION_V2,
         })
     }
@@ -642,10 +785,29 @@ impl AirportDatabase {
         &self.taxiways
     }
 
+    #[must_use]
+    pub fn aprons(&self) -> &[AirportApron] {
+        &self.aprons
+    }
+
+    #[must_use]
+    pub fn holding_positions(&self) -> &[AirportHoldingPosition] {
+        &self.holding_positions
+    }
+
+    #[must_use]
+    pub fn ground_lights(&self) -> &[AirportGroundLight] {
+        &self.ground_lights
+    }
+
     /// DB が空か。
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.runways.is_empty() && self.taxiways.is_empty()
+        self.runways.is_empty()
+            && self.taxiways.is_empty()
+            && self.aprons.is_empty()
+            && self.holding_positions.is_empty()
+            && self.ground_lights.is_empty()
     }
 
     /// 滑走路数。
@@ -701,6 +863,9 @@ impl AirportDatabase {
             });
         }
 
+        if read_u16(bytes, 4) == FORMAT_VERSION_V3 {
+            return v3::from_bytes(bytes);
+        }
         let header = parse_header(&bytes[..HEADER_LEN])?;
         match bytes.len().cmp(&header.expected_len) {
             Ordering::Less => {
@@ -847,6 +1012,9 @@ impl AirportDatabase {
     /// 公開フィールドが保存端点と不整合になっている場合、件数が上限を超える場合、
     /// または必要なメモリを確保できない場合。
     pub fn to_bytes(&self) -> Result<Vec<u8>, AirportDatabaseError> {
+        if self.format_version == FORMAT_VERSION_V3 {
+            return v3::to_bytes(self);
+        }
         let taxiway_segment_count = self
             .taxiways
             .iter()
@@ -980,6 +1148,9 @@ impl AirportDatabase {
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self, AirportDatabaseError> {
         let mut header_bytes = [0_u8; HEADER_LEN];
         read_exact_or_truncated(reader, &mut header_bytes, HEADER_LEN, 0)?;
+        if read_u16(&header_bytes, 4) == FORMAT_VERSION_V3 {
+            return v3::read_from(reader, header_bytes);
+        }
         let header = parse_header(&header_bytes)?;
 
         let mut payload = Vec::new();
@@ -1054,7 +1225,7 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, AirportDatabaseError> {
     if version != FORMAT_VERSION && version != FORMAT_VERSION_V2 {
         return Err(AirportDatabaseError::UnsupportedVersion {
             found: version,
-            supported: FORMAT_VERSION_V2,
+            supported: FORMAT_VERSION_V3,
         });
     }
 
@@ -1644,12 +1815,12 @@ mod tests {
             .expect("encoding should succeed");
 
         let mut version = reference.clone();
-        version[4..6].copy_from_slice(&3_u16.to_le_bytes());
+        version[4..6].copy_from_slice(&4_u16.to_le_bytes());
         assert!(matches!(
             AirportDatabase::from_bytes(&version),
             Err(AirportDatabaseError::UnsupportedVersion {
-                found: 3,
-                supported: 2
+                found: 4,
+                supported: 3
             })
         ));
 
