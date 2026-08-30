@@ -15,9 +15,10 @@
 //!   1. カメラ位置から RenderFrame を打ち直す（必要なら）
 //!   2. WorldPosition / WorldOrientation → Transform を更新
 //!   3. 時刻を進め、太陽の位置と光量を決める
-//!   4. LOD を選ぶ
-//!   5. 予算内でタイルを読み、メッシュを作って spawn
-//!   6. 選ばれなくなったタイルを despawn
+//!   4. 雲面と雲中視程を更新
+//!   5. LOD を選ぶ
+//!   6. 予算内でタイルを読み、メッシュを作って spawn
+//!   7. 選ばれなくなったタイルを despawn
 //! ```
 //!
 //! この手順は `flightsim-sim` の `tests/render_rehearsal.rs` が Bevy 抜きで
@@ -63,6 +64,7 @@ pub mod runway;
 pub mod runway_lights;
 pub mod sun;
 pub mod terrain;
+pub mod weather;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
 pub use daylight::{
@@ -71,6 +73,7 @@ pub use daylight::{
 pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
 pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
+pub use weather::{CloudDeckSurface, CloudDistanceFog, CloudLayer, CloudLayerError};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**
 ///
@@ -149,6 +152,8 @@ pub enum RenderSet {
     Transforms,
     /// 時刻の進行と太陽の位置・光量。
     Sun,
+    /// 雲面と雲中視程。
+    Weather,
     /// 地形の LOD 選択・ストリーミング・spawn。
     Terrain,
 }
@@ -163,6 +168,8 @@ impl Plugin for FlightsimRenderPlugin {
             .init_resource::<SunDirection>()
             .init_resource::<TimeOfDay>()
             .init_resource::<SunLighting>()
+            .init_resource::<CloudLayer>()
+            .init_resource::<weather::CloudVisuals>()
             // `LightPlugin` も同じことをする。**どちらが先でも同じ値**になるよう
             // `init_resource` で入れること（`insert_resource` だと上書きし合う）。
             .init_resource::<bevy::light::GlobalAmbientLight>()
@@ -185,6 +192,7 @@ impl Plugin for FlightsimRenderPlugin {
                     RenderSet::Rebase,
                     RenderSet::Transforms,
                     RenderSet::Sun,
+                    RenderSet::Weather,
                     RenderSet::Terrain,
                 )
                     .chain(),
@@ -201,6 +209,13 @@ impl Plugin for FlightsimRenderPlugin {
                     )
                         .chain()
                         .in_set(RenderSet::Sun),
+                    (
+                        weather::sync_cloud_visuals,
+                        weather::update_cloud_visuals,
+                        weather::update_cloud_distance_fog,
+                    )
+                        .chain()
+                        .in_set(RenderSet::Weather),
                 ),
             );
     }

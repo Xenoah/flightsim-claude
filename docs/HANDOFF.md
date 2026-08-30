@@ -1,7 +1,7 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-30（v0.6.0-alpha.8 = 滑走路灯・計器盤・計器照明）
+更新: 2026-08-30（v0.6.0-alpha.9 = 計器照明・雲と視程。alpha.8 は計器盤まで）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
@@ -13,7 +13,7 @@
 
 ## 1. 現状を 30 秒で
 
-**M2 達成、M3 が半分。ゲームとして一周する。**
+**M2 達成、M3 を実装中。ゲームとして一周し、雲中の計器飛行も練習できる。**
 引数なしで起動すると合成飛行場の滑走路中心線上から始まり、離陸して戻って
 降りると着陸が 5 段階で評価される。
 
@@ -24,6 +24,8 @@ cargo run -p flightsim-tilegen -- --input data/synthetic.tif --output data/tiles
 
 cargo run -p flightsim-app --release -- --tiles data/tiles              # 滑走路から
 cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 着陸練習
+cargo run -p flightsim-app --release -- --tiles data/tiles \
+  --cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300
 ```
 
 | できること | 入口 |
@@ -33,6 +35,7 @@ cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 
 | 風 | `--wind 270/10`（方位/ノット） |
 | 乱流 | `--turbulence light\|moderate\|severe` |
 | 時刻・太陽位置 | `--time 05:30`（地方平均太陽時）、`--time-rate 60`、実行中は `,` `.` |
+| 雲量・雲層・雲中視程 | `--cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300` |
 | チュートリアル導線 | 既定で出る。`H` で消せる |
 | ゲームパッド | 繋げば自動。キーボードと**軸ごとに**共存 |
 | 検証用: 空中から落として評価表示を通す | `--drop 15` |
@@ -41,7 +44,7 @@ cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 
 - M2 の受け入れテストは `crates/flightsim-sim/tests/airport_circuit.rs`
 - ワークスペースの全テストを Windows / Linux の CI で実行する。
   加えて lint・ドキュメント・依存規約・ソフトウェア Vulkan 起動を検査する
-- `v0.6.0-alpha.5` 以降は、成功した `main` の CI 後に Windows x86_64 の zip を
+- `v0.6.0-alpha.6` 以降は、成功した `main` の CI 後に Windows x86_64 の zip を
   prerelease へ自動添付する。実行ファイル、`assets/`、README、変更履歴、帰属・
   ライセンス文を同梱する
 
@@ -68,29 +71,28 @@ CI が検査しないが、レビューで落とす規約:
 ## 3. 次のタスク
 
 M1（ヘッドレスで妥当に飛ぶ）と M2（1 空港周辺で離陸→旋回→着陸）は達成済み。
-**いま M3 の途中。** 主要タスクは次の 3 つで、上から順に価値が高い。
-夜間照明・HOTAS・追加の天候は [ROADMAP](ROADMAP.md) に分けて記録している。
+**いま M3 の途中。** 雲と雲中視程（[Issue #11](../../../issues/11)）は完了し、
+次は OSM 空港が第一候補だが、
+ODbL の帰属表示を含む判断が要る。継続課題は [ROADMAP](ROADMAP.md) に記録している。
 
-### TASK-A: 計器盤（`flightsim-ui`）— 未着手・最優先
+### TASK-A: 計器盤（`flightsim-ui`）— 完了
 
-**コックピット視点が現状ほぼ空。** 外形モデルは視界を塞ぐので隠してあり
-（`ExteriorModel` + `update_model_visibility`）、内装モデルも無いため、
-画面には空と地面と左上の文字 HUD しかない。**計器が描かれていれば
-「コックピットに座っている」感じになる。**
+2026-08-30 完了。コックピット視点に対気速度・姿勢・高度・昇降・方位・出力の
+丸型 6 計器を置いた。外形モデルは視界を塞ぐので隠してあり
+（`ExteriorModel` + `update_model_visibility`）、内装の 3D モデルはまだ無い。
 
-- 対気速度・姿勢・高度・昇降・方位の 5 つが最低限
-- `HudState` に必要な値は既に全部ある（`view_mode: &'static str` で
-  コックピット視点かどうかも分かる）
-- **Bevy の UI で丸い針を描くのは面倒。** 横棒のテープ計器
-  （グラスコックピット風）で済ませてもよいが、**その判断理由を doc に書くこと**
-- **角度→針の回転角の変換は Bevy 非依存の純関数に切り出してテストする。**
-  特に「高度計の針が 1000 ft で 1 周」「方位計が 359°→1° をまたぐとき逆回転
-  しない」「負の高度・超過速度・NaN で壊れない」
-- 既存の HUD と重ならない位置に置くこと（左上=計器列、右上=着陸評価、
-  左下=操作説明、右下=飛行記録、中央上=チュートリアル）
+- 角度から針への変換は Bevy 非依存の純関数として検査する
+- 針の中心ずれと操作説明との重なりは実際のスクリーンショットで発見して修正した
+- 太陽高度に連動する照明も実装済み。**alpha.8 タグは計器盤までで、照明は alpha.9**
 
-**過去 2 回、この作業をエージェントに投げてセッション上限で失敗している。**
-実装量が多いので、計器 1 つずつ刻んで進めるのを勧める。
+### 天候: 雲と視程（`flightsim-render` / `flightsim-app`）— 完了
+
+- `--cloud-cover`（0〜1）、`--cloud-base` / `--cloud-top`（楕円体高 m）、
+  `--cloud-visibility`（m）で雲層を設定する。既定は雲量 0 の快晴
+- 固定 seed の周期的な 2D value/fBm noise なので、同じ時刻・位置・設定なら同じ雲場になる
+- 雲底・雲頂は alpha mask 付き PBR 平面。雲中だけ distance fog を使い、
+  大気散乱の `ClearColor` は変えない
+- これは計器飛行を成立させる最小実装。高品質なボリューム雲と METAR は後続
 
 ### TASK-B: 空港データ（`flightsim-world`）— 未着手
 
@@ -115,7 +117,7 @@ OSM の `aeroway=runway` から実空港を取り込めば、飛べる場所が�
 
 - ゲームパッドの変換ロジックとキーボード共存はテスト済みだが、
   実機の符号・感度は未確認（[Issue #2](../../../issues/2)）
-- 夜間の滑走路灯とコックピット照明は未実装（[Issue #3](../../../issues/3)）
+- 夜間の滑走路灯とコックピット照明は実装済み（[Issue #3](../../../issues/3)）
 - フライトディレクタは回帰テストの駆動装置。6 km手前から滑走路中心線を連続捕捉し、
   左右6 m/sの直角横風でも滑走路内へ接地する（[Issue #4](../../../issues/4)）。
   ILS・航法データ・認証されたautolandではない
@@ -124,8 +126,9 @@ OSM の `aeroway=runway` から実空港を取り込めば、飛べる場所が�
 - CI の起動スモークは Mesa/lavapipe の CPU Vulkan で同梱 glTF と 1 枚の描画を
   確認する（[Issue #8](../../../issues/8)）。Windows zip もクリーンな展開先から
   D3D12 フォールバックで検査するが、実 GPU、ベンダードライバ、性能は保証しない
-- HOTAS・軸再割り当て（[Issue #9](../../../issues/9)）、追加機体（[Issue #10](../../../issues/10)）、
-  雲（[Issue #11](../../../issues/11)）、リプレイ（[Issue #12](../../../issues/12)）、
+- 雲の最小実装（[Issue #11](../../../issues/11)）は完了。高品質なボリューム雲と
+  METAR は後続。HOTAS・軸再割り当て（[Issue #9](../../../issues/9)）、
+  追加機体（[Issue #10](../../../issues/10)）、リプレイ（[Issue #12](../../../issues/12)）、
   交通（[Issue #13](../../../issues/13)）、オンライン（[Issue #14](../../../issues/14)）は未着手
 
 ### リリース経路
@@ -582,5 +585,6 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 
 エージェント別の詳細な指示は [.claude/agents/](../.claude/agents/) にある。
 TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 と M2 の Bevy 統合は完了。
-現在は M3。最優先は TASK-A（計器盤）で、次が TASK-B（OSM 空港）、
-TASK-C（難易度設定）。結線を触る場合は `flightsim-sim` の公開 API を先に読むこと。
+現在は M3。TASK-A（計器盤）と雲・雲中視程は完了し、次は TASK-B（OSM 空港）が
+第一候補。TASK-C（難易度設定）が続く。結線を触る場合は `flightsim-sim` の
+公開 API を先に読むこと。
