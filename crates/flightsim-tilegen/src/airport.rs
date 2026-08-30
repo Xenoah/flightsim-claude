@@ -9,6 +9,7 @@ use flightsim_world::{AirportDatabase, AirportRunway};
 use osmpbf::{Element, IndexedReader};
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_RUNWAY_WIDTH: Meters = Meters(45.0);
@@ -40,6 +41,22 @@ pub struct AirportGenerationReport {
 /// 空港 DB 生成の入出力エラー。
 #[derive(Debug)]
 pub enum AirportGenError {
+    /// 入力 PBF と出力 DB が同じファイルを指している。
+    InputOutputConflict {
+        /// 読み込もうとした PBF。
+        input: PathBuf,
+        /// 書き込もうとした DB。
+        output: PathBuf,
+    },
+    /// 入出力が同じファイルか確認できなかった。
+    ComparePaths {
+        /// 読み込もうとした PBF。
+        input: PathBuf,
+        /// 書き込もうとした DB。
+        output: PathBuf,
+        /// OS が返した詳細。
+        message: String,
+    },
     /// OSM PBF を開く、索引する、またはデコードできなかった。
     ReadPbf {
         /// 読み込もうとしたパス。
@@ -64,6 +81,22 @@ pub enum AirportGenError {
 impl fmt::Display for AirportGenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InputOutputConflict { input, output } => write!(
+                f,
+                "input OSM PBF {} and output airport database {} refer to the same file",
+                input.display(),
+                output.display()
+            ),
+            Self::ComparePaths {
+                input,
+                output,
+                message,
+            } => write!(
+                f,
+                "failed to compare input {} with output {}: {message}",
+                input.display(),
+                output.display()
+            ),
             Self::ReadPbf { path, message } => {
                 write!(f, "failed to read OSM PBF {}: {message}", path.display())
             }
@@ -88,13 +121,14 @@ impl std::error::Error for AirportGenError {}
 ///
 /// # Errors
 ///
-/// PBF を読めない場合、変換後の DB を構築できない場合、または出力を書けない場合に
-/// [`AirportGenError`] を返す。個々の不正 way はエラーで全体を止めず、理由別に数えて
-/// [`AirportGenerationReport`] で報告する。
+/// 入出力が同じファイルを指す場合、PBF を読めない場合、変換後の DB を構築できない
+/// 場合、または出力を書けない場合に [`AirportGenError`] を返す。個々の不正 way は
+/// エラーで全体を止めず、理由別に数えて [`AirportGenerationReport`] で報告する。
 pub fn generate_airport_database(
     input: &Path,
     output: &Path,
 ) -> Result<AirportGenerationReport, AirportGenError> {
+    ensure_distinct_files(input, output)?;
     let extraction = extract_pbf(input)?;
     let (runways, mut report) =
         convert_candidates(extraction.candidates, &extraction.nodes, extraction.report);
@@ -104,13 +138,64 @@ pub fn generate_airport_database(
             message: error.to_string(),
         })?;
     report.runways_written = database.runways().len();
-    database
-        .write_to_path(output)
+    write_database_atomically(&database, output)?;
+    Ok(report)
+}
+
+fn ensure_distinct_files(input: &Path, output: &Path) -> Result<(), AirportGenError> {
+    match same_file::is_same_file(input, output) {
+        Ok(true) => Err(AirportGenError::InputOutputConflict {
+            input: input.to_path_buf(),
+            output: output.to_path_buf(),
+        }),
+        Ok(false) => Ok(()),
+        // 入力または出力がまだ無い場合は後続の読み書きが担当する。特に通常の
+        // 新規出力はここへ来る。両方が存在する場合は same-file が正規化済みの
+        // ファイル ID を比較するため、別表記・symlink・hard link も検出できる。
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(AirportGenError::ComparePaths {
+            input: input.to_path_buf(),
+            output: output.to_path_buf(),
+            message: error.to_string(),
+        }),
+    }
+}
+
+fn write_database_atomically(
+    database: &AirportDatabase,
+    output: &Path,
+) -> Result<(), AirportGenError> {
+    let bytes = database
+        .to_bytes()
         .map_err(|error| AirportGenError::WriteDatabase {
             path: output.to_path_buf(),
             message: error.to_string(),
         })?;
-    Ok(report)
+    let parent = output
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".flightsim-airportgen-")
+        .tempfile_in(parent)
+        .map_err(|error| AirportGenError::WriteDatabase {
+            path: output.to_path_buf(),
+            message: error.to_string(),
+        })?;
+    temporary
+        .write_all(&bytes)
+        .and_then(|()| temporary.as_file().sync_all())
+        .map_err(|error| AirportGenError::WriteDatabase {
+            path: output.to_path_buf(),
+            message: error.to_string(),
+        })?;
+    temporary
+        .persist(output)
+        .map_err(|error| AirportGenError::WriteDatabase {
+            path: output.to_path_buf(),
+            message: error.error.to_string(),
+        })?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -329,6 +414,7 @@ fn parse_width(text: Option<&str>) -> (Meters, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn candidate(
         source_way_id: i64,
@@ -486,5 +572,67 @@ mod tests {
         );
         assert!(runways.is_empty());
         assert_eq!(report.skipped_degenerate, 1);
+    }
+
+    #[test]
+    fn identical_input_and_output_are_rejected_without_truncation() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let input = directory.path().join("source.osm.pbf");
+        let original = b"not a PBF, but it must remain untouched";
+        fs::write(&input, original).expect("fixture should be written");
+
+        let error = generate_airport_database(&input, &input)
+            .expect_err("the same input and output must be rejected before decoding");
+
+        assert!(matches!(error, AirportGenError::InputOutputConflict { .. }));
+        assert_eq!(
+            fs::read(&input).expect("input should remain readable"),
+            original
+        );
+    }
+
+    #[test]
+    fn hard_link_output_is_rejected_without_truncation() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let input = directory.path().join("source.osm.pbf");
+        let output = directory.path().join("output.fsairports");
+        let original = b"hard-linked input must remain untouched";
+        fs::write(&input, original).expect("fixture should be written");
+        fs::hard_link(&input, &output).expect("hard link should be created");
+
+        let error = generate_airport_database(&input, &output)
+            .expect_err("hard-linked input and output must be rejected before decoding");
+
+        assert!(matches!(error, AirportGenError::InputOutputConflict { .. }));
+        assert_eq!(
+            fs::read(&input).expect("input should remain readable"),
+            original
+        );
+        assert_eq!(
+            fs::read(&output).expect("hard link should remain readable"),
+            original
+        );
+    }
+
+    #[test]
+    fn atomic_writer_replaces_an_existing_database() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let output = directory.path().join("airport.fsairports");
+        fs::write(&output, b"old partial data").expect("old output should be written");
+        let database = AirportDatabase::new(Vec::new()).expect("empty database is valid");
+
+        write_database_atomically(&database, &output).expect("replacement should succeed");
+
+        assert_eq!(
+            fs::read(&output).expect("replacement should be readable"),
+            database.to_bytes().expect("database should encode")
+        );
+        assert_eq!(
+            fs::read_dir(directory.path())
+                .expect("directory should be readable")
+                .count(),
+            1,
+            "the temporary file must not remain after persistence"
+        );
     }
 }

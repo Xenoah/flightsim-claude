@@ -24,6 +24,12 @@ pub const RECORD_LEN: usize = 48;
 
 const RECORD_LEN_FIELD: u32 = 48;
 
+/// 読み込む滑走路レコード数の上限。
+///
+/// 100 万本は全球の実用 DB に十分な余裕があり、payload は最大 48 MB に収まる。
+/// 壊れた header の `u32::MAX` から巨大な確保を試みないための防御上限である。
+pub const MAX_RECORD_COUNT: u32 = 1_000_000;
+
 /// 空港 DB ファイルの拡張子。
 pub const FILE_EXTENSION: &str = "fsairports";
 
@@ -201,6 +207,11 @@ pub enum AirportDatabaseError {
         found: u32,
         supported: u32,
     },
+    /// 宣言レコード数が実用上限を超え、payload を安全に確保できない。
+    RecordCountExceedsLimit {
+        found: u32,
+        maximum: u32,
+    },
     /// 宣言されたレコード列の後ろに未解釈のデータがある。
     TrailingData {
         expected: usize,
@@ -253,6 +264,10 @@ impl core::fmt::Display for AirportDatabaseError {
                 formatter,
                 "airport record size {found} is not supported (version 1 requires {supported})"
             ),
+            Self::RecordCountExceedsLimit { found, maximum } => write!(
+                formatter,
+                "airport database declares {found} records; the safe runtime limit is {maximum}"
+            ),
             Self::TrailingData { expected, actual } => write!(
                 formatter,
                 "airport database has trailing data: expected {expected} bytes, got {actual}"
@@ -271,8 +286,7 @@ impl core::fmt::Display for AirportDatabaseError {
             ),
             Self::TooManyRunways { count } => write!(
                 formatter,
-                "airport database has {count} runways; the format limit is {}",
-                u32::MAX
+                "airport database has {count} runways; the safe runtime limit is {MAX_RECORD_COUNT}"
             ),
             Self::InvalidRunway {
                 record_index,
@@ -313,9 +327,14 @@ impl AirportDatabase {
     ///
     /// # Errors
     ///
-    /// レコード数が FSAP v1 の上限を超える場合、または滑走路が不正な場合。
+    /// レコード数が [`MAX_RECORD_COUNT`] の runtime safe limit を超える場合、
+    /// または滑走路が不正な場合。
     pub fn new(mut runways: Vec<AirportRunway>) -> Result<Self, AirportDatabaseError> {
-        if u32::try_from(runways.len()).is_err() {
+        let exceeds_limit = match u32::try_from(runways.len()) {
+            Ok(count) => count > MAX_RECORD_COUNT,
+            Err(_) => true,
+        };
+        if exceeds_limit {
             return Err(AirportDatabaseError::TooManyRunways {
                 count: runways.len(),
             });
@@ -400,73 +419,41 @@ impl AirportDatabase {
             });
         }
 
-        let magic = [bytes[0], bytes[1], bytes[2], bytes[3]];
-        if magic != MAGIC {
-            return Err(AirportDatabaseError::NotAnAirportDatabase { found: magic });
-        }
-
-        let version = read_u16(bytes, 4);
-        if version != FORMAT_VERSION {
-            return Err(AirportDatabaseError::UnsupportedVersion {
-                found: version,
-                supported: FORMAT_VERSION,
-            });
-        }
-
-        let flags = read_u16(bytes, 6);
-        if flags != 0 {
-            return Err(AirportDatabaseError::UnsupportedFlags(flags));
-        }
-
-        let record_count = read_u32(bytes, 8);
-        let record_size = read_u32(bytes, 12);
-        if record_size != RECORD_LEN_FIELD {
-            return Err(AirportDatabaseError::UnsupportedRecordSize {
-                found: record_size,
-                supported: RECORD_LEN_FIELD,
-            });
-        }
-
-        let count = usize::try_from(record_count)
-            .map_err(|_| AirportDatabaseError::SizeOverflow { record_count })?;
-        let payload_len = count
-            .checked_mul(RECORD_LEN)
-            .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
-        let expected_len = HEADER_LEN
-            .checked_add(payload_len)
-            .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
-        match bytes.len().cmp(&expected_len) {
+        let header = parse_header(&bytes[..HEADER_LEN])?;
+        match bytes.len().cmp(&header.expected_len) {
             Ordering::Less => {
                 return Err(AirportDatabaseError::Truncated {
-                    expected: expected_len,
+                    expected: header.expected_len,
                     actual: bytes.len(),
                 });
             }
             Ordering::Greater => {
                 return Err(AirportDatabaseError::TrailingData {
-                    expected: expected_len,
+                    expected: header.expected_len,
                     actual: bytes.len(),
                 });
             }
             Ordering::Equal => {}
         }
 
-        let payload = &bytes[HEADER_LEN..];
-        let expected_checksum = read_u64(bytes, 16);
+        Self::from_payload(&header, &bytes[HEADER_LEN..])
+    }
+
+    fn from_payload(header: &ParsedHeader, payload: &[u8]) -> Result<Self, AirportDatabaseError> {
         let actual_checksum = fnv1a(payload);
-        if actual_checksum != expected_checksum {
+        if actual_checksum != header.checksum {
             return Err(AirportDatabaseError::ChecksumMismatch {
-                expected: expected_checksum,
+                expected: header.checksum,
                 actual: actual_checksum,
             });
         }
 
         let mut runways = Vec::new();
-        runways
-            .try_reserve_exact(count)
-            .map_err(|_| AirportDatabaseError::AllocationFailed {
-                requested: payload_len,
-            })?;
+        runways.try_reserve_exact(header.count).map_err(|_| {
+            AirportDatabaseError::AllocationFailed {
+                requested: header.payload_len,
+            }
+        })?;
         for (record_index, record) in payload.chunks_exact(RECORD_LEN).enumerate() {
             let source_way_id = read_i64(record, 0);
             let threshold_latitude = read_f64(record, 8);
@@ -557,11 +544,41 @@ impl AirportDatabase {
     ///
     /// # Errors
     ///
-    /// I/O または [`Self::from_bytes`] の検証に失敗した場合。
+    /// I/O、header、宣言された payload、checksum、またはレコード幾何が不正な場合。
+    /// header を検証するまでは payload を読まず、payload の後は trailing 判定用の
+    /// 1 byte だけを追加で読む。
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self, AirportDatabaseError> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-        Self::from_bytes(&bytes)
+        let mut header_bytes = [0_u8; HEADER_LEN];
+        read_exact_or_truncated(reader, &mut header_bytes, HEADER_LEN, 0)?;
+        let header = parse_header(&header_bytes)?;
+
+        let mut payload = Vec::new();
+        payload.try_reserve_exact(header.payload_len).map_err(|_| {
+            AirportDatabaseError::AllocationFailed {
+                requested: header.payload_len,
+            }
+        })?;
+        payload.resize(header.payload_len, 0);
+        read_exact_or_truncated(reader, &mut payload, header.expected_len, HEADER_LEN)?;
+
+        let mut trailing = [0_u8; 1];
+        loop {
+            match reader.read(&mut trailing) {
+                Ok(0) => break,
+                Ok(_) => {
+                    return Err(AirportDatabaseError::TrailingData {
+                        expected: header.expected_len,
+                        // 意図的に 1 byte しか読まない。後続の全長を調べるために
+                        // 信頼できない stream を無制限に消費しない。
+                        actual: header.expected_len + 1,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(error) => return Err(AirportDatabaseError::Io(error)),
+            }
+        }
+
+        Self::from_payload(&header, &payload)
     }
 
     /// path の FSAP v1 DB を読む。
@@ -570,8 +587,8 @@ impl AirportDatabase {
     ///
     /// ファイル I/O または形式の検証に失敗した場合。
     pub fn read_from_path(path: impl AsRef<Path>) -> Result<Self, AirportDatabaseError> {
-        let bytes = std::fs::read(path)?;
-        Self::from_bytes(&bytes)
+        let mut file = std::fs::File::open(path)?;
+        Self::read_from(&mut file)
     }
 
     /// writer へ FSAP v1 DB を書く。
@@ -583,16 +600,90 @@ impl AirportDatabase {
         writer.write_all(&self.to_bytes()?)?;
         Ok(())
     }
+}
 
-    /// path へ FSAP v1 DB を書く。
-    ///
-    /// # Errors
-    ///
-    /// DB の検証、メモリ確保、またはファイル I/O に失敗した場合。
-    pub fn write_to_path(&self, path: impl AsRef<Path>) -> Result<(), AirportDatabaseError> {
-        let mut file = std::fs::File::create(path)?;
-        self.write_to(&mut file)
+#[derive(Debug, Clone, Copy)]
+struct ParsedHeader {
+    count: usize,
+    payload_len: usize,
+    expected_len: usize,
+    checksum: u64,
+}
+
+fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, AirportDatabaseError> {
+    debug_assert!(bytes.len() >= HEADER_LEN);
+
+    let magic = [bytes[0], bytes[1], bytes[2], bytes[3]];
+    if magic != MAGIC {
+        return Err(AirportDatabaseError::NotAnAirportDatabase { found: magic });
     }
+
+    let version = read_u16(bytes, 4);
+    if version != FORMAT_VERSION {
+        return Err(AirportDatabaseError::UnsupportedVersion {
+            found: version,
+            supported: FORMAT_VERSION,
+        });
+    }
+
+    let flags = read_u16(bytes, 6);
+    if flags != 0 {
+        return Err(AirportDatabaseError::UnsupportedFlags(flags));
+    }
+
+    let record_size = read_u32(bytes, 12);
+    if record_size != RECORD_LEN_FIELD {
+        return Err(AirportDatabaseError::UnsupportedRecordSize {
+            found: record_size,
+            supported: RECORD_LEN_FIELD,
+        });
+    }
+
+    let record_count = read_u32(bytes, 8);
+    if record_count > MAX_RECORD_COUNT {
+        return Err(AirportDatabaseError::RecordCountExceedsLimit {
+            found: record_count,
+            maximum: MAX_RECORD_COUNT,
+        });
+    }
+    let count = usize::try_from(record_count)
+        .map_err(|_| AirportDatabaseError::SizeOverflow { record_count })?;
+    let payload_len = count
+        .checked_mul(RECORD_LEN)
+        .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
+    let expected_len = HEADER_LEN
+        .checked_add(payload_len)
+        .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
+
+    Ok(ParsedHeader {
+        count,
+        payload_len,
+        expected_len,
+        checksum: read_u64(bytes, 16),
+    })
+}
+
+fn read_exact_or_truncated<R: Read>(
+    reader: &mut R,
+    buffer: &mut [u8],
+    expected: usize,
+    already_read: usize,
+) -> Result<(), AirportDatabaseError> {
+    let mut filled = 0;
+    while filled < buffer.len() {
+        match reader.read(&mut buffer[filled..]) {
+            Ok(0) => {
+                return Err(AirportDatabaseError::Truncated {
+                    expected,
+                    actual: already_read + filled,
+                });
+            }
+            Ok(count) => filled += count,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(AirportDatabaseError::Io(error)),
+        }
+    }
+    Ok(())
 }
 
 fn compare_runways(left: &AirportRunway, right: &AirportRunway) -> Ordering {
@@ -655,6 +746,7 @@ mod tests {
 
     use super::*;
     use flightsim_core::{Degrees, LocalFrame, Radians};
+    use std::io::Cursor;
 
     macro_rules! assert_close {
         ($actual:expr, $expected:expr, $tolerance:expr) => {{
@@ -716,6 +808,29 @@ mod tests {
             airport_runway(-12, -33.95, 151.17, -33.93, 151.19, 60.0),
         ])
         .expect("sample database should be valid")
+    }
+
+    #[derive(Debug)]
+    struct CountingReader {
+        inner: Cursor<Vec<u8>>,
+        bytes_read: usize,
+    }
+
+    impl CountingReader {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                bytes_read: 0,
+            }
+        }
+    }
+
+    impl Read for CountingReader {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let count = self.inner.read(buffer)?;
+            self.bytes_read += count;
+            Ok(count)
+        }
     }
 
     // --- FSAP v1 の互換性 ---
@@ -862,6 +977,77 @@ mod tests {
             AirportDatabase::from_bytes(&bytes),
             Err(AirportDatabaseError::NotAnAirportDatabase { found }) if &found == b"FSDM"
         ));
+    }
+
+    #[test]
+    fn stream_with_wrong_magic_reads_only_the_fixed_header() {
+        let mut bytes = sample_database()
+            .to_bytes()
+            .expect("encoding should succeed");
+        bytes[0..4].copy_from_slice(b"FSDM");
+        let mut reader = CountingReader::new(bytes);
+
+        assert!(matches!(
+            AirportDatabase::read_from(&mut reader),
+            Err(AirportDatabaseError::NotAnAirportDatabase { found }) if &found == b"FSDM"
+        ));
+        assert_eq!(
+            reader.bytes_read, HEADER_LEN,
+            "invalid magic must be rejected before any payload is consumed"
+        );
+    }
+
+    #[test]
+    fn enormous_declared_count_is_rejected_before_payload_read_or_allocation() {
+        let mut bytes = AirportDatabase::new(Vec::new())
+            .expect("empty database should be valid")
+            .to_bytes()
+            .expect("encoding should succeed");
+        let declared = MAX_RECORD_COUNT + 1;
+        bytes[8..12].copy_from_slice(&declared.to_le_bytes());
+        bytes.push(0xa5);
+        let mut reader = CountingReader::new(bytes);
+
+        assert!(matches!(
+            AirportDatabase::read_from(&mut reader),
+            Err(AirportDatabaseError::RecordCountExceedsLimit {
+                found,
+                maximum: MAX_RECORD_COUNT
+            }) if found == declared
+        ));
+        assert_eq!(
+            reader.bytes_read, HEADER_LEN,
+            "record-count limits must be checked before consuming payload"
+        );
+    }
+
+    #[test]
+    fn stream_round_trip_and_single_byte_trailing_probe_are_bounded() {
+        let database = sample_database();
+        let bytes = database.to_bytes().expect("encoding should succeed");
+        let mut valid_reader = CountingReader::new(bytes.clone());
+        assert_eq!(
+            AirportDatabase::read_from(&mut valid_reader).expect("stream should decode"),
+            database
+        );
+        assert_eq!(valid_reader.bytes_read, bytes.len());
+
+        let expected = bytes.len();
+        let mut with_trailing = bytes;
+        with_trailing.extend_from_slice(&[0xaa, 0x55, 0x33]);
+        let mut trailing_reader = CountingReader::new(with_trailing);
+        assert!(matches!(
+            AirportDatabase::read_from(&mut trailing_reader),
+            Err(AirportDatabaseError::TrailingData {
+                expected: error_expected,
+                actual
+            }) if error_expected == expected && actual == expected + 1
+        ));
+        assert_eq!(
+            trailing_reader.bytes_read,
+            expected + 1,
+            "trailing detection must consume only one byte past the declared payload"
+        );
     }
 
     #[test]

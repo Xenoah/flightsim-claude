@@ -94,13 +94,16 @@ CC BY 4.0。https://esa-worldcover.org/
 |---|---|---|
 | [glam](https://github.com/bitshifter/glam-rs) | MIT OR Apache-2.0 | 全体（線形代数） |
 | [tiff](https://github.com/image-rs/image-tiff) | MIT | `flightsim-tilegen`（GeoTIFF デコード） |
-| [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen`（CLI） |
+| [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen` / `flightsim-airportgen` / `flightsim-headless`（CLI） |
 | [osmpbf](https://github.com/b-r-u/osmpbf) | MIT OR Apache-2.0 | `flightsim-airportgen`（OSM PBF デコード） |
+| [same-file](https://github.com/BurntSushi/same-file) | Unlicense OR MIT | `flightsim-airportgen`（入出力の同一ファイル検出） |
+| [tempfile](https://github.com/Stebalien/tempfile) | MIT OR Apache-2.0 | `flightsim-airportgen`（DB の原子的な置換） |
 | [bevy](https://bevyengine.org/) | MIT OR Apache-2.0 | 描画層（[ADR-0007](docs/adr/0007-bevy-version.md) で 0.18.1 に固定） |
 | [ureq](https://github.com/algesten/ureq) | MIT OR Apache-2.0 | `flightsim-assetgen`（HTTP） |
 | [criterion](https://github.com/bheisler/criterion.rs) | MIT OR Apache-2.0 | ベンチ（dev-dependency） |
 
-`tiff`、`clap`、`osmpbf` はオフラインの生成ツールのみが使い、実行時には載りません
-（[ADR-0003](docs/adr/0003-terrain-data.md)）。
+`tiff` と `osmpbf` はオフライン生成専用。`same-file` と `tempfile` も空港 DB 生成専用。
+`clap` はオフライン生成 CLI とヘッドレスランナーが使う。いずれも
+`flightsim-app` の実行時依存には載らない（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
 本プロジェクト自体は [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) です。

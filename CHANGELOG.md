@@ -9,6 +9,61 @@
 
 ---
 
+## [0.6.0-alpha.10] — 2026-08-30
+
+**OpenStreetMap の実在滑走路を、配布ライセンスと実行時依存を分けたまま飛べるようになった。**
+（#21 完了）
+
+### 追加 — OSM 滑走路パイプライン
+
+```bash
+cargo run -p flightsim-tilegen --bin flightsim-airportgen -- \
+  --input data/region.osm.pbf --output data/region.fsairports
+
+cargo run -p flightsim-app --release -- \
+  --tiles data/tiles --airports data/region.fsairports --start 35.55,139.78
+```
+
+- `flightsim-airportgen` が `aeroway=runway` の中心線 way と依存 node を読み、
+  OSM way ID 順の決定論的な実行時 DB を作る。`area=yes`・閉じた面形状・
+  端点欠落・不正座標・縮退形状は理由別に数えて除外する
+- `width` は数値、`m`、`ft` を扱い、欠落・不正時は 45 m の fallback を使った件数を
+  報告する
+- 入力 PBF と出力先が同じ実ファイル（symlink・hard link を含む）なら変換前に拒否する。
+  DB は同じディレクトリの一時ファイルへ完全書き込み・同期してから原子的に置換する
+- `.fsairports` FSAP v1 を追加。24 bytes の版付き header と 48 bytes の固定長 record、
+  FNV-1a checksum を持ち、未知版・フラグ・長さ・末尾データ・幾何の破損を panic なしで拒否する
+- 外部 DB は 24-byte header を先に検査し、最大 1,000,000 record の宣言 payload と
+  末尾確認用 1 byte だけを読む。巨大な誤入力を形式判定前に全読込しない
+- `--airports` で DB を読み、開始地点から滑走路中心までの ECEF 距離が最小の 1 本を
+  選ぶ。同距離は OSM way ID で決まる
+- `--start` / `--heading` を明示しなければ、選んだ滑走路上の離陸開始点と方位から開始する。
+  開始・進入・描画・灯火・着陸評価は同じ `ActiveRunway` を共有する
+- OSM DB から滑走路を実際に選んだ場合だけ、右下に
+  `Airport data: (c) OpenStreetMap contributors (ODbL)` を常時表示する。元 PBF と派生 DB は
+  リポジトリ・prerelease に同梱しない
+
+### 修正
+
+- 値を省略した `--approach` や値の欠けた option が、直後の `--airports` などを値として
+  飲み込まないようにした
+- `--approach` の不正な値を暗黙の 1 NM とせず、診断を表示して無効化する
+- 150 m より短い滑走路でも、離陸開始点が反対端の外へ出ないよう全長の半分までに制限した
+- OSM 未使用時は右下の飛行記録を従来の位置から動かさず、帰属表示中だけ 1 行上へ退避させる
+
+### 設計と検証
+
+- [ADR-0008](docs/adr/0008-osm-airport-data.md) で、PBF をオフライン変換する境界、FSAP v1、
+  最寄り選択、ODbL の帰属と非同梱方針を記録
+- 実際の Haneda 地域 PBF で 9 本を 456 bytes に変換。2 回の出力 SHA-256 が一致し、
+  実滑走路上の開始と帰属表示をスクリーンショットで目視確認
+- レビュー中に Copernicus DEM GLO-30 の鉛直基準が EGM2008 で、現在の tilegen が
+  WGS84 楕円体高へ変換していない既存課題を発見。[Issue #22](../../issues/22) へ分離した
+- PBF parser は sandbox ではないため信頼できる提供元の入力に限定し、破損入力の
+  hardening は [Issue #23](../../issues/23) へ分離した
+
+---
+
 ## [0.6.0-alpha.9] — 2026-08-30
 
 **雲と雲中視程が加わり、夜の計器盤も読めるようになった。**（#3・#11 完了）
@@ -998,7 +1053,8 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.10...HEAD
+[0.6.0-alpha.10]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...v0.6.0-alpha.10
 [0.6.0-alpha.9]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.8...v0.6.0-alpha.9
 [0.6.0-alpha.8]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.7...v0.6.0-alpha.8
 [0.6.0-alpha.7]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.6...v0.6.0-alpha.7

@@ -1,7 +1,7 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-30（v0.6.0-alpha.9 = 計器照明・雲と視程。alpha.8 は計器盤まで）
+更新: 2026-08-30（v0.6.0-alpha.10 = OSM 滑走路。alpha.9 は計器照明・雲と視程）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
@@ -15,14 +15,21 @@
 
 **M2 達成、M3 を実装中。ゲームとして一周し、雲中の計器飛行も練習できる。**
 引数なしで起動すると合成飛行場の滑走路中心線上から始まり、離陸して戻って
-降りると着陸が 5 段階で評価される。
+降りると着陸が 5 段階で評価される。地域 OSM PBF をオフライン変換すれば、
+開始地点に最も近い実在滑走路で同じループを飛べる。
 
 ```bash
 # タイルが無ければ先に焼く（実 DEM は要らない。合成地形で動く）
 cargo run -p flightsim-tilegen --example synthetic_dem -- data/synthetic.tif
 cargo run -p flightsim-tilegen -- --input data/synthetic.tif --output data/tiles     --min-level 8 --max-level 12
 
+# 実滑走路（信頼できる提供元の PBF を利用者が用意。同梱しない）
+cargo run -p flightsim-tilegen --bin flightsim-airportgen -- \
+  --input data/region.osm.pbf --output data/region.fsairports
+
 cargo run -p flightsim-app --release -- --tiles data/tiles              # 滑走路から
+cargo run -p flightsim-app --release -- --tiles data/tiles \
+  --airports data/region.fsairports --start 35.55,139.78                 # 最寄りの OSM 滑走路
 cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 着陸練習
 cargo run -p flightsim-app --release -- --tiles data/tiles \
   --cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300
@@ -36,6 +43,7 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 乱流 | `--turbulence light\|moderate\|severe` |
 | 時刻・太陽位置 | `--time 05:30`（地方平均太陽時）、`--time-rate 60`、実行中は `,` `.` |
 | 雲量・雲層・雲中視程 | `--cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300` |
+| OSM の最寄り滑走路 | PBF を `flightsim-airportgen` で焼き、`--airports <FILE>` |
 | チュートリアル導線 | 既定で出る。`H` で消せる |
 | ゲームパッド | 繋げば自動。キーボードと**軸ごとに**共存 |
 | 検証用: 空中から落として評価表示を通す | `--drop 15` |
@@ -71,9 +79,10 @@ CI が検査しないが、レビューで落とす規約:
 ## 3. 次のタスク
 
 M1（ヘッドレスで妥当に飛ぶ）と M2（1 空港周辺で離陸→旋回→着陸）は達成済み。
-**いま M3 の途中。** 雲と雲中視程（[Issue #11](../../../issues/11)）は完了し、
-次は OSM 空港が第一候補だが、
-ODbL の帰属表示を含む判断が要る。継続課題は [ROADMAP](ROADMAP.md) に記録している。
+**いま M3 の途中。** 雲と雲中視程（[Issue #11](../../../issues/11)）と、
+OSM 滑走路の取り込み（[Issue #21](../../../issues/21)）は完了。空港データの次段は
+taxiway の取り込み・描画で、完了まで M3 の空港項目は閉じない。
+継続課題は [ROADMAP](ROADMAP.md) に記録している。
 
 ### TASK-A: 計器盤（`flightsim-ui`）— 完了
 
@@ -94,16 +103,28 @@ ODbL の帰属表示を含む判断が要る。継続課題は [ROADMAP](ROADMAP
   大気散乱の `ClearColor` は変えない
 - これは計器飛行を成立させる最小実装。高品質なボリューム雲と METAR は後続
 
-### TASK-B: 空港データ（`flightsim-world`）— 未着手
+### TASK-B: 空港データ — 滑走路完了、taxiway 残り
 
-現状の滑走路は `Runway::synthetic()` ひとつだけの合成フィクスチャ。
-OSM の `aeroway=runway` から実空港を取り込めば、飛べる場所が一気に増える。
+2026-08-30、[Issue #21](../../../issues/21) で `aeroway=runway` 中心線まで完了。
 
-- **取り込んだら `ATTRIBUTION.md` に帰属表示を足すこと**（OSM は ODbL）。
-  `Runway::synthetic()` は合成なので帰属不要、と `airport.rs` に明記してある
-- `flightsim-tilegen` と同じくオフライン CLI で焼くのが素直
-- 複数滑走路になると `ActiveRunway`（app のリソース）の選び方が要る。
-  「いちばん近い滑走路」で足りるはず
+- `flightsim-airportgen` が地域 `.osm.pbf` をオフラインで `.fsairports`（FSAP v1）へ焼く。
+  生 PBF と派生 DB は同梱しない（[ADR-0008](adr/0008-osm-airport-data.md)）
+- 中心線 way の先頭・末尾 node から方位と長さを作り、幅は `m` / `ft` を読む。
+  幅欠落・不正は 45 m、面形状・端点欠落・縮退は理由別に除外する
+- 入力 PBF と出力 DB が同じ実ファイルなら hard link 経由でも変換前に拒否する。
+  出力は同じディレクトリで完全に書いて同期した一時ファイルから原子的に置換する
+- FSAP reader は 24-byte header を先に検査し、宣言 payload は最大 1,000,000 record、
+  末尾は 1 byte だけ読む。巨大な誤入力を magic 判定前に全読込しない
+- app は `--start` から ECEF 中心距離が最小の 1 本を選び、開始・進入・描画・
+  灯火・着陸評価で共有する。`--start` 省略時は選んだ滑走路上へ自動配置する
+- OSM 滑走路を実際に選んだ場合だけ、画面右下に ASCII の帰属を表示する。
+  詳細は `ATTRIBUTION.md`
+- Haneda の実 PBF は 9 本 / 456 bytes、2 回の SHA-256 一致。実滑走路と帰属表示を
+  `--screenshot` で目視済み
+
+**次は taxiway。** FSAP v1 は滑走路の固定長 record のみなので、折れ線と可変長属性を
+入れるなら版 2 または別テーブルを判断する。`surface`・灯火・空港名・滑走路 `ref`・
+建物も未実装。
 
 ### TASK-C: 難易度設定 — 未着手
 
@@ -123,6 +144,11 @@ OSM の `aeroway=runway` から実空港を取り込めば、飛べる場所が�
   ILS・航法データ・認証されたautolandではない
 - 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整（[Issue #5](../../../issues/5)）
 - 実 Copernicus DEM を使った夜間・高高度の見え方は未確認（[Issue #6](../../../issues/6)）
+- Copernicus DEM GLO-30 は EGM2008 標高だが、tilegen は WGS84 楕円体高へ
+  変換せず格納している。地形・接地・滑走路は局所的に揃うが、絶対高度に
+  ジオイド高相当の系統誤差が残る（[Issue #22](../../../issues/22)）
+- `osmpbf 0.3.7` は細工・破損 PBF の全経路を panic-free にしない。入力は信頼できる
+  提供元に限り、parser hardening は [Issue #23](../../../issues/23) で追跡する
 - CI の起動スモークは Mesa/lavapipe の CPU Vulkan で同梱 glTF と 1 枚の描画を
   確認する（[Issue #8](../../../issues/8)）。Windows zip もクリーンな展開先から
   D3D12 フォールバックで検査するが、実 GPU、ベンダードライバ、性能は保証しない
@@ -258,7 +284,8 @@ ref が変わっていないことを確認し、PR コードを checkout せず
   実データが無い場所ほど細分化されるという逆転が起きる。
   当面は `--bounds` で被覆内に限定する。将来はフェザリングか低被覆タイルの除外
 - ダウンロード機能は無い。GeoTIFF は手元に用意する
-- 標高のみ。OSM（空港・建物）と地表画像は未対応
+- このタスク完了時点では標高のみだった。現在は OSM 滑走路に対応済みだが、
+  taxiway・空港建物と地表画像は未対応
 
 ### TASK-3: ヘッドレス統合ランナー — 完了
 
@@ -573,6 +600,10 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   cargo clippy --workspace --all-targets -- -D warnings
   cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
     -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --all-targets
+  cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --doc
+  cargo bench -p flightsim-core -p flightsim-fdm -p flightsim-world \
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --no-run
   cargo test -j 2 -p flightsim-render -p flightsim-input \
     -p flightsim-ui -p flightsim-app --all-targets
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
@@ -585,6 +616,6 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 
 エージェント別の詳細な指示は [.claude/agents/](../.claude/agents/) にある。
 TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 と M2 の Bevy 統合は完了。
-現在は M3。TASK-A（計器盤）と雲・雲中視程は完了し、次は TASK-B（OSM 空港）が
-第一候補。TASK-C（難易度設定）が続く。結線を触る場合は `flightsim-sim` の
-公開 API を先に読むこと。
+現在は M3。TASK-A（計器盤）、雲・雲中視程、TASK-B の OSM 滑走路まで完了。
+次は TASK-B の taxiway 取り込み・描画が第一候補で、TASK-C（難易度設定）が続く。
+結線を触る場合は `flightsim-sim` の公開 API を先に読むこと。

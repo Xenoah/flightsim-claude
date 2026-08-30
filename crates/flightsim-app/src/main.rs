@@ -559,16 +559,17 @@ fn parse_arguments_from(
                 }
             },
             // 着陸練習。`--approach` だけなら 1 海里、値を付ければその距離。
-            "--approach" => {
-                let distance = next_argument_value(&mut arguments)
-                    .and_then(|text| text.parse::<f64>().ok())
-                    .unwrap_or(1.0);
-                if distance.is_finite() && distance > 0.0 {
-                    startup.approach = Some(distance);
-                } else {
-                    notes.push(format!("--approach expects miles out, got `{distance}`"));
-                }
-            }
+            "--approach" => match next_argument_value(&mut arguments) {
+                None => startup.approach = Some(1.0),
+                Some(text) => match text.parse::<f64>() {
+                    Ok(distance) if distance.is_finite() && distance > 0.0 => {
+                        startup.approach = Some(distance);
+                    }
+                    _ => {
+                        notes.push(format!("--approach expects miles out, got `{text}`"));
+                    }
+                },
+            },
             "--drop" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value > 0.0 => startup.drop_height = Some(value),
@@ -1645,6 +1646,17 @@ mod tests {
             Some(std::path::Path::new("data/tokyo.fsairports"))
         );
         assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn malformed_approach_distance_is_reported_instead_of_enabling_one_mile() {
+        for value in ["far", "0", "-1", "NaN", "inf"] {
+            let (startup, notes) = parse(&["--approach", value]);
+
+            assert_eq!(startup.approach, None, "{value}");
+            assert_eq!(notes.len(), 1, "{value}: {notes:?}");
+            assert!(notes[0].contains(value), "{value}: {notes:?}");
+        }
     }
 
     #[test]

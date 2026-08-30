@@ -78,8 +78,9 @@ cargo run -p flightsim-fdm --example aero_trace   # 空力の内訳を時系列�
 
 cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif     --output data/tiles --min-level 8 --max-level 12
 
+# 信頼できる提供元の地域 PBF を data/ に置く（parser は sandbox ではない）
 cargo run -p flightsim-tilegen --bin flightsim-airportgen -- \
-    --input japan-latest.osm.pbf --output data/japan.fsairports
+    --input data/japan-latest.osm.pbf --output data/japan.fsairports
 
 cargo run -p flightsim-sim --bin flightsim-headless --     --tiles data/tiles --start 35.553,139.781 --output flight.csv
 
