@@ -16,6 +16,10 @@
 //!
 //! # タイルが無ければ海面 0 m の上を飛ぶ
 //! cargo run -p flightsim-app --release
+//!
+//! # 雲量 60%、雲底 900 m、雲頂 1700 m（雲中視程 250 m）
+//! cargo run -p flightsim-app --release -- \
+//!     --cloud-cover 0.6 --cloud-base 900 --cloud-top 1700 --cloud-visibility 250
 //! ```
 
 #![allow(
@@ -32,8 +36,8 @@ use flightsim_core::{Degrees, Geodetic, Meters, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
 use flightsim_input::{CameraRig, FlightsimInputPlugin, PilotControls, ViewMode};
 use flightsim_render::{
-    CameraWorldPosition, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin, RenderSet,
-    SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
+    CameraWorldPosition, CloudLayer, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin,
+    RenderSet, SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
     extents_in_model_space,
     terrain::{TerrainTile, despawn_tile, spawn_tile},
     update_terrain_selection,
@@ -116,6 +120,8 @@ struct Startup {
     start_hour: Option<(u8, u8)>,
     /// 時間加速の倍率。
     time_rate: f64,
+    /// 描画する雲レイヤー。既定は快晴（雲量 0）。
+    clouds: CloudLayer,
     /// 指定すると、地面から この高さ（m）の空中に静止 spawn する。
     ///
     /// **着陸評価の結線を実際に確かめるための開発用。** 落下して接地する
@@ -158,6 +164,7 @@ impl Default for Startup {
             turbulence: flightsim_fdm::Turbulence::CALM,
             start_hour: None,
             time_rate: 1.0,
+            clouds: CloudLayer::default(),
             drop_height: None,
             approach: None,
             assets: None,
@@ -232,6 +239,7 @@ fn main() {
         clock.rate = flightsim_render::TimeRate(startup.time_rate);
         clock
     };
+    let clouds = startup.clouds;
 
     App::new()
         .add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
@@ -247,6 +255,7 @@ fn main() {
             FlightsimUiPlugin,
         ))
         .insert_resource(clock)
+        .insert_resource(clouds)
         .insert_resource(startup)
         .insert_resource(diagnostics)
         .init_resource::<CameraRig>()
@@ -285,8 +294,22 @@ fn main() {
 /// **指摘は `warn!` せず溜めて返す。** この関数は `LogPlugin` より前に走るので、
 /// ここで出しても購読者が居らず何も表示されない（[`StartupDiagnostics`]）。
 fn parse_arguments() -> (Startup, StartupDiagnostics) {
+    parse_arguments_from(std::env::args().skip(1))
+}
+
+/// 引数列を解釈する。テストから実プロセスの引数を差し替えられる入口。
+fn parse_arguments_from(
+    arguments: impl IntoIterator<Item = String>,
+) -> (Startup, StartupDiagnostics) {
     let mut startup = Startup::default();
     let mut notes = Vec::new();
+
+    // 雲の値は順不同で指定できるよう、全部読んでから組として検証する。
+    let mut cloud_cover = startup.clouds.cover;
+    let mut cloud_base = startup.clouds.base;
+    let mut cloud_top = startup.clouds.top;
+    let mut cloud_visibility = startup.clouds.visibility;
+    let mut cloud_arguments_valid = true;
 
     // モデル関連は最後にまとめて決める。**軸の既定が「どのモデルか」で変わる**ため、
     // 引数を読んだ順に確定させられない。
@@ -295,7 +318,7 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
     let mut forward = None;
     let mut up = None;
 
-    let mut arguments = std::env::args().skip(1);
+    let mut arguments = arguments.into_iter();
 
     while let Some(flag) = arguments.next() {
         match flag.as_str() {
@@ -405,6 +428,64 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
                 },
                 None => notes.push("--time-rate needs a multiplier".to_owned()),
             },
+            "--cloud-cover" => match arguments.next() {
+                Some(text) => match text.parse::<f32>() {
+                    Ok(value) => cloud_cover = value,
+                    Err(_) => {
+                        cloud_arguments_valid = false;
+                        notes.push(format!(
+                            "--cloud-cover expects a number from 0 to 1, got `{text}`"
+                        ));
+                    }
+                },
+                None => {
+                    cloud_arguments_valid = false;
+                    notes.push("--cloud-cover needs a value from 0 to 1".to_owned());
+                }
+            },
+            "--cloud-base" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) => cloud_base = Meters(value),
+                    Err(_) => {
+                        cloud_arguments_valid = false;
+                        notes.push(format!(
+                            "--cloud-base expects an ellipsoid height in metres, got `{text}`"
+                        ));
+                    }
+                },
+                None => {
+                    cloud_arguments_valid = false;
+                    notes.push("--cloud-base needs a height in metres".to_owned());
+                }
+            },
+            "--cloud-top" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) => cloud_top = Meters(value),
+                    Err(_) => {
+                        cloud_arguments_valid = false;
+                        notes.push(format!(
+                            "--cloud-top expects an ellipsoid height in metres, got `{text}`"
+                        ));
+                    }
+                },
+                None => {
+                    cloud_arguments_valid = false;
+                    notes.push("--cloud-top needs a height in metres".to_owned());
+                }
+            },
+            "--cloud-visibility" => match arguments.next() {
+                Some(text) => match text.parse::<f64>() {
+                    Ok(value) => cloud_visibility = Meters(value),
+                    Err(_) => {
+                        cloud_arguments_valid = false;
+                        notes.push(format!("--cloud-visibility expects metres, got `{text}`"))
+                    }
+                },
+                None => {
+                    cloud_arguments_valid = false;
+                    notes.push("--cloud-visibility needs a distance in metres".to_owned());
+                }
+            },
             // 着陸練習。`--approach` だけなら 1 海里、値を付ければその距離。
             "--approach" => {
                 let distance = arguments
@@ -445,6 +526,17 @@ fn parse_arguments() -> (Startup, StartupDiagnostics) {
     let (model, fit) = resolve_model(requested_model, placeholder, forward, up, &mut notes);
     startup.model = model;
     startup.model_fit = fit;
+
+    if cloud_arguments_valid {
+        match CloudLayer::try_new(cloud_cover, cloud_base, cloud_top, cloud_visibility, 1) {
+            Ok(clouds) => startup.clouds = clouds,
+            Err(error) => notes.push(format!(
+                "invalid cloud layer ({error}); using the clear default"
+            )),
+        }
+    } else {
+        notes.push("invalid cloud arguments; using the clear default".to_owned());
+    }
 
     (startup, StartupDiagnostics(notes))
 }
@@ -1337,6 +1429,99 @@ fn publish_hud(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(args: &[&str]) -> (Startup, Vec<String>) {
+        let (startup, diagnostics) =
+            parse_arguments_from(args.iter().map(|argument| (*argument).to_owned()));
+        (startup, diagnostics.0)
+    }
+
+    // --- 雲の CLI ---
+
+    #[test]
+    fn clouds_default_to_clear_without_changing_the_existing_scene() {
+        let (startup, notes) = parse(&[]);
+        assert_eq!(startup.clouds.cover.to_bits(), 0.0_f32.to_bits());
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn cloud_cover_base_top_and_visibility_can_be_set_in_any_order() {
+        let (startup, notes) = parse(&[
+            "--cloud-top",
+            "1700",
+            "--cloud-visibility",
+            "250",
+            "--cloud-cover",
+            "0.65",
+            "--cloud-base",
+            "900",
+        ]);
+
+        assert_eq!(startup.clouds.cover.to_bits(), 0.65_f32.to_bits());
+        assert_eq!(startup.clouds.base, Meters(900.0));
+        assert_eq!(startup.clouds.top, Meters(1_700.0));
+        assert_eq!(startup.clouds.visibility, Meters(250.0));
+        assert_eq!(startup.clouds.seed, 1);
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn both_cloud_cover_boundaries_are_accepted() {
+        for cover in ["0", "1"] {
+            let (startup, notes) = parse(&["--cloud-cover", cover]);
+            assert_eq!(
+                startup.clouds.cover.to_bits(),
+                cover.parse::<f32>().unwrap().to_bits()
+            );
+            assert!(notes.is_empty(), "{cover}: {notes:?}");
+        }
+    }
+
+    #[test]
+    fn invalid_cloud_layers_fall_back_to_clear_and_explain_why() {
+        for args in [
+            &["--cloud-cover", "1.01"][..],
+            &["--cloud-cover", "NaN"][..],
+            &["--cloud-base", "1700", "--cloud-top", "900"][..],
+            &["--cloud-base", "-1"][..],
+            &["--cloud-visibility", "0"][..],
+        ] {
+            let (startup, notes) = parse(args);
+            assert_eq!(
+                startup.clouds.cover.to_bits(),
+                CloudLayer::default().cover.to_bits(),
+                "{args:?}"
+            );
+            assert!(
+                notes
+                    .iter()
+                    .any(|note| note.contains("invalid cloud layer")),
+                "{args:?}: {notes:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_cloud_arguments_make_the_whole_layer_clear() {
+        for args in [
+            &["--cloud-cover", "0.5", "--cloud-base", "nope"][..],
+            &["--cloud-cover", "0.5", "--cloud-visibility"][..],
+        ] {
+            let (startup, notes) = parse(args);
+            assert_eq!(
+                startup.clouds.cover.to_bits(),
+                CloudLayer::default().cover.to_bits(),
+                "{args:?}"
+            );
+            assert!(
+                notes
+                    .iter()
+                    .any(|note| note.contains("using the clear default")),
+                "{args:?}: {notes:?}"
+            );
+        }
+    }
 
     // --- モデルと軸の決め方 ---
 

@@ -9,9 +9,30 @@
 
 ---
 
-## [0.6.0-alpha.8] — 2026-08-30
+## [0.6.0-alpha.9] — 2026-08-30
 
-**コックピット視点に計器盤が出て、夜は照明で読めるようになった。**（#3 完了）
+**雲と雲中視程が加わり、夜の計器盤も読めるようになった。**（#3・#11 完了）
+
+### 追加 — 雲と視程
+
+```bash
+cargo run -p flightsim-app --release -- --tiles data/tiles \
+    --cloud-cover 0.65 --cloud-base 900 --cloud-top 1700 --cloud-visibility 250
+```
+
+- 雲量（0〜1）、楕円体高での雲底・雲頂、雲中視程を CLI から設定できる。
+  既定は快晴なので、従来の画面は変わらない
+- 雲模様は固定 seed の周期的な 2D value noise / fBm。緯度・経度と時刻から
+  局所密度を求めるため、同じ状態は同じ見た目になり、リプレイを壊さない
+- 雲底と雲頂を 2 枚の PBR マスク面で描く。unlit や自己発光にはせず、
+  太陽と環境光に追従するので夜の雲だけが明るく浮かない
+- 雲中ではカメラの距離フォグを使い、指定視程でコントラストが 5% になる
+  Koschmieder 則（`beta = -ln(0.05) / visibility`）から減衰係数を決める
+- 大気散乱の背景として効く `ClearColor` は変更しない。夜空が明るく戻る
+  既知の回帰を避ける
+
+設定は有限値、雲量の範囲、雲底 0 m 以上、雲頂が雲底より上、視程が正で
+あることをまとめて検証し、不正なら理由を表示して快晴へ戻す。
 
 ### 追加 — 計器の照明
 
@@ -27,7 +48,18 @@
 
 実測: 盤面の平均 RGB が昼 (55, 53, 50) から夜 (44, 34, 22) へ橙寄りに変わる。
 
-### 追加 — 計器盤
+### 検証
+
+雲の純関数では設定境界、同一 seed のビット一致、雲量に対する被覆の単調性、
+層の外ではフォグが消えること、指定視程で 5% へ減衰することを固定する。
+描画は `--screenshot` で昼夜それぞれの雲底下・雲中・雲頂上を比較し、
+雲中の視程低下、層を抜けたときの視界、夜に自己発光しないことを目で確かめる。
+
+---
+
+## [0.6.0-alpha.8] — 2026-08-30
+
+**コックピット視点に計器盤が出るようになった。**（#3 の残り）
 
 ### 追加 — 計器盤
 
@@ -966,8 +998,12 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.5...HEAD
-[0.6.0-alpha.5]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.4...v0.6.0-alpha.5
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...HEAD
+[0.6.0-alpha.9]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.8...v0.6.0-alpha.9
+[0.6.0-alpha.8]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.7...v0.6.0-alpha.8
+[0.6.0-alpha.7]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.6...v0.6.0-alpha.7
+[0.6.0-alpha.6]: https://github.com/Xenoah/flightsim-claude/compare/8927f129e842624fc67e44c2ab4eb625c6f50bf3...v0.6.0-alpha.6
+[0.6.0-alpha.5]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.4...8927f129e842624fc67e44c2ab4eb625c6f50bf3
 [0.6.0-alpha.4]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.3...v0.6.0-alpha.4
 [0.6.0-alpha.3]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.2...v0.6.0-alpha.3
 [0.6.0-alpha.2]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.1...v0.6.0-alpha.2

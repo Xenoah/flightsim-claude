@@ -2,8 +2,9 @@
 
 地球規模のフライトシミュレータ。Rust + Bevy、Windows 対象。
 
-**M2（離陸→場周→着陸のゲームループ）を達成し、M3 を実装中です。** 実地形・機体・
-滑走路・時刻・風・乱流が描画され、着陸練習と 5 段階評価まで遊べます。検証済みの範囲と
+**M2（離陸→場周→着陸のゲームループ）を達成し、M3 を実装中です。**
+実地形・機体・滑走路・時刻・風・乱流・雲層が描画され、着陸練習と 5 段階評価まで
+遊べます。検証済みの範囲と
 未検証事項は [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
 
 ---
@@ -55,6 +56,9 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
 - **時刻と太陽位置** — `--time 05:30`（地方平均太陽時）と `--time-rate 60`。
   天文計算（Meeus / NOAA と同じ低精度式）で日の出・南中・日没が正しい位置に来る。
   夏至の東京の南中高度 77.75°、分点の日の出は真東、極の白夜と極夜まで一致する
+- **決定論的な雲層と雲中視程** — 雲量は `--cloud-cover`（0〜1）、雲底・雲頂は
+  `--cloud-base` / `--cloud-top`（楕円体高 m）、雲中視程は `--cloud-visibility`（m）で
+  指定する。同じ設定なら同じ雲場になり、雲へ入ると外が見えにくくなる。既定は快晴
 
 | ゲームパッド | 機能 |
 |---|---|
@@ -72,19 +76,22 @@ cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_
 
 cargo run -p flightsim-sim --bin flightsim-headless --     --tiles data/tiles --start 35.553,139.781 --output flight.csv
 
+cargo run -p flightsim-app --release -- --tiles data/tiles \
+    --cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300
+
 cargo bench --workspace                           # 性能測定（criterion）
 ```
 
 ### Windows で起動する
 
-`v0.6.0-alpha.5` 以降の [Releases](https://github.com/Xenoah/flightsim-claude/releases) には
+`v0.6.0-alpha.6` 以降の [Releases](https://github.com/Xenoah/flightsim-claude/releases) には
 `flightsim-claude-v<version>-windows-x86_64.zip` が付きます。展開後、`assets/` を
 `flightsim-app.exe` と同じフォルダに置いたまま実行してください。これは開発途中の
 prerelease です。
 
 ## 未実装・未検証
 
-- コックピット内装（内装モデル）、OSM 空港データ、METAR・視程、雲、難易度設定
+- コックピット内装（内装モデル）、OSM 空港データ、METAR、高品質なボリューム雲、難易度設定
 - HOTAS と軸の再割り当て、追加機体、リプレイ、ライブ交通、オンライン共有ワールド
 - ゲームパッドは変換ロジックとキーボード共存を自動テスト済みですが、実機での符号・
   感度確認は未実施
