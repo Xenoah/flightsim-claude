@@ -336,6 +336,37 @@ mod tests {
     }
 
     #[test]
+    fn each_node_keeps_its_own_surface_elevation() {
+        let points = [
+            Geodetic::from_degrees(35.5480, 139.7750, 5.0),
+            Geodetic::from_degrees(35.5490, 139.7760, 25.0),
+        ];
+        let (mesh, origin) = taxiway_mesh(&points, Meters(20.0)).expect("valid sloping taxiway");
+        let positions = match mesh.attribute(Mesh::ATTRIBUTE_POSITION) {
+            Some(bevy::mesh::VertexAttributeValues::Float32x3(values)) => values,
+            _ => panic!("positions must be f32x3"),
+        };
+        let altitude = |index: usize| {
+            let relative = positions[index];
+            Ecef::from_vec(
+                origin.as_vec()
+                    + DVec3::new(
+                        f64::from(relative[0]),
+                        f64::from(relative[1]),
+                        f64::from(relative[2]),
+                    ),
+            )
+            .to_geodetic()
+            .altitude
+            .get()
+        };
+
+        // 最初の pavement quad は near-left, near-right, far-right, far-left の順。
+        assert!((altitude(0) - 5.06).abs() < 0.02);
+        assert!((altitude(2) - 25.06).abs() < 0.02);
+    }
+
+    #[test]
     fn centreline_uses_linear_yellow() {
         let (mesh, _) = taxiway_mesh(&sample(), Meters(20.0)).expect("valid taxiway");
         let colors = match mesh.attribute(Mesh::ATTRIBUTE_COLOR) {

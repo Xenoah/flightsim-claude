@@ -5,8 +5,10 @@
 //! `flightsim-world` が検証して読む固定長形式へ焼く。
 
 use flightsim_core::{Feet, Geodetic, Meters};
-use flightsim_world::{AirportDatabase, AirportRunway, AirportTaxiway};
+use flightsim_world::airport::io::MAX_RECORD_COUNT;
+use flightsim_world::{AirportDatabase, AirportRunway, AirportTaxiway, TaxiwayGeometryError};
 use osmpbf::{Element, IndexedReader};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::Write;
@@ -82,6 +84,20 @@ pub enum AirportGenError {
         /// `osmpbf` が返した詳細。
         message: String,
     },
+    /// FSAP へ書く候補レコード数が runtime safe limit を超えた。
+    RecordLimitExceeded {
+        /// 上限を超えると判明した時点の候補レコード数。
+        attempted: usize,
+        /// FSAP reader / writer と共有する上限。
+        maximum: u32,
+    },
+    /// 変換処理が所有する collection のメモリを確保できなかった。
+    AllocationFailed {
+        /// 確保しようとしたデータの用途。
+        context: &'static str,
+        /// 確保しようとした capacity（collection の要素数または文字列の byte 数）。
+        requested: usize,
+    },
     /// 変換後のレコード集合が DB の不変条件を満たさなかった。
     BuildDatabase {
         /// `flightsim-world` が返した詳細。
@@ -118,6 +134,14 @@ impl fmt::Display for AirportGenError {
             Self::ReadPbf { path, message } => {
                 write!(f, "failed to read OSM PBF {}: {message}", path.display())
             }
+            Self::RecordLimitExceeded { attempted, maximum } => write!(
+                f,
+                "airport conversion encountered {attempted} candidate FSAP records; the safe runtime limit is {maximum}"
+            ),
+            Self::AllocationFailed { context, requested } => write!(
+                f,
+                "could not reserve capacity {requested} for airport conversion {context}"
+            ),
             Self::BuildDatabase { message } => {
                 write!(f, "failed to build airport database: {message}")
             }
@@ -139,9 +163,10 @@ impl std::error::Error for AirportGenError {}
 ///
 /// # Errors
 ///
-/// 入出力が同じファイルを指す場合、PBF を読めない場合、変換後の DB を構築できない
-/// 場合、または出力を書けない場合に [`AirportGenError`] を返す。個々の不正 way は
-/// エラーで全体を止めず、理由別に数えて [`AirportGenerationReport`] で報告する。
+/// 入出力が同じファイルを指す場合、PBF を読めない場合、候補レコード数が安全上限を
+/// 超える場合、変換用 collection を確保できない場合、変換後の DB を構築できない場合、
+/// または出力を書けない場合に [`AirportGenError`] を返す。個々の不正 way はエラーで
+/// 全体を止めず、理由別に数えて [`AirportGenerationReport`] で報告する。
 pub fn generate_airport_database(
     input: &Path,
     output: &Path,
@@ -152,9 +177,9 @@ pub fn generate_airport_database(
         extraction.runway_candidates,
         &extraction.nodes,
         extraction.report,
-    );
+    )?;
     let (taxiways, mut report) =
-        convert_taxiway_candidates(extraction.taxiway_candidates, &extraction.nodes, report);
+        convert_taxiway_candidates(extraction.taxiway_candidates, &extraction.nodes, report)?;
 
     let database = AirportDatabase::with_taxiways(runways, taxiways).map_err(|error| {
         AirportGenError::BuildDatabase {
@@ -270,6 +295,70 @@ struct PbfExtraction {
     report: AirportGenerationReport,
 }
 
+fn add_candidate_records(total: &mut usize, additional: usize) -> Result<(), AirportGenError> {
+    let attempted = total
+        .checked_add(additional)
+        .ok_or(AirportGenError::RecordLimitExceeded {
+            attempted: usize::MAX,
+            maximum: MAX_RECORD_COUNT,
+        })?;
+    if attempted > MAX_RECORD_COUNT as usize {
+        return Err(AirportGenError::RecordLimitExceeded {
+            attempted,
+            maximum: MAX_RECORD_COUNT,
+        });
+    }
+    *total = attempted;
+    Ok(())
+}
+
+fn copy_optional_tag(
+    value: Option<&str>,
+    context: &'static str,
+) -> Result<Option<String>, AirportGenError> {
+    value
+        .map(|value| {
+            let mut owned = String::new();
+            owned.try_reserve_exact(value.len()).map_err(|_| {
+                AirportGenError::AllocationFailed {
+                    context,
+                    requested: value.len(),
+                }
+            })?;
+            owned.push_str(value);
+            Ok(owned)
+        })
+        .transpose()
+}
+
+fn reserve_candidate<T>(
+    candidates: &mut Vec<T>,
+    context: &'static str,
+) -> Result<(), AirportGenError> {
+    let requested = candidates.len().saturating_add(1);
+    candidates
+        .try_reserve(1)
+        .map_err(|_| AirportGenError::AllocationFailed { context, requested })
+}
+
+fn insert_node(
+    nodes: &mut HashMap<i64, NodeCoordinate>,
+    node_id: i64,
+    coordinate: NodeCoordinate,
+) -> Result<(), AirportGenError> {
+    if !nodes.contains_key(&node_id) {
+        let requested = nodes.len().saturating_add(1);
+        nodes
+            .try_reserve(1)
+            .map_err(|_| AirportGenError::AllocationFailed {
+                context: "node lookup",
+                requested,
+            })?;
+    }
+    nodes.insert(node_id, coordinate);
+    Ok(())
+}
+
 fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
     let mut reader = IndexedReader::from_path(path).map_err(|error| AirportGenError::ReadPbf {
         path: path.to_path_buf(),
@@ -280,76 +369,146 @@ fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
     let mut taxiway_candidates = Vec::new();
     let mut nodes = HashMap::new();
     let mut report = AirportGenerationReport::default();
+    let mut candidate_records = 0_usize;
+    let halted = Cell::new(false);
+    let mut way_error = None;
+    let mut node_error = None;
 
-    reader
-        .read_ways_and_deps(
-            |way| {
-                let tags: Vec<_> = way.tags().collect();
-                let node_refs: Vec<_> = way.refs().collect();
-                match classify_way(&tags, &node_refs) {
-                    WayDisposition::Other => false,
+    let read_result = reader.read_ways_and_deps(
+        |way| {
+            if halted.get() {
+                return false;
+            }
+
+            let result = (|| {
+                let mut aeroway = None;
+                let mut area = None;
+                let mut width = None;
+                for (key, value) in way.tags() {
+                    match key {
+                        "aeroway" if aeroway.is_none() => aeroway = Some(value),
+                        "area" if area.is_none() => area = Some(value),
+                        "width" if width.is_none() => width = Some(value),
+                        _ => {}
+                    }
+                }
+                if !matches!(aeroway, Some("runway" | "taxiway")) {
+                    return Ok(false);
+                }
+
+                let node_count = way.refs().count();
+                let first_node = (aeroway == Some("runway"))
+                    .then(|| way.refs().next())
+                    .flatten();
+                let last_node = (aeroway == Some("runway"))
+                    .then(|| way.refs().last())
+                    .flatten();
+                match classify_way_parts(
+                    aeroway,
+                    area == Some("yes"),
+                    node_count,
+                    first_node,
+                    last_node,
+                ) {
+                    WayDisposition::Other => Ok(false),
                     WayDisposition::RunwayArea => {
                         report.runway_ways_seen += 1;
                         report.skipped_areas += 1;
-                        false
+                        Ok(false)
                     }
                     WayDisposition::RunwayClosed => {
                         report.runway_ways_seen += 1;
                         report.skipped_closed += 1;
-                        false
+                        Ok(false)
                     }
                     WayDisposition::RunwayCenterline => {
                         report.runway_ways_seen += 1;
+                        add_candidate_records(&mut candidate_records, 1)?;
+                        reserve_candidate(&mut runway_candidates, "runway candidates")?;
                         runway_candidates.push(RunwayCandidate {
                             source_way_id: way.id(),
-                            first_node: node_refs.first().copied(),
-                            last_node: node_refs.last().copied(),
-                            width: tag_value(&tags, "width").map(str::to_owned),
+                            first_node,
+                            last_node,
+                            width: copy_optional_tag(width, "runway width tag")?,
                         });
-                        true
+                        Ok(true)
                     }
                     WayDisposition::TaxiwayArea => {
                         report.taxiway_ways_seen += 1;
                         report.skipped_taxiway_areas += 1;
-                        false
+                        Ok(false)
+                    }
+                    WayDisposition::TaxiwayCenterline if node_count < 2 => {
+                        report.taxiway_ways_seen += 1;
+                        report.skipped_taxiway_degenerate += 1;
+                        Ok(false)
                     }
                     WayDisposition::TaxiwayCenterline => {
                         report.taxiway_ways_seen += 1;
+                        add_candidate_records(&mut candidate_records, node_count - 1)?;
+                        reserve_candidate(&mut taxiway_candidates, "taxiway candidates")?;
+                        let mut node_refs = Vec::new();
+                        node_refs.try_reserve_exact(node_count).map_err(|_| {
+                            AirportGenError::AllocationFailed {
+                                context: "taxiway node references",
+                                requested: node_count,
+                            }
+                        })?;
+                        node_refs.extend(way.refs());
                         taxiway_candidates.push(TaxiwayCandidate {
                             source_way_id: way.id(),
                             node_refs,
-                            width: tag_value(&tags, "width").map(str::to_owned),
+                            width: copy_optional_tag(width, "taxiway width tag")?,
                         });
-                        true
+                        Ok(true)
                     }
                 }
-            },
-            |element| match element {
-                Element::Node(node) => {
-                    nodes.insert(
-                        node.id(),
-                        NodeCoordinate {
-                            latitude_degrees: node.lat(),
-                            longitude_degrees: node.lon(),
-                        },
-                    );
+            })();
+            match result {
+                Ok(selected) => selected,
+                Err(error) => {
+                    way_error = Some(error);
+                    halted.set(true);
+                    false
                 }
-                Element::DenseNode(node) => {
-                    nodes.insert(
-                        node.id(),
-                        NodeCoordinate {
-                            latitude_degrees: node.lat(),
-                            longitude_degrees: node.lon(),
-                        },
-                    );
-                }
-                Element::Way(_) | Element::Relation(_) => {}
-            },
-        )
-        .map_err(|error| AirportGenError::ReadPbf {
-            path: path.to_path_buf(),
-            message: error.to_string(),
-        })?;
+            }
+        },
+        |element| {
+            if halted.get() {
+                return;
+            }
+            let result = match element {
+                Element::Node(node) => insert_node(
+                    &mut nodes,
+                    node.id(),
+                    NodeCoordinate {
+                        latitude_degrees: node.lat(),
+                        longitude_degrees: node.lon(),
+                    },
+                ),
+                Element::DenseNode(node) => insert_node(
+                    &mut nodes,
+                    node.id(),
+                    NodeCoordinate {
+                        latitude_degrees: node.lat(),
+                        longitude_degrees: node.lon(),
+                    },
+                ),
+                Element::Way(_) | Element::Relation(_) => Ok(()),
+            };
+            if let Err(error) = result {
+                node_error = Some(error);
+                halted.set(true);
+            }
+        },
+    );
+    if let Some(error) = way_error.or(node_error) {
+        return Err(error);
+    }
+    read_result.map_err(|error| AirportGenError::ReadPbf {
+        path: path.to_path_buf(),
+        message: error.to_string(),
+    })?;
 
     Ok(PbfExtraction {
         runway_candidates,
@@ -369,9 +528,24 @@ enum WayDisposition {
     TaxiwayCenterline,
 }
 
+#[cfg(test)]
 fn classify_way(tags: &[(&str, &str)], node_refs: &[i64]) -> WayDisposition {
-    let aeroway = tag_value(tags, "aeroway");
-    let is_area = tag_value(tags, "area") == Some("yes");
+    classify_way_parts(
+        tag_value(tags, "aeroway"),
+        tag_value(tags, "area") == Some("yes"),
+        node_refs.len(),
+        node_refs.first().copied(),
+        node_refs.last().copied(),
+    )
+}
+
+fn classify_way_parts(
+    aeroway: Option<&str>,
+    is_area: bool,
+    node_count: usize,
+    first_node: Option<i64>,
+    last_node: Option<i64>,
+) -> WayDisposition {
     if aeroway == Some("taxiway") {
         return if is_area {
             WayDisposition::TaxiwayArea
@@ -386,12 +560,13 @@ fn classify_way(tags: &[(&str, &str)], node_refs: &[i64]) -> WayDisposition {
         return WayDisposition::RunwayArea;
     }
     // 参照 1 個だけの壊れた way は面ではなく縮退線として後段で数える。
-    if node_refs.len() >= 2 && node_refs.first() == node_refs.last() {
+    if node_count >= 2 && first_node == last_node {
         return WayDisposition::RunwayClosed;
     }
     WayDisposition::RunwayCenterline
 }
 
+#[cfg(test)]
 fn tag_value<'a>(tags: &'a [(&'a str, &'a str)], key: &str) -> Option<&'a str> {
     tags.iter()
         .find_map(|(candidate, value)| (*candidate == key).then_some(*value))
@@ -401,9 +576,15 @@ fn convert_candidates(
     mut candidates: Vec<RunwayCandidate>,
     nodes: &HashMap<i64, NodeCoordinate>,
     mut report: AirportGenerationReport,
-) -> (Vec<AirportRunway>, AirportGenerationReport) {
+) -> Result<(Vec<AirportRunway>, AirportGenerationReport), AirportGenError> {
     candidates.sort_unstable_by_key(|candidate| candidate.source_way_id);
-    let mut runways = Vec::with_capacity(candidates.len());
+    let mut runways = Vec::new();
+    runways
+        .try_reserve_exact(candidates.len())
+        .map_err(|_| AirportGenError::AllocationFailed {
+            context: "converted runways",
+            requested: candidates.len(),
+        })?;
 
     for candidate in candidates {
         let (Some(first_node), Some(last_node)) = (candidate.first_node, candidate.last_node)
@@ -445,44 +626,69 @@ fn convert_candidates(
     }
 
     report.runways_written = runways.len();
-    (runways, report)
+    Ok((runways, report))
 }
 
 fn convert_taxiway_candidates(
     mut candidates: Vec<TaxiwayCandidate>,
     nodes: &HashMap<i64, NodeCoordinate>,
     mut report: AirportGenerationReport,
-) -> (Vec<AirportTaxiway>, AirportGenerationReport) {
+) -> Result<(Vec<AirportTaxiway>, AirportGenerationReport), AirportGenError> {
     candidates.sort_unstable_by_key(|candidate| candidate.source_way_id);
-    let mut taxiways = Vec::with_capacity(candidates.len());
+    let mut taxiways = Vec::new();
+    taxiways.try_reserve_exact(candidates.len()).map_err(|_| {
+        AirportGenError::AllocationFailed {
+            context: "converted taxiways",
+            requested: candidates.len(),
+        }
+    })?;
 
     for candidate in candidates {
         if candidate.node_refs.len() < 2 {
             report.skipped_taxiway_degenerate += 1;
             continue;
         }
-        let Some(coordinates) = candidate
+        if candidate
             .node_refs
             .iter()
-            .map(|node_id| nodes.get(node_id).copied())
-            .collect::<Option<Vec<_>>>()
-        else {
+            .any(|node_id| !nodes.contains_key(node_id))
+        {
             report.skipped_taxiway_missing_nodes += 1;
             continue;
-        };
-        if coordinates.iter().any(|coordinate| !coordinate.is_valid()) {
+        }
+        if candidate.node_refs.iter().any(|node_id| {
+            nodes
+                .get(node_id)
+                .is_none_or(|coordinate| !coordinate.is_valid())
+        }) {
             report.skipped_taxiway_bad_coordinates += 1;
             continue;
         }
         let (width, defaulted) = parse_width(candidate.width.as_deref(), DEFAULT_TAXIWAY_WIDTH);
-        let points = coordinates
-            .into_iter()
-            .map(NodeCoordinate::to_geodetic)
-            .collect();
-        let Ok(taxiway) = AirportTaxiway::from_points(candidate.source_way_id, points, width)
-        else {
-            report.skipped_taxiway_degenerate += 1;
-            continue;
+        let mut points = Vec::new();
+        points
+            .try_reserve_exact(candidate.node_refs.len())
+            .map_err(|_| AirportGenError::AllocationFailed {
+                context: "taxiway geodetic points",
+                requested: candidate.node_refs.len(),
+            })?;
+        for node_id in &candidate.node_refs {
+            if let Some(coordinate) = nodes.get(node_id) {
+                points.push(coordinate.to_geodetic());
+            }
+        }
+        let taxiway = match AirportTaxiway::from_points(candidate.source_way_id, points, width) {
+            Ok(taxiway) => taxiway,
+            Err(TaxiwayGeometryError::AllocationFailed { requested }) => {
+                return Err(AirportGenError::AllocationFailed {
+                    context: "taxiway stored points",
+                    requested,
+                });
+            }
+            Err(_) => {
+                report.skipped_taxiway_degenerate += 1;
+                continue;
+            }
         };
         if defaulted {
             report.taxiway_widths_defaulted += 1;
@@ -494,7 +700,7 @@ fn convert_taxiway_candidates(
         .iter()
         .map(|taxiway| taxiway.points().len() - 1)
         .sum();
-    (taxiways, report)
+    Ok((taxiways, report))
 }
 
 fn parse_width(text: Option<&str>, fallback: Meters) -> (Meters, bool) {
@@ -596,6 +802,57 @@ mod tests {
             classify_way(&[("aeroway", "taxiway"), ("area", "yes")], &[1, 2, 1]),
             WayDisposition::TaxiwayArea
         );
+
+        let nodes = coordinates(&[(1, 35.0, 139.0), (2, 35.001, 139.002), (3, 35.002, 139.0)]);
+        let (taxiways, report) = convert_taxiway_candidates(
+            vec![TaxiwayCandidate {
+                source_way_id: 77,
+                node_refs: vec![1, 2, 3, 1],
+                width: Some("12 m".to_owned()),
+            }],
+            &nodes,
+            AirportGenerationReport::default(),
+        )
+        .expect("closed centerline conversion should allocate");
+        assert_eq!(report.taxiway_segments_written, 3);
+
+        let database = AirportDatabase::with_taxiways(Vec::new(), taxiways)
+            .expect("closed centerline should be valid FSAP geometry");
+        let bytes = database
+            .to_bytes()
+            .expect("FSAP v2 encoding should succeed");
+        assert_eq!(&bytes[4..6], &2_u16.to_le_bytes());
+        let restored = AirportDatabase::from_bytes(&bytes).expect("FSAP v2 should decode");
+        let restored_points = restored.taxiways()[0].points();
+        assert_eq!(restored_points.len(), 4);
+        assert_eq!(restored_points.first(), restored_points.last());
+    }
+
+    #[test]
+    fn candidate_record_budget_counts_segments_and_rejects_excess_or_overflow() {
+        let mut records = 0;
+        add_candidate_records(&mut records, 1).expect("one runway record fits");
+        add_candidate_records(&mut records, 4 - 1).expect("three taxiway segments fit");
+        assert_eq!(records, 4);
+
+        records = MAX_RECORD_COUNT as usize;
+        assert!(matches!(
+            add_candidate_records(&mut records, 1),
+            Err(AirportGenError::RecordLimitExceeded {
+                attempted,
+                maximum: MAX_RECORD_COUNT,
+            }) if attempted == MAX_RECORD_COUNT as usize + 1
+        ));
+        assert_eq!(records, MAX_RECORD_COUNT as usize);
+
+        records = usize::MAX;
+        assert!(matches!(
+            add_candidate_records(&mut records, 1),
+            Err(AirportGenError::RecordLimitExceeded {
+                attempted: usize::MAX,
+                maximum: MAX_RECORD_COUNT,
+            })
+        ));
     }
 
     #[test]
@@ -650,7 +907,8 @@ mod tests {
                 runway_ways_seen: 2,
                 ..AirportGenerationReport::default()
             },
-        );
+        )
+        .expect("runway conversion should allocate");
 
         assert_eq!(
             runways
@@ -686,7 +944,8 @@ mod tests {
         ];
 
         let (runways, report) =
-            convert_candidates(candidates, &nodes, AirportGenerationReport::default());
+            convert_candidates(candidates, &nodes, AirportGenerationReport::default())
+                .expect("runway conversion should allocate");
 
         assert!(runways.is_empty());
         assert_eq!(report.skipped_missing_nodes, 1);
@@ -702,7 +961,8 @@ mod tests {
             vec![candidate(1, Some(1), Some(2), Some("45"))],
             &nodes,
             AirportGenerationReport::default(),
-        );
+        )
+        .expect("runway conversion should allocate");
         assert!(runways.is_empty());
         assert_eq!(report.skipped_degenerate, 1);
     }
@@ -730,7 +990,8 @@ mod tests {
         ];
 
         let (taxiways, report) =
-            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default());
+            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default())
+                .expect("taxiway conversion should allocate");
 
         assert_eq!(
             taxiways
@@ -768,7 +1029,8 @@ mod tests {
             },
         ];
         let (taxiways, report) =
-            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default());
+            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default())
+                .expect("taxiway conversion should allocate");
         assert!(taxiways.is_empty());
         assert_eq!(report.skipped_taxiway_missing_nodes, 1);
         assert_eq!(report.skipped_taxiway_bad_coordinates, 1);

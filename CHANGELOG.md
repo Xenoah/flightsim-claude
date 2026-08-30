@@ -22,6 +22,9 @@
   way の全 node を順番どおり保持し、node 欠落・不正座標・縮退線分が一つでもあれば
   way 全体を理由別に数えて除外する
 - 誘導路の `width` は数値、`m`、`ft` を扱い、欠落・不正時は 15 m の fallback を使う
+- PBF 走査中から滑走路 1 record、誘導路は隣接 node ごとの segment record を数え、
+  1,000,000 record の安全上限を超える入力は出力へ触る前に拒否する。変換側が所有する
+  候補・node collection の確保失敗も明示的なエラーにする
 - `.fsairports` FSAP v2 を追加。24-byte header と 64-byte 固定長 record からなり、
   kind（0 = 滑走路、1 = 誘導路）、OSM way ID、segment index、線分両端、幅を持つ。
   v1 の read / write 互換性も維持する

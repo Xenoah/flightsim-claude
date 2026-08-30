@@ -1,8 +1,9 @@
-//! OSM 由来の滑走路を格納する実行時空港 DB（`.fsairports`）。
+//! OSM 由来の滑走路・誘導路を格納する実行時空港 DB（`.fsairports`）。
 //!
 //! 形式とデータ境界は [ADR-0008](../../../../docs/adr/0008-osm-airport-data.md) に従う。
-//! リトルエンディアン固定で、[`HEADER_LEN`] バイトのヘッダと [`RECORD_LEN`] バイトの
-//! 固定長レコードからなる。実行時は OSM PBF を解析せず、この形式だけを読む。
+//! リトルエンディアン固定で、[`HEADER_LEN`] バイトのヘッダに、v1 は 48 バイトの
+//! 滑走路レコード、v2 は 64 バイトの種別付きレコードが続く。実行時は OSM PBF を
+//! 解析せず、この形式だけを読む。
 
 use super::{Runway, RunwayGeometryError, validate_horizontal_coordinate};
 use flightsim_core::{Geodetic, Meters};
@@ -51,6 +52,10 @@ fn fnv1a(bytes: &[u8]) -> u64 {
         hash = hash.wrapping_mul(FNV_PRIME);
     }
     hash
+}
+
+fn allocation_bytes<T>(count: usize) -> usize {
+    count.saturating_mul(core::mem::size_of::<T>())
 }
 
 /// OSM の中心線 way から得た滑走路 1 本。
@@ -567,7 +572,9 @@ impl AirportDatabase {
             })?;
         }
 
-        runways.sort_by(compare_runways);
+        // 比較キーが完全に同じ滑走路は serialized bytes も同じ。stable sort の
+        // scratch allocation は外部 DB の上限付近で不要な OOM 経路になる。
+        runways.sort_unstable_by(compare_runways);
         Ok(Self {
             runways,
             taxiways: Vec::new(),
@@ -607,8 +614,8 @@ impl AirportDatabase {
                 }
             })?;
         }
-        runways.sort_by(compare_runways);
-        taxiways.sort_by(|left, right| left.source_way_id.cmp(&right.source_way_id));
+        runways.sort_unstable_by(compare_runways);
+        taxiways.sort_unstable_by_key(|taxiway| taxiway.source_way_id);
         if let Some(duplicate) = taxiways
             .windows(2)
             .find(|pair| pair[0].source_way_id == pair[1].source_way_id)
@@ -739,14 +746,14 @@ impl AirportDatabase {
         let mut runways = Vec::new();
         runways.try_reserve_exact(runway_count).map_err(|_| {
             AirportDatabaseError::AllocationFailed {
-                requested: header.payload_len,
+                requested: allocation_bytes::<AirportRunway>(runway_count),
             }
         })?;
         let mut taxiway_segments = Vec::new();
         taxiway_segments
             .try_reserve_exact(taxiway_segment_count)
             .map_err(|_| AirportDatabaseError::AllocationFailed {
-                requested: header.payload_len,
+                requested: allocation_bytes::<RawTaxiwaySegment>(taxiway_segment_count),
             })?;
         for (record_index, record) in payload.chunks_exact(header.record_len).enumerate() {
             if header.version == FORMAT_VERSION {
@@ -1131,7 +1138,9 @@ struct RawTaxiwaySegment {
 fn assemble_taxiways(
     mut segments: Vec<RawTaxiwaySegment>,
 ) -> Result<Vec<AirportTaxiway>, AirportDatabaseError> {
-    segments.sort_by_key(|segment| (segment.source_way_id, segment.segment_index));
+    // 不正 DB の重複 index は後段で拒否する。正常 DB のキーは一意なので、追加の
+    // scratch allocation を要しない unstable sort でも復元結果は決定論的である。
+    segments.sort_unstable_by_key(|segment| (segment.source_way_id, segment.segment_index));
     let taxiway_count = segments
         .iter()
         .enumerate()
@@ -1142,7 +1151,7 @@ fn assemble_taxiways(
     let mut taxiways = Vec::new();
     taxiways.try_reserve_exact(taxiway_count).map_err(|_| {
         AirportDatabaseError::AllocationFailed {
-            requested: taxiway_count,
+            requested: allocation_bytes::<AirportTaxiway>(taxiway_count),
         }
     })?;
     let mut cursor = 0;
@@ -1163,7 +1172,7 @@ fn assemble_taxiways(
         let mut points = Vec::new();
         points.try_reserve_exact(point_count).map_err(|_| {
             AirportDatabaseError::AllocationFailed {
-                requested: point_count,
+                requested: allocation_bytes::<(f64, f64)>(point_count),
             }
         })?;
         points.push(group[0].first);
@@ -1550,6 +1559,47 @@ mod tests {
             database
                 .to_bytes()
                 .expect("hand-built file should re-encode"),
+            bytes
+        );
+    }
+
+    #[test]
+    fn independently_hand_built_v2_taxiway_record_has_the_documented_layout() {
+        // この checksum は下の 64 bytes に対して実装とは独立に計算した FNV-1a 値。
+        // v2 writer と reader が同じ offset を誤っても、この fixture は追従しない。
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&[0x46, 0x53, 0x41, 0x50]); // FSAP
+        bytes.extend_from_slice(&[0x02, 0x00]); // version 2
+        bytes.extend_from_slice(&[0x00, 0x00]); // header flags 0
+        bytes.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]); // one record
+        bytes.extend_from_slice(&[0x40, 0x00, 0x00, 0x00]); // 64-byte record
+        bytes.extend_from_slice(&[0xec, 0x34, 0x90, 0xb0, 0x30, 0xbe, 0x9c, 0xbc]);
+        bytes.extend_from_slice(&[0x01]); // taxiway kind
+        bytes.extend_from_slice(&[0x00; 7]); // reserved
+        bytes.extend_from_slice(&[0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]); // -2 i64
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // segment index 0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // record flags 0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f]); // 1.0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40]); // 2.0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x40]); // 3.0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x40]); // 4.0
+        bytes.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x40]); // 5.0
+
+        assert_eq!(bytes.len(), 88);
+        let database = AirportDatabase::from_bytes(&bytes).expect("hand-built v2 file is valid");
+        assert!(database.runways().is_empty());
+        let taxiway = &database.taxiways()[0];
+        assert_eq!(taxiway.source_way_id, -2);
+        assert_eq!(taxiway.points().len(), 2);
+        assert_close!(taxiway.points()[0].latitude_degrees(), 1.0, 1.0e-14);
+        assert_close!(taxiway.points()[0].longitude_degrees(), 2.0, 1.0e-14);
+        assert_close!(taxiway.points()[1].latitude_degrees(), 3.0, 1.0e-14);
+        assert_close!(taxiway.points()[1].longitude_degrees(), 4.0, 1.0e-14);
+        assert_close!(taxiway.width.get(), 5.0, 0.0);
+        assert_eq!(
+            database
+                .to_bytes()
+                .expect("hand-built v2 file should re-encode"),
             bytes
         );
     }
