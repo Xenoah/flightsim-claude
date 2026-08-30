@@ -45,8 +45,8 @@ use flightsim_render::{
 use flightsim_sim::{GroundSampler, Simulation};
 use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
 use flightsim_world::{
-    AirportDatabase, DiskTileSource, LodSelector, MemoryTileSource, Runway, Terrain, TileCache,
-    TileId, TileSource,
+    AirportDatabase, AirportTaxiway, DiskTileSource, LodSelector, MemoryTileSource, Runway,
+    Terrain, TileCache, TileId, TileSource,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -59,6 +59,12 @@ const APPROACH_THROTTLE: f64 = 0.45;
 
 /// 進入練習を始めるときのフラップ。実機の進入形態に倣って全開。
 const APPROACH_FLAPS: f64 = 1.0;
+
+/// Active runway と同じ空港とみなして描画する誘導路の探索半径。
+///
+/// FSAP は空港 relation へ依存せず中心線だけを保持する。地域抽出全域を描くと、遠方の
+/// 空港まで一度に GPU へ載るため、滑走路中心から 15 km の実用的な境界で一度だけ絞る。
+const ACTIVE_AIRPORT_RADIUS: Meters = Meters(15_000.0);
 
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
@@ -123,6 +129,8 @@ struct Startup {
     ///
     /// `main` で空港 DB を解決した後は、各 system が別々に選び直してはならない。
     runway: Runway,
+    /// Active runway の周囲にある OSM 誘導路。起動時に一度だけ地域 DB から絞る。
+    taxiways: Vec<AirportTaxiway>,
     runway_source: RunwaySource,
     min_level: u8,
     max_level: u8,
@@ -184,6 +192,7 @@ impl Default for Startup {
             heading: runway.heading,
             heading_was_explicit: false,
             runway,
+            taxiways: Vec::new(),
             runway_source: RunwaySource::Synthetic,
             min_level: 8,
             max_level: 13,
@@ -678,10 +687,18 @@ fn resolve_airport_database(startup: &mut Startup, diagnostics: &mut StartupDiag
 fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> Option<i64> {
     let selected = database.nearest(startup.start)?;
     let runway = selected.runway;
+    let source_way_id = selected.source_way_id;
+    let taxiways = database
+        .taxiways()
+        .iter()
+        .filter(|taxiway| taxiway_is_near_runway(taxiway, runway, ACTIVE_AIRPORT_RADIUS))
+        .cloned()
+        .collect();
 
     startup.runway = runway;
+    startup.taxiways = taxiways;
     startup.runway_source = RunwaySource::OpenStreetMap {
-        way_id: selected.source_way_id,
+        way_id: source_way_id,
     };
     if !startup.start_was_explicit {
         startup.start = runway.takeoff_start();
@@ -690,7 +707,16 @@ fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> O
         startup.heading = runway.heading;
     }
 
-    Some(selected.source_way_id)
+    Some(source_way_id)
+}
+
+/// 空港 relation が無くても、active runway 周辺だけを描画対象へ絞る。
+fn taxiway_is_near_runway(taxiway: &AirportTaxiway, runway: Runway, radius: Meters) -> bool {
+    let centre = runway.center().to_ecef();
+    taxiway
+        .points()
+        .iter()
+        .any(|point| centre.distance_to(point.to_ecef()).get() <= radius.get())
 }
 
 /// `05:30` のような時刻を読む。
@@ -1050,18 +1076,16 @@ fn setup(
     // OSM `ele` の基準・品質は一定せず、使用中の地形とは揃わない（ADR-0008）。
     // 選択した滑走路の進入端で実際の地形数値を引き、描画・接地を局所的に揃える。
     // これは鉛直基準の変換ではない。Copernicus DEM の EGM2008 ⇒ WGS84 は #22。
-    let runway = {
-        let sampler = GroundSampler::default();
-        let mut probe = Terrain::new(
-            make_source(&startup),
-            8 * 1024 * 1024,
-            startup.min_level..=startup.max_level,
-        );
-        let elevation = sampler
-            .sample(&mut probe, startup.runway.threshold)
-            .elevation;
-        startup.runway.with_elevation(elevation)
-    };
+    let airport_sampler = GroundSampler::default();
+    let mut airport_probe = Terrain::new(
+        make_source(&startup),
+        8 * 1024 * 1024,
+        startup.min_level..=startup.max_level,
+    );
+    let runway_elevation = airport_sampler
+        .sample(&mut airport_probe, startup.runway.threshold)
+        .elevation;
+    let runway = startup.runway.with_elevation(runway_elevation);
 
     let terrain = Terrain::new(
         make_source(&startup),
@@ -1146,7 +1170,44 @@ fn setup(
 
     commands.insert_resource(startup.view);
 
-    // --- 滑走路 ---
+    // --- 空港面 ---
+
+    // 誘導路は各 OSM node で DEM を引く。滑走路標高を全 way へ固定すると、長い
+    // 誘導路の端が斜面へ埋まる。中心線 way ごとに 1 mesh へまとめるため、entity 数は
+    // node 数ではなく way 数に抑えられる。
+    let taxiway_material = materials.add(flightsim_render::default_terrain_material());
+    let mut rendered_taxiways = 0_usize;
+    for taxiway in &startup.taxiways {
+        let surface_points: Vec<Geodetic> = taxiway
+            .points()
+            .iter()
+            .map(|point| {
+                let elevation = airport_sampler.sample(&mut airport_probe, *point).elevation;
+                Geodetic::new(point.latitude, point.longitude, elevation)
+            })
+            .collect();
+        let Some((mesh, origin)) =
+            flightsim_render::taxiway::taxiway_mesh(&surface_points, taxiway.width)
+        else {
+            warn!(
+                "taxiway: skipped invalid OpenStreetMap way {}",
+                taxiway.source_way_id
+            );
+            continue;
+        };
+        commands.spawn((
+            flightsim_render::terrain_mesh_bundle(
+                meshes.add(mesh),
+                taxiway_material.clone(),
+                origin,
+            ),
+            Name::new(format!("taxiway OSM way {}", taxiway.source_way_id)),
+        ));
+        rendered_taxiways += 1;
+    }
+    if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. }) {
+        info!("taxiways: {rendered_taxiways} OpenStreetMap ways");
+    }
 
     // 見た目も進入・評価と同じ滑走路、同じ DEM 標高へ置く。
     let visual_threshold = runway.threshold;
@@ -1751,6 +1812,64 @@ mod tests {
             startup.runway_source,
             RunwaySource::OpenStreetMap { way_id: 200 }
         );
+        assert!(startup.taxiways.is_empty());
+    }
+
+    #[test]
+    fn only_taxiways_near_the_active_runway_are_kept() {
+        let (_, selected) = airport_database_for_app_tests();
+        let near = AirportTaxiway::from_points(
+            300,
+            vec![
+                Geodetic::from_degrees(35.551, 139.779, 0.0),
+                Geodetic::from_degrees(35.552, 139.780, 0.0),
+            ],
+            Meters(20.0),
+        )
+        .expect("valid nearby taxiway");
+        let far = AirportTaxiway::from_points(
+            400,
+            vec![
+                Geodetic::from_degrees(36.0, 140.0, 0.0),
+                Geodetic::from_degrees(36.001, 140.0, 0.0),
+            ],
+            Meters(20.0),
+        )
+        .expect("valid distant taxiway");
+        let database = AirportDatabase::with_taxiways(vec![selected], vec![far, near])
+            .expect("valid airport database");
+        let mut startup = Startup::default();
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(startup.taxiways.len(), 1);
+        assert_eq!(startup.taxiways[0].source_way_id, 300);
+    }
+
+    #[test]
+    fn taxiway_selection_includes_the_radius_boundary() {
+        let (_, selected) = airport_database_for_app_tests();
+        let centre = selected.runway.center();
+        let taxiway = AirportTaxiway::from_points(
+            300,
+            vec![
+                centre.offset_by(Meters(15_000.0), Meters::ZERO),
+                centre.offset_by(Meters(15_010.0), Meters::ZERO),
+            ],
+            Meters(20.0),
+        )
+        .expect("valid boundary taxiway");
+        let exact_radius = centre.to_ecef().distance_to(taxiway.points()[0].to_ecef());
+
+        assert!(taxiway_is_near_runway(
+            &taxiway,
+            selected.runway,
+            exact_radius
+        ));
+        assert!(!taxiway_is_near_runway(
+            &taxiway,
+            selected.runway,
+            Meters(exact_radius.get() - 0.01)
+        ));
     }
 
     #[test]

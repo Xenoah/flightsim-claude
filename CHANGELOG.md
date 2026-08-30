@@ -9,6 +9,48 @@
 
 ---
 
+## [0.6.0-alpha.11] — 2026-08-30
+
+**OpenStreetMap の誘導路が、実在滑走路の周囲で地形に沿って見えるようになった。**
+（#25 完了）
+
+### 追加 — OSM 誘導路パイプライン
+
+- `flightsim-airportgen` が `aeroway=taxiway` の中心線 way と依存 node を取り込み、
+  滑走路と同じ `.fsairports` へ決定論的に格納する
+- `area=yes` は除外するが、先頭と末尾が同じ閉じた中心線はループとして受け入れる。
+  way の全 node を順番どおり保持し、node 欠落・不正座標・縮退線分が一つでもあれば
+  way 全体を理由別に数えて除外する
+- 誘導路の `width` は数値、`m`、`ft` を扱い、欠落・不正時は 15 m の fallback を使う
+- PBF 走査中から滑走路 1 record、誘導路は隣接 node ごとの segment record を数え、
+  1,000,000 record の安全上限を超える入力は出力へ触る前に拒否する。変換側が所有する
+  候補・node collection の確保失敗も明示的なエラーにする
+- `.fsairports` FSAP v2 を追加。24-byte header と 64-byte 固定長 record からなり、
+  kind（0 = 滑走路、1 = 誘導路）、OSM way ID、segment index、線分両端、幅を持つ。
+  v1 の read / write 互換性も維持する
+- v2 reader は未知 kind、非ゼロの予約領域・record flags、滑走路の非ゼロ segment index、
+  誘導路の欠番・幅不一致・不連続な端点を拒否する。既存の header・全長・checksum・
+  件数・座標・幅の検査も v2 に適用する
+- active runway の中心から 15 km 以内に point が一つでもある誘導路だけを描画対象にする。
+  地域 extract 全域の誘導路を一度に GPU へ載せない
+- 誘導路の各 node で DEM 標高を引き、地球の曲率と地形に沿う暗い asphalt の舗装面、
+  黄色の中心線、曲がり角を塞ぐ継ぎ目を way ごとに一つのメッシュで描く
+
+### 設計と検証
+
+- [ADR-0008](docs/adr/0008-osm-airport-data.md) を FSAP v2、誘導路の変換・選択・標高・
+  描画契約に合わせて更新
+- v1 / v2 の往復互換性、誘導路の閉じた中心線と全 node 保持、way 単位の除外、
+  厳格な segment 復元、15 km 境界、メッシュの向き・標高・中心線色を回帰テストで固定
+- OpenStreetMap Map API から取得した Haneda の小領域 PBF（13,450 bytes、入力 SHA-256
+  `7336D1821F9DC17BE507019A5D0DC7FE6E589FD32E124752C0B42862DB8E579F`）で、滑走路 3 way・
+  誘導路 113 way / 1,023 segment を 65,688 bytes へ変換。2 回の出力 SHA-256
+  `B29B8E599ABA81AFDBD130F4C2DC14E49382F47FF0914D7042A4594080C74D09` が一致した
+- free view のスクリーンショットで、113 way の舗装・黄色中心線・曲線と junction、
+  滑走路との重なり、OSM 帰属表示を目視確認した
+
+---
+
 ## [0.6.0-alpha.10] — 2026-08-30
 
 **OpenStreetMap の実在滑走路を、配布ライセンスと実行時依存を分けたまま飛べるようになった。**
@@ -1053,7 +1095,8 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.10...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.11...HEAD
+[0.6.0-alpha.11]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.10...v0.6.0-alpha.11
 [0.6.0-alpha.10]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...v0.6.0-alpha.10
 [0.6.0-alpha.9]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.8...v0.6.0-alpha.9
 [0.6.0-alpha.8]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.7...v0.6.0-alpha.8

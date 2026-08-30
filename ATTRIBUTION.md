@@ -22,10 +22,10 @@
 なお、リポジトリに実データは含まれていません（全球で数百 GB あるため）。
 テストは合成 GeoTIFF で動いており、CI は実データを必要としません。
 
-### 空港・滑走路 — OpenStreetMap
+### 空港・滑走路・誘導路 — OpenStreetMap
 
 `flightsim-airportgen` は、利用者が用意した地域 `.osm.pbf` から
-`aeroway=runway` の中心線を実行時空港 DB へ変換します。
+`aeroway=runway` と `aeroway=taxiway` の中心線を実行時空港 DB へ変換します。
 
 > Airport data: © OpenStreetMap contributors
 

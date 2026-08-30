@@ -63,6 +63,7 @@ pub mod model;
 pub mod runway;
 pub mod runway_lights;
 pub mod sun;
+pub mod taxiway;
 pub mod terrain;
 pub mod weather;
 
