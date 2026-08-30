@@ -1292,6 +1292,7 @@ fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
     mode: Res<ViewMode>,
+    sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
 ) {
     let state = simulation.0.state();
@@ -1317,6 +1318,8 @@ fn publish_hud(
         view_mode: mode.name(),
         wind_from: simulation.0.wind().from,
         wind_speed: simulation.0.wind().speed,
+        // 計器の照明に使う。ui は render に依存できないので app が渡す。
+        sun_elevation: sun.elevation,
         log: {
             // sim の記録を ui の型へ詰め替える。**ui は sim に依存しない**
             // ので（依存は一方向）、変換はここが引き受ける。

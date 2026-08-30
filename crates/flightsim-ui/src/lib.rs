@@ -75,6 +75,12 @@ pub struct HudState {
     pub wind_speed: MetersPerSecond,
     /// この飛行の積み上げ。
     pub log: FlightSummary,
+    /// 太陽の仰角。**計器の照明を決めるのに使う。**
+    ///
+    /// `flightsim-ui` は `flightsim-render` に依存できない（同階層の横断は
+    /// 規約 2 違反）ので、app が詰め替える。既定の 0 は「地平線」で、
+    /// 照明が中途半端に点く。値を渡し忘れても破綻はしない。
+    pub sun_elevation: Radians,
 }
 
 /// 画面に出す飛行の積み上げ。
@@ -209,6 +215,7 @@ impl Plugin for FlightsimUiPlugin {
                 (
                     instruments::update_instrument_visibility,
                     instruments::update_instruments,
+                    instruments::update_panel_lighting,
                 ),
             );
     }
@@ -426,6 +433,7 @@ mod tests {
             wind_from: Radians(0.0),
             wind_speed: MetersPerSecond(0.0),
             log: FlightSummary::default(),
+            sun_elevation: Radians(0.0),
         }
     }
 

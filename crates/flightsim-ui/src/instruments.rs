@@ -60,6 +60,21 @@ const VSI_SWEEP_DEGREES: f64 = 170.0;
 /// 姿勢儀のピッチ 1 度あたりの地平線の移動量（直径に対する比）。
 const PITCH_SCALE_PER_DEGREE: f32 = 0.006;
 
+/// 計器の照明が完全に点く太陽高度（度）。市民薄明の下限。
+const PANEL_LIGHT_FULL_ON_DEGREES: f64 = -6.0;
+
+/// 計器の照明が完全に消える太陽高度（度）。
+///
+/// 滑走路灯（+3 度）より低い。**盤面は昼でも外光で読めるので、
+/// 点けるのは本当に暗くなってから**でよい。
+const PANEL_LIGHT_FULL_OFF_DEGREES: f64 = 0.0;
+
+/// 照明が最も明るいときの盤面の明るさ。
+///
+/// 実機の計器照明は赤系（暗順応を壊さない）だが、**ここでは読みやすさを
+/// 優先して淡い橙**にする。赤一色は数字の視認性が落ちる。
+const PANEL_LIT_FACE: Color = Color::srgba(0.16, 0.12, 0.07, 0.94);
+
 /// どの計器か。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Instrument {
@@ -216,6 +231,42 @@ pub fn horizon_placement(pitch: Radians, roll: Radians) -> HorizonPlacement {
     }
 }
 
+/// 計器照明の強さ。1 が全点灯、0 が消灯。
+///
+/// **滑走路灯と同じ考え方**（[`crate::instruments`] と
+/// `flightsim_render::runway_lights` で別々に持つのは、ui が render に
+/// 依存できないため）。両端で滑らかに繋ぐ。
+#[must_use]
+pub fn panel_light_fraction(sun_elevation: Radians) -> f32 {
+    let degrees = finite_or_zero(sun_elevation.to_degrees().get());
+    let span = PANEL_LIGHT_FULL_OFF_DEGREES - PANEL_LIGHT_FULL_ON_DEGREES;
+    let t = ((PANEL_LIGHT_FULL_OFF_DEGREES - degrees) / span).clamp(0.0, 1.0);
+    #[allow(clippy::cast_possible_truncation, reason = "0..=1 の比率。f32 で十分")]
+    let t = t as f32;
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// 照明の強さから盤面の色を決める。
+///
+/// 消灯時は素の暗い盤面、全点灯で淡い橙。**間を線形に混ぜる**ので、
+/// 日没にかけて滑らかに明るくなる。
+#[must_use]
+pub fn lit_dial_face(fraction: f32) -> Color {
+    let fraction = if fraction.is_finite() {
+        fraction.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let dark = DIAL_FACE.to_linear();
+    let lit = PANEL_LIT_FACE.to_linear();
+    Color::linear_rgba(
+        dark.red + (lit.red - dark.red) * fraction,
+        dark.green + (lit.green - dark.green) * fraction,
+        dark.blue + (lit.blue - dark.blue) * fraction,
+        dark.alpha + (lit.alpha - dark.alpha) * fraction,
+    )
+}
+
 /// 盤面に添える数値。針だけでは細かい値が読めない。
 #[must_use]
 pub fn instrument_readout(instrument: Instrument, state: &HudReadout) -> String {
@@ -298,6 +349,10 @@ pub struct AttitudeHorizon;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct InstrumentReadout(pub Instrument);
 
+/// 盤面そのもの。照明で色が変わる。
+#[derive(Component, Debug, Clone, Copy)]
+pub struct DialFace;
+
 /// 計器盤を組み立てる。
 ///
 /// **画面下端の中央**に横並び。左上の計器列・右上の着陸評価・
@@ -344,6 +399,7 @@ fn spawn_dial(panel: &mut ChildSpawnerCommands, instrument: Instrument) {
                 ..default()
             },
             BackgroundColor(DIAL_FACE),
+            DialFace,
         ))
         .with_children(|dial| {
             if matches!(instrument, Instrument::Attitude) {
@@ -524,6 +580,27 @@ pub fn update_instruments(
 
     for (target, mut text) in &mut readouts {
         **text = instrument_readout(target.0, &readout);
+    }
+}
+
+/// 太陽高度に応じて盤面を照らす。
+///
+/// **夜に盤面が読めないと計器盤の意味がない。** 滑走路灯と同じく
+/// 太陽高度へ連動させ、暗くなるほど盤面を明るくする。
+pub fn update_panel_lighting(
+    state: Res<HudState>,
+    mut faces: Query<&mut BackgroundColor, With<DialFace>>,
+    mut previous: Local<Option<f32>>,
+) {
+    let fraction = panel_light_fraction(state.sun_elevation);
+    if previous.is_some_and(|value| (value - fraction).abs() < 1e-3) {
+        return;
+    }
+    *previous = Some(fraction);
+
+    let color = lit_dial_face(fraction);
+    for mut face in &mut faces {
+        face.0 = color;
     }
 }
 
@@ -784,6 +861,109 @@ mod tests {
         let placement = horizon_placement(Radians(f64::NAN), Radians(f64::INFINITY));
         assert!(placement.offset.is_finite() && placement.offset.abs() < 1e-6);
         assert!(placement.roll.degrees().is_finite());
+    }
+
+    // --- 計器の照明 ---
+
+    #[test]
+    fn the_panel_is_unlit_in_daylight() {
+        // 昼は外光で読める。点けると盤面が白飛びして逆に読みにくい。
+        for degrees in [1.0, 20.0, 78.0] {
+            let fraction = panel_light_fraction(Degrees(degrees).to_radians());
+            assert!(
+                fraction.abs() < 1e-6,
+                "the panel should stay unlit at {degrees} deg, got {fraction}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_panel_is_fully_lit_at_night() {
+        for degrees in [-6.0, -15.0, -40.0] {
+            let fraction = panel_light_fraction(Degrees(degrees).to_radians());
+            assert!(
+                (fraction - 1.0).abs() < 1e-6,
+                "the panel should be fully lit at {degrees} deg, got {fraction}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_panel_lights_later_than_the_runway() {
+        // 滑走路灯は +3 度から点き始める。**盤面はもっと暗くなってから**で
+        // よい（外光で読めるうちに点けると白飛びする）。
+        let at_sunset = panel_light_fraction(Degrees(0.0).to_radians());
+        assert!(
+            at_sunset.abs() < 1e-6,
+            "the panel should still be dark at sunset, got {at_sunset}"
+        );
+        let just_after = panel_light_fraction(Degrees(-1.0).to_radians());
+        assert!(
+            just_after > 0.0,
+            "the panel should start lighting just after sunset, got {just_after}"
+        );
+    }
+
+    #[test]
+    fn the_panel_light_rises_smoothly() {
+        let mut previous = 0.0_f32;
+        let mut degrees = 2.0;
+        while degrees >= -10.0 {
+            let fraction = panel_light_fraction(Degrees(degrees).to_radians());
+            assert!(
+                fraction >= previous - 1e-6,
+                "the panel dimmed as the sun set: {previous} then {fraction}"
+            );
+            assert!(
+                fraction - previous < 0.2,
+                "the panel light jumped by {} at {degrees} deg",
+                fraction - previous
+            );
+            previous = fraction;
+            degrees -= 0.25;
+        }
+        assert!((previous - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_broken_sun_angle_leaves_the_panel_unlit() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let fraction = panel_light_fraction(Radians(value));
+            assert!(
+                fraction.is_finite() && (0.0..=1.0).contains(&fraction),
+                "a broken sun angle produced {fraction}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_lit_face_brightens_without_losing_opacity() {
+        // 透けると背景の地形が盤面越しに見えて読めなくなる。
+        let dark = lit_dial_face(0.0).to_linear();
+        let bright = lit_dial_face(1.0).to_linear();
+        assert!(
+            bright.red > dark.red,
+            "the lit face should be brighter: {dark:?} -> {bright:?}"
+        );
+        assert!(
+            bright.alpha >= dark.alpha && bright.alpha > 0.8,
+            "the face must stay opaque enough to read, got {}",
+            bright.alpha
+        );
+    }
+
+    #[test]
+    fn a_broken_fraction_falls_back_to_the_dark_face() {
+        for fraction in [f32::NAN, f32::INFINITY, -1.0, 9.0] {
+            let color = lit_dial_face(fraction).to_linear();
+            assert!(
+                color.red.is_finite() && color.alpha.is_finite(),
+                "fraction {fraction} produced {color:?}"
+            );
+        }
+        let broken = lit_dial_face(f32::NAN).to_linear();
+        let dark = lit_dial_face(0.0).to_linear();
+        assert!((broken.red - dark.red).abs() < 1e-6);
     }
 
     // --- 表示 ---

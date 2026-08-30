@@ -410,6 +410,7 @@ mod tests {
             wind_from: Radians(0.0),
             wind_speed: MetersPerSecond(0.0),
             log: crate::FlightSummary::default(),
+            sun_elevation: Radians(0.0),
         }
     }
 
