@@ -1,11 +1,11 @@
 //! OpenStreetMap PBF から実行時空港 DB を作る。
 //!
 //! 生の PBF は実行時に読ませない。[`generate_airport_database`] が
-//! `aeroway=runway` の中心線 way と依存 node を取り出し、
+//! `aeroway=runway` と `aeroway=taxiway` の中心線 way・依存 node を取り出し、
 //! `flightsim-world` が検証して読む固定長形式へ焼く。
 
 use flightsim_core::{Feet, Geodetic, Meters};
-use flightsim_world::{AirportDatabase, AirportRunway};
+use flightsim_world::{AirportDatabase, AirportRunway, AirportTaxiway};
 use osmpbf::{Element, IndexedReader};
 use std::collections::HashMap;
 use std::fmt;
@@ -13,11 +13,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_RUNWAY_WIDTH: Meters = Meters(45.0);
+const DEFAULT_TAXIWAY_WIDTH: Meters = Meters(15.0);
 
 /// 空港 DB 生成で採用・除外した way の件数。
 ///
 /// 除外件数は way 単位で、最初に該当した理由へだけ加算する。そのため
-/// `runways_written` とすべての `skipped_*` の和は `runway_ways_seen` に一致する。
+/// 滑走路の採用数と滑走路用 `skipped_*` の和は `runway_ways_seen` に、誘導路の
+/// 採用数と `skipped_taxiway_*` の和は `taxiway_ways_seen` に一致する。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct AirportGenerationReport {
     /// PBF 内で `aeroway=runway` だった way の総数。
@@ -36,6 +38,22 @@ pub struct AirportGenerationReport {
     pub skipped_bad_coordinates: usize,
     /// 端点を持たない、同一点であるなど、線分を作れず除外した way 数。
     pub skipped_degenerate: usize,
+    /// PBF 内で `aeroway=taxiway` だった way の総数。
+    pub taxiway_ways_seen: usize,
+    /// `.fsairports` に書いた誘導路の折れ線数。
+    pub taxiways_written: usize,
+    /// `.fsairports` に書いた誘導路の固定長 segment レコード数。
+    pub taxiway_segments_written: usize,
+    /// `width` が欠落または不正で、15 m を使った誘導路数。
+    pub taxiway_widths_defaulted: usize,
+    /// `area=yes` なので誘導路中心線から除外した way 数。
+    pub skipped_taxiway_areas: usize,
+    /// 参照 node が PBF に無く、除外した誘導路 way 数。
+    pub skipped_taxiway_missing_nodes: usize,
+    /// node の緯度経度が非有限または範囲外で、除外した誘導路 way 数。
+    pub skipped_taxiway_bad_coordinates: usize,
+    /// 点不足・隣接点の縮退などで線分を作れず、除外した誘導路 way 数。
+    pub skipped_taxiway_degenerate: usize,
 }
 
 /// 空港 DB 生成の入出力エラー。
@@ -114,7 +132,7 @@ impl fmt::Display for AirportGenError {
 
 impl std::error::Error for AirportGenError {}
 
-/// OSM PBF の滑走路中心線を `.fsairports` へ変換する。
+/// OSM PBF の滑走路・誘導路中心線を `.fsairports` へ変換する。
 ///
 /// way は OSM ID 順に並べてから DB へ渡す。同じ入力 PBF と同じ
 /// `flightsim-world` 版からは、常に同じレコード順と同じ bytes が得られる。
@@ -130,14 +148,26 @@ pub fn generate_airport_database(
 ) -> Result<AirportGenerationReport, AirportGenError> {
     ensure_distinct_files(input, output)?;
     let extraction = extract_pbf(input)?;
-    let (runways, mut report) =
-        convert_candidates(extraction.candidates, &extraction.nodes, extraction.report);
+    let (runways, report) = convert_candidates(
+        extraction.runway_candidates,
+        &extraction.nodes,
+        extraction.report,
+    );
+    let (taxiways, mut report) =
+        convert_taxiway_candidates(extraction.taxiway_candidates, &extraction.nodes, report);
 
-    let database =
-        AirportDatabase::new(runways).map_err(|error| AirportGenError::BuildDatabase {
+    let database = AirportDatabase::with_taxiways(runways, taxiways).map_err(|error| {
+        AirportGenError::BuildDatabase {
             message: error.to_string(),
-        })?;
+        }
+    })?;
     report.runways_written = database.runways().len();
+    report.taxiways_written = database.taxiways().len();
+    report.taxiway_segments_written = database
+        .taxiways()
+        .iter()
+        .map(|taxiway| taxiway.points().len() - 1)
+        .sum();
     write_database_atomically(&database, output)?;
     Ok(report)
 }
@@ -225,9 +255,17 @@ struct RunwayCandidate {
     width: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TaxiwayCandidate {
+    source_way_id: i64,
+    node_refs: Vec<i64>,
+    width: Option<String>,
+}
+
 #[derive(Debug)]
 struct PbfExtraction {
-    candidates: Vec<RunwayCandidate>,
+    runway_candidates: Vec<RunwayCandidate>,
+    taxiway_candidates: Vec<TaxiwayCandidate>,
     nodes: HashMap<i64, NodeCoordinate>,
     report: AirportGenerationReport,
 }
@@ -238,7 +276,8 @@ fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
         message: error.to_string(),
     })?;
 
-    let mut candidates = Vec::new();
+    let mut runway_candidates = Vec::new();
+    let mut taxiway_candidates = Vec::new();
     let mut nodes = HashMap::new();
     let mut report = AirportGenerationReport::default();
 
@@ -248,23 +287,37 @@ fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
                 let tags: Vec<_> = way.tags().collect();
                 let node_refs: Vec<_> = way.refs().collect();
                 match classify_way(&tags, &node_refs) {
-                    WayDisposition::NotRunway => false,
-                    WayDisposition::Area => {
+                    WayDisposition::Other => false,
+                    WayDisposition::RunwayArea => {
                         report.runway_ways_seen += 1;
                         report.skipped_areas += 1;
                         false
                     }
-                    WayDisposition::Closed => {
+                    WayDisposition::RunwayClosed => {
                         report.runway_ways_seen += 1;
                         report.skipped_closed += 1;
                         false
                     }
-                    WayDisposition::Centerline => {
+                    WayDisposition::RunwayCenterline => {
                         report.runway_ways_seen += 1;
-                        candidates.push(RunwayCandidate {
+                        runway_candidates.push(RunwayCandidate {
                             source_way_id: way.id(),
                             first_node: node_refs.first().copied(),
                             last_node: node_refs.last().copied(),
+                            width: tag_value(&tags, "width").map(str::to_owned),
+                        });
+                        true
+                    }
+                    WayDisposition::TaxiwayArea => {
+                        report.taxiway_ways_seen += 1;
+                        report.skipped_taxiway_areas += 1;
+                        false
+                    }
+                    WayDisposition::TaxiwayCenterline => {
+                        report.taxiway_ways_seen += 1;
+                        taxiway_candidates.push(TaxiwayCandidate {
+                            source_way_id: way.id(),
+                            node_refs,
                             width: tag_value(&tags, "width").map(str::to_owned),
                         });
                         true
@@ -299,7 +352,8 @@ fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
         })?;
 
     Ok(PbfExtraction {
-        candidates,
+        runway_candidates,
+        taxiway_candidates,
         nodes,
         report,
     })
@@ -307,24 +361,35 @@ fn extract_pbf(path: &Path) -> Result<PbfExtraction, AirportGenError> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WayDisposition {
-    NotRunway,
-    Area,
-    Closed,
-    Centerline,
+    Other,
+    RunwayArea,
+    RunwayClosed,
+    RunwayCenterline,
+    TaxiwayArea,
+    TaxiwayCenterline,
 }
 
 fn classify_way(tags: &[(&str, &str)], node_refs: &[i64]) -> WayDisposition {
-    if tag_value(tags, "aeroway") != Some("runway") {
-        return WayDisposition::NotRunway;
+    let aeroway = tag_value(tags, "aeroway");
+    let is_area = tag_value(tags, "area") == Some("yes");
+    if aeroway == Some("taxiway") {
+        return if is_area {
+            WayDisposition::TaxiwayArea
+        } else {
+            WayDisposition::TaxiwayCenterline
+        };
     }
-    if tag_value(tags, "area") == Some("yes") {
-        return WayDisposition::Area;
+    if aeroway != Some("runway") {
+        return WayDisposition::Other;
+    }
+    if is_area {
+        return WayDisposition::RunwayArea;
     }
     // 参照 1 個だけの壊れた way は面ではなく縮退線として後段で数える。
     if node_refs.len() >= 2 && node_refs.first() == node_refs.last() {
-        return WayDisposition::Closed;
+        return WayDisposition::RunwayClosed;
     }
-    WayDisposition::Centerline
+    WayDisposition::RunwayCenterline
 }
 
 fn tag_value<'a>(tags: &'a [(&'a str, &'a str)], key: &str) -> Option<&'a str> {
@@ -360,7 +425,7 @@ fn convert_candidates(
             continue;
         }
 
-        let (width, defaulted) = parse_width(candidate.width.as_deref());
+        let (width, defaulted) = parse_width(candidate.width.as_deref(), DEFAULT_RUNWAY_WIDTH);
         let Ok(runway) = AirportRunway::from_endpoints(
             candidate.source_way_id,
             first.to_geodetic(),
@@ -383,9 +448,58 @@ fn convert_candidates(
     (runways, report)
 }
 
-fn parse_width(text: Option<&str>) -> (Meters, bool) {
+fn convert_taxiway_candidates(
+    mut candidates: Vec<TaxiwayCandidate>,
+    nodes: &HashMap<i64, NodeCoordinate>,
+    mut report: AirportGenerationReport,
+) -> (Vec<AirportTaxiway>, AirportGenerationReport) {
+    candidates.sort_unstable_by_key(|candidate| candidate.source_way_id);
+    let mut taxiways = Vec::with_capacity(candidates.len());
+
+    for candidate in candidates {
+        if candidate.node_refs.len() < 2 {
+            report.skipped_taxiway_degenerate += 1;
+            continue;
+        }
+        let Some(coordinates) = candidate
+            .node_refs
+            .iter()
+            .map(|node_id| nodes.get(node_id).copied())
+            .collect::<Option<Vec<_>>>()
+        else {
+            report.skipped_taxiway_missing_nodes += 1;
+            continue;
+        };
+        if coordinates.iter().any(|coordinate| !coordinate.is_valid()) {
+            report.skipped_taxiway_bad_coordinates += 1;
+            continue;
+        }
+        let (width, defaulted) = parse_width(candidate.width.as_deref(), DEFAULT_TAXIWAY_WIDTH);
+        let points = coordinates
+            .into_iter()
+            .map(NodeCoordinate::to_geodetic)
+            .collect();
+        let Ok(taxiway) = AirportTaxiway::from_points(candidate.source_way_id, points, width)
+        else {
+            report.skipped_taxiway_degenerate += 1;
+            continue;
+        };
+        if defaulted {
+            report.taxiway_widths_defaulted += 1;
+        }
+        taxiways.push(taxiway);
+    }
+    report.taxiways_written = taxiways.len();
+    report.taxiway_segments_written = taxiways
+        .iter()
+        .map(|taxiway| taxiway.points().len() - 1)
+        .sum();
+    (taxiways, report)
+}
+
+fn parse_width(text: Option<&str>, fallback: Meters) -> (Meters, bool) {
     let Some(text) = text.map(str::trim).filter(|text| !text.is_empty()) else {
-        return (DEFAULT_RUNWAY_WIDTH, true);
+        return (fallback, true);
     };
 
     let (number, feet) = if let Some(number) = text.strip_suffix("ft") {
@@ -397,7 +511,7 @@ fn parse_width(text: Option<&str>) -> (Meters, bool) {
     };
 
     let Ok(value) = number.parse::<f64>() else {
-        return (DEFAULT_RUNWAY_WIDTH, true);
+        return (fallback, true);
     };
     let width = if feet {
         Feet(value).to_meters()
@@ -407,7 +521,7 @@ fn parse_width(text: Option<&str>) -> (Meters, bool) {
     if width.is_finite() && width.get() > 0.0 {
         (width, false)
     } else {
-        (DEFAULT_RUNWAY_WIDTH, true)
+        (fallback, true)
     }
 }
 
@@ -448,32 +562,51 @@ mod tests {
     #[test]
     fn only_open_runway_centerlines_are_selected() {
         let runway = [("aeroway", "runway")];
-        assert_eq!(classify_way(&runway, &[1, 2]), WayDisposition::Centerline);
         assert_eq!(
-            classify_way(&[("aeroway", "taxiway")], &[1, 2]),
-            WayDisposition::NotRunway
+            classify_way(&runway, &[1, 2]),
+            WayDisposition::RunwayCenterline
+        );
+        assert_eq!(
+            classify_way(&[("aeroway", "apron")], &[1, 2]),
+            WayDisposition::Other
         );
         assert_eq!(
             classify_way(&[("aeroway", "runway"), ("area", "yes")], &[1, 2]),
-            WayDisposition::Area
+            WayDisposition::RunwayArea
         );
-        assert_eq!(classify_way(&runway, &[1, 2, 3, 1]), WayDisposition::Closed);
+        assert_eq!(
+            classify_way(&runway, &[1, 2, 3, 1]),
+            WayDisposition::RunwayClosed
+        );
         assert_eq!(
             classify_way(&runway, &[1]),
-            WayDisposition::Centerline,
+            WayDisposition::RunwayCenterline,
             "a one-node way is a degenerate line, not an area"
+        );
+    }
+
+    #[test]
+    fn taxiway_centerlines_include_closed_ways_but_not_areas() {
+        let taxiway = [("aeroway", "taxiway")];
+        assert_eq!(
+            classify_way(&taxiway, &[1, 2, 3, 1]),
+            WayDisposition::TaxiwayCenterline
+        );
+        assert_eq!(
+            classify_way(&[("aeroway", "taxiway"), ("area", "yes")], &[1, 2, 1]),
+            WayDisposition::TaxiwayArea
         );
     }
 
     #[test]
     fn widths_accept_bare_metres_and_explicit_units() {
         for text in ["30", "30m", " 30 m "] {
-            let (width, defaulted) = parse_width(Some(text));
+            let (width, defaulted) = parse_width(Some(text), DEFAULT_RUNWAY_WIDTH);
             assert!(!defaulted, "{text}");
             assert!((width.get() - 30.0).abs() < 1e-12, "{text}");
         }
 
-        let (width, defaulted) = parse_width(Some("150 ft"));
+        let (width, defaulted) = parse_width(Some("150 ft"), DEFAULT_RUNWAY_WIDTH);
         assert!(!defaulted);
         // 国際フィートの定義 0.3048 m/ft から独立に検算した値。
         assert!((width.get() - 45.72).abs() < 1e-12);
@@ -491,7 +624,7 @@ mod tests {
             Some("-5"),
             Some("12 yd"),
         ] {
-            let (width, defaulted) = parse_width(text);
+            let (width, defaulted) = parse_width(text, DEFAULT_RUNWAY_WIDTH);
             assert!(defaulted, "{text:?}");
             assert_eq!(width, DEFAULT_RUNWAY_WIDTH, "{text:?}");
         }
@@ -572,6 +705,75 @@ mod tests {
         );
         assert!(runways.is_empty());
         assert_eq!(report.skipped_degenerate, 1);
+    }
+
+    #[test]
+    fn taxiway_conversion_is_sorted_preserves_points_and_uses_15m_fallback() {
+        let nodes = coordinates(&[
+            (1, 35.0, 139.0),
+            (2, 35.001, 139.002),
+            (3, 35.002, 139.004),
+            (4, 36.0, 140.0),
+            (5, 36.001, 140.002),
+        ]);
+        let candidates = vec![
+            TaxiwayCandidate {
+                source_way_id: 20,
+                node_refs: vec![4, 5],
+                width: Some("8 m".to_owned()),
+            },
+            TaxiwayCandidate {
+                source_way_id: 10,
+                node_refs: vec![1, 2, 3],
+                width: None,
+            },
+        ];
+
+        let (taxiways, report) =
+            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default());
+
+        assert_eq!(
+            taxiways
+                .iter()
+                .map(|taxiway| taxiway.source_way_id)
+                .collect::<Vec<_>>(),
+            [10, 20]
+        );
+        assert_eq!(taxiways[0].points().len(), 3);
+        assert_eq!(taxiways[0].width, DEFAULT_TAXIWAY_WIDTH);
+        assert_eq!(taxiways[1].width, Meters(8.0));
+        assert_eq!(report.taxiways_written, 2);
+        assert_eq!(report.taxiway_segments_written, 3);
+        assert_eq!(report.taxiway_widths_defaulted, 1);
+    }
+
+    #[test]
+    fn taxiway_conversion_reports_missing_bad_and_collapsed_ways() {
+        let nodes = coordinates(&[(1, 35.0, 139.0), (2, f64::NAN, 139.1), (3, 35.0, 139.0)]);
+        let candidates = vec![
+            TaxiwayCandidate {
+                source_way_id: 1,
+                node_refs: vec![1, 99],
+                width: None,
+            },
+            TaxiwayCandidate {
+                source_way_id: 2,
+                node_refs: vec![1, 2],
+                width: None,
+            },
+            TaxiwayCandidate {
+                source_way_id: 3,
+                node_refs: vec![1, 3],
+                width: None,
+            },
+        ];
+        let (taxiways, report) =
+            convert_taxiway_candidates(candidates, &nodes, AirportGenerationReport::default());
+        assert!(taxiways.is_empty());
+        assert_eq!(report.skipped_taxiway_missing_nodes, 1);
+        assert_eq!(report.skipped_taxiway_bad_coordinates, 1);
+        assert_eq!(report.skipped_taxiway_degenerate, 1);
+        assert_eq!(report.taxiway_widths_defaulted, 0);
     }
 
     #[test]

@@ -32,10 +32,11 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   サンプリング、幾何誤差ベースの LOD 選択、フレーム予算つきストリーミング
 - **実地形の焼き込み** — Copernicus DEM の GeoTIFF から実行時タイルを生成する
   オフライン CLI。日付変更線と極、投影座標系の誤読、nodata を扱う
-- **OSM の滑走路を飛べる** — 利用者が用意した地域 `.osm.pbf` から
-  `aeroway=runway` の中心線を決定論的な `.fsairports` へ焼くオフライン CLI。
-  起動時に開始地点に最も近い 1 本を選び、離陸・進入・描画・灯火・着陸評価で共有する。
-  OSM 由来 DB を実際に読んだときだけ画面に帰属を表示する
+- **OSM の滑走路と誘導路を使える** — 利用者が用意した地域 `.osm.pbf` から
+  `aeroway=runway` / `aeroway=taxiway` の中心線を決定論的な `.fsairports` へ焼く
+  オフライン CLI。起動時に開始地点へ最も近い滑走路を選び、その周辺の誘導路も描画する。
+  離陸・進入・滑走路描画・灯火・着陸評価は同じ滑走路を共有し、OSM 由来 DB を実際に
+  読んだときだけ画面に帰属を表示する
 - **実地形の上をヘッドレスで飛べる** — 焼いたタイルから接地平面（標高と勾配）を作って
   FDM へ渡し、離陸 → 上昇 → 巡航 → 旋回 → 進入 → 接地までを軌跡 CSV に出力する
 - **機体 3D モデルを読める** — glTF / glb を機体軸へ合わせる補正層つき。モデルごとに
@@ -102,7 +103,7 @@ prerelease です。
 
 ## 未実装・未検証
 
-- コックピット内装（内装モデル）、OSM の taxiway・空港建物、METAR、
+- コックピット内装（内装モデル）、OSM の空港建物・apron、METAR、
   高品質なボリューム雲、難易度設定
 - HOTAS と軸の再割り当て、追加機体、リプレイ、ライブ交通、オンライン共有ワールド
 - ゲームパッドは変換ロジックとキーボード共存を自動テスト済みですが、実機での符号・
@@ -130,7 +131,7 @@ prerelease です。
 | [ADR-0005](docs/adr/0005-runtime-tile-format.md) | なぜ自前の `u16` 量子化タイル形式か |
 | [ADR-0006](docs/adr/0006-simulation-integration-layer.md) | なぜ結線を `flightsim-sim` に置くか |
 | [ADR-0007](docs/adr/0007-bevy-version.md) | なぜ Bevy 0.18.1 か |
-| [ADR-0008](docs/adr/0008-osm-airport-data.md) | OSM 滑走路の配布境界と実行時 DB |
+| [ADR-0008](docs/adr/0008-osm-airport-data.md) | OSM 滑走路・誘導路の配布境界と実行時 DB |
 
 設計の要は 1 点に集約されます。
 

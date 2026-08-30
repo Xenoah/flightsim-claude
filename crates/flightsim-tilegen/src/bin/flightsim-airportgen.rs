@@ -5,12 +5,12 @@ use flightsim_tilegen::{AirportGenerationReport, generate_airport_database};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-/// 地域 OSM PBF の滑走路中心線を実行時空港 DB へ変換する。
+/// 地域 OSM PBF の滑走路・誘導路中心線を実行時空港 DB へ変換する。
 #[derive(Debug, Parser)]
 #[command(
     name = "flightsim-airportgen",
     version,
-    about = "地域 OSM PBF の滑走路中心線を実行時空港 DB へ変換する。",
+    about = "地域 OSM PBF の滑走路・誘導路中心線を実行時空港 DB へ変換する。",
     long_about = None
 )]
 struct Cli {
@@ -44,11 +44,17 @@ fn run(cli: &Cli) -> Result<(), String> {
 
 fn print_report(report: AirportGenerationReport, output: &std::path::Path) {
     eprintln!(
-        "wrote {} runway(s) to {}",
+        "wrote {} runway(s) and {} taxiway way(s) ({} segment record(s)) to {}",
         report.runways_written,
+        report.taxiways_written,
+        report.taxiway_segments_written,
         output.display()
     );
     eprintln!("matched {} aeroway=runway way(s)", report.runway_ways_seen);
+    eprintln!(
+        "matched {} aeroway=taxiway way(s)",
+        report.taxiway_ways_seen
+    );
     if report.widths_defaulted > 0 {
         eprintln!(
             "warning: used the 45 m width fallback for {} runway(s)",
@@ -63,6 +69,25 @@ fn print_report(report: AirportGenerationReport, output: &std::path::Path) {
         report.skipped_bad_coordinates,
     );
     report_skipped("degenerate endpoint geometry", report.skipped_degenerate);
+    if report.taxiway_widths_defaulted > 0 {
+        eprintln!(
+            "warning: used the 15 m width fallback for {} taxiway(s)",
+            report.taxiway_widths_defaulted
+        );
+    }
+    report_skipped("taxiway area=yes", report.skipped_taxiway_areas);
+    report_skipped(
+        "taxiway missing referenced nodes",
+        report.skipped_taxiway_missing_nodes,
+    );
+    report_skipped(
+        "taxiway invalid node coordinates",
+        report.skipped_taxiway_bad_coordinates,
+    );
+    report_skipped(
+        "taxiway degenerate polyline geometry",
+        report.skipped_taxiway_degenerate,
+    );
 }
 
 fn report_skipped(reason: &str, count: usize) {

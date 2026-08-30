@@ -66,7 +66,9 @@ pub mod streaming;
 pub mod terrain;
 pub mod tile;
 
-pub use airport::io::{AirportDatabase, AirportDatabaseError, AirportRunway};
+pub use airport::io::{
+    AirportDatabase, AirportDatabaseError, AirportRunway, AirportTaxiway, TaxiwayGeometryError,
+};
 pub use airport::{Runway, RunwayGeometryError, RunwayOffsets};
 pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};

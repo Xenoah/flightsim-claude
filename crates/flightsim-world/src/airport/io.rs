@@ -13,8 +13,12 @@ use std::path::Path;
 /// ファイル先頭のマジックバイト。
 pub const MAGIC: [u8; 4] = *b"FSAP";
 
-/// 現在のフォーマット版。
+/// 滑走路だけを格納する従来のフォーマット版。
+///
+/// [`AirportDatabase::new`] は後方互換のため、この v1 を書き出す。
 pub const FORMAT_VERSION: u16 = 1;
+/// 誘導路の折れ線 segment を含む現在のフォーマット版。
+pub const FORMAT_VERSION_V2: u16 = 2;
 
 /// ヘッダのバイト数。
 pub const HEADER_LEN: usize = 24;
@@ -23,10 +27,14 @@ pub const HEADER_LEN: usize = 24;
 pub const RECORD_LEN: usize = 48;
 
 const RECORD_LEN_FIELD: u32 = 48;
+const V2_RECORD_LEN: usize = 64;
+const V2_RECORD_LEN_FIELD: u32 = 64;
+const RECORD_KIND_RUNWAY: u8 = 0;
+const RECORD_KIND_TAXIWAY: u8 = 1;
 
-/// 読み込む滑走路レコード数の上限。
+/// 読み込む空港レコード数の上限。
 ///
-/// 100 万本は全球の実用 DB に十分な余裕があり、payload は最大 48 MB に収まる。
+/// 100 万本は全球の実用 DB に十分な余裕があり、payload は最大 64 MB に収まる。
 /// 壊れた header の `u32::MAX` から巨大な確保を試みないための防御上限である。
 pub const MAX_RECORD_COUNT: u32 = 1_000_000;
 
@@ -186,6 +194,181 @@ impl AirportRunway {
     }
 }
 
+/// 誘導路中心線の不正な幾何。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TaxiwayGeometryError {
+    TooFewPoints,
+    InvalidCoordinate {
+        point_index: usize,
+        field: &'static str,
+        value: f64,
+    },
+    InvalidWidth {
+        value: f64,
+    },
+    CollapsedSegment {
+        segment_index: usize,
+    },
+    InconsistentStoredPoints,
+    AllocationFailed {
+        requested: usize,
+    },
+}
+
+impl core::fmt::Display for TaxiwayGeometryError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::TooFewPoints => write!(formatter, "taxiway needs at least two points"),
+            Self::InvalidCoordinate {
+                point_index,
+                field,
+                value,
+            } => write!(
+                formatter,
+                "taxiway point {point_index} {field} has invalid value {value} radians"
+            ),
+            Self::InvalidWidth { value } => write!(
+                formatter,
+                "taxiway width must be positive and finite, got {value} m"
+            ),
+            Self::CollapsedSegment { segment_index } => {
+                write!(formatter, "taxiway segment {segment_index} is collapsed")
+            }
+            Self::InconsistentStoredPoints => {
+                write!(
+                    formatter,
+                    "taxiway points no longer match stored coordinates"
+                )
+            }
+            Self::AllocationFailed { requested } => write!(
+                formatter,
+                "could not allocate storage for {requested} taxiway points"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for TaxiwayGeometryError {}
+
+/// OSM の `aeroway=taxiway` 中心線 way。
+#[derive(Debug, Clone, PartialEq)]
+pub struct AirportTaxiway {
+    pub source_way_id: i64,
+    pub width: Meters,
+    points: Vec<Geodetic>,
+    point_degrees: Vec<(f64, f64)>,
+}
+
+impl AirportTaxiway {
+    /// 中心線の全 node を OSM 順に保持する。
+    /// 各点の高度は保存せず、FSAP の契約どおり 0 m へ揃える。
+    ///
+    /// # Errors
+    /// 点が 2 個未満、座標・幅が不正、またはいずれかの隣接点が縮退している場合。
+    pub fn from_points(
+        source_way_id: i64,
+        points: Vec<Geodetic>,
+        width: Meters,
+    ) -> Result<Self, TaxiwayGeometryError> {
+        let mut point_degrees = Vec::new();
+        point_degrees.try_reserve_exact(points.len()).map_err(|_| {
+            TaxiwayGeometryError::AllocationFailed {
+                requested: points.len(),
+            }
+        })?;
+        point_degrees.extend(
+            points
+                .into_iter()
+                .map(|point| (point.latitude_degrees(), point.longitude_degrees())),
+        );
+        Self::from_degree_points(source_way_id, point_degrees, width)
+    }
+
+    fn from_degree_points(
+        source_way_id: i64,
+        point_degrees: Vec<(f64, f64)>,
+        width: Meters,
+    ) -> Result<Self, TaxiwayGeometryError> {
+        validate_taxiway_geometry(&point_degrees, width)?;
+        let mut points = Vec::new();
+        points.try_reserve_exact(point_degrees.len()).map_err(|_| {
+            TaxiwayGeometryError::AllocationFailed {
+                requested: point_degrees.len(),
+            }
+        })?;
+        points.extend(
+            point_degrees
+                .iter()
+                .map(|&(latitude, longitude)| Geodetic::from_degrees(latitude, longitude, 0.0)),
+        );
+        Ok(Self {
+            source_way_id,
+            width,
+            points,
+            point_degrees,
+        })
+    }
+
+    #[must_use]
+    pub fn points(&self) -> &[Geodetic] {
+        &self.points
+    }
+
+    fn validate_for_storage(&self) -> Result<(), TaxiwayGeometryError> {
+        validate_taxiway_geometry(&self.point_degrees, self.width)?;
+        if self.point_degrees.len() != self.points.len()
+            || self
+                .point_degrees
+                .iter()
+                .zip(&self.points)
+                .any(|(&(latitude, longitude), point)| {
+                    Geodetic::from_degrees(latitude, longitude, 0.0) != *point
+                })
+        {
+            return Err(TaxiwayGeometryError::InconsistentStoredPoints);
+        }
+        Ok(())
+    }
+}
+
+fn validate_taxiway_geometry(
+    point_degrees: &[(f64, f64)],
+    width: Meters,
+) -> Result<(), TaxiwayGeometryError> {
+    if point_degrees.len() < 2 {
+        return Err(TaxiwayGeometryError::TooFewPoints);
+    }
+    if !width.is_finite() || width.get() <= 0.0 {
+        return Err(TaxiwayGeometryError::InvalidWidth { value: width.get() });
+    }
+
+    let mut previous = None;
+    for (point_index, &(latitude, longitude)) in point_degrees.iter().enumerate() {
+        let point = Geodetic::from_degrees(latitude, longitude, 0.0);
+        if validate_horizontal_coordinate(point, "taxiway_point").is_err() {
+            let (field, value) = if !latitude.is_finite() || !(-90.0..=90.0).contains(&latitude) {
+                ("latitude", point.latitude.get())
+            } else {
+                ("longitude", point.longitude.get())
+            };
+            return Err(TaxiwayGeometryError::InvalidCoordinate {
+                point_index,
+                field,
+                value,
+            });
+        }
+        if previous.is_some_and(|previous| {
+            Runway::from_endpoints(previous, point, width, Meters::ZERO).is_err()
+        }) {
+            return Err(TaxiwayGeometryError::CollapsedSegment {
+                segment_index: point_index - 1,
+            });
+        }
+        previous = Some(point);
+    }
+    Ok(())
+}
+
 /// FSAP DB の構築・読み書きに失敗した理由。
 #[derive(Debug)]
 pub enum AirportDatabaseError {
@@ -229,13 +412,25 @@ pub enum AirportDatabaseError {
     AllocationFailed {
         requested: usize,
     },
-    TooManyRunways {
+    TooManyRecords {
         count: usize,
+    },
+    DuplicateTaxiwayWayId {
+        source_way_id: i64,
     },
     InvalidRunway {
         record_index: usize,
         source_way_id: i64,
         source: RunwayGeometryError,
+    },
+    InvalidTaxiway {
+        record_index: usize,
+        source_way_id: i64,
+        source: TaxiwayGeometryError,
+    },
+    InvalidV2Record {
+        record_index: usize,
+        message: &'static str,
     },
 }
 
@@ -254,7 +449,7 @@ impl core::fmt::Display for AirportDatabaseError {
             ),
             Self::UnsupportedVersion { found, supported } => write!(
                 formatter,
-                "airport database version {found} is not supported (this build reads version {supported})"
+                "airport database version {found} is not supported (this build reads versions 1 through {supported})"
             ),
             Self::UnsupportedFlags(flags) => write!(
                 formatter,
@@ -262,7 +457,7 @@ impl core::fmt::Display for AirportDatabaseError {
             ),
             Self::UnsupportedRecordSize { found, supported } => write!(
                 formatter,
-                "airport record size {found} is not supported (version 1 requires {supported})"
+                "airport record size {found} is not supported (this version requires {supported})"
             ),
             Self::RecordCountExceedsLimit { found, maximum } => write!(
                 formatter,
@@ -284,9 +479,13 @@ impl core::fmt::Display for AirportDatabaseError {
                 formatter,
                 "could not allocate {requested} bytes for the airport database"
             ),
-            Self::TooManyRunways { count } => write!(
+            Self::TooManyRecords { count } => write!(
                 formatter,
-                "airport database has {count} runways; the safe runtime limit is {MAX_RECORD_COUNT}"
+                "airport database has {count} records; the safe runtime limit is {MAX_RECORD_COUNT}"
+            ),
+            Self::DuplicateTaxiwayWayId { source_way_id } => write!(
+                formatter,
+                "airport database has more than one taxiway for OSM way {source_way_id}"
             ),
             Self::InvalidRunway {
                 record_index,
@@ -295,6 +494,21 @@ impl core::fmt::Display for AirportDatabaseError {
             } => write!(
                 formatter,
                 "airport record {record_index} (OSM way {source_way_id}) is invalid: {source}"
+            ),
+            Self::InvalidTaxiway {
+                record_index,
+                source_way_id,
+                source,
+            } => write!(
+                formatter,
+                "taxiway record {record_index} (OSM way {source_way_id}) is invalid: {source}"
+            ),
+            Self::InvalidV2Record {
+                record_index,
+                message,
+            } => write!(
+                formatter,
+                "FSAP v2 record {record_index} is invalid: {message}"
             ),
         }
     }
@@ -305,6 +519,7 @@ impl std::error::Error for AirportDatabaseError {
         match self {
             Self::Io(error) => Some(error),
             Self::InvalidRunway { source, .. } => Some(source),
+            Self::InvalidTaxiway { source, .. } => Some(source),
             _ => None,
         }
     }
@@ -320,6 +535,8 @@ impl From<std::io::Error> for AirportDatabaseError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AirportDatabase {
     runways: Vec<AirportRunway>,
+    taxiways: Vec<AirportTaxiway>,
+    format_version: u16,
 }
 
 impl AirportDatabase {
@@ -335,7 +552,7 @@ impl AirportDatabase {
             Err(_) => true,
         };
         if exceeds_limit {
-            return Err(AirportDatabaseError::TooManyRunways {
+            return Err(AirportDatabaseError::TooManyRecords {
                 count: runways.len(),
             });
         }
@@ -351,7 +568,60 @@ impl AirportDatabase {
         }
 
         runways.sort_by(compare_runways);
-        Ok(Self { runways })
+        Ok(Self {
+            runways,
+            taxiways: Vec::new(),
+            format_version: FORMAT_VERSION,
+        })
+    }
+
+    /// 滑走路と誘導路を持つ FSAP v2 DB を構築する。
+    pub fn with_taxiways(
+        mut runways: Vec<AirportRunway>,
+        mut taxiways: Vec<AirportTaxiway>,
+    ) -> Result<Self, AirportDatabaseError> {
+        let segment_count = taxiways.iter().try_fold(0_usize, |total, taxiway| {
+            total.checked_add(taxiway.points.len().saturating_sub(1))
+        });
+        let count = segment_count
+            .and_then(|segments| segments.checked_add(runways.len()))
+            .ok_or(AirportDatabaseError::TooManyRecords { count: usize::MAX })?;
+        if count > MAX_RECORD_COUNT as usize {
+            return Err(AirportDatabaseError::TooManyRecords { count });
+        }
+        for (record_index, runway) in runways.iter().enumerate() {
+            runway.validate_for_storage().map_err(|source| {
+                AirportDatabaseError::InvalidRunway {
+                    record_index,
+                    source_way_id: runway.source_way_id,
+                    source,
+                }
+            })?;
+        }
+        for (record_index, taxiway) in taxiways.iter().enumerate() {
+            taxiway.validate_for_storage().map_err(|source| {
+                AirportDatabaseError::InvalidTaxiway {
+                    record_index,
+                    source_way_id: taxiway.source_way_id,
+                    source,
+                }
+            })?;
+        }
+        runways.sort_by(compare_runways);
+        taxiways.sort_by(|left, right| left.source_way_id.cmp(&right.source_way_id));
+        if let Some(duplicate) = taxiways
+            .windows(2)
+            .find(|pair| pair[0].source_way_id == pair[1].source_way_id)
+        {
+            return Err(AirportDatabaseError::DuplicateTaxiwayWayId {
+                source_way_id: duplicate[0].source_way_id,
+            });
+        }
+        Ok(Self {
+            runways,
+            taxiways,
+            format_version: FORMAT_VERSION_V2,
+        })
     }
 
     /// 格納された滑走路。順序は決定論的。
@@ -360,10 +630,15 @@ impl AirportDatabase {
         &self.runways
     }
 
+    #[must_use]
+    pub fn taxiways(&self) -> &[AirportTaxiway] {
+        &self.taxiways
+    }
+
     /// DB が空か。
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.runways.is_empty()
+        self.runways.is_empty() && self.taxiways.is_empty()
     }
 
     /// 滑走路数。
@@ -406,7 +681,7 @@ impl AirportDatabase {
         })
     }
 
-    /// FSAP v1 の bytes を検証して読む。
+    /// FSAP v1 または v2 の bytes を検証して読む。
     ///
     /// # Errors
     ///
@@ -448,56 +723,153 @@ impl AirportDatabase {
             });
         }
 
+        let (runway_count, taxiway_segment_count) = if header.version == FORMAT_VERSION {
+            (header.count, 0)
+        } else {
+            payload.chunks_exact(header.record_len).fold(
+                (0_usize, 0_usize),
+                |(runways, taxiways), record| match record[0] {
+                    RECORD_KIND_RUNWAY => (runways + 1, taxiways),
+                    RECORD_KIND_TAXIWAY => (runways, taxiways + 1),
+                    _ => (runways, taxiways),
+                },
+            )
+        };
+
         let mut runways = Vec::new();
-        runways.try_reserve_exact(header.count).map_err(|_| {
+        runways.try_reserve_exact(runway_count).map_err(|_| {
             AirportDatabaseError::AllocationFailed {
                 requested: header.payload_len,
             }
         })?;
-        for (record_index, record) in payload.chunks_exact(RECORD_LEN).enumerate() {
-            let source_way_id = read_i64(record, 0);
-            let threshold_latitude = read_f64(record, 8);
-            let threshold_longitude = read_f64(record, 16);
-            let opposite_latitude = read_f64(record, 24);
-            let opposite_longitude = read_f64(record, 32);
-            let width = Meters(read_f64(record, 40));
-
-            let runway = AirportRunway::from_degree_endpoints(
-                source_way_id,
-                threshold_latitude,
-                threshold_longitude,
-                opposite_latitude,
-                opposite_longitude,
-                width,
-            )
-            .map_err(|source| AirportDatabaseError::InvalidRunway {
-                record_index,
-                source_way_id,
-                source,
+        let mut taxiway_segments = Vec::new();
+        taxiway_segments
+            .try_reserve_exact(taxiway_segment_count)
+            .map_err(|_| AirportDatabaseError::AllocationFailed {
+                requested: header.payload_len,
             })?;
-            runways.push(runway);
+        for (record_index, record) in payload.chunks_exact(header.record_len).enumerate() {
+            if header.version == FORMAT_VERSION {
+                let source_way_id = read_i64(record, 0);
+                let runway = AirportRunway::from_degree_endpoints(
+                    source_way_id,
+                    read_f64(record, 8),
+                    read_f64(record, 16),
+                    read_f64(record, 24),
+                    read_f64(record, 32),
+                    Meters(read_f64(record, 40)),
+                )
+                .map_err(|source| AirportDatabaseError::InvalidRunway {
+                    record_index,
+                    source_way_id,
+                    source,
+                })?;
+                runways.push(runway);
+                continue;
+            }
+
+            if record[1..8].iter().any(|byte| *byte != 0) {
+                return Err(AirportDatabaseError::InvalidV2Record {
+                    record_index,
+                    message: "reserved bytes are non-zero",
+                });
+            }
+            if read_u32(record, 20) != 0 {
+                return Err(AirportDatabaseError::InvalidV2Record {
+                    record_index,
+                    message: "record flags are non-zero",
+                });
+            }
+            let source_way_id = read_i64(record, 8);
+            let segment_index = read_u32(record, 16);
+            let first = (read_f64(record, 24), read_f64(record, 32));
+            let last = (read_f64(record, 40), read_f64(record, 48));
+            let width = Meters(read_f64(record, 56));
+            match record[0] {
+                RECORD_KIND_RUNWAY => {
+                    if segment_index != 0 {
+                        return Err(AirportDatabaseError::InvalidV2Record {
+                            record_index,
+                            message: "runway segment index is non-zero",
+                        });
+                    }
+                    let runway = AirportRunway::from_degree_endpoints(
+                        source_way_id,
+                        first.0,
+                        first.1,
+                        last.0,
+                        last.1,
+                        width,
+                    )
+                    .map_err(|source| AirportDatabaseError::InvalidRunway {
+                        record_index,
+                        source_way_id,
+                        source,
+                    })?;
+                    runways.push(runway);
+                }
+                RECORD_KIND_TAXIWAY => taxiway_segments.push(RawTaxiwaySegment {
+                    source_way_id,
+                    segment_index,
+                    first,
+                    last,
+                    width,
+                    record_index,
+                }),
+                _ => {
+                    return Err(AirportDatabaseError::InvalidV2Record {
+                        record_index,
+                        message: "unknown record kind",
+                    });
+                }
+            }
         }
 
-        Self::new(runways)
+        if header.version == FORMAT_VERSION {
+            Self::new(runways)
+        } else {
+            let taxiways = assemble_taxiways(taxiway_segments)?;
+            Self::with_taxiways(runways, taxiways)
+        }
     }
 
-    /// FSAP v1 bytes を作る。
+    /// DB の版に対応する FSAP bytes を作る。
     ///
     /// # Errors
     ///
     /// 公開フィールドが保存端点と不整合になっている場合、件数が上限を超える場合、
     /// または必要なメモリを確保できない場合。
     pub fn to_bytes(&self) -> Result<Vec<u8>, AirportDatabaseError> {
-        let record_count = u32::try_from(self.runways.len()).map_err(|_| {
-            AirportDatabaseError::TooManyRunways {
-                count: self.runways.len(),
-            }
-        })?;
-        let payload_len = self.runways.len().checked_mul(RECORD_LEN).ok_or(
-            AirportDatabaseError::TooManyRunways {
-                count: self.runways.len(),
-            },
-        )?;
+        let taxiway_segment_count = self
+            .taxiways
+            .iter()
+            .try_fold(0_usize, |total, taxiway| {
+                total.checked_add(taxiway.points.len().saturating_sub(1))
+            })
+            .ok_or(AirportDatabaseError::TooManyRecords { count: usize::MAX })?;
+        let total_records = if self.format_version == FORMAT_VERSION_V2 {
+            self.runways
+                .len()
+                .checked_add(taxiway_segment_count)
+                .ok_or(AirportDatabaseError::TooManyRecords { count: usize::MAX })?
+        } else {
+            self.runways.len()
+        };
+        let record_count =
+            u32::try_from(total_records).map_err(|_| AirportDatabaseError::TooManyRecords {
+                count: total_records,
+            })?;
+        let record_len = if self.format_version == FORMAT_VERSION_V2 {
+            V2_RECORD_LEN
+        } else {
+            RECORD_LEN
+        };
+        let payload_len =
+            total_records
+                .checked_mul(record_len)
+                .ok_or(AirportDatabaseError::TooManyRecords {
+                    count: total_records,
+                })?;
 
         let mut payload = Vec::new();
         payload.try_reserve_exact(payload_len).map_err(|_| {
@@ -513,12 +885,58 @@ impl AirportDatabase {
                     source,
                 }
             })?;
-            payload.extend_from_slice(&airport_runway.source_way_id.to_le_bytes());
-            payload.extend_from_slice(&airport_runway.threshold_latitude_degrees.to_le_bytes());
-            payload.extend_from_slice(&airport_runway.threshold_longitude_degrees.to_le_bytes());
-            payload.extend_from_slice(&airport_runway.opposite_latitude_degrees.to_le_bytes());
-            payload.extend_from_slice(&airport_runway.opposite_longitude_degrees.to_le_bytes());
-            payload.extend_from_slice(&airport_runway.runway.width.get().to_le_bytes());
+            if self.format_version == FORMAT_VERSION_V2 {
+                write_v2_record(
+                    &mut payload,
+                    RECORD_KIND_RUNWAY,
+                    airport_runway.source_way_id,
+                    0,
+                    (
+                        airport_runway.threshold_latitude_degrees,
+                        airport_runway.threshold_longitude_degrees,
+                    ),
+                    (
+                        airport_runway.opposite_latitude_degrees,
+                        airport_runway.opposite_longitude_degrees,
+                    ),
+                    airport_runway.runway.width,
+                );
+            } else {
+                payload.extend_from_slice(&airport_runway.source_way_id.to_le_bytes());
+                payload.extend_from_slice(&airport_runway.threshold_latitude_degrees.to_le_bytes());
+                payload
+                    .extend_from_slice(&airport_runway.threshold_longitude_degrees.to_le_bytes());
+                payload.extend_from_slice(&airport_runway.opposite_latitude_degrees.to_le_bytes());
+                payload.extend_from_slice(&airport_runway.opposite_longitude_degrees.to_le_bytes());
+                payload.extend_from_slice(&airport_runway.runway.width.get().to_le_bytes());
+            }
+        }
+        if self.format_version == FORMAT_VERSION_V2 {
+            for (taxiway_index, taxiway) in self.taxiways.iter().enumerate() {
+                taxiway.validate_for_storage().map_err(|source| {
+                    AirportDatabaseError::InvalidTaxiway {
+                        record_index: self.runways.len() + taxiway_index,
+                        source_way_id: taxiway.source_way_id,
+                        source,
+                    }
+                })?;
+                for (segment_index, pair) in taxiway.point_degrees.windows(2).enumerate() {
+                    let segment_index = u32::try_from(segment_index).map_err(|_| {
+                        AirportDatabaseError::TooManyRecords {
+                            count: total_records,
+                        }
+                    })?;
+                    write_v2_record(
+                        &mut payload,
+                        RECORD_KIND_TAXIWAY,
+                        taxiway.source_way_id,
+                        segment_index,
+                        pair[0],
+                        pair[1],
+                        taxiway.width,
+                    );
+                }
+            }
         }
         debug_assert_eq!(payload.len(), payload_len);
 
@@ -530,17 +948,22 @@ impl AirportDatabase {
                 requested: total_len,
             })?;
         bytes.extend_from_slice(&MAGIC);
-        bytes.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&self.format_version.to_le_bytes());
         bytes.extend_from_slice(&0_u16.to_le_bytes());
         bytes.extend_from_slice(&record_count.to_le_bytes());
-        bytes.extend_from_slice(&RECORD_LEN_FIELD.to_le_bytes());
+        let record_len_field = if self.format_version == FORMAT_VERSION_V2 {
+            V2_RECORD_LEN_FIELD
+        } else {
+            RECORD_LEN_FIELD
+        };
+        bytes.extend_from_slice(&record_len_field.to_le_bytes());
         bytes.extend_from_slice(&fnv1a(&payload).to_le_bytes());
         debug_assert_eq!(bytes.len(), HEADER_LEN);
         bytes.extend_from_slice(&payload);
         Ok(bytes)
     }
 
-    /// reader から FSAP v1 DB を読む。
+    /// reader から FSAP v1 または v2 DB を読む。
     ///
     /// # Errors
     ///
@@ -581,7 +1004,7 @@ impl AirportDatabase {
         Self::from_payload(&header, &payload)
     }
 
-    /// path の FSAP v1 DB を読む。
+    /// path の FSAP v1 または v2 DB を読む。
     ///
     /// # Errors
     ///
@@ -591,7 +1014,7 @@ impl AirportDatabase {
         Self::read_from(&mut file)
     }
 
-    /// writer へ FSAP v1 DB を書く。
+    /// writer へ DB の版に対応する FSAP bytes を書く。
     ///
     /// # Errors
     ///
@@ -604,7 +1027,9 @@ impl AirportDatabase {
 
 #[derive(Debug, Clone, Copy)]
 struct ParsedHeader {
+    version: u16,
     count: usize,
+    record_len: usize,
     payload_len: usize,
     expected_len: usize,
     checksum: u64,
@@ -619,10 +1044,10 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, AirportDatabaseError> {
     }
 
     let version = read_u16(bytes, 4);
-    if version != FORMAT_VERSION {
+    if version != FORMAT_VERSION && version != FORMAT_VERSION_V2 {
         return Err(AirportDatabaseError::UnsupportedVersion {
             found: version,
-            supported: FORMAT_VERSION,
+            supported: FORMAT_VERSION_V2,
         });
     }
 
@@ -631,11 +1056,16 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, AirportDatabaseError> {
         return Err(AirportDatabaseError::UnsupportedFlags(flags));
     }
 
+    let (record_len, expected_record_size) = if version == FORMAT_VERSION {
+        (RECORD_LEN, RECORD_LEN_FIELD)
+    } else {
+        (V2_RECORD_LEN, V2_RECORD_LEN_FIELD)
+    };
     let record_size = read_u32(bytes, 12);
-    if record_size != RECORD_LEN_FIELD {
+    if record_size != expected_record_size {
         return Err(AirportDatabaseError::UnsupportedRecordSize {
             found: record_size,
-            supported: RECORD_LEN_FIELD,
+            supported: expected_record_size,
         });
     }
 
@@ -649,14 +1079,16 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, AirportDatabaseError> {
     let count = usize::try_from(record_count)
         .map_err(|_| AirportDatabaseError::SizeOverflow { record_count })?;
     let payload_len = count
-        .checked_mul(RECORD_LEN)
+        .checked_mul(record_len)
         .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
     let expected_len = HEADER_LEN
         .checked_add(payload_len)
         .ok_or(AirportDatabaseError::SizeOverflow { record_count })?;
 
     Ok(ParsedHeader {
+        version,
         count,
+        record_len,
         payload_len,
         expected_len,
         checksum: read_u64(bytes, 16),
@@ -684,6 +1116,111 @@ fn read_exact_or_truncated<R: Read>(
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RawTaxiwaySegment {
+    source_way_id: i64,
+    segment_index: u32,
+    first: (f64, f64),
+    last: (f64, f64),
+    width: Meters,
+    record_index: usize,
+}
+
+fn assemble_taxiways(
+    mut segments: Vec<RawTaxiwaySegment>,
+) -> Result<Vec<AirportTaxiway>, AirportDatabaseError> {
+    segments.sort_by_key(|segment| (segment.source_way_id, segment.segment_index));
+    let taxiway_count = segments
+        .iter()
+        .enumerate()
+        .filter(|(index, segment)| {
+            *index == 0 || segments[*index - 1].source_way_id != segment.source_way_id
+        })
+        .count();
+    let mut taxiways = Vec::new();
+    taxiways.try_reserve_exact(taxiway_count).map_err(|_| {
+        AirportDatabaseError::AllocationFailed {
+            requested: taxiway_count,
+        }
+    })?;
+    let mut cursor = 0;
+    while cursor < segments.len() {
+        let source_way_id = segments[cursor].source_way_id;
+        let start = cursor;
+        while cursor < segments.len() && segments[cursor].source_way_id == source_way_id {
+            cursor += 1;
+        }
+        let group = &segments[start..cursor];
+        let point_count =
+            group
+                .len()
+                .checked_add(1)
+                .ok_or(AirportDatabaseError::AllocationFailed {
+                    requested: usize::MAX,
+                })?;
+        let mut points = Vec::new();
+        points.try_reserve_exact(point_count).map_err(|_| {
+            AirportDatabaseError::AllocationFailed {
+                requested: point_count,
+            }
+        })?;
+        points.push(group[0].first);
+        for (expected_index, segment) in group.iter().enumerate() {
+            if usize::try_from(segment.segment_index) != Ok(expected_index) {
+                return Err(AirportDatabaseError::InvalidV2Record {
+                    record_index: segment.record_index,
+                    message: "taxiway segment indices are not contiguous from zero",
+                });
+            }
+            if segment.width.get().total_cmp(&group[0].width.get()).is_ne() {
+                return Err(AirportDatabaseError::InvalidV2Record {
+                    record_index: segment.record_index,
+                    message: "taxiway segments disagree on width",
+                });
+            }
+            if points.last().is_none_or(|point| {
+                point.0.to_bits() != segment.first.0.to_bits()
+                    || point.1.to_bits() != segment.first.1.to_bits()
+            }) {
+                return Err(AirportDatabaseError::InvalidV2Record {
+                    record_index: segment.record_index,
+                    message: "taxiway segments do not form one continuous polyline",
+                });
+            }
+            points.push(segment.last);
+        }
+        let taxiway = AirportTaxiway::from_degree_points(source_way_id, points, group[0].width)
+            .map_err(|source| AirportDatabaseError::InvalidTaxiway {
+                record_index: group[0].record_index,
+                source_way_id,
+                source,
+            })?;
+        taxiways.push(taxiway);
+    }
+    Ok(taxiways)
+}
+
+fn write_v2_record(
+    payload: &mut Vec<u8>,
+    kind: u8,
+    source_way_id: i64,
+    segment_index: u32,
+    first: (f64, f64),
+    last: (f64, f64),
+    width: Meters,
+) {
+    payload.push(kind);
+    payload.extend_from_slice(&[0_u8; 7]);
+    payload.extend_from_slice(&source_way_id.to_le_bytes());
+    payload.extend_from_slice(&segment_index.to_le_bytes());
+    payload.extend_from_slice(&0_u32.to_le_bytes());
+    payload.extend_from_slice(&first.0.to_le_bytes());
+    payload.extend_from_slice(&first.1.to_le_bytes());
+    payload.extend_from_slice(&last.0.to_le_bytes());
+    payload.extend_from_slice(&last.1.to_le_bytes());
+    payload.extend_from_slice(&width.get().to_le_bytes());
 }
 
 fn compare_runways(left: &AirportRunway, right: &AirportRunway) -> Ordering {
@@ -810,6 +1347,24 @@ mod tests {
         .expect("sample database should be valid")
     }
 
+    fn sample_taxiway(source_way_id: i64) -> AirportTaxiway {
+        AirportTaxiway::from_points(
+            source_way_id,
+            vec![
+                Geodetic::from_degrees(35.0, 139.0, 0.0),
+                Geodetic::from_degrees(35.001, 139.002, 0.0),
+                Geodetic::from_degrees(35.003, 139.004, 0.0),
+            ],
+            Meters(15.0),
+        )
+        .expect("sample taxiway should be valid")
+    }
+
+    fn refresh_checksum(bytes: &mut [u8]) {
+        let checksum = fnv1a(&bytes[HEADER_LEN..]);
+        bytes[16..24].copy_from_slice(&checksum.to_le_bytes());
+    }
+
     #[derive(Debug)]
     struct CountingReader {
         inner: Cursor<Vec<u8>>,
@@ -858,6 +1413,105 @@ mod tests {
             .write_to(&mut via_writer)
             .expect("writer API should succeed");
         assert_eq!(via_writer, bytes);
+    }
+
+    #[test]
+    fn v2_round_trip_preserves_taxiway_polylines_and_v1_runway_selection() {
+        let runways = sample_database().runways().to_vec();
+        let database =
+            AirportDatabase::with_taxiways(runways, vec![sample_taxiway(20), sample_taxiway(10)])
+                .expect("v2 database should be valid");
+        let bytes = database.to_bytes().expect("v2 encoding should succeed");
+        assert_eq!(read_u16(&bytes, 4), FORMAT_VERSION_V2);
+        assert_eq!(read_u32(&bytes, 12), V2_RECORD_LEN_FIELD);
+
+        let restored = AirportDatabase::from_bytes(&bytes).expect("v2 decoding should succeed");
+        assert_eq!(restored, database);
+        assert_eq!(restored.to_bytes().expect("v2 re-encoding"), bytes);
+        assert_eq!(
+            restored
+                .taxiways()
+                .iter()
+                .map(|taxiway| taxiway.source_way_id)
+                .collect::<Vec<_>>(),
+            [10, 20]
+        );
+        assert_eq!(restored.taxiways()[0].points().len(), 3);
+        assert_eq!(restored.taxiways()[0].width, Meters(15.0));
+        assert_eq!(
+            restored
+                .nearest(Geodetic::from_degrees(35.55, 139.78, 0.0))
+                .expect("runways remain selectable")
+                .source_way_id,
+            900
+        );
+    }
+
+    #[test]
+    fn a_taxiway_only_database_is_not_empty() {
+        let database = AirportDatabase::with_taxiways(Vec::new(), vec![sample_taxiway(10)])
+            .expect("v2 database should be valid");
+
+        assert!(!database.is_empty());
+        assert_eq!(database.len(), 0, "len continues to mean runway count");
+        assert_eq!(database.taxiways().len(), 1);
+    }
+
+    #[test]
+    fn duplicate_taxiway_way_ids_are_rejected_before_serialization() {
+        let result = AirportDatabase::with_taxiways(
+            Vec::new(),
+            vec![sample_taxiway(10), sample_taxiway(10)],
+        );
+
+        assert!(matches!(
+            result,
+            Err(AirportDatabaseError::DuplicateTaxiwayWayId { source_way_id: 10 })
+        ));
+    }
+
+    #[test]
+    fn v2_rejects_unknown_kind_reserved_flags_gaps_and_broken_chains() {
+        let database = AirportDatabase::with_taxiways(Vec::new(), vec![sample_taxiway(10)])
+            .expect("v2 database should be valid");
+        let reference = database.to_bytes().expect("v2 encoding should succeed");
+
+        for (offset, value, message) in [
+            (HEADER_LEN, 9_u8, "unknown record kind"),
+            (HEADER_LEN + 1, 1, "reserved bytes are non-zero"),
+            (HEADER_LEN + 20, 1, "record flags are non-zero"),
+        ] {
+            let mut bytes = reference.clone();
+            bytes[offset] = value;
+            refresh_checksum(&mut bytes);
+            assert!(matches!(
+                AirportDatabase::from_bytes(&bytes),
+                Err(AirportDatabaseError::InvalidV2Record {
+                    message: found,
+                    ..
+                }) if found == message
+            ));
+        }
+
+        let mut gap = reference.clone();
+        gap[HEADER_LEN + 16..HEADER_LEN + 20].copy_from_slice(&1_u32.to_le_bytes());
+        refresh_checksum(&mut gap);
+        assert!(matches!(
+            AirportDatabase::from_bytes(&gap),
+            Err(AirportDatabaseError::InvalidV2Record { .. })
+        ));
+
+        let mut broken = reference;
+        let second = HEADER_LEN + V2_RECORD_LEN;
+        broken[second + 24..second + 32].copy_from_slice(&36.0_f64.to_le_bytes());
+        refresh_checksum(&mut broken);
+        assert!(matches!(
+            AirportDatabase::from_bytes(&broken),
+            Err(AirportDatabaseError::InvalidV2Record {
+                message: "taxiway segments do not form one continuous polyline",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -940,12 +1594,12 @@ mod tests {
             .expect("encoding should succeed");
 
         let mut version = reference.clone();
-        version[4..6].copy_from_slice(&2_u16.to_le_bytes());
+        version[4..6].copy_from_slice(&3_u16.to_le_bytes());
         assert!(matches!(
             AirportDatabase::from_bytes(&version),
             Err(AirportDatabaseError::UnsupportedVersion {
-                found: 2,
-                supported: 1
+                found: 3,
+                supported: 2
             })
         ));
 
