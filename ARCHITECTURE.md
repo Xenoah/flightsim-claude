@@ -150,11 +150,20 @@ LOD は幾何誤差ベースの screen-space error で選択する（距離ベ�
 
 実行時タイル形式 `.fsdem` は `u16` 量子化 + タイル毎スケールの自前バイナリ（[ADR-0005](docs/adr/0005-runtime-tile-format.md)）。焼き込みは `flightsim-tilegen` が行う。
 
-OSM の滑走路と誘導路は、利用者が用意した地域 PBF から `flightsim-airportgen` が
-`aeroway=runway` / `aeroway=taxiway` の中心線を固定長 `.fsairports` へ焼く。
+OSM の空港設備は、利用者が用意した地域 PBF から `flightsim-airportgen` が
+滑走路・誘導路中心線、apron polygon、待機位置、地上灯火と必要な文字列属性を
+section-directory 形式の `.fsairports` FSAP v3 へ焼く。reader は既存の FSAP v1 / v2
+bytes も引き続き読み、writer も v1 / v2 の byte 互換性を維持する。v3 は payload
+集約済み文字列と参照の展開量はそれぞれ 16 MiB、payload は 96 MiB、固定長
+record 合計は 1,000,000 を上限とし、section の順序・
+範囲・schema・flags・record size・checksum・末尾を確保前に厳格検査する。
+
 実行時は PBF デコーダに依存せず、開始地点から ECEF 距離が最小の滑走路を選び、
-その周辺の誘導路を描画する。元 PBF と派生 DB は同梱しない
-（[ADR-0008](docs/adr/0008-osm-airport-data.md)）。
+その中心から 15 km 圏と交差する誘導路・apron、および圏内の待機位置・灯火だけを描く。
+apron の各三角形頂点、誘導路の各 node、待機位置・標識・灯火で DEM を引く。surface は
+apron → 誘導路 → 滑走路の順に lift を上げ、各路面標示と灯火にも固定 lift を割り当てて
+重なりを決定論的にする。
+元 PBF と派生 DB は同梱しない（[ADR-0008](docs/adr/0008-osm-airport-data.md)）。
 
 Copernicus DEM GLO-30 の鉛直基準は EGM2008 だが、現在の tilegen は WGS84 楕円体高へ
 変換していない。地形・接地・滑走路は同じ数値を共有するので局所的には整合するが、
@@ -182,14 +191,14 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 |---|---|
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ、描画座標フレーム |
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF、失速、プロペラ推力、3 点式着陸装置、接地摩擦・ブレーキ、RK4、定常風と決定論的乱流 |
-| `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路、`.fsairports` v1/v2 の検証と最寄り滑走路選択 |
-| `flightsim-tilegen` | GeoTIFF の地理参照解釈・地形タイル焼き込み、OSM PBF の滑走路・誘導路 DB 焼き込み CLI |
+| `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路、`.fsairports` v1/v2/v3 の厳格検証と最寄り滑走路選択 |
+| `flightsim-tilegen` | GeoTIFF の地理参照解釈・地形タイル焼き込み、OSM PBF の滑走路・誘導路・apron・待機位置・地上灯火 DB 焼き込み CLI |
 | `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
 | `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
-| `flightsim-render` | 地形・滑走路・誘導路・滑走路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、決定論的な雲層と雲中視程、glTF の軸・倍率補正 |
+| `flightsim-render` | 地形・滑走路・誘導路・apron・待機位置標示・ASCII 物理標識・滑走路/誘導路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、決定論的な雲層と雲中視程、glTF の軸・倍率補正 |
 | `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
 | `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤、利用中データの帰属表示 |
-| `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と周辺誘導路、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
+| `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
 
 雲場は固定 seed の周期的な 2D value/fBm noise を緯度・経度と `TimeOfDay` から
 サンプルするため、同じ設定なら同じ結果になる。雲底・雲頂は alpha mask 付きの
@@ -206,8 +215,7 @@ PBR 平面で表し、カメラが層内に入ったときだけ distance fog �
 ### 未実装
 
 - コックピット内装の 3D モデル（計器盤・計器照明・滑走路灯は実装済み）
-- OSM の空港建物・apron、地表画像、METAR、高品質なボリューム雲。
-  OSM 対応は滑走路・誘導路の中心線まで
+- OSM の空港建物、地表画像、METAR、高品質なボリューム雲。
 - 難易度設定、HOTAS と軸の再割り当て、推力線オフセット
 - 追加機体、リプレイ、ライブ交通、オンライン共有ワールド
 
