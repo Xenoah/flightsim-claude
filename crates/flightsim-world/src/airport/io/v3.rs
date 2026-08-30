@@ -766,6 +766,7 @@ fn canonical_string_slices<'a>(
     taxiways: &'a [AirportTaxiway],
     holding_positions: &'a [AirportHoldingPosition],
 ) -> Result<Vec<&'a str>, AirportDatabaseError> {
+    validate_reference_expansion(taxiways, holding_positions)?;
     let count = taxiways.iter().filter(|v| v.reference().is_some()).count()
         + holding_positions
             .iter()
@@ -804,6 +805,32 @@ fn canonical_string_slices<'a>(
         });
     }
     Ok(strings)
+}
+
+fn validate_reference_expansion(
+    taxiways: &[AirportTaxiway],
+    holding_positions: &[AirportHoldingPosition],
+) -> Result<(), AirportDatabaseError> {
+    let mut expanded = 0usize;
+    for value in taxiways.iter().filter_map(AirportTaxiway::reference).chain(
+        holding_positions
+            .iter()
+            .filter_map(AirportHoldingPosition::reference),
+    ) {
+        expanded = expanded.checked_add(value.len()).ok_or(
+            AirportDatabaseError::StringBytesExceedLimit {
+                found: usize::MAX,
+                maximum: MAX_STRING_BYTES,
+            },
+        )?;
+        if expanded > MAX_STRING_BYTES {
+            return Err(AirportDatabaseError::StringBytesExceedLimit {
+                found: expanded,
+                maximum: MAX_STRING_BYTES,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn string_id(strings: &[&str], value: Option<&str>) -> u32 {
@@ -1268,15 +1295,22 @@ fn decode(payload: &[u8], dirs: &[Directory]) -> Result<AirportDatabase, Airport
         .try_reserve_exact(strings.len())
         .map_err(|_| allocation(strings.len()))?;
     referenced.resize(strings.len(), false);
+    let mut expanded_string_bytes = 0usize;
     let mut taxiways = base.taxiways;
     decode_attributes(
         section(TAXIWAY_ATTRIBUTES),
         &strings,
         &mut referenced,
+        &mut expanded_string_bytes,
         &mut taxiways,
     )?;
     let aprons = decode_aprons(section(APRON_TRIANGLES))?;
-    let holdings = decode_holdings(section(HOLDING_POSITIONS), &strings, &mut referenced)?;
+    let holdings = decode_holdings(
+        section(HOLDING_POSITIONS),
+        &strings,
+        &mut referenced,
+        &mut expanded_string_bytes,
+    )?;
     let lights = decode_lights(section(GROUND_LIGHTS))?;
     if referenced.iter().any(|v| !v) {
         return Err(invalid(
@@ -1340,6 +1374,7 @@ fn decode_attributes(
     records: &[u8],
     strings: &[String],
     referenced: &mut [bool],
+    expanded_string_bytes: &mut usize,
     taxiways: &mut [AirportTaxiway],
 ) -> Result<(), AirportDatabaseError> {
     let mut prior = None;
@@ -1360,8 +1395,14 @@ fn decode_attributes(
             ));
         }
         prior = Some(id);
-        let reference =
-            decode_reference(read_u32(r, 8), strings, referenced, TAXIWAY_ATTRIBUTES, i)?;
+        let reference = decode_reference(
+            read_u32(r, 8),
+            strings,
+            referenced,
+            expanded_string_bytes,
+            TAXIWAY_ATTRIBUTES,
+            i,
+        )?;
         let surface = AirportSurface::decode(r[12])
             .ok_or_else(|| invalid(TAXIWAY_ATTRIBUTES, i, "unknown surface"))?;
         let lighting = TaxiwayLighting::decode(r[13])
@@ -1390,6 +1431,7 @@ fn decode_reference(
     id: u32,
     strings: &[String],
     referenced: &mut [bool],
+    expanded_string_bytes: &mut usize,
     section: u16,
     record: usize,
 ) -> Result<Option<String>, AirportDatabaseError> {
@@ -1400,6 +1442,18 @@ fn decode_reference(
     let value = strings
         .get(index)
         .ok_or_else(|| invalid(section, record, "string index is out of bounds"))?;
+    *expanded_string_bytes = expanded_string_bytes.checked_add(value.len()).ok_or(
+        AirportDatabaseError::StringBytesExceedLimit {
+            found: usize::MAX,
+            maximum: MAX_STRING_BYTES,
+        },
+    )?;
+    if *expanded_string_bytes > MAX_STRING_BYTES {
+        return Err(AirportDatabaseError::StringBytesExceedLimit {
+            found: *expanded_string_bytes,
+            maximum: MAX_STRING_BYTES,
+        });
+    }
     referenced[index] = true;
     let mut copy = String::new();
     copy.try_reserve_exact(value.len())
@@ -1412,9 +1466,16 @@ fn decode_aprons(records: &[u8]) -> Result<Vec<AirportApron>, AirportDatabaseErr
     let record_count = records.len() / APRON_RECORD_LEN;
     let record_at =
         |index: usize| &records[index * APRON_RECORD_LEN..(index + 1) * APRON_RECORD_LEN];
+    let group_count = (0..record_count)
+        .filter(|&index| {
+            index == 0
+                || read_i64(record_at(index - 1), 0) != read_i64(record_at(index), 0)
+                || record_at(index - 1)[8] != record_at(index)[8]
+        })
+        .count();
     let mut out = Vec::new();
-    out.try_reserve_exact(record_count)
-        .map_err(|_| allocation(allocation_bytes::<AirportApron>(record_count)))?;
+    out.try_reserve_exact(group_count)
+        .map_err(|_| allocation(allocation_bytes::<AirportApron>(group_count)))?;
     let mut cursor = 0;
     while cursor < record_count {
         let first = record_at(cursor);
@@ -1468,6 +1529,7 @@ fn decode_holdings(
     records: &[u8],
     strings: &[String],
     referenced: &mut [bool],
+    expanded_string_bytes: &mut usize,
 ) -> Result<Vec<AirportHoldingPosition>, AirportDatabaseError> {
     let mut out = Vec::new();
     out.try_reserve_exact(records.len() / HOLDING_RECORD_LEN)
@@ -1482,8 +1544,14 @@ fn decode_holdings(
             .ok_or_else(|| invalid(HOLDING_POSITIONS, i, "unknown holding type"))?;
         let side = RunwaySide::decode(r[10])
             .ok_or_else(|| invalid(HOLDING_POSITIONS, i, "unknown runway side"))?;
-        let reference =
-            decode_reference(read_u32(r, 12), strings, referenced, HOLDING_POSITIONS, i)?;
+        let reference = decode_reference(
+            read_u32(r, 12),
+            strings,
+            referenced,
+            expanded_string_bytes,
+            HOLDING_POSITIONS,
+            i,
+        )?;
         let related = if r[11] & 1 == 1 {
             Some(read_i64(r, 48))
         } else {
@@ -1576,6 +1644,10 @@ mod tests {
     use std::io::Cursor;
 
     fn taxiway(id: i64, reference: &str) -> AirportTaxiway {
+        taxiway_with_reference(id, reference.to_owned())
+    }
+
+    fn taxiway_with_reference(id: i64, reference: String) -> AirportTaxiway {
         AirportTaxiway::from_points_with_metadata(
             id,
             vec![
@@ -1585,7 +1657,7 @@ mod tests {
             ],
             Meters(15.0),
             TaxiwayMetadata::new(
-                Some(reference.to_owned()),
+                Some(reference),
                 AirportSurface::Asphalt,
                 TaxiwayLighting::EdgeAndCenterline,
             ),
@@ -1893,5 +1965,92 @@ mod tests {
             ),
             Err(AirportDatabaseError::OrphanTaxiwayReference { source_way_id: 999 })
         ));
+    }
+
+    #[test]
+    fn expanded_reference_bytes_are_bounded_on_construct_and_encode() {
+        let half_limit = "x".repeat(MAX_STRING_BYTES / 2);
+        let database = AirportDatabase::with_ground_features(
+            Vec::new(),
+            vec![
+                taxiway_with_reference(1, half_limit.clone()),
+                taxiway_with_reference(2, half_limit),
+            ],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("the exact expanded-string limit is valid");
+        let mut expanded_input = database
+            .to_bytes()
+            .expect("the encoder accepts the exact expanded-string limit");
+        let string_index = section_offset(&expanded_input, STRING_INDEX);
+        let string_bytes_directory = directory(&expanded_input, STRING_BYTES);
+        let expanded_length = u32::try_from(MAX_STRING_BYTES / 2 + 1).expect("limit fits u32");
+        expanded_input[string_index + 4..string_index + 8]
+            .copy_from_slice(&expanded_length.to_le_bytes());
+        expanded_input[string_bytes_directory + 12..string_bytes_directory + 16]
+            .copy_from_slice(&expanded_length.to_le_bytes());
+        expanded_input[string_bytes_directory + 24..string_bytes_directory + 32]
+            .copy_from_slice(&u64::from(expanded_length).to_le_bytes());
+        expanded_input.push(b'x');
+        refresh_checksum(&mut expanded_input);
+        assert!(matches!(
+            AirportDatabase::from_bytes(&expanded_input),
+            Err(AirportDatabaseError::StringBytesExceedLimit {
+                found,
+                maximum: MAX_STRING_BYTES,
+            }) if found == MAX_STRING_BYTES + 2
+        ));
+
+        let over_half = "x".repeat(MAX_STRING_BYTES / 2 + 1);
+        assert!(matches!(
+            AirportDatabase::with_ground_features(
+                Vec::new(),
+                vec![
+                    taxiway_with_reference(1, over_half.clone()),
+                    taxiway_with_reference(2, over_half),
+                ],
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
+            Err(AirportDatabaseError::StringBytesExceedLimit {
+                found,
+                maximum: MAX_STRING_BYTES,
+            }) if found == MAX_STRING_BYTES + 2
+        ));
+    }
+
+    #[test]
+    fn one_apron_with_many_triangles_decodes_as_one_group() {
+        let mut triangles = Vec::new();
+        for index in 0..1_024 {
+            let offset = f64::from(index) * 0.000_01;
+            triangles.push([
+                Geodetic::from_degrees(35.0 + offset, 139.0, 0.0),
+                Geodetic::from_degrees(35.0 + offset, 139.000_001, 0.0),
+                Geodetic::from_degrees(35.000_001 + offset, 139.0, 0.0),
+            ]);
+        }
+        let apron = AirportApron::new(
+            AirportSourceKind::Way,
+            99,
+            AirportSurface::Concrete,
+            triangles,
+        )
+        .expect("many valid triangles");
+        let database = AirportDatabase::with_ground_features(
+            Vec::new(),
+            Vec::new(),
+            vec![apron],
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("one apron group");
+        let restored = AirportDatabase::from_bytes(&database.to_bytes().expect("encode"))
+            .expect("decode one large apron group");
+        assert_eq!(restored.aprons().len(), 1);
+        assert_eq!(restored.aprons()[0].triangles().len(), 1_024);
     }
 }
