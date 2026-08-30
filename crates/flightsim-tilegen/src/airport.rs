@@ -89,6 +89,8 @@ pub struct AirportGenerationReport {
     pub holding_ways_seen: usize,
     /// `.fsairports` に書いた停止位置数。
     pub holding_positions_written: usize,
+    /// 有効な明示停止線 way が同じ OSM node を参照していたため、way を優先して省いた node 数。
+    pub holding_nodes_superseded_by_way: usize,
     /// 誘導路へ一意に関連付けられなかった停止位置 node 数。
     pub skipped_holding_unassociated: usize,
     /// node 不足または縮退 geometry で除外した停止位置数。
@@ -568,13 +570,19 @@ fn discover_node<'a>(
 ) -> Result<(), AirportGenError> {
     let mut aeroway = None;
     let mut navigationaid = None;
-    let mut holding_type = None;
+    let mut canonical_holding_type = None;
+    let mut legacy_holding_type = None;
     let mut reference = None;
     for (key, value) in tags {
         match key {
             "aeroway" if aeroway.is_none() => aeroway = Some(value),
             "navigationaid" if navigationaid.is_none() => navigationaid = Some(value),
-            "holding_position" if holding_type.is_none() => holding_type = Some(value),
+            "holding_position:type" if canonical_holding_type.is_none() => {
+                canonical_holding_type = Some(value);
+            }
+            "holding_position" if legacy_holding_type.is_none() => {
+                legacy_holding_type = Some(value);
+            }
             "ref" if reference.is_none() => reference = Some(value),
             _ => {}
         }
@@ -585,7 +593,7 @@ fn discover_node<'a>(
         discovery.holding_nodes.push(HoldingNodeCandidate {
             source_node_id: node_id,
             coordinate,
-            holding_type: parse_holding_type(holding_type),
+            holding_type: parse_holding_type(canonical_holding_type.or(legacy_holding_type)),
             reference: copy_optional_tag(reference, "holding node reference tag")?,
         });
         report.holding_nodes_seen += 1;
@@ -612,7 +620,8 @@ fn discover_way<'a>(
 ) -> Result<(), AirportGenError> {
     let mut aeroway = None;
     let mut aerodrome_marking = None;
-    let mut holding_type = None;
+    let mut canonical_holding_type = None;
+    let mut legacy_holding_type = None;
     let mut reference = None;
     for (key, value) in tags {
         match key {
@@ -620,7 +629,12 @@ fn discover_way<'a>(
             "aerodrome_marking" if aerodrome_marking.is_none() => {
                 aerodrome_marking = Some(value);
             }
-            "holding_position" if holding_type.is_none() => holding_type = Some(value),
+            "holding_position:type" if canonical_holding_type.is_none() => {
+                canonical_holding_type = Some(value);
+            }
+            "holding_position" if legacy_holding_type.is_none() => {
+                legacy_holding_type = Some(value);
+            }
             "ref" if reference.is_none() => reference = Some(value),
             _ => {}
         }
@@ -643,7 +657,7 @@ fn discover_way<'a>(
     discovery.holding_ways.insert(
         way_id,
         HoldingWayDiscovery {
-            holding_type: parse_holding_type(holding_type),
+            holding_type: parse_holding_type(canonical_holding_type.or(legacy_holding_type)),
             reference: copy_optional_tag(reference, "holding way reference tag")?,
         },
     );
@@ -2049,6 +2063,58 @@ fn associated_reference(
         })
 }
 
+fn holding_node_candidate_by_id(
+    candidates: &[HoldingNodeCandidate],
+    source_node_id: i64,
+) -> Option<&HoldingNodeCandidate> {
+    candidates
+        .binary_search_by_key(&source_node_id, |candidate| candidate.source_node_id)
+        .ok()
+        .map(|index| &candidates[index])
+}
+
+fn smallest_shared_holding_reference(
+    node_refs: &[i64],
+    node_candidates: &[HoldingNodeCandidate],
+) -> Option<String> {
+    node_refs
+        .iter()
+        .filter_map(|source_node_id| holding_node_candidate_by_id(node_candidates, *source_node_id))
+        .filter(|candidate| {
+            candidate
+                .reference
+                .as_ref()
+                .is_some_and(|reference| !reference.is_empty())
+        })
+        .min_by_key(|candidate| candidate.source_node_id)
+        .and_then(|candidate| candidate.reference.clone())
+}
+
+fn smallest_shared_holding_association(
+    node_refs: &[i64],
+    node_candidates: &[HoldingNodeCandidate],
+    taxiway_candidates: &[TaxiwayCandidate],
+    nodes: &HashMap<i64, NodeCoordinate>,
+) -> Option<TaxiwayAssociation> {
+    node_refs
+        .iter()
+        .filter_map(|source_node_id| {
+            let candidate = holding_node_candidate_by_id(node_candidates, *source_node_id)?;
+            if !candidate.coordinate.is_valid() {
+                return None;
+            }
+            find_taxiway_association(
+                candidate.coordinate,
+                Some(candidate.source_node_id),
+                taxiway_candidates,
+                nodes,
+            )
+            .map(|association| (candidate.source_node_id, association))
+        })
+        .min_by_key(|(source_node_id, _)| *source_node_id)
+        .map(|(_, association)| association)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn convert_holding_candidates(
     mut node_candidates: Vec<HoldingNodeCandidate>,
@@ -2068,8 +2134,105 @@ fn convert_holding_candidates(
             context: "converted holding positions",
             requested: node_candidates.len().saturating_add(way_candidates.len()),
         })?;
+    let mut superseded_node_ids = HashSet::new();
+    superseded_node_ids
+        .try_reserve(node_candidates.len())
+        .map_err(|_| AirportGenError::AllocationFailed {
+            context: "superseded holding node IDs",
+            requested: node_candidates.len(),
+        })?;
+
+    // A way carries the explicit marking geometry. Only a successfully converted way may
+    // supersede holding nodes that are actual members of that same OSM way; proximity alone is
+    // deliberately insufficient because distinct holding positions can be close together.
+    for candidate in way_candidates {
+        let HoldingWayCandidate {
+            source_way_id,
+            node_refs,
+            holding_type,
+            reference: way_reference,
+        } = candidate;
+        if node_refs.len() < 2 {
+            report.skipped_holding_bad_geometry += 1;
+            continue;
+        }
+        let (Some(first), Some(last)) = (
+            node_refs
+                .first()
+                .and_then(|node_id| nodes.get(node_id))
+                .copied(),
+            node_refs
+                .last()
+                .and_then(|node_id| nodes.get(node_id))
+                .copied(),
+        ) else {
+            report.skipped_holding_bad_geometry += 1;
+            continue;
+        };
+        if !first.is_valid() || !last.is_valid() {
+            report.skipped_holding_bad_coordinates += 1;
+            continue;
+        }
+        let position = midpoint(first, last);
+        let Some(marking_heading) = heading_between(first, last) else {
+            report.skipped_holding_bad_geometry += 1;
+            continue;
+        };
+        let taxiway_heading = Radians(marking_heading.get() + core::f64::consts::FRAC_PI_2);
+        let width = Meters(coordinate_distance_meters(first, last));
+        let association = find_taxiway_association(position, None, taxiway_candidates, nodes)
+            .or_else(|| {
+                smallest_shared_holding_association(
+                    &node_refs,
+                    &node_candidates,
+                    taxiway_candidates,
+                    nodes,
+                )
+            });
+        let own_reference = way_reference
+            .filter(|reference| !reference.is_empty())
+            .or_else(|| smallest_shared_holding_reference(&node_refs, &node_candidates));
+        let reference = associated_reference(own_reference, association, taxiway_candidates);
+        let holding = AirportHoldingPosition::new(
+            AirportSourceKind::Way,
+            source_way_id,
+            position.to_geodetic(),
+            holding_type,
+            taxiway_heading,
+            width,
+            reference.clone(),
+            association.map(|association| association.source_way_id),
+            runway_side_for_heading(position, taxiway_heading, runways),
+        );
+        match holding {
+            Ok(holding) => {
+                add_candidate_records(candidate_records, 1)?;
+                if reference.is_some() {
+                    add_candidate_records(candidate_records, 1)?;
+                }
+                note_renderer_ineligible_reference(reference.as_deref(), &mut report);
+                for source_node_id in &node_refs {
+                    if holding_node_candidate_by_id(&node_candidates, *source_node_id).is_some() {
+                        superseded_node_ids.insert(*source_node_id);
+                    }
+                }
+                holdings.push(holding);
+            }
+            Err(GroundFeatureGeometryError::AllocationFailed { requested }) => {
+                return Err(AirportGenError::AllocationFailed {
+                    context: "holding position",
+                    requested,
+                });
+            }
+            Err(_) => report.skipped_holding_bad_geometry += 1,
+        }
+    }
 
     for candidate in node_candidates {
+        if superseded_node_ids.contains(&candidate.source_node_id) {
+            report.holding_nodes_superseded_by_way += 1;
+            continue;
+        }
         if !candidate.coordinate.is_valid() {
             report.skipped_holding_bad_coordinates += 1;
             continue;
@@ -2096,69 +2259,6 @@ fn convert_holding_candidates(
             reference.clone(),
             Some(association.source_way_id),
             runway_side_for_heading(candidate.coordinate, association.heading, runways),
-        );
-        match holding {
-            Ok(holding) => {
-                add_candidate_records(candidate_records, 1)?;
-                if reference.is_some() {
-                    add_candidate_records(candidate_records, 1)?;
-                }
-                note_renderer_ineligible_reference(reference.as_deref(), &mut report);
-                holdings.push(holding);
-            }
-            Err(GroundFeatureGeometryError::AllocationFailed { requested }) => {
-                return Err(AirportGenError::AllocationFailed {
-                    context: "holding position",
-                    requested,
-                });
-            }
-            Err(_) => report.skipped_holding_bad_geometry += 1,
-        }
-    }
-
-    for candidate in way_candidates {
-        if candidate.node_refs.len() < 2 {
-            report.skipped_holding_bad_geometry += 1;
-            continue;
-        }
-        let (Some(first), Some(last)) = (
-            candidate
-                .node_refs
-                .first()
-                .and_then(|node_id| nodes.get(node_id))
-                .copied(),
-            candidate
-                .node_refs
-                .last()
-                .and_then(|node_id| nodes.get(node_id))
-                .copied(),
-        ) else {
-            report.skipped_holding_bad_geometry += 1;
-            continue;
-        };
-        if !first.is_valid() || !last.is_valid() {
-            report.skipped_holding_bad_coordinates += 1;
-            continue;
-        }
-        let position = midpoint(first, last);
-        let Some(marking_heading) = heading_between(first, last) else {
-            report.skipped_holding_bad_geometry += 1;
-            continue;
-        };
-        let taxiway_heading = Radians(marking_heading.get() + core::f64::consts::FRAC_PI_2);
-        let width = Meters(coordinate_distance_meters(first, last));
-        let association = find_taxiway_association(position, None, taxiway_candidates, nodes);
-        let reference = associated_reference(candidate.reference, association, taxiway_candidates);
-        let holding = AirportHoldingPosition::new(
-            AirportSourceKind::Way,
-            candidate.source_way_id,
-            position.to_geodetic(),
-            candidate.holding_type,
-            taxiway_heading,
-            width,
-            reference.clone(),
-            association.map(|association| association.source_way_id),
-            runway_side_for_heading(position, taxiway_heading, runways),
         );
         match holding {
             Ok(holding) => {
@@ -2283,6 +2383,74 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    fn holding_test_coordinates() -> HashMap<i64, NodeCoordinate> {
+        coordinates(&[
+            (1, 35.0, 138.9999),
+            (2, 35.0, 139.0),
+            (3, 35.0, 139.0001),
+            (4, 35.0, 139.000001),
+            (10, 35.0001, 139.0),
+            (11, 34.9999, 139.0),
+            (12, 35.0, 139.000001),
+            (20, 35.0002, 138.99995),
+            (21, 35.0002, 139.00005),
+        ])
+    }
+
+    fn holding_test_taxiway() -> TaxiwayCandidate {
+        TaxiwayCandidate {
+            source_way_id: 500,
+            node_refs: vec![1, 2, 4, 3],
+            width: Some("30".to_owned()),
+            reference: Some("A11".to_owned()),
+            surface: None,
+            lit: None,
+        }
+    }
+
+    fn holding_node_candidate(
+        source_node_id: i64,
+        reference: Option<&str>,
+    ) -> HoldingNodeCandidate {
+        let coordinate = *holding_test_coordinates()
+            .get(&source_node_id)
+            .expect("holding fixture node");
+        HoldingNodeCandidate {
+            source_node_id,
+            coordinate,
+            holding_type: HoldingPositionType::Runway,
+            reference: reference.map(str::to_owned),
+        }
+    }
+
+    fn holding_way_candidate(node_refs: Vec<i64>, reference: Option<&str>) -> HoldingWayCandidate {
+        HoldingWayCandidate {
+            source_way_id: 900,
+            node_refs,
+            holding_type: HoldingPositionType::Runway,
+            reference: reference.map(str::to_owned),
+        }
+    }
+
+    fn convert_holding_test_candidates(
+        node_candidates: Vec<HoldingNodeCandidate>,
+        way_candidates: Vec<HoldingWayCandidate>,
+    ) -> (Vec<AirportHoldingPosition>, AirportGenerationReport, usize) {
+        let nodes = holding_test_coordinates();
+        let mut candidate_records = 0;
+        let (holdings, report) = convert_holding_candidates(
+            node_candidates,
+            way_candidates,
+            &[holding_test_taxiway()],
+            &nodes,
+            &[],
+            AirportGenerationReport::default(),
+            &mut candidate_records,
+        )
+        .expect("holding conversion should allocate");
+        (holdings, report, candidate_records)
     }
 
     #[test]
@@ -2645,6 +2813,208 @@ mod tests {
         .expect("holding marking discovery should allocate");
         assert!(discovery.holding_ways.contains_key(&1_104_043_730));
         assert_eq!(report.holding_ways_seen, 1);
+    }
+
+    #[test]
+    fn canonical_holding_position_type_overrides_legacy_tag_in_any_order() {
+        for tags in [
+            vec![
+                ("aeroway", "holding_position"),
+                ("holding_position", "intermediate"),
+                ("holding_position:type", "ils"),
+            ],
+            vec![
+                ("aeroway", "holding_position"),
+                ("holding_position:type", "ils"),
+                ("holding_position", "intermediate"),
+            ],
+        ] {
+            let mut discovery = PbfDiscovery::default();
+            discover_node(
+                42,
+                NodeCoordinate {
+                    latitude_degrees: 35.0,
+                    longitude_degrees: 139.0,
+                },
+                tags.into_iter(),
+                &mut discovery,
+                &mut AirportGenerationReport::default(),
+            )
+            .expect("holding node discovery should allocate");
+            assert_eq!(
+                discovery.holding_nodes[0].holding_type,
+                HoldingPositionType::Ils
+            );
+        }
+
+        for tags in [
+            vec![
+                ("aeroway", "aerodrome_marking"),
+                ("aerodrome_marking", "holding_position"),
+                ("holding_position", "ils"),
+                ("holding_position:type", "intermediate"),
+            ],
+            vec![
+                ("holding_position:type", "intermediate"),
+                ("holding_position", "ils"),
+                ("aeroway", "aerodrome_marking"),
+                ("aerodrome_marking", "holding_position"),
+            ],
+        ] {
+            let mut discovery = PbfDiscovery::default();
+            discover_way(
+                84,
+                tags.into_iter(),
+                &mut discovery,
+                &mut AirportGenerationReport::default(),
+            )
+            .expect("holding way discovery should allocate");
+            assert_eq!(
+                discovery.holding_ways[&84].holding_type,
+                HoldingPositionType::Intermediate
+            );
+        }
+    }
+
+    #[test]
+    fn valid_holding_way_supersedes_only_its_shared_node() {
+        let (holdings, report, candidate_records) = convert_holding_test_candidates(
+            vec![holding_node_candidate(2, Some("滑走路"))],
+            vec![holding_way_candidate(vec![10, 2, 11], Some("34L"))],
+        );
+
+        assert_eq!(holdings.len(), 1);
+        let holding = &holdings[0];
+        assert_eq!(holding.source_kind(), AirportSourceKind::Way);
+        assert_eq!(holding.source_id(), 900);
+        assert_eq!(holding.reference(), Some("34L"));
+        assert_eq!(holding.related_taxiway(), Some(500));
+        let nodes = holding_test_coordinates();
+        let expected_width = coordinate_distance_meters(nodes[&10], nodes[&11]);
+        assert!((holding.width().get() - expected_width).abs() < 1.0e-9);
+        assert_ne!(holding.width(), Meters(30.0), "way geometry supplies width");
+        assert_eq!(report.holding_nodes_superseded_by_way, 1);
+        assert_eq!(report.holding_positions_written, 1);
+        assert_eq!(report.renderer_ineligible_non_ascii_refs, 0);
+        assert_eq!(candidate_records, 2, "one holding and its retained ref");
+    }
+
+    #[test]
+    fn invalid_holding_way_leaves_the_shared_node_fallback() {
+        let (holdings, report, candidate_records) = convert_holding_test_candidates(
+            vec![holding_node_candidate(2, Some("NODE"))],
+            vec![holding_way_candidate(vec![2], Some("WAY"))],
+        );
+
+        assert_eq!(holdings.len(), 1);
+        assert_eq!(holdings[0].source_kind(), AirportSourceKind::Node);
+        assert_eq!(holdings[0].source_id(), 2);
+        assert_eq!(holdings[0].reference(), Some("NODE"));
+        assert_eq!(report.holding_nodes_superseded_by_way, 0);
+        assert_eq!(report.skipped_holding_bad_geometry, 1);
+        assert_eq!(candidate_records, 2);
+    }
+
+    #[test]
+    fn proximity_without_a_shared_osm_node_does_not_deduplicate_holdings() {
+        let (holdings, report, candidate_records) = convert_holding_test_candidates(
+            vec![holding_node_candidate(2, Some("NODE"))],
+            vec![holding_way_candidate(vec![10, 12, 11], Some("WAY"))],
+        );
+
+        assert_eq!(holdings.len(), 2);
+        assert!(
+            holdings
+                .iter()
+                .any(|holding| holding.source_kind() == AirportSourceKind::Node)
+        );
+        assert!(
+            holdings
+                .iter()
+                .any(|holding| holding.source_kind() == AirportSourceKind::Way)
+        );
+        assert_eq!(report.holding_nodes_superseded_by_way, 0);
+        assert_eq!(candidate_records, 4);
+        assert!(
+            holdings[0]
+                .position()
+                .to_ecef()
+                .distance_to(holdings[1].position().to_ecef())
+                .get()
+                < 0.01,
+            "even coincident unshared OSM features remain distinct"
+        );
+    }
+
+    #[test]
+    fn holding_way_reference_precedes_smallest_shared_node_then_taxiway() {
+        let shared_nodes = || {
+            vec![
+                holding_node_candidate(4, Some("NODE4")),
+                holding_node_candidate(2, Some("NODE2")),
+            ]
+        };
+        let shared_refs = vec![10, 4, 2, 11];
+
+        let (holdings, report, _) = convert_holding_test_candidates(
+            shared_nodes(),
+            vec![holding_way_candidate(shared_refs.clone(), Some("WAY"))],
+        );
+        assert_eq!(holdings[0].reference(), Some("WAY"));
+        assert_eq!(report.holding_nodes_superseded_by_way, 2);
+
+        let (holdings, report, _) = convert_holding_test_candidates(
+            shared_nodes(),
+            vec![holding_way_candidate(shared_refs.clone(), None)],
+        );
+        assert_eq!(holdings[0].reference(), Some("NODE2"));
+        assert_eq!(report.holding_nodes_superseded_by_way, 2);
+
+        let (holdings, report, _) = convert_holding_test_candidates(
+            vec![
+                holding_node_candidate(4, None),
+                holding_node_candidate(2, None),
+            ],
+            vec![holding_way_candidate(shared_refs, None)],
+        );
+        assert_eq!(holdings[0].reference(), Some("A11"));
+        assert_eq!(report.holding_nodes_superseded_by_way, 2);
+    }
+
+    #[test]
+    fn shared_node_association_only_fills_way_metadata() {
+        let nodes = holding_test_coordinates();
+        let expected_position = midpoint(nodes[&20], nodes[&21]).to_geodetic();
+        let expected_width = coordinate_distance_meters(nodes[&20], nodes[&21]);
+        let (holdings, report, _) = convert_holding_test_candidates(
+            vec![holding_node_candidate(2, None)],
+            vec![holding_way_candidate(vec![20, 2, 21], None)],
+        );
+
+        assert_eq!(holdings.len(), 1);
+        let holding = &holdings[0];
+        assert_eq!(holding.source_kind(), AirportSourceKind::Way);
+        assert_eq!(holding.related_taxiway(), Some(500));
+        assert_eq!(holding.reference(), Some("A11"));
+        assert!(
+            holding
+                .position()
+                .to_ecef()
+                .distance_to(expected_position.to_ecef())
+                .get()
+                < 1.0e-6
+        );
+        assert!((holding.width().get() - expected_width).abs() < 1.0e-9);
+        assert!(
+            holding
+                .position()
+                .to_ecef()
+                .distance_to(nodes[&2].to_geodetic().to_ecef())
+                .get()
+                > 10.0,
+            "shared node metadata must not replace explicit way geometry"
+        );
+        assert_eq!(report.holding_nodes_superseded_by_way, 1);
     }
 
     #[test]

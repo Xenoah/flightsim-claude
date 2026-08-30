@@ -82,11 +82,15 @@ asphalt / concrete / paved / grass / gravel / dirt / sand の限定列挙へ写�
 
 待機位置は `aeroway=holding_position` の node / way、および
 `aeroway=aerodrome_marking + aerodrome_marking=holding_position` の way を対象にする。
+種別は `holding_position:type` を正典とし、互換用の `holding_position` より優先する。
 node は誘導路 node の共有を優先し、無ければ幅 + 1 m の corridor 内で距離、way ID、
 segment index の順に最寄り誘導路の線分、方位、幅へ関連付ける。候補が無い node は除外する。
 way は両端の中点・向き・長さから、誘導路を横断する路面標示として保存する。待機位置自身の
-`ref` を優先し、無ければ関連誘導路の `ref` を補う。滑走路側を判定できた場合だけ、路面に
-2 本の実線と 2 本の破線を描く。滑走路側を捏造できない場合は標示を省略する。
+`ref`、同じ way が member に持つ holding node の `ref`、関連誘導路の `ref` の順に補う。
+変換に成功した明示 way と holding node が OSM node ID を共有する場合は way の geometry・幅・
+source を優先して node を重複出力しない。不正 way では node fallback を残し、近接距離だけの
+統合は行わない。滑走路側を判定できた場合だけ、路面に 2 本の実線と 2 本の破線を描く。
+滑走路側を捏造できない場合は標示を省略する。
 
 地上灯火は node の `aeroway=navigationaid` と `navigationaid=txe|txc|rgl` を対象にし、
 それぞれ誘導路縁灯・中心線灯・滑走路警戒灯として保持する。明示的な TXE / TXC が

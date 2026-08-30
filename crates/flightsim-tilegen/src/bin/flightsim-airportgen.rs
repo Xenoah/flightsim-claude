@@ -126,6 +126,10 @@ fn print_report(report: AirportGenerationReport, output: &std::path::Path) {
         report.skipped_holding_unassociated,
     );
     report_skipped(
+        "holding node superseded by an explicit marking way",
+        report.holding_nodes_superseded_by_way,
+    );
+    report_skipped(
         "holding position invalid geometry",
         report.skipped_holding_bad_geometry,
     );

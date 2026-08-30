@@ -23,11 +23,15 @@
   dirt / sand を保持する
 - `aeroway=holding_position` の node / way と、
   `aeroway=aerodrome_marking + aerodrome_marking=holding_position` の way を待機位置へ
-  変換する。node は最寄りの誘導路へ関連付け、way は線の向き・幅から停止線 geometry を作る
+  変換する。種別は `holding_position:type` を正典とし、従来の `holding_position` tag も読む。
+  node は最寄りの誘導路へ関連付け、way は線の向き・幅から停止線 geometry を作る。有効な
+  明示停止線 way が holding node を member に持つ場合は way を優先し、不正 way なら node を
+  fallback として残す
 - 滑走路側を判定できる待機位置には 2 本の実線と 2 本の破線を描く。待機位置と関連誘導路の
   `ref` が揃う場合は、外部フォントに依存しない 3x5 glyph の物理標識を中心線の右側へ立てる。
   画面へ出す文字の ASCII 制約に合わせ、非 ASCII、8 文字超、未収録 glyph は DB には
-  保持しても標識にしない
+  保持しても標識にしない。盤面の winding・法線・文字の lift は接近側へ揃え、片面 culling
+  でも正面を読めるようにする
 - `aeroway=navigationaid + navigationaid=txe|txc|rgl` の node を、それぞれ青い誘導路
   縁灯、緑の中心線灯、黄の滑走路警戒灯として保持・描画する
 - 明示灯火が無い誘導路には edge 60 m、centerline 30 m 間隔の灯火を決定論的に補う。
@@ -58,12 +62,14 @@
 
 - Haneda 小領域 PBF（75,393 bytes、SHA-256
   `075B94E8723336A8C1B32B271DE2EF3944717E5A60B98F34DC26A2264257B6B2`）を 2 回変換し、
-  滑走路 3、誘導路 113 way / 1,023 segment、apron 3 / 2,940 triangle、待機位置 29、
-  明示灯火 0 を 258,983 bytes へ出力した。両出力の SHA-256 は
-  `4D2D369B3D058833A1121FD2FC55AD456A27602B076C072EA0A0FE439C9B7BE7` で一致した
-- 同じ実 DB の readback は滑走路 3、誘導路 113、apron 3 / 2,940 triangle、待機位置 29、
-  明示灯火 0。入力にあった待機位置 node 19 と路面標示 way 13 のうち 29 件を書き、
-  誘導路へ関連付けられない node 3 件は理由付きで除外した
+  滑走路 3、誘導路 113 way / 1,023 segment、apron 3 / 2,940 triangle、待機位置 16、
+  明示灯火 0 を 258,151 bytes へ出力した。両出力の SHA-256 は
+  `93ADF41982F15F26896FAF19F1BBB0CC3024AE15DF4C925E9371C476495DD87B` で一致した
+- 同じ実 DB の readback は滑走路 3、誘導路 113、apron 3 / 2,940 triangle、待機位置 16、
+  明示灯火 0。入力にあった待機位置 node 19 と路面標示 way 13 のうち、誘導路へ関連付け
+  られない node 3 件を除外し、way と OSM node を共有する 13 件は明示 way へ統合した
+- 同じ実 DB を昼 12:00 の free / cockpit view と夜 21:00 の free view で撮影し、apron、
+  単一の 2 実線 + 2 破線、`34L-16R` / `A11` の物理標識、夜間灯火、OSM 帰属を目視確認した
 - この実 extract には apron multipolygon と明示 TXE / TXC / RGL が無いため、hole の保持、
   ring の反転接続、明示灯火と fallback の channel 単位重複排除、`lit=no` は合成 fixture で
   境界を固定する

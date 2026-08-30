@@ -123,6 +123,9 @@ apron・待機位置・標識・誘導路灯まで完了。
   を OSM ID 順に反転も含めて接続し、hole を保って三角形分割する。各三角形辺は最大 75 m
 - 待機位置は `aeroway=holding_position` の node / way と、
   `aeroway=aerodrome_marking + aerodrome_marking=holding_position` の way を扱う。
+  種別は `holding_position:type` を正典として従来 tag より優先する。有効な明示停止線 way が
+  holding node を member に持つ場合は way の geometry・幅・source を優先し、不正 way なら
+  node fallback を残す。近接距離だけでは統合しない
   node は誘導路 node と共有されず、幅 + 1 m の corridor 内にも候補が無い場合に除外する。
   候補が複数なら距離、way ID、segment index の順で決定論的に選ぶ
 - 明示灯火は `aeroway=navigationaid + navigationaid=txe|txc|rgl` の node。
@@ -143,7 +146,8 @@ apron・待機位置・標識・誘導路灯まで完了。
   滑走路の順に lift を上げ、路面標示・灯火にも固定 lift を割り当てて z-fighting を避ける
 - 滑走路側を判定できる待機位置は 2 実線 + 2 破線。待機位置と関連誘導路の `ref` が
   揃えば、中心線右側へ 3x5 glyph の物理標識を置く。**画面文字は ASCII のみ**で、
-  非 ASCII、8 文字超、未収録 glyph は DB に保持しても標識へ描かない
+  非 ASCII、8 文字超、未収録 glyph は DB に保持しても標識へ描かない。盤面の winding・
+  法線・文字 lift は接近側へ揃え、片面 culling でも正面を読める
 - OSM 滑走路を実際に選んだ場合だけ、画面右下に ASCII の帰属を表示する。
   詳細は `ATTRIBUTION.md`。PBF も派生 DB も ODbL 由来で、公開時は share-alike を確認する
 - alpha.10 では Haneda の実 PBF を滑走路 9 本 / 456 bytes へ変換し、2 回の SHA-256
@@ -154,11 +158,13 @@ apron・待機位置・標識・誘導路灯まで完了。
   `--screenshot` で舗装・黄色中心線・曲線・junction・滑走路との重なり・帰属を目視済み
 - alpha.12 では Haneda 小領域 PBF（75,393 bytes、SHA-256
   `075B94E8723336A8C1B32B271DE2EF3944717E5A60B98F34DC26A2264257B6B2`）から滑走路 3、
-  誘導路 113 / 1,023 segment、apron 3 / 2,940 triangle、待機位置 29、明示灯火 0 を
-  258,983 bytes へ変換した。2 回の出力 SHA-256 は
-  `4D2D369B3D058833A1121FD2FC55AD456A27602B076C072EA0A0FE439C9B7BE7` で一致し、readback
-  件数も一致。待機位置 node 19 + marking way 13 のうち 29 件を書き、誘導路へ関連しない
-  node 3 件は除外した。この extract に無い multipolygon hole と明示灯火は合成 fixture で検査する
+  誘導路 113 / 1,023 segment、apron 3 / 2,940 triangle、待機位置 16、明示灯火 0 を
+  258,151 bytes へ変換した。2 回の出力 SHA-256 は
+  `93ADF41982F15F26896FAF19F1BBB0CC3024AE15DF4C925E9371C476495DD87B` で一致し、readback
+  件数も一致。待機位置 node 19 + marking way 13 のうち、誘導路へ関連しない node 3 件を
+  除外し、way と node を共有する 13 件は明示 way へ統合した。昼の free / cockpit view と
+  夜の free view で apron、単一の停止線、`34L-16R` / `A11` 標識、灯火、OSM 帰属を目視済み。
+  この extract に無い multipolygon hole と明示灯火は合成 fixture で検査する
 
 空港名・滑走路 `ref`・建物は未実装。OSM の `surface=*` は表示用の限定した列挙へ写像し、
 未知値は `Unknown` として保持する。PBF parser 自体の hardening は Issue #23 のまま。

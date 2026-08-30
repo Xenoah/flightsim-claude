@@ -242,9 +242,9 @@ impl SignMeshBuilder {
     ) -> Result<(), TaxiwaySignMeshError> {
         let points = [
             sign_point(position, self.facing, left, bottom, depth),
-            sign_point(position, self.facing, right, bottom, depth),
-            sign_point(position, self.facing, right, top, depth),
             sign_point(position, self.facing, left, top, depth),
+            sign_point(position, self.facing, right, top, depth),
+            sign_point(position, self.facing, right, bottom, depth),
         ];
         let worlds = points.map(Geodetic::to_ecef);
         let normal = (worlds[1].as_vec() - worlds[0].as_vec())
@@ -369,7 +369,14 @@ fn glyph(byte: u8) -> Option<[u8; 5]> {
 mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
-    use flightsim_core::Degrees;
+    use flightsim_core::{Degrees, LocalFrame, Ned};
+
+    fn facing_ecef(position: Geodetic, facing: Radians) -> glam::DVec3 {
+        let (sin, cos) = facing.get().sin_cos();
+        LocalFrame::new(position)
+            .ned_to_ecef_vector(Ned(glam::DVec3::new(cos, sin, 0.0)))
+            .normalize()
+    }
 
     fn sign(taxiway: &str, holding: &str) -> Option<(Mesh, Ecef)> {
         holding_position_sign_mesh(
@@ -421,6 +428,108 @@ mod tests {
             );
             normal.dot(up).abs() < 1e-3
         }));
+    }
+
+    #[test]
+    fn front_winding_and_normals_point_along_facing() {
+        let position = Geodetic::from_degrees(35.0, 139.0, 8.0);
+        for bearing in [0.0, 90.0, 180.0, 270.0] {
+            let facing = Degrees(bearing).to_radians();
+            let origin = lifted(position, SIGN_GROUND_LIFT).to_ecef();
+            let mut builder = SignMeshBuilder::new(origin, facing, 1).expect("one quad");
+            builder
+                .rect(
+                    position,
+                    -0.5,
+                    0.5,
+                    BOARD_BOTTOM,
+                    BOARD_BOTTOM + BOARD_HEIGHT,
+                    0.0,
+                    TAXI_BACKGROUND,
+                )
+                .expect("valid rectangle");
+            let mesh = builder.build();
+            let positions = match mesh.attribute(Mesh::ATTRIBUTE_POSITION) {
+                Some(VertexAttributeValues::Float32x3(values)) => values,
+                _ => panic!("missing positions"),
+            };
+            let point = |index: usize| {
+                let value = positions[index];
+                glam::DVec3::new(
+                    f64::from(value[0]),
+                    f64::from(value[1]),
+                    f64::from(value[2]),
+                )
+            };
+            let winding_normal = (point(1) - point(0)).cross(point(2) - point(0)).normalize();
+            let normals = match mesh.attribute(Mesh::ATTRIBUTE_NORMAL) {
+                Some(VertexAttributeValues::Float32x3(values)) => values,
+                _ => panic!("missing normals"),
+            };
+            let stored_normal = glam::DVec3::new(
+                f64::from(normals[0][0]),
+                f64::from(normals[0][1]),
+                f64::from(normals[0][2]),
+            );
+            let expected = facing_ecef(position, facing);
+
+            assert!(
+                winding_normal.dot(expected) > 0.999_999,
+                "bearing {bearing} has back-facing winding"
+            );
+            assert!(
+                stored_normal.dot(expected) > 0.999_999,
+                "bearing {bearing} has a back-facing normal"
+            );
+        }
+    }
+
+    #[test]
+    fn glyph_lift_moves_text_toward_the_front() {
+        let position = Geodetic::from_degrees(35.0, 139.0, 8.0);
+        for bearing in [0.0, 90.0, 180.0, 270.0] {
+            let facing = Degrees(bearing).to_radians();
+            let origin = lifted(position, SIGN_GROUND_LIFT).to_ecef();
+            let glyph_bottom = BOARD_BOTTOM + (BOARD_HEIGHT - GLYPH_ROWS * CELL) * 0.5;
+            let first_pixel_left = PANEL_PADDING + CELL;
+            let first_pixel_bottom = glyph_bottom + 4.0 * CELL;
+            let mut builder = SignMeshBuilder::new(origin, facing, 16).expect("small sign");
+            builder
+                .rect(
+                    position,
+                    first_pixel_left,
+                    first_pixel_left + PIXEL,
+                    first_pixel_bottom,
+                    first_pixel_bottom + PIXEL,
+                    0.0,
+                    TAXI_BACKGROUND,
+                )
+                .expect("reference board pixel");
+            builder
+                .text(position, 0.0, b"A", TAXI_TEXT)
+                .expect("supported glyph");
+            let mesh = builder.build();
+            let positions = match mesh.attribute(Mesh::ATTRIBUTE_POSITION) {
+                Some(VertexAttributeValues::Float32x3(values)) => values,
+                _ => panic!("missing positions"),
+            };
+            let expected = facing_ecef(position, facing);
+
+            for corner in 0..4 {
+                let board = positions[corner];
+                let glyph = positions[4 + corner];
+                let delta = glam::DVec3::new(
+                    f64::from(glyph[0] - board[0]),
+                    f64::from(glyph[1] - board[1]),
+                    f64::from(glyph[2] - board[2]),
+                );
+                let front_distance = delta.dot(expected);
+                assert!(
+                    (front_distance - GLYPH_LIFT).abs() < 1.0e-5,
+                    "bearing {bearing} glyph lift was {front_distance}"
+                );
+            }
+        }
     }
 
     #[test]
