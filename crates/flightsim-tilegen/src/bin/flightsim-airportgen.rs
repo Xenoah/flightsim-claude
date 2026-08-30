@@ -5,12 +5,12 @@ use flightsim_tilegen::{AirportGenerationReport, generate_airport_database};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-/// 地域 OSM PBF の滑走路・誘導路中心線を実行時空港 DB へ変換する。
+/// 地域 OSM PBF の滑走路・誘導路・地上設備を実行時空港 DB へ変換する。
 #[derive(Debug, Parser)]
 #[command(
     name = "flightsim-airportgen",
     version,
-    about = "地域 OSM PBF の滑走路・誘導路中心線を実行時空港 DB へ変換する。",
+    about = "地域 OSM PBF の滑走路・誘導路・apron・停止位置・灯火を実行時空港 DB へ変換する。",
     long_about = None
 )]
 struct Cli {
@@ -44,16 +44,28 @@ fn run(cli: &Cli) -> Result<(), String> {
 
 fn print_report(report: AirportGenerationReport, output: &std::path::Path) {
     eprintln!(
-        "wrote {} runway(s) and {} taxiway way(s) ({} segment record(s)) to {}",
+        "wrote {} runway(s), {} taxiway way(s) ({} segment record(s)), {} apron(s) ({} triangle(s)), {} holding position(s), and {} explicit ground light(s) to {}",
         report.runways_written,
         report.taxiways_written,
         report.taxiway_segments_written,
+        report.aprons_written,
+        report.apron_triangles_written,
+        report.holding_positions_written,
+        report.ground_lights_written,
         output.display()
     );
     eprintln!("matched {} aeroway=runway way(s)", report.runway_ways_seen);
     eprintln!(
         "matched {} aeroway=taxiway way(s)",
         report.taxiway_ways_seen
+    );
+    eprintln!(
+        "matched {} apron way(s), {} apron multipolygon relation(s), {} holding node(s), {} holding/marking way(s), and {} explicit ground-light node(s)",
+        report.apron_ways_seen,
+        report.apron_relations_seen,
+        report.holding_nodes_seen,
+        report.holding_ways_seen,
+        report.ground_light_nodes_seen,
     );
     if report.widths_defaulted > 0 {
         eprintln!(
@@ -88,11 +100,60 @@ fn print_report(report: AirportGenerationReport, output: &std::path::Path) {
         "taxiway degenerate polyline geometry",
         report.skipped_taxiway_degenerate,
     );
+    report_skipped("open apron way geometry", report.skipped_apron_open_ways);
+    report_skipped(
+        "apron relation missing/unsupported members",
+        report.skipped_apron_bad_members,
+    );
+    report_skipped(
+        "apron relation members that do not form closed rings",
+        report.skipped_apron_unclosed_rings,
+    );
+    report_skipped(
+        "apron missing referenced nodes",
+        report.skipped_apron_missing_nodes,
+    );
+    report_skipped(
+        "apron invalid node coordinates",
+        report.skipped_apron_bad_coordinates,
+    );
+    report_skipped(
+        "apron degenerate, intersecting, or untriangulatable geometry",
+        report.skipped_apron_bad_geometry,
+    );
+    report_skipped(
+        "holding node not associated with a taxiway",
+        report.skipped_holding_unassociated,
+    );
+    report_skipped(
+        "holding position invalid geometry",
+        report.skipped_holding_bad_geometry,
+    );
+    report_skipped(
+        "holding position invalid coordinates",
+        report.skipped_holding_bad_coordinates,
+    );
+    report_skipped(
+        "explicit ground light invalid coordinates",
+        report.skipped_ground_light_bad_coordinates,
+    );
+    if report.renderer_ineligible_non_ascii_refs > 0 {
+        eprintln!(
+            "warning: preserved {} non-ASCII reference(s) in the DB; the current sign renderer will omit them",
+            report.renderer_ineligible_non_ascii_refs
+        );
+    }
+    if report.renderer_ineligible_long_refs > 0 {
+        eprintln!(
+            "warning: preserved {} reference(s) longer than 8 ASCII bytes in the DB; the current sign renderer will omit them",
+            report.renderer_ineligible_long_refs
+        );
+    }
 }
 
 fn report_skipped(reason: &str, count: usize) {
     if count > 0 {
-        eprintln!("skipped {count} way(s): {reason}");
+        eprintln!("skipped {count} item(s): {reason}");
     }
 }
 
