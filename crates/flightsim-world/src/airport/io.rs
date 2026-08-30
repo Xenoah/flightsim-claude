@@ -665,6 +665,22 @@ impl From<std::io::Error> for AirportDatabaseError {
     }
 }
 
+/// 実行時の active airport 選択へ所有権を移せる地上設備。
+///
+/// [`AirportDatabase::into_ground_features`] は外部 DB から復号した大きな
+/// geometry を clone せず、この各 `Vec` へそのまま移す。
+#[derive(Debug, Default, PartialEq)]
+pub struct AirportGroundFeatures {
+    /// 誘導路中心線と属性。
+    pub taxiways: Vec<AirportTaxiway>,
+    /// 三角形分割済みの apron。
+    pub aprons: Vec<AirportApron>,
+    /// 待機位置の標示・標識用 geometry。
+    pub holding_positions: Vec<AirportHoldingPosition>,
+    /// 明示的な地上灯火。
+    pub ground_lights: Vec<AirportGroundLight>,
+}
+
 /// 検証済みの実行時空港 DB。
 #[derive(Debug, Clone, PartialEq)]
 pub struct AirportDatabase {
@@ -798,6 +814,20 @@ impl AirportDatabase {
     #[must_use]
     pub fn ground_lights(&self) -> &[AirportGroundLight] {
         &self.ground_lights
+    }
+
+    /// DB を消費し、滑走路以外の地上設備を clone なしで取り出す。
+    ///
+    /// 最寄り滑走路の選択後に active airport 周辺だけへ `retain` する用途を
+    /// 想定する。復号済み geometry を二重に確保しないための消費型 API。
+    #[must_use]
+    pub fn into_ground_features(self) -> AirportGroundFeatures {
+        AirportGroundFeatures {
+            taxiways: self.taxiways,
+            aprons: self.aprons,
+            holding_positions: self.holding_positions,
+            ground_lights: self.ground_lights,
+        }
     }
 
     /// DB が空か。
@@ -1635,6 +1665,22 @@ mod tests {
         assert!(!database.is_empty());
         assert_eq!(database.len(), 0, "len continues to mean runway count");
         assert_eq!(database.taxiways().len(), 1);
+    }
+
+    #[test]
+    fn consuming_ground_features_moves_decoded_geometry_without_cloning() {
+        let database = AirportDatabase::with_taxiways(Vec::new(), vec![sample_taxiway(10)])
+            .expect("v2 database should be valid");
+        let taxiway_storage = database.taxiways().as_ptr();
+        let point_storage = database.taxiways()[0].points().as_ptr();
+
+        let ground = database.into_ground_features();
+
+        assert_eq!(ground.taxiways.as_ptr(), taxiway_storage);
+        assert_eq!(ground.taxiways[0].points().as_ptr(), point_storage);
+        assert!(ground.aprons.is_empty());
+        assert!(ground.holding_positions.is_empty());
+        assert!(ground.ground_lights.is_empty());
     }
 
     #[test]

@@ -269,7 +269,9 @@ mod tests {
         let (mesh, _) = sample(RunwaySide::Forward)
             .expect("valid geometry")
             .expect("known side");
-        let dash_count = (20.0_f64 / DASH_PITCH).ceil() as usize;
+        let dash_count = core::iter::successors(Some(0.0_f64), |offset| Some(*offset + DASH_PITCH))
+            .take_while(|offset| *offset < 20.0)
+            .count();
         assert_eq!(mesh.count_vertices(), (2 + 2 * dash_count) * 4);
     }
 

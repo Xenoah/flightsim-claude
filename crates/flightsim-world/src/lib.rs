@@ -67,7 +67,7 @@ pub mod terrain;
 pub mod tile;
 
 pub use airport::io::{
-    AirportApron, AirportDatabase, AirportDatabaseError, AirportGroundLight,
+    AirportApron, AirportDatabase, AirportDatabaseError, AirportGroundFeatures, AirportGroundLight,
     AirportHoldingPosition, AirportRunway, AirportSourceKind, AirportSurface, AirportTaxiway,
     GroundFeatureGeometryError, GroundLightKind, HoldingPositionType, RunwaySide,
     TaxiwayGeometryError, TaxiwayLighting, TaxiwayMetadata,

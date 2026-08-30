@@ -46,7 +46,8 @@ use flightsim_sim::{GroundSampler, Simulation};
 use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
 use flightsim_world::{
     AirportApron, AirportDatabase, AirportGroundLight, AirportHoldingPosition, AirportTaxiway,
-    DiskTileSource, LodSelector, MemoryTileSource, Runway, Terrain, TileCache, TileId, TileSource,
+    DiskTileSource, GroundLightKind, LodSelector, MemoryTileSource, Runway, RunwaySide, Terrain,
+    TileCache, TileId, TileSource,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -65,6 +66,16 @@ const APPROACH_FLAPS: f64 = 1.0;
 /// FSAP は空港 relation へ依存せず中心線だけを保持する。地域抽出全域を描くと、遠方の
 /// 空港まで一度に GPU へ載るため、滑走路中心から 15 km の実用的な境界で一度だけ絞る。
 const ACTIVE_AIRPORT_RADIUS: Meters = Meters(15_000.0);
+
+/// 1 本の誘導路から描画用に展開する中心線点数の上限。
+///
+/// 舗装 mesh と灯火配置はいずれも 4,096 点を境界にしている。DEM を引いた後で弾くと、
+/// 不正に巨大な way のために先にメモリと地形探索を消費するため、app の入口でも揃えて守る。
+const MAX_TAXIWAY_SURFACE_POINTS: usize =
+    flightsim_render::taxiway_lights::MAX_TAXIWAY_LIGHT_PATH_POINTS;
+
+/// OSM 明示灯と中心線から作った灯火を同一点とみなす ECEF 距離。
+const GROUND_LIGHT_DEDUP_DISTANCE: f64 = 0.25;
 
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
@@ -676,7 +687,7 @@ fn resolve_airport_database(startup: &mut Startup, diagnostics: &mut StartupDiag
 
     match AirportDatabase::read_from_path(&path) {
         Ok(database) => {
-            if apply_nearest_airport(startup, &database).is_none() {
+            if apply_nearest_airport(startup, database).is_none() {
                 diagnostics.0.push(format!(
                     "airport database `{}` contains no runways; using the synthetic runway",
                     path.display()
@@ -693,40 +704,29 @@ fn resolve_airport_database(startup: &mut Startup, diagnostics: &mut StartupDiag
 /// 最寄り滑走路を [`Startup`] の唯一の active runway として適用する。
 ///
 /// 戻り値は OSM way ID。空 DB または不正な検索地点なら `None` で、設定は変えない。
-fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> Option<i64> {
+fn apply_nearest_airport(startup: &mut Startup, database: AirportDatabase) -> Option<i64> {
     let selected = database.nearest(startup.start)?;
     let runway = selected.runway;
     let source_way_id = selected.source_way_id;
-    let taxiways = database
-        .taxiways()
-        .iter()
-        .filter(|taxiway| taxiway_is_near_runway(taxiway, runway, ACTIVE_AIRPORT_RADIUS))
-        .cloned()
-        .collect();
-    let aprons = database
-        .aprons()
-        .iter()
-        .filter(|apron| apron_is_near_runway(apron, runway, ACTIVE_AIRPORT_RADIUS))
-        .cloned()
-        .collect();
-    let holding_positions = database
-        .holding_positions()
-        .iter()
-        .filter(|holding| point_is_near_runway(holding.position(), runway, ACTIVE_AIRPORT_RADIUS))
-        .cloned()
-        .collect();
-    let ground_lights = database
-        .ground_lights()
-        .iter()
-        .filter(|light| point_is_near_runway(light.position(), runway, ACTIVE_AIRPORT_RADIUS))
-        .copied()
-        .collect();
+    let mut ground = database.into_ground_features();
+    ground
+        .taxiways
+        .retain(|taxiway| taxiway_is_near_runway(taxiway, runway, ACTIVE_AIRPORT_RADIUS));
+    ground
+        .aprons
+        .retain(|apron| apron_is_near_runway(apron, runway, ACTIVE_AIRPORT_RADIUS));
+    ground
+        .holding_positions
+        .retain(|holding| point_is_near_runway(holding.position(), runway, ACTIVE_AIRPORT_RADIUS));
+    ground
+        .ground_lights
+        .retain(|light| point_is_near_runway(light.position(), runway, ACTIVE_AIRPORT_RADIUS));
 
     startup.runway = runway;
-    startup.taxiways = taxiways;
-    startup.aprons = aprons;
-    startup.holding_positions = holding_positions;
-    startup.ground_lights = ground_lights;
+    startup.taxiways = ground.taxiways;
+    startup.aprons = ground.aprons;
+    startup.holding_positions = ground.holding_positions;
+    startup.ground_lights = ground.ground_lights;
     startup.runway_source = RunwaySource::OpenStreetMap {
         way_id: source_way_id,
     };
@@ -830,6 +830,136 @@ fn point_right_of_heading(point: Geodetic, heading: Radians, distance: Meters) -
     LocalFrame::new(point)
         .ned_to_ecef_position(Ned(right_ned))
         .to_geodetic()
+}
+
+/// 待機位置から滑走路へ向かう接近方位。向きが分からない標識は安全側で省略する。
+fn holding_approach_heading(heading: Radians, runway_side: RunwaySide) -> Option<Radians> {
+    match runway_side {
+        RunwaySide::Forward => Some(heading),
+        RunwaySide::Backward => {
+            Some(Radians(heading.get() + core::f64::consts::PI).wrap_positive())
+        }
+        RunwaySide::Unknown => None,
+    }
+}
+
+type GroundLightCell = (GroundLightKind, i64, i64, i64);
+
+/// 明示灯を優先しつつ、空間的に同じ灯火を除く bounded accumulator。
+///
+/// セル幅を重複距離と同じにすれば、重複候補は自身を含む 27 セルだけに存在する。
+/// セルは候補の絞り込みにだけ使い、最終判定は ECEF の実距離で行う。
+struct GroundLightAccumulator {
+    limit: usize,
+    lights: Vec<(Geodetic, GroundLightKind)>,
+    ecef_positions: Vec<bevy::math::DVec3>,
+    cells: HashMap<GroundLightCell, Vec<usize>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GroundLightInsert {
+    Inserted,
+    Duplicate,
+    AtCapacity,
+    AllocationFailed,
+}
+
+impl GroundLightAccumulator {
+    fn try_new(limit: usize) -> Result<Self, std::collections::TryReserveError> {
+        let mut lights = Vec::new();
+        lights.try_reserve_exact(limit)?;
+        let mut ecef_positions = Vec::new();
+        ecef_positions.try_reserve_exact(limit)?;
+        let mut cells = HashMap::new();
+        cells.try_reserve(limit)?;
+        Ok(Self {
+            limit,
+            lights,
+            ecef_positions,
+            cells,
+        })
+    }
+
+    fn insert(&mut self, point: Geodetic, kind: GroundLightKind) -> GroundLightInsert {
+        let ecef = point.to_ecef().as_vec();
+        let (_, x, y, z) = ground_light_cell(ecef, kind);
+        let maximum_distance_squared = GROUND_LIGHT_DEDUP_DISTANCE.powi(2);
+
+        for delta_x in -1_i64..=1 {
+            for delta_y in -1_i64..=1 {
+                for delta_z in -1_i64..=1 {
+                    let Some(neighbour_x) = x.checked_add(delta_x) else {
+                        continue;
+                    };
+                    let Some(neighbour_y) = y.checked_add(delta_y) else {
+                        continue;
+                    };
+                    let Some(neighbour_z) = z.checked_add(delta_z) else {
+                        continue;
+                    };
+                    let Some(indices) =
+                        self.cells
+                            .get(&(kind, neighbour_x, neighbour_y, neighbour_z))
+                    else {
+                        continue;
+                    };
+                    if indices.iter().any(|&index| {
+                        self.ecef_positions[index].distance_squared(ecef)
+                            <= maximum_distance_squared
+                    }) {
+                        return GroundLightInsert::Duplicate;
+                    }
+                }
+            }
+        }
+
+        // 重複を先に判定する。上限到達後の duplicate も capacity を消費せず、
+        // 明示灯と fallback の順序を変えても unique 数にだけ上限が掛かる。
+        if self.lights.len() == self.limit {
+            return GroundLightInsert::AtCapacity;
+        }
+
+        let index = self.lights.len();
+        let indices = self.cells.entry((kind, x, y, z)).or_default();
+        if indices.try_reserve(1).is_err() {
+            return GroundLightInsert::AllocationFailed;
+        }
+        self.lights.push((point, kind));
+        self.ecef_positions.push(ecef);
+        indices.push(index);
+        GroundLightInsert::Inserted
+    }
+
+    fn len(&self) -> usize {
+        self.lights.len()
+    }
+
+    fn into_lights(self) -> Vec<(Geodetic, GroundLightKind)> {
+        self.lights
+    }
+}
+
+fn ground_light_cell(ecef: bevy::math::DVec3, kind: GroundLightKind) -> GroundLightCell {
+    let scaled = ecef / GROUND_LIGHT_DEDUP_DISTANCE;
+    debug_assert!(scaled.is_finite());
+    debug_assert!(
+        scaled.abs().max_element() < 9.0e18_f64,
+        "有効な地球近傍の測地座標は i64 セル範囲に収まる"
+    );
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "有限な地球近傍 ECEF を 0.25 m セルへ切り下げ、i64 範囲も直前で確認する"
+    )]
+    (
+        kind,
+        scaled.x.floor() as i64,
+        scaled.y.floor() as i64,
+        scaled.z.floor() as i64,
+    )
+}
+
+fn valid_taxiway_surface_point_count(count: usize) -> bool {
+    (2..=MAX_TAXIWAY_SURFACE_POINTS).contains(&count)
 }
 
 /// `05:30` のような時刻を読む。
@@ -1329,20 +1459,79 @@ fn setup(
         rendered_aprons += 1;
     }
 
+    // 明示 OSM 灯火を先に登録する。同種かつ 0.25 m 以内の fallback は後から除かれ、
+    // 明示データが常に優先される。上限は raw 入力ではなく dedup 後の unique 数に掛ける。
+    let ground_light_cap = flightsim_render::taxiway_lights::MAX_GROUND_LIGHTS;
+    let has_ground_light_sources = !startup.ground_lights.is_empty()
+        || startup
+            .taxiways
+            .iter()
+            .any(|taxiway| taxiway.lighting() != flightsim_world::TaxiwayLighting::None);
+    let mut ground_light_accumulator = if has_ground_light_sources {
+        match GroundLightAccumulator::try_new(ground_light_cap) {
+            Ok(accumulator) => Some(accumulator),
+            Err(error) => {
+                warn!("airport lights: could not allocate ground-light layout ({error})");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let mut duplicate_ground_lights = 0_usize;
+    let mut dropped_ground_lights = 0_usize;
+    let mut rendered_explicit_lights = 0_usize;
+    let mut rendered_fallback_lights = 0_usize;
+    let mut ground_light_allocation_failed =
+        has_ground_light_sources && ground_light_accumulator.is_none();
+    if let Some(accumulator) = ground_light_accumulator.as_mut() {
+        for light in &startup.ground_lights {
+            let elevation = airport_sampler
+                .sample(&mut airport_probe, light.position())
+                .elevation;
+            let point = Geodetic::new(
+                light.position().latitude,
+                light.position().longitude,
+                elevation,
+            );
+            match accumulator.insert(point, light.kind()) {
+                GroundLightInsert::Inserted => rendered_explicit_lights += 1,
+                GroundLightInsert::Duplicate => duplicate_ground_lights += 1,
+                GroundLightInsert::AtCapacity => dropped_ground_lights += 1,
+                GroundLightInsert::AllocationFailed => {
+                    warn!("airport lights: could not extend ground-light spatial index");
+                    ground_light_allocation_failed = true;
+                    break;
+                }
+            }
+        }
+    }
+
     // 誘導路は各 OSM node で DEM を引く。滑走路標高を全 way へ固定すると、長い
     // 誘導路の端が斜面へ埋まる。中心線 way ごとに 1 mesh へまとめるため、entity 数は
     // node 数ではなく way 数に抑えられる。
     let mut rendered_taxiways = 0_usize;
-    let mut procedural_lights = Vec::new();
     for taxiway in &startup.taxiways {
-        let surface_points: Vec<Geodetic> = taxiway
-            .points()
-            .iter()
-            .map(|point| {
-                let elevation = airport_sampler.sample(&mut airport_probe, *point).elevation;
-                Geodetic::new(point.latitude, point.longitude, elevation)
-            })
-            .collect();
+        let point_count = taxiway.points().len();
+        if !valid_taxiway_surface_point_count(point_count) {
+            warn!(
+                "taxiway: skipped invalid OpenStreetMap way {} ({point_count} points)",
+                taxiway.source_way_id
+            );
+            continue;
+        }
+        let mut surface_points = Vec::new();
+        if surface_points.try_reserve_exact(point_count).is_err() {
+            warn!(
+                "taxiway: could not allocate OpenStreetMap way {}",
+                taxiway.source_way_id
+            );
+            continue;
+        }
+        for &point in taxiway.points() {
+            let elevation = airport_sampler.sample(&mut airport_probe, point).elevation;
+            surface_points.push(Geodetic::new(point.latitude, point.longitude, elevation));
+        }
         let Some((mesh, origin)) =
             flightsim_render::taxiway::taxiway_mesh(&surface_points, taxiway.width)
         else {
@@ -1362,19 +1551,34 @@ fn setup(
         ));
         rendered_taxiways += 1;
 
+        if ground_light_allocation_failed || ground_light_accumulator.is_none() {
+            continue;
+        }
         match flightsim_render::taxiway_lights::procedural_taxiway_light_layout(
             &surface_points,
             taxiway.width,
             taxiway.lighting(),
         ) {
             Ok(layout) => {
-                if procedural_lights.try_reserve(layout.len()).is_err() {
-                    warn!(
-                        "taxiway lights: could not allocate fallback for OSM way {}",
-                        taxiway.source_way_id
-                    );
-                } else {
-                    procedural_lights.extend(layout);
+                let Some(accumulator) = ground_light_accumulator.as_mut() else {
+                    continue;
+                };
+                for (point, kind) in layout {
+                    let elevation = airport_sampler.sample(&mut airport_probe, point).elevation;
+                    let surface_point = Geodetic::new(point.latitude, point.longitude, elevation);
+                    match accumulator.insert(surface_point, kind) {
+                        GroundLightInsert::Inserted => rendered_fallback_lights += 1,
+                        GroundLightInsert::Duplicate => duplicate_ground_lights += 1,
+                        GroundLightInsert::AtCapacity => dropped_ground_lights += 1,
+                        GroundLightInsert::AllocationFailed => {
+                            warn!(
+                                "taxiway lights: could not extend fallback index at OSM way {}",
+                                taxiway.source_way_id
+                            );
+                            ground_light_allocation_failed = true;
+                            break;
+                        }
+                    }
                 }
             }
             Err(error) => warn!(
@@ -1384,8 +1588,8 @@ fn setup(
         }
     }
 
-    // 待機位置の路面標示と物理標識。標識は中心線上へ立てず、進行方向の右側へ
-    // 逃がして正面を中心線へ向ける。
+    // 待機位置の路面標示と物理標識。標識は中心線上へ立てず、滑走路へ向かう方位の
+    // 右側へ逃がし、正面を接近機側へ向ける。
     let mut rendered_markings = 0_usize;
     let mut rendered_signs = 0_usize;
     for holding in &startup.holding_positions {
@@ -1436,9 +1640,25 @@ fn setup(
         }) else {
             continue;
         };
+        let Some(approach_heading) =
+            holding_approach_heading(holding.heading(), holding.runway_side())
+        else {
+            continue;
+        };
+        if !taxiway_ref.is_ascii()
+            || !holding_ref.is_ascii()
+            || taxiway_ref.len() > flightsim_render::taxiway_sign::MAX_SIGN_REF_CHARS
+            || holding_ref.len() > flightsim_render::taxiway_sign::MAX_SIGN_REF_CHARS
+        {
+            warn!(
+                "holding sign: unsupported ref on OSM feature {}",
+                holding.source_id()
+            );
+            continue;
+        }
         let sign_centre = point_right_of_heading(
             holding.position(),
-            holding.heading(),
+            approach_heading,
             Meters(holding.width().get() * 0.5 + 2.0),
         );
         let sign_elevation = airport_sampler
@@ -1446,8 +1666,7 @@ fn setup(
             .elevation;
         let sign_position =
             Geodetic::new(sign_centre.latitude, sign_centre.longitude, sign_elevation);
-        let sign_facing =
-            Radians(holding.heading().get() - core::f64::consts::FRAC_PI_2).wrap_positive();
+        let sign_facing = Radians(approach_heading.get() + core::f64::consts::PI).wrap_positive();
         let taxiway_ref = taxiway_ref.to_ascii_uppercase();
         let holding_ref = holding_ref.to_ascii_uppercase();
         match flightsim_render::taxiway_sign::holding_position_sign_mesh(
@@ -1478,63 +1697,52 @@ fn setup(
         }
     }
 
-    // 明示 OSM 灯火を正とし、変換時に不足 channel だけ残した metadata から
-    // 決定論的な fallback を足す。どちらも色別の少数 mesh に束ねる。
-    let mut airport_ground_lights = Vec::new();
-    if airport_ground_lights
-        .try_reserve_exact(startup.ground_lights.len() + procedural_lights.len())
-        .is_err()
-    {
-        warn!("airport lights: could not allocate ground-light layout");
-    } else {
-        for light in &startup.ground_lights {
-            let elevation = airport_sampler
-                .sample(&mut airport_probe, light.position())
-                .elevation;
-            airport_ground_lights.push((
-                Geodetic::new(
-                    light.position().latitude,
-                    light.position().longitude,
-                    elevation,
-                ),
-                light.kind(),
-            ));
-        }
-        airport_ground_lights.extend(procedural_lights);
+    // 明示灯と各 way の fallback を統合済みの配列だけ、色別の少数 mesh に束ねる。
+    if duplicate_ground_lights != 0 {
+        info!("airport lights: removed {duplicate_ground_lights} duplicate points");
     }
+    if dropped_ground_lights != 0 {
+        warn!(
+            "airport lights: dropped {dropped_ground_lights} points beyond the deduplicated active-airport limit"
+        );
+    }
+    info!(
+        "airport lights: {rendered_explicit_lights} explicit + \
+         {rendered_fallback_lights} fallback points"
+    );
+    debug_assert_eq!(
+        ground_light_accumulator
+            .as_ref()
+            .map_or(0, GroundLightAccumulator::len),
+        rendered_explicit_lights + rendered_fallback_lights
+    );
+    let airport_ground_lights =
+        ground_light_accumulator.map_or_else(Vec::new, GroundLightAccumulator::into_lights);
     let mut rendered_light_groups = 0_usize;
-    for (chunk_index, chunk) in airport_ground_lights
-        .chunks(flightsim_render::taxiway_lights::MAX_GROUND_LIGHTS)
-        .enumerate()
-    {
-        match flightsim_render::taxiway_lights::ground_light_meshes(chunk) {
-            Ok(Some((groups, origin))) => {
-                for group in groups {
-                    commands.spawn((
-                        flightsim_render::terrain_mesh_bundle(
-                            meshes.add(group.mesh),
-                            materials.add(group.material),
-                            origin,
-                        ),
-                        group.marker,
-                        Name::new(format!("airport ground lights {chunk_index}")),
-                    ));
-                    rendered_light_groups += 1;
-                }
+    match flightsim_render::taxiway_lights::ground_light_meshes(&airport_ground_lights) {
+        Ok(Some((groups, origin))) => {
+            for group in groups {
+                commands.spawn((
+                    flightsim_render::terrain_mesh_bundle(
+                        meshes.add(group.mesh),
+                        materials.add(group.material),
+                        origin,
+                    ),
+                    group.marker,
+                    Name::new(format!("airport ground lights {rendered_light_groups}")),
+                ));
+                rendered_light_groups += 1;
             }
-            Ok(None) => {}
-            Err(error) => warn!("airport lights: skipped chunk {chunk_index} ({error})"),
         }
+        Ok(None) => {}
+        Err(error) => warn!("airport lights: skipped ground-light layout ({error})"),
     }
     if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. }) {
         info!(
             "airport ground: {rendered_aprons} aprons, {rendered_taxiways} taxiways, \
              {rendered_markings} holding markings, {rendered_signs} signs, \
-             {} explicit + {} fallback lights in {rendered_light_groups} groups",
-            startup.ground_lights.len(),
-            airport_ground_lights
-                .len()
-                .saturating_sub(startup.ground_lights.len())
+             {} ground lights in {rendered_light_groups} groups",
+            airport_ground_lights.len()
         );
     }
 
@@ -2133,7 +2341,7 @@ mod tests {
         let (database, expected) = airport_database_for_app_tests();
         let mut startup = Startup::default();
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(apply_nearest_airport(&mut startup, database), Some(200));
         assert_eq!(startup.runway, expected.runway);
         assert_eq!(startup.start, expected.runway.takeoff_start());
         assert_eq!(startup.heading, expected.runway.heading);
@@ -2169,7 +2377,7 @@ mod tests {
             .expect("valid airport database");
         let mut startup = Startup::default();
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(apply_nearest_airport(&mut startup, database), Some(200));
         assert_eq!(startup.taxiways.len(), 1);
         assert_eq!(startup.taxiways[0].source_way_id, 300);
     }
@@ -2333,13 +2541,107 @@ mod tests {
         .expect("valid ground-feature database");
         let mut startup = Startup::default();
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(apply_nearest_airport(&mut startup, database), Some(200));
         assert_eq!(startup.aprons.len(), 1);
         assert_eq!(startup.aprons[0].source_id(), 500);
         assert_eq!(startup.holding_positions.len(), 1);
         assert_eq!(startup.holding_positions[0].source_id(), 600);
         assert_eq!(startup.ground_lights.len(), 1);
         assert_eq!(startup.ground_lights[0].source_id(), 700);
+    }
+
+    #[test]
+    fn ground_light_accumulator_deduplicates_same_kind_by_ecef_distance() {
+        let origin = Geodetic::from_degrees(35.55, 139.78, 6.0);
+        let within = origin.offset_by(Meters(0.1), Meters::ZERO);
+        let outside = origin.offset_by(Meters(0.3), Meters::ZERO);
+        let mut accumulator = GroundLightAccumulator::try_new(4).expect("small allocation");
+
+        assert_eq!(
+            accumulator.insert(origin, GroundLightKind::TaxiwayEdge),
+            GroundLightInsert::Inserted
+        );
+        assert_eq!(
+            accumulator.insert(within, GroundLightKind::TaxiwayEdge),
+            GroundLightInsert::Duplicate
+        );
+        assert_eq!(
+            accumulator.insert(origin, GroundLightKind::TaxiwayCenterline),
+            GroundLightInsert::Inserted
+        );
+        assert_eq!(
+            accumulator.insert(outside, GroundLightKind::TaxiwayEdge),
+            GroundLightInsert::Inserted
+        );
+        assert_eq!(accumulator.len(), 3);
+        assert_eq!(
+            accumulator.into_lights()[0],
+            (origin, GroundLightKind::TaxiwayEdge),
+            "先に登録した明示灯相当の点を残す"
+        );
+    }
+
+    #[test]
+    fn duplicate_ground_light_does_not_consume_unique_capacity() {
+        let origin = Geodetic::from_degrees(35.55, 139.78, 6.0);
+        let within = origin.offset_by(Meters::ZERO, Meters(0.1));
+        let mut accumulator = GroundLightAccumulator::try_new(2).expect("small allocation");
+
+        assert_eq!(
+            accumulator.insert(origin, GroundLightKind::TaxiwayEdge),
+            GroundLightInsert::Inserted
+        );
+        assert_eq!(
+            accumulator.insert(within, GroundLightKind::TaxiwayEdge),
+            GroundLightInsert::Duplicate
+        );
+        assert_eq!(
+            accumulator.insert(origin, GroundLightKind::TaxiwayCenterline),
+            GroundLightInsert::Inserted
+        );
+        assert_eq!(
+            accumulator.insert(origin, GroundLightKind::RunwayGuard),
+            GroundLightInsert::AtCapacity
+        );
+        assert_eq!(accumulator.len(), 2);
+    }
+
+    #[test]
+    fn taxiway_surface_point_limit_is_checked_before_dem_expansion() {
+        assert!(!valid_taxiway_surface_point_count(0));
+        assert!(!valid_taxiway_surface_point_count(1));
+        assert!(valid_taxiway_surface_point_count(2));
+        assert!(valid_taxiway_surface_point_count(
+            MAX_TAXIWAY_SURFACE_POINTS
+        ));
+        assert!(!valid_taxiway_surface_point_count(
+            MAX_TAXIWAY_SURFACE_POINTS + 1
+        ));
+    }
+
+    #[test]
+    fn holding_sign_approach_heading_follows_the_runway_side() {
+        let heading = Degrees(10.0).to_radians();
+        let forward = holding_approach_heading(heading, RunwaySide::Forward)
+            .expect("forward side has a known approach");
+        let backward = holding_approach_heading(heading, RunwaySide::Backward)
+            .expect("backward side has a known approach");
+
+        assert!(
+            forward
+                .shortest_difference_to(Degrees(10.0).to_radians())
+                .get()
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            backward
+                .shortest_difference_to(Degrees(190.0).to_radians())
+                .get()
+                .abs()
+                < 1.0e-12
+        );
+        assert!(holding_approach_heading(heading, RunwaySide::Unknown).is_none());
     }
 
     #[test]
@@ -2350,7 +2652,7 @@ mod tests {
         let explicit_start = startup.start;
         let explicit_heading = startup.heading;
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(apply_nearest_airport(&mut startup, database), Some(200));
         assert_eq!(startup.runway, expected.runway);
         assert_eq!(startup.start, explicit_start);
         assert_eq!(startup.heading, explicit_heading);
@@ -2362,7 +2664,7 @@ mod tests {
         let (mut startup, notes) = parse(&["--start", "0.005,0"]);
         assert!(notes.is_empty(), "{notes:?}");
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(100));
+        assert_eq!(apply_nearest_airport(&mut startup, database), Some(100));
         assert_eq!(
             startup.runway_source,
             RunwaySource::OpenStreetMap { way_id: 100 }
@@ -2375,7 +2677,7 @@ mod tests {
         let mut startup = Startup::default();
         let original = startup.clone();
 
-        assert_eq!(apply_nearest_airport(&mut startup, &database), None);
+        assert_eq!(apply_nearest_airport(&mut startup, database), None);
         assert_eq!(startup.runway, original.runway);
         assert_eq!(startup.start, original.start);
         assert_eq!(startup.heading, original.heading);
