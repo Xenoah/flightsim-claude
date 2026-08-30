@@ -43,10 +43,10 @@ use flightsim_render::{
     update_terrain_selection,
 };
 use flightsim_sim::{GroundSampler, Simulation};
-use flightsim_ui::{FlightsimUiPlugin, HudState};
-use flightsim_world::Runway;
+use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
 use flightsim_world::{
-    DiskTileSource, LodSelector, MemoryTileSource, Terrain, TileCache, TileId, TileSource,
+    AirportDatabase, DiskTileSource, LodSelector, MemoryTileSource, Runway, Terrain, TileCache,
+    TileId, TileSource,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -76,6 +76,22 @@ const BUNDLED_MODEL: &str = "aircraft/light_single.glb";
 /// **同梱ぶん専用の実測値**として、ここにだけ置く。
 const BUNDLED_MODEL_AXES: (ModelAxis, ModelAxis) = (ModelAxis::NegativeX, ModelAxis::PositiveY);
 
+/// OSM 空港 DB を実際に使う場合だけ表示する帰属。
+///
+/// 既定フォントに無い `©` は使わず `(c)` とする。詳細な URL と ODbL の説明は
+/// 配布物の `ATTRIBUTION.md` にある。
+const OSM_AIRPORT_ATTRIBUTION: &str = "Airport data: (c) OpenStreetMap contributors (ODbL)";
+
+/// 起動時に選ばれた滑走路の出所。
+///
+/// OSM の DB を指定しても、読み込み失敗や空 DB なら合成滑走路へ戻る。その場合に
+/// 帰属表示を出すと「使っていないデータの出所」を主張することになるため、結果を持つ。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunwaySource {
+    Synthetic,
+    OpenStreetMap { way_id: i64 },
+}
+
 /// 引数の解釈中に出た指摘。
 ///
 /// # なぜ溜めるのか
@@ -90,8 +106,24 @@ struct StartupDiagnostics(Vec<String>);
 #[derive(Resource, Debug, Clone)]
 struct Startup {
     tiles: Option<PathBuf>,
+    /// オフライン変換済みの OSM 空港 DB（`.fsairports`）。
+    ///
+    /// 生の PBF は実行時に読まない（ADR-0003 / ADR-0008）。
+    airports: Option<PathBuf>,
     start: Geodetic,
+    /// `--start` が明示されたか。
+    ///
+    /// 空港 DB だけを指定した場合は、選んだ滑走路上から始める。明示された場合は
+    /// その地点を nearest 検索と spawn の両方に使うため、値だけでは区別できない。
+    start_was_explicit: bool,
     heading: Radians,
+    /// `--heading` が明示されたか。未指定なら選んだ滑走路方位へ揃える。
+    heading_was_explicit: bool,
+    /// 開始・進入・描画・灯火・着陸評価が共有する滑走路。
+    ///
+    /// `main` で空港 DB を解決した後は、各 system が別々に選び直してはならない。
+    runway: Runway,
+    runway_source: RunwaySource,
     min_level: u8,
     max_level: u8,
     /// 指定すると、起動から一定時間後に 1 枚だけ撮って保存する。
@@ -146,8 +178,13 @@ impl Default for Startup {
         let runway = Runway::synthetic();
         Self {
             tiles: None,
+            airports: None,
             start: runway.takeoff_start(),
+            start_was_explicit: false,
             heading: runway.heading,
+            heading_was_explicit: false,
+            runway,
+            runway_source: RunwaySource::Synthetic,
             min_level: 8,
             max_level: 13,
             screenshot: None,
@@ -178,7 +215,8 @@ struct FlightSimulation(Simulation<BoxedSource>);
 
 /// 着陸評価に使う滑走路。
 ///
-/// 現状は合成飛行場ひとつ。空港データベースが入ったら差し替える。
+/// 合成滑走路または OSM DB から起動時に選んだ 1 本。開始・進入・描画・灯火も
+/// 同じ値を使い、system ごとに選び直さない。
 #[derive(Resource, Debug, Clone)]
 struct ActiveRunway(Runway);
 
@@ -212,6 +250,7 @@ struct PendingModelFit(ModelFit);
 
 fn main() {
     let (mut startup, mut diagnostics) = parse_arguments();
+    resolve_airport_database(&mut startup, &mut diagnostics);
 
     // アセットの置き場所を先に決める。**Bevy の既定はこのリポジトリを指さない。**
     let mut asset_plugin = AssetPlugin::default();
@@ -240,6 +279,10 @@ fn main() {
         clock
     };
     let clouds = startup.clouds;
+    let data_attribution = match startup.runway_source {
+        RunwaySource::Synthetic => DataAttribution::default(),
+        RunwaySource::OpenStreetMap { .. } => DataAttribution::new(OSM_AIRPORT_ATTRIBUTION),
+    };
 
     App::new()
         .add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
@@ -256,6 +299,7 @@ fn main() {
         ))
         .insert_resource(clock)
         .insert_resource(clouds)
+        .insert_resource(data_attribution)
         .insert_resource(startup)
         .insert_resource(diagnostics)
         .init_resource::<CameraRig>()
@@ -287,7 +331,7 @@ fn main() {
         .run();
 }
 
-/// `--tiles <DIR>` と `--start <LAT,LON>` を読む。
+/// `--tiles <DIR>`、`--airports <FILE>`、`--start <LAT,LON>` を読む。
 ///
 /// clap を入れるほどの規模ではない。増えたら入れる。
 ///
@@ -295,6 +339,20 @@ fn main() {
 /// ここで出しても購読者が居らず何も表示されない（[`StartupDiagnostics`]）。
 fn parse_arguments() -> (Startup, StartupDiagnostics) {
     parse_arguments_from(std::env::args().skip(1))
+}
+
+/// 次のトークンが別の long option でなければ、値として取り出す。
+///
+/// 値の無い option が後続 option を飲み込むと、後続側が警告なしで消える。
+/// 負の数値は `-1` のようにハイフン 1 つなので、値として渡す。
+fn next_argument_value<I>(arguments: &mut std::iter::Peekable<I>) -> Option<String>
+where
+    I: Iterator<Item = String>,
+{
+    arguments
+        .peek()
+        .is_some_and(|value| !value.starts_with("--"))
+        .then(|| arguments.next().expect("peeked argument must exist"))
 }
 
 /// 引数列を解釈する。テストから実プロセスの引数を差し替えられる入口。
@@ -318,32 +376,44 @@ fn parse_arguments_from(
     let mut forward = None;
     let mut up = None;
 
-    let mut arguments = arguments.into_iter();
+    let mut arguments = arguments.into_iter().peekable();
 
     while let Some(flag) = arguments.next() {
         match flag.as_str() {
-            "--tiles" => startup.tiles = arguments.next().map(PathBuf::from),
+            "--tiles" => match next_argument_value(&mut arguments) {
+                Some(path) => startup.tiles = Some(PathBuf::from(path)),
+                None => notes.push("--tiles needs a directory".to_owned()),
+            },
+            "--airports" => match next_argument_value(&mut arguments) {
+                Some(path) => startup.airports = Some(PathBuf::from(path)),
+                None => notes.push("--airports needs a .fsairports file".to_owned()),
+            },
             "--start" => {
-                if let Some(text) = arguments.next() {
-                    let parts: Vec<f64> = text
-                        .split(',')
-                        .filter_map(|p| p.trim().parse().ok())
-                        .collect();
-                    if let [latitude, longitude] = parts.as_slice() {
-                        startup.start = Geodetic::from_degrees(*latitude, *longitude, 0.0);
-                    } else {
-                        notes.push(format!("--start expects `lat,lon`; ignoring `{text}`"));
+                if let Some(text) = next_argument_value(&mut arguments) {
+                    match parse_start_position(&text) {
+                        Ok(position) => {
+                            startup.start = position;
+                            startup.start_was_explicit = true;
+                        }
+                        Err(message) => notes.push(message),
                     }
+                } else {
+                    notes.push("--start needs `lat,lon`".to_owned());
                 }
             }
-            "--heading" => match arguments.next() {
+            "--heading" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
-                    Ok(value) => startup.heading = Degrees(value).to_radians(),
-                    Err(_) => notes.push(format!("--heading expects degrees; ignoring `{text}`")),
+                    Ok(value) if value.is_finite() => {
+                        startup.heading = Degrees(value).to_radians();
+                        startup.heading_was_explicit = true;
+                    }
+                    _ => notes.push(format!(
+                        "--heading expects finite degrees; ignoring `{text}`"
+                    )),
                 },
                 None => notes.push("--heading needs a value".to_owned()),
             },
-            "--max-level" => match arguments.next() {
+            "--max-level" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<u8>() {
                     Ok(value) => startup.max_level = value,
                     Err(_) => {
@@ -353,7 +423,7 @@ fn parse_arguments_from(
                 None => notes.push("--max-level needs a value".to_owned()),
             },
             "--view" => {
-                if let Some(name) = arguments.next() {
+                if let Some(name) = next_argument_value(&mut arguments) {
                     startup.view = match name.to_lowercase().as_str() {
                         "cockpit" => ViewMode::Cockpit,
                         "chase" => ViewMode::Chase,
@@ -364,9 +434,11 @@ fn parse_arguments_from(
                             startup.view
                         }
                     };
+                } else {
+                    notes.push("--view needs a view name".to_owned());
                 }
             }
-            "--model" => match arguments.next() {
+            "--model" => match next_argument_value(&mut arguments) {
                 Some(path) => requested_model = Some(path),
                 None => notes.push("--model needs a path".to_owned()),
             },
@@ -374,7 +446,7 @@ fn parse_arguments_from(
             // **戻す手段が無いと寸法の食い違いを比べられない。**
             "--no-model" => placeholder = true,
             "--model-forward" | "--model-up" => {
-                let Some(text) = arguments.next() else {
+                let Some(text) = next_argument_value(&mut arguments) else {
                     notes.push(format!("{flag} needs an axis"));
                     continue;
                 };
@@ -390,14 +462,14 @@ fn parse_arguments_from(
                 }
             }
             // 航空の慣習に合わせて `270/10`（西から 10 kt）。
-            "--wind" => match arguments.next() {
+            "--wind" => match next_argument_value(&mut arguments) {
                 Some(text) => match parse_wind(&text) {
                     Ok(wind) => startup.wind = wind,
                     Err(message) => notes.push(message),
                 },
                 None => notes.push("--wind needs `<bearing>/<knots>`, e.g. 270/10".to_owned()),
             },
-            "--turbulence" => match arguments.next() {
+            "--turbulence" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.to_lowercase().as_str() {
                     // 種は固定。**同じ指定なら毎回同じ大気**になり、
                     // 「さっきの着陸が難しかったのは運か腕か」を切り分けられる。
@@ -412,14 +484,14 @@ fn parse_arguments_from(
                 None => notes.push("--turbulence needs a level".to_owned()),
             },
             // 地方平均太陽時。`--time 05:30` で日の出前から始まる。
-            "--time" => match arguments.next() {
+            "--time" => match next_argument_value(&mut arguments) {
                 Some(text) => match parse_clock(&text) {
                     Ok(clock) => startup.start_hour = Some(clock),
                     Err(message) => notes.push(message),
                 },
                 None => notes.push("--time needs `HH:MM`".to_owned()),
             },
-            "--time-rate" => match arguments.next() {
+            "--time-rate" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value.is_finite() && value >= 0.0 => startup.time_rate = value,
                     _ => notes.push(format!(
@@ -428,7 +500,7 @@ fn parse_arguments_from(
                 },
                 None => notes.push("--time-rate needs a multiplier".to_owned()),
             },
-            "--cloud-cover" => match arguments.next() {
+            "--cloud-cover" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f32>() {
                     Ok(value) => cloud_cover = value,
                     Err(_) => {
@@ -443,7 +515,7 @@ fn parse_arguments_from(
                     notes.push("--cloud-cover needs a value from 0 to 1".to_owned());
                 }
             },
-            "--cloud-base" => match arguments.next() {
+            "--cloud-base" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) => cloud_base = Meters(value),
                     Err(_) => {
@@ -458,7 +530,7 @@ fn parse_arguments_from(
                     notes.push("--cloud-base needs a height in metres".to_owned());
                 }
             },
-            "--cloud-top" => match arguments.next() {
+            "--cloud-top" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) => cloud_top = Meters(value),
                     Err(_) => {
@@ -473,7 +545,7 @@ fn parse_arguments_from(
                     notes.push("--cloud-top needs a height in metres".to_owned());
                 }
             },
-            "--cloud-visibility" => match arguments.next() {
+            "--cloud-visibility" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) => cloud_visibility = Meters(value),
                     Err(_) => {
@@ -487,18 +559,18 @@ fn parse_arguments_from(
                 }
             },
             // 着陸練習。`--approach` だけなら 1 海里、値を付ければその距離。
-            "--approach" => {
-                let distance = arguments
-                    .next()
-                    .and_then(|text| text.parse::<f64>().ok())
-                    .unwrap_or(1.0);
-                if distance.is_finite() && distance > 0.0 {
-                    startup.approach = Some(distance);
-                } else {
-                    notes.push(format!("--approach expects miles out, got `{distance}`"));
-                }
-            }
-            "--drop" => match arguments.next() {
+            "--approach" => match next_argument_value(&mut arguments) {
+                None => startup.approach = Some(1.0),
+                Some(text) => match text.parse::<f64>() {
+                    Ok(distance) if distance.is_finite() && distance > 0.0 => {
+                        startup.approach = Some(distance);
+                    }
+                    _ => {
+                        notes.push(format!("--approach expects miles out, got `{text}`"));
+                    }
+                },
+            },
+            "--drop" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value > 0.0 => startup.drop_height = Some(value),
                     _ => notes.push(format!(
@@ -507,8 +579,11 @@ fn parse_arguments_from(
                 },
                 None => notes.push("--drop needs a height in metres".to_owned()),
             },
-            "--screenshot" => startup.screenshot = arguments.next().map(PathBuf::from),
-            "--screenshot-delay" => match arguments.next() {
+            "--screenshot" => match next_argument_value(&mut arguments) {
+                Some(path) => startup.screenshot = Some(PathBuf::from(path)),
+                None => notes.push("--screenshot needs a PNG path".to_owned()),
+            },
+            "--screenshot-delay" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) => startup.screenshot_delay = value,
                     Err(_) => {
@@ -539,6 +614,83 @@ fn parse_arguments_from(
     }
 
     (startup, StartupDiagnostics(notes))
+}
+
+/// `latitude,longitude` を有限な度として読む。
+///
+/// `filter_map` で数値だけ拾うと `35,nope,139` が誤って 2 要素として通るため、
+/// 各フィールドを独立に検査する。
+fn parse_start_position(text: &str) -> Result<Geodetic, String> {
+    let fields: Vec<&str> = text.split(',').collect();
+    let [latitude, longitude] = fields.as_slice() else {
+        return Err(format!("--start expects `lat,lon`; ignoring `{text}`"));
+    };
+    let latitude = latitude
+        .trim()
+        .parse::<f64>()
+        .map_err(|_| format!("--start latitude is not a number; ignoring `{text}`"))?;
+    let longitude = longitude
+        .trim()
+        .parse::<f64>()
+        .map_err(|_| format!("--start longitude is not a number; ignoring `{text}`"))?;
+
+    if !latitude.is_finite()
+        || !longitude.is_finite()
+        || !(-90.0..=90.0).contains(&latitude)
+        || !(-180.0..=180.0).contains(&longitude)
+    {
+        return Err(format!(
+            "--start expects latitude -90..90 and longitude -180..180; ignoring `{text}`"
+        ));
+    }
+
+    Ok(Geodetic::from_degrees(latitude, longitude, 0.0))
+}
+
+/// 指定された実行時空港 DB から最寄り滑走路を一度だけ選ぶ。
+///
+/// ここは `App::new()` より前なので、失敗はログへ直接出さず diagnostics に溜める。
+/// 選択を setup や着陸評価で繰り返すと、開始位置と表示対象が別滑走路になり得る。
+fn resolve_airport_database(startup: &mut Startup, diagnostics: &mut StartupDiagnostics) {
+    let Some(path) = startup.airports.clone() else {
+        return;
+    };
+
+    match AirportDatabase::read_from_path(&path) {
+        Ok(database) => {
+            if apply_nearest_airport(startup, &database).is_none() {
+                diagnostics.0.push(format!(
+                    "airport database `{}` contains no runways; using the synthetic runway",
+                    path.display()
+                ));
+            }
+        }
+        Err(error) => diagnostics.0.push(format!(
+            "could not read airport database `{}` ({error}); using the synthetic runway",
+            path.display()
+        )),
+    }
+}
+
+/// 最寄り滑走路を [`Startup`] の唯一の active runway として適用する。
+///
+/// 戻り値は OSM way ID。空 DB または不正な検索地点なら `None` で、設定は変えない。
+fn apply_nearest_airport(startup: &mut Startup, database: &AirportDatabase) -> Option<i64> {
+    let selected = database.nearest(startup.start)?;
+    let runway = selected.runway;
+
+    startup.runway = runway;
+    startup.runway_source = RunwaySource::OpenStreetMap {
+        way_id: selected.source_way_id,
+    };
+    if !startup.start_was_explicit {
+        startup.start = runway.takeoff_start();
+    }
+    if !startup.heading_was_explicit {
+        startup.heading = runway.heading;
+    }
+
+    Some(selected.source_way_id)
 }
 
 /// `05:30` のような時刻を読む。
@@ -886,8 +1038,30 @@ fn setup(
         startup.start.latitude_degrees(),
         startup.start.longitude_degrees()
     );
+    match startup.runway_source {
+        RunwaySource::Synthetic => info!("runway: synthetic"),
+        RunwaySource::OpenStreetMap { way_id } => {
+            info!("runway: OpenStreetMap way {way_id}")
+        }
+    }
 
     // --- シミュレーション ---
+
+    // OSM `ele` の基準・品質は一定せず、使用中の地形とは揃わない（ADR-0008）。
+    // 選択した滑走路の進入端で実際の地形数値を引き、描画・接地を局所的に揃える。
+    // これは鉛直基準の変換ではない。Copernicus DEM の EGM2008 ⇒ WGS84 は #22。
+    let runway = {
+        let sampler = GroundSampler::default();
+        let mut probe = Terrain::new(
+            make_source(&startup),
+            8 * 1024 * 1024,
+            startup.min_level..=startup.max_level,
+        );
+        let elevation = sampler
+            .sample(&mut probe, startup.runway.threshold)
+            .elevation;
+        startup.runway.with_elevation(elevation)
+    };
 
     let terrain = Terrain::new(
         make_source(&startup),
@@ -913,7 +1087,7 @@ fn setup(
 
     let simulation = if let Some(miles) = startup.approach {
         let state = flightsim_sim::approach_state(
-            &Runway::synthetic(),
+            &runway,
             flightsim_core::NauticalMiles(miles).to_meters(),
             Degrees(3.0).to_radians(),
             flightsim_core::MetersPerSecond(35.0),
@@ -974,16 +1148,8 @@ fn setup(
 
     // --- 滑走路 ---
 
-    // 見た目は**実際の地面の高さ**に置く。地形タイルがあれば彫られた 8 m、
-    // 無ければ海面 0 m。着陸評価（contains / offsets）は高度を見ないので、
-    // 見た目の高さを地面へ合わせても評価はずれない。
-    let runway = Runway::synthetic();
-    let ground_elevation = simulation.ground().elevation;
-    let visual_threshold = Geodetic::new(
-        runway.threshold.latitude,
-        runway.threshold.longitude,
-        ground_elevation,
-    );
+    // 見た目も進入・評価と同じ滑走路、同じ DEM 標高へ置く。
+    let visual_threshold = runway.threshold;
     let (runway_mesh, runway_origin) = flightsim_render::runway::runway_mesh(
         visual_threshold,
         runway.heading,
@@ -1434,6 +1600,197 @@ mod tests {
         let (startup, diagnostics) =
             parse_arguments_from(args.iter().map(|argument| (*argument).to_owned()));
         (startup, diagnostics.0)
+    }
+
+    // --- 空港 DB と開始位置の CLI ---
+
+    #[test]
+    fn airport_database_and_explicit_start_are_recorded_separately() {
+        let (startup, notes) = parse(&[
+            "--airports",
+            "data/tokyo.fsairports",
+            "--start",
+            "35.55,139.78",
+            "--heading",
+            "335",
+        ]);
+
+        assert_eq!(
+            startup.airports.as_deref(),
+            Some(std::path::Path::new("data/tokyo.fsairports"))
+        );
+        assert!(startup.start_was_explicit);
+        assert!(startup.heading_was_explicit);
+        assert!((startup.start.latitude_degrees() - 35.55).abs() < 1.0e-12);
+        assert!((startup.start.longitude_degrees() - 139.78).abs() < 1.0e-12);
+        assert!((startup.heading.to_degrees().get() - 335.0).abs() < 1.0e-12);
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn airport_database_does_not_make_the_default_start_explicit() {
+        let (startup, notes) = parse(&["--airports", "data/tokyo.fsairports"]);
+        assert!(startup.airports.is_some());
+        assert!(!startup.start_was_explicit);
+        assert!(!startup.heading_was_explicit);
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn optional_approach_value_does_not_consume_the_following_airport_option() {
+        let (startup, notes) = parse(&["--approach", "--airports", "data/tokyo.fsairports"]);
+
+        assert_eq!(startup.approach, Some(1.0));
+        assert_eq!(
+            startup.airports.as_deref(),
+            Some(std::path::Path::new("data/tokyo.fsairports"))
+        );
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn malformed_approach_distance_is_reported_instead_of_enabling_one_mile() {
+        for value in ["far", "0", "-1", "NaN", "inf"] {
+            let (startup, notes) = parse(&["--approach", value]);
+
+            assert_eq!(startup.approach, None, "{value}");
+            assert_eq!(notes.len(), 1, "{value}: {notes:?}");
+            assert!(notes[0].contains(value), "{value}: {notes:?}");
+        }
+    }
+
+    #[test]
+    fn a_missing_required_value_does_not_consume_the_following_option() {
+        let (startup, notes) = parse(&["--heading", "--airports", "data/tokyo.fsairports"]);
+
+        assert!(!startup.heading_was_explicit);
+        assert_eq!(
+            startup.airports.as_deref(),
+            Some(std::path::Path::new("data/tokyo.fsairports"))
+        );
+        assert!(notes.iter().any(|note| note.contains("--heading needs")));
+    }
+
+    #[test]
+    fn malformed_or_out_of_range_start_is_rejected_atomically() {
+        for value in [
+            "35,nope,139",
+            "35",
+            "35,139,8",
+            "91,139",
+            "35,181",
+            "NaN,139",
+            "35,inf",
+        ] {
+            let (startup, notes) = parse(&["--start", value]);
+            assert!(!startup.start_was_explicit, "{value}");
+            assert_eq!(
+                startup.start,
+                Runway::synthetic().takeoff_start(),
+                "{value}"
+            );
+            assert_eq!(notes.len(), 1, "{value}: {notes:?}");
+        }
+    }
+
+    #[test]
+    fn missing_airport_path_and_non_finite_heading_are_reported() {
+        let (startup, notes) = parse(&["--airports", "--heading", "NaN"]);
+        assert!(startup.airports.is_none());
+        assert!(!startup.heading_was_explicit);
+        assert!(
+            notes
+                .iter()
+                .any(|note| note.contains("needs a .fsairports"))
+        );
+        assert!(notes.iter().any(|note| note.contains("finite degrees")));
+
+        let (startup, notes) = parse(&["--airports"]);
+        assert!(startup.airports.is_none());
+        assert!(
+            notes
+                .iter()
+                .any(|note| note.contains("needs a .fsairports"))
+        );
+
+        let (startup, notes) = parse(&["--heading", "inf"]);
+        assert!(!startup.heading_was_explicit);
+        assert!(notes.iter().any(|note| note.contains("finite degrees")));
+    }
+
+    fn airport_database_for_app_tests() -> (AirportDatabase, flightsim_world::AirportRunway) {
+        let near = flightsim_world::AirportRunway::from_endpoints(
+            200,
+            Geodetic::from_degrees(35.55, 139.78, 0.0),
+            Geodetic::from_degrees(35.56, 139.78, 0.0),
+            Meters(45.0),
+        )
+        .expect("valid Tokyo runway");
+        let far = flightsim_world::AirportRunway::from_endpoints(
+            100,
+            Geodetic::from_degrees(0.0, 0.0, 0.0),
+            Geodetic::from_degrees(0.01, 0.0, 0.0),
+            Meters(30.0),
+        )
+        .expect("valid distant runway");
+        let expected = near;
+        let database = AirportDatabase::new(vec![far, near]).expect("valid airport database");
+        (database, expected)
+    }
+
+    #[test]
+    fn database_only_starts_on_the_nearest_runway_and_uses_its_heading() {
+        let (database, expected) = airport_database_for_app_tests();
+        let mut startup = Startup::default();
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(startup.runway, expected.runway);
+        assert_eq!(startup.start, expected.runway.takeoff_start());
+        assert_eq!(startup.heading, expected.runway.heading);
+        assert_eq!(
+            startup.runway_source,
+            RunwaySource::OpenStreetMap { way_id: 200 }
+        );
+    }
+
+    #[test]
+    fn explicit_start_and_heading_survive_nearest_runway_selection() {
+        let (database, expected) = airport_database_for_app_tests();
+        let (mut startup, notes) = parse(&["--start", "35.555,139.781", "--heading", "123"]);
+        assert!(notes.is_empty(), "{notes:?}");
+        let explicit_start = startup.start;
+        let explicit_heading = startup.heading;
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(200));
+        assert_eq!(startup.runway, expected.runway);
+        assert_eq!(startup.start, explicit_start);
+        assert_eq!(startup.heading, explicit_heading);
+    }
+
+    #[test]
+    fn explicit_start_is_the_query_for_nearest_runway_selection() {
+        let (database, _) = airport_database_for_app_tests();
+        let (mut startup, notes) = parse(&["--start", "0.005,0"]);
+        assert!(notes.is_empty(), "{notes:?}");
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), Some(100));
+        assert_eq!(
+            startup.runway_source,
+            RunwaySource::OpenStreetMap { way_id: 100 }
+        );
+    }
+
+    #[test]
+    fn empty_database_keeps_the_synthetic_runway() {
+        let database = AirportDatabase::new(Vec::new()).expect("empty databases are valid");
+        let mut startup = Startup::default();
+        let original = startup.clone();
+
+        assert_eq!(apply_nearest_airport(&mut startup, &database), None);
+        assert_eq!(startup.runway, original.runway);
+        assert_eq!(startup.start, original.start);
+        assert_eq!(startup.heading, original.heading);
+        assert_eq!(startup.runway_source, RunwaySource::Synthetic);
     }
 
     // --- 雲の CLI ---

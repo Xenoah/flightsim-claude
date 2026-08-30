@@ -150,8 +150,21 @@ LOD は幾何誤差ベースの screen-space error で選択する（距離ベ�
 
 実行時タイル形式 `.fsdem` は `u16` 量子化 + タイル毎スケールの自前バイナリ（[ADR-0005](docs/adr/0005-runtime-tile-format.md)）。焼き込みは `flightsim-tilegen` が行う。
 
+OSM の滑走路は、利用者が用意した地域 PBF から `flightsim-airportgen` が
+`aeroway=runway` の中心線だけを固定長 `.fsairports` へ焼く。実行時は PBF デコーダに
+依存せず、開始地点から ECEF 距離が最小の 1 本を選ぶ。元 PBF と派生 DB は同梱しない
+（[ADR-0008](docs/adr/0008-osm-airport-data.md)）。
+
+Copernicus DEM GLO-30 の鉛直基準は EGM2008 だが、現在の tilegen は WGS84 楕円体高へ
+変換していない。地形・接地・滑走路は同じ数値を共有するので局所的には整合するが、
+絶対高度の系統誤差は [Issue #22](../../issues/22) で追跡する。
+
 ```text
 Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  tiles/{level}/{x}/{y}.fsdem
+                                                                          │
+                                                              [flightsim-world / 実行時]
+
+OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> region.fsairports
                                                                           │
                                                               [flightsim-world / 実行時]
 ```
@@ -168,14 +181,14 @@ Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  ti
 |---|---|
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ、描画座標フレーム |
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF、失速、プロペラ推力、3 点式着陸装置、接地摩擦・ブレーキ、RK4、定常風と決定論的乱流 |
-| `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路 |
-| `flightsim-tilegen` | GeoTIFF の地理参照解釈、面積平均リサンプリング、タイル列挙、焼き込み CLI |
+| `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路、`.fsairports` の検証と最寄り滑走路選択 |
+| `flightsim-tilegen` | GeoTIFF の地理参照解釈・地形タイル焼き込み、OSM PBF の滑走路 DB 焼き込み CLI |
 | `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
 | `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
 | `flightsim-render` | 地形・滑走路・滑走路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、決定論的な雲層と雲中視程、glTF の軸・倍率補正 |
 | `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
-| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤 |
-| `flightsim-app` | 上記の統合、合成飛行場、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
+| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤、利用中データの帰属表示 |
+| `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
 
 雲場は固定 seed の周期的な 2D value/fBm noise を緯度・経度と `TimeOfDay` から
 サンプルするため、同じ設定なら同じ結果になる。雲底・雲頂は alpha mask 付きの
@@ -192,7 +205,8 @@ PBR 平面で表し、カメラが層内に入ったときだけ distance fog �
 ### 未実装
 
 - コックピット内装の 3D モデル（計器盤・計器照明・滑走路灯は実装済み）
-- OSM の空港・建物、地表画像、METAR、高品質なボリューム雲。tilegen が扱う実データは標高のみ
+- OSM の taxiway・空港建物、地表画像、METAR、高品質なボリューム雲。
+  OSM 対応は滑走路中心線のみ
 - 難易度設定、HOTAS と軸の再割り当て、推力線オフセット
 - 追加機体、リプレイ、ライブ交通、オンライン共有ワールド
 

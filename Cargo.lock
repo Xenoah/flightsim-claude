@@ -180,6 +180,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.104"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2228,7 +2234,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-app"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2242,7 +2248,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-assetgen"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "serde_json",
  "ureq",
@@ -2250,7 +2256,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-core"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "criterion",
  "glam",
@@ -2258,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-fdm"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "criterion",
  "flightsim-core",
@@ -2267,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-input"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2276,7 +2282,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-render"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2288,7 +2294,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-sim"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "clap",
  "flightsim-core",
@@ -2300,17 +2306,20 @@ dependencies = [
 
 [[package]]
 name = "flightsim-tilegen"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "clap",
  "flightsim-core",
  "flightsim-world",
+ "osmpbf",
+ "same-file",
+ "tempfile",
  "tiff",
 ]
 
 [[package]]
 name = "flightsim-ui"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2319,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-world"
-version = "0.6.0-alpha.9"
+version = "0.6.0-alpha.10"
 dependencies = [
  "criterion",
  "flightsim-core",
@@ -2379,7 +2388,7 @@ checksum = "457e789b3d1202543297a350643cf459f836cade38934e7a4cf6a39e7cde2905"
 dependencies = [
  "fontconfig-parser",
  "log",
- "memmap2",
+ "memmap2 0.9.11",
  "slotmap",
  "tinyvec",
  "ttf-parser",
@@ -2560,7 +2569,7 @@ dependencies = [
  "vec_map",
  "wasm-bindgen",
  "web-sys",
- "windows 0.58.0",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -2779,6 +2788,15 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
+
+[[package]]
+name = "home"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
+dependencies = [
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "http"
@@ -3196,6 +3214,15 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "memmap2"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "memmap2"
@@ -3669,6 +3696,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "osmpbf"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51b6d8d4418d577b7a07c2113955cf1aec96d8b528ddbeaeb2e6299b9691d712"
+dependencies = [
+ "byteorder",
+ "flate2",
+ "memmap2 0.5.10",
+ "protobuf",
+ "protobuf-codegen",
+ "rayon",
+]
+
+[[package]]
 name = "page_size"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3900,6 +3941,57 @@ name = "profiling"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
+
+[[package]]
+name = "protobuf"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
+dependencies = [
+ "once_cell",
+ "protobuf-support",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "protobuf-codegen"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d3976825c0014bbd2f3b34f0001876604fe87e0c86cd8fa54251530f1544ace"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "protobuf",
+ "protobuf-parse",
+ "regex",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "protobuf-parse"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4aeaa1f2460f1d348eeaeed86aea999ce98c1bded6f089ff8514c9d9dbdc973"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "log",
+ "protobuf",
+ "protobuf-support",
+ "tempfile",
+ "thiserror 1.0.69",
+ "which",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e36c2f31e0a47f9280fb347ef5e461ffcd2c52dd520d8e216b52f93b0b0d7d6"
+dependencies = [
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "pxfm"
@@ -4515,6 +4607,19 @@ dependencies = [
  "grid",
  "serde",
  "slotmap",
+]
+
+[[package]]
+name = "tempfile"
+version = "3.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+dependencies = [
+ "fastrand",
+ "getrandom 0.4.3",
+ "once_cell",
+ "rustix 1.1.4",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5211,6 +5316,18 @@ dependencies = [
  "serde",
  "thiserror 2.0.19",
  "web-sys",
+]
+
+[[package]]
+name = "which"
+version = "4.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
+dependencies = [
+ "either",
+ "home",
+ "once_cell",
+ "rustix 0.38.44",
 ]
 
 [[package]]

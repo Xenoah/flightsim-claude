@@ -22,19 +22,31 @@
 なお、リポジトリに実データは含まれていません（全球で数百 GB あるため）。
 テストは合成 GeoTIFF で動いており、CI は実データを必要としません。
 
+### 空港・滑走路 — OpenStreetMap
+
+`flightsim-airportgen` は、利用者が用意した地域 `.osm.pbf` から
+`aeroway=runway` の中心線を実行時空港 DB へ変換します。
+
+> Airport data: © OpenStreetMap contributors
+
+OpenStreetMap のデータは Open Data Commons Open Database License
+（ODbL）v1.0 で提供されています。
+
+- 帰属・データソース: https://www.openstreetmap.org/copyright
+- ODbL v1.0: https://opendatacommons.org/licenses/odbl/1-0/
+- ゲーム・シミュレーション向け表示指針:
+  https://osmfoundation.org/wiki/Licence/Attribution_Guidelines
+
+OSM の PBF と変換後の派生 DB は、リポジトリにも prerelease にも**同梱しません**。
+OSM 空港 DB を実際に読み込んだ場合だけ、ゲーム画面にも
+`Airport data: (c) OpenStreetMap contributors (ODbL)` と表示します。
+派生 DB を公開・配布する人は ODbL の share-alike 条件を確認してください。
+
 ---
 
 ## 利用予定のデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）
 
 パイプライン実装時にここへ移し、ゲーム内クレジットにも追加すること。
-
-### 空港・滑走路・建物
-
-**OpenStreetMap** — © OpenStreetMap contributors
-ODbL v1.0 で提供。https://www.openstreetmap.org/copyright
-
-派生データベースを配布する場合、ODbL の share-alike 条項が適用されます。
-**配布形態を決める前にライセンス条件を確認すること。**
 
 ### 地表画像
 
@@ -82,12 +94,16 @@ CC BY 4.0。https://esa-worldcover.org/
 |---|---|---|
 | [glam](https://github.com/bitshifter/glam-rs) | MIT OR Apache-2.0 | 全体（線形代数） |
 | [tiff](https://github.com/image-rs/image-tiff) | MIT | `flightsim-tilegen`（GeoTIFF デコード） |
-| [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen`（CLI） |
+| [clap](https://github.com/clap-rs/clap) | MIT OR Apache-2.0 | `flightsim-tilegen` / `flightsim-airportgen` / `flightsim-headless`（CLI） |
+| [osmpbf](https://github.com/b-r-u/osmpbf) | MIT OR Apache-2.0 | `flightsim-airportgen`（OSM PBF デコード） |
+| [same-file](https://github.com/BurntSushi/same-file) | Unlicense OR MIT | `flightsim-airportgen`（入出力の同一ファイル検出） |
+| [tempfile](https://github.com/Stebalien/tempfile) | MIT OR Apache-2.0 | `flightsim-airportgen`（DB の原子的な置換） |
 | [bevy](https://bevyengine.org/) | MIT OR Apache-2.0 | 描画層（[ADR-0007](docs/adr/0007-bevy-version.md) で 0.18.1 に固定） |
 | [ureq](https://github.com/algesten/ureq) | MIT OR Apache-2.0 | `flightsim-assetgen`（HTTP） |
 | [criterion](https://github.com/bheisler/criterion.rs) | MIT OR Apache-2.0 | ベンチ（dev-dependency） |
 
-`tiff` と `clap` はオフラインのタイル生成ツールのみが使い、実行時には載りません
-（[ADR-0003](docs/adr/0003-terrain-data.md)）。
+`tiff` と `osmpbf` はオフライン生成専用。`same-file` と `tempfile` も空港 DB 生成専用。
+`clap` はオフライン生成 CLI とヘッドレスランナーが使う。いずれも
+`flightsim-app` の実行時依存には載らない（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
 本プロジェクト自体は [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) です。

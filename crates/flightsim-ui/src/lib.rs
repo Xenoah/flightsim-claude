@@ -174,6 +174,64 @@ impl HudSmoothing {
     }
 }
 
+/// 画面右下に常時表示するデータ帰属表記。
+///
+/// 空文字列なら表示しない。Bevy の既定フォントで確実に読めるよう、設定できるのは
+/// ASCII の単一行だけである。アプリ側は [`DataAttribution::new`] で初期値を挿入するか、
+/// [`DataAttribution::set`] で内容を更新する。
+#[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
+pub struct DataAttribution(String);
+
+impl DataAttribution {
+    /// 表示する帰属表記を作る。空文字列なら画面には出ない。
+    ///
+    /// # Panics
+    ///
+    /// `text` が非 ASCII または複数行ならパニックする。既定フォントに無い字形が
+    /// 豆腐として表示されたり、右下の予約領域からはみ出したりするのを防ぐためである。
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        let mut attribution = Self::default();
+        attribution.set(text);
+        attribution
+    }
+
+    /// 表示する帰属表記を置き換える。空文字列を渡すと非表示になる。
+    ///
+    /// # Panics
+    ///
+    /// `text` が非 ASCII または複数行ならパニックする。
+    pub fn set(&mut self, text: impl Into<String>) {
+        let text = text.into();
+        assert!(
+            text.is_ascii(),
+            "data attribution must be ASCII for Bevy's default font"
+        );
+        assert!(
+            !text.contains('\n') && !text.contains('\r'),
+            "data attribution must be a single line"
+        );
+        self.0 = text;
+    }
+
+    /// 現在の帰属表記。空なら画面には出ない。
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+
+    /// 帰属表記を消して表示を隠す。
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    /// 表示する帰属表記が無いか。
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 /// HUD のテキスト要素につける印。
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HudText;
@@ -186,6 +244,10 @@ pub struct HudHelp;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HudLog;
 
+/// データ帰属表記のテキストにつける印。
+#[derive(Component, Debug, Clone, Copy)]
+pub struct DataAttributionDisplay;
+
 /// HUD のプラグイン。
 #[derive(Debug, Default)]
 pub struct FlightsimUiPlugin;
@@ -194,8 +256,16 @@ impl Plugin for FlightsimUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
+            .init_resource::<DataAttribution>()
             .add_systems(Startup, spawn_hud)
-            .add_systems(Update, (update_hud, update_flight_log_display))
+            .add_systems(
+                Update,
+                (
+                    update_hud,
+                    update_flight_log_display,
+                    update_data_attribution_display,
+                ),
+            )
             // 着陸評価。`LandingReport` 自体は着陸するまで存在しないので、
             // ここでは `init_resource` しない（app が接地のたびに挿入する契約）。
             .init_resource::<LandingReportState>()
@@ -257,8 +327,8 @@ pub fn spawn_hud(mut commands: Commands) {
         HudHelp,
     ));
 
-    // 飛行の積み上げ。右下に控えめに置く。**着陸評価（右上）と
-    // 計器（左上）と操作説明（左下）のどれにも重ならない場所。**
+    // 飛行の積み上げ。帰属表記が出る間だけ update system が 1 行ぶん上へ退避させる。
+    // **OSM 未使用の従来起動では位置を変えない。**
     commands.spawn((
         Text::new(""),
         TextFont {
@@ -273,6 +343,28 @@ pub fn spawn_hud(mut commands: Commands) {
             ..default()
         },
         HudLog,
+    ));
+
+    // 法的な帰属表記は飛行中も読める必要がある。地形上でも文字が埋もれないよう
+    // 薄い背景を付け、飛行記録は上で 1 行ぶん退避してある。
+    commands.spawn((
+        Text::new(""),
+        TextFont {
+            font_size: 12.0,
+            ..default()
+        },
+        TextColor(Color::srgba(0.95, 0.95, 0.95, 0.9)),
+        TextLayout::new_with_justify(Justify::Right),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            right: Val::Px(12.0),
+            padding: UiRect::axes(Val::Px(6.0), Val::Px(3.0)),
+            ..default()
+        },
+        Visibility::Hidden,
+        DataAttributionDisplay,
     ));
 }
 
@@ -411,6 +503,29 @@ pub fn update_flight_log_display(state: Res<HudState>, mut query: Query<&mut Tex
     }
 }
 
+/// データ帰属表記を更新する。空文字列なら要素ごと隠す。
+pub fn update_data_attribution_display(
+    attribution: Res<DataAttribution>,
+    mut display_query: Query<(&mut Text, &mut Visibility), With<DataAttributionDisplay>>,
+    mut log_query: Query<&mut Node, With<HudLog>>,
+) {
+    for (mut text, mut visibility) in &mut display_query {
+        if text.as_str() != attribution.text() {
+            **text = attribution.text().to_owned();
+        }
+        *visibility = if attribution.is_empty() {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        };
+    }
+
+    let log_bottom = if attribution.is_empty() { 12.0 } else { 42.0 };
+    for mut node in &mut log_query {
+        node.bottom = Val::Px(log_bottom);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +571,9 @@ mod tests {
             format_flight_log(FlightSummary::default()),
             help_text(),
             format_wind(Degrees(270.0).to_radians(), MetersPerSecond(5.144)),
+            DataAttribution::new("Airport data: (c) OpenStreetMap contributors (ODbL)")
+                .text()
+                .to_owned(),
         ];
         for screen in screens {
             assert!(
@@ -463,6 +581,78 @@ mod tests {
                 "a non-ASCII glyph reached the screen: {screen:?}"
             );
         }
+    }
+
+    fn attribution_harness(attribution: DataAttribution) -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(attribution)
+            .add_systems(Startup, spawn_hud)
+            .add_systems(Update, update_data_attribution_display);
+        app.update();
+        app
+    }
+
+    #[test]
+    fn an_empty_attribution_is_absent_from_the_screen() {
+        let mut app = attribution_harness(DataAttribution::default());
+        let world = app.world_mut();
+        let mut query =
+            world.query_filtered::<(&Text, &Visibility), With<DataAttributionDisplay>>();
+        let (text, visibility) = query
+            .single(world)
+            .expect("spawn_hud should create one attribution display");
+
+        assert!(text.is_empty());
+        assert_eq!(*visibility, Visibility::Hidden);
+    }
+
+    #[test]
+    fn a_non_empty_attribution_is_persistent_and_visible() {
+        const OSM: &str = "Airport data: (c) OpenStreetMap contributors (ODbL)";
+        let mut app = attribution_harness(DataAttribution::new(OSM));
+
+        for _ in 0..2 {
+            let world = app.world_mut();
+            let mut query =
+                world.query_filtered::<(&Text, &Visibility), With<DataAttributionDisplay>>();
+            let (text, visibility) = query
+                .single(world)
+                .expect("spawn_hud should create one attribution display");
+            assert_eq!(text.as_str(), OSM);
+            assert_eq!(*visibility, Visibility::Visible);
+            app.update();
+        }
+    }
+
+    #[test]
+    fn the_flight_log_moves_only_while_attribution_is_visible() {
+        const OSM: &str = "Airport data: (c) OpenStreetMap contributors (ODbL)";
+        let mut app = attribution_harness(DataAttribution::default());
+
+        let log_bottom = |app: &mut App| {
+            let world = app.world_mut();
+            let mut query = world.query_filtered::<&Node, With<HudLog>>();
+            query
+                .single(world)
+                .expect("spawn_hud should create one flight log")
+                .bottom
+        };
+        assert_eq!(log_bottom(&mut app), Val::Px(12.0));
+
+        app.world_mut().resource_mut::<DataAttribution>().set(OSM);
+        app.update();
+        assert_eq!(log_bottom(&mut app), Val::Px(42.0));
+
+        app.world_mut().resource_mut::<DataAttribution>().clear();
+        app.update();
+        assert_eq!(log_bottom(&mut app), Val::Px(12.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "must be ASCII")]
+    fn non_ascii_attribution_is_rejected_before_reaching_the_default_font() {
+        let _ = DataAttribution::new("Airport data: OpenStreetMap contributors ©");
     }
 
     // --- 飛行記録 ---

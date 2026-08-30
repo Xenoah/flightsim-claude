@@ -20,11 +20,93 @@
 //!
 //! [`Runway::synthetic`] は**実在しない合成フィクスチャ**であり、OpenStreetMap を
 //! 含むいかなる外部データにも由来しない。したがって `ATTRIBUTION.md` の対象外。
-//! 実空港（OSM の `aeroway=runway`）を取り込む際は帰属表示の追加が**必須**。
+//! [`io::AirportDatabase`] は OSM の `aeroway=runway` から変換したデータを読む。
+//! この DB を実際に使う起動だけ、アプリが OpenStreetMap の帰属を表示する。
 
 use flightsim_core::frames::Ned;
 use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Meters, Radians};
 use glam::DVec3;
+
+pub mod io;
+
+/// 2 つの端点から滑走路を作れない理由。
+///
+/// OSM と実行時 DB は信頼できる Rust 値ではなく外部入力であるため、幾何の境界では
+/// panic せず、このエラーを返す。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RunwayGeometryError {
+    /// 緯度・経度が有限でないか、測地座標の範囲外。
+    InvalidCoordinate {
+        /// `threshold` または `opposite_threshold`。
+        endpoint: &'static str,
+        /// `latitude` または `longitude`。
+        field: &'static str,
+        /// ラジアン単位の入力値。
+        value: f64,
+    },
+    /// 幅が正の有限値でない。
+    InvalidWidth { value: f64 },
+    /// 楕円体高が有限でない。
+    InvalidElevation { value: f64 },
+    /// 方位が有限でない。
+    InvalidHeading { value: f64 },
+    /// 全長が正の有限値でない。
+    InvalidLength { value: f64 },
+    /// 2 つの端点が同じ場所を表し、方位と長さを決められない。
+    CollapsedEndpoints,
+    /// 公開された派生幾何が、DB に保存する端点と食い違っている。
+    InconsistentStoredEndpoints,
+}
+
+impl core::fmt::Display for RunwayGeometryError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidCoordinate {
+                endpoint,
+                field,
+                value,
+            } => write!(
+                formatter,
+                "runway {endpoint} {field} has invalid value {value} radians"
+            ),
+            Self::InvalidWidth { value } => {
+                write!(
+                    formatter,
+                    "runway width must be positive and finite, got {value} m"
+                )
+            }
+            Self::InvalidElevation { value } => {
+                write!(formatter, "runway elevation must be finite, got {value} m")
+            }
+            Self::InvalidHeading { value } => {
+                write!(
+                    formatter,
+                    "runway heading must be finite, got {value} radians"
+                )
+            }
+            Self::InvalidLength { value } => {
+                write!(
+                    formatter,
+                    "runway length must be positive and finite, got {value} m"
+                )
+            }
+            Self::CollapsedEndpoints => write!(
+                formatter,
+                "runway endpoints collapse to the same horizontal position"
+            ),
+            Self::InconsistentStoredEndpoints => write!(
+                formatter,
+                "runway geometry no longer matches its stored endpoint coordinates"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RunwayGeometryError {}
+
+// 1 micrometre 未満の端点差は、WGS84 変換の丸め（特に極点の未定義な経度）と
+// 物理的な滑走路を区別できない。任意の「最短滑走路」制限ではなく縮退判定だけに使う。
+const COLLAPSED_ENDPOINT_EPSILON_M: f64 = 1.0e-6;
 
 /// 滑走路の末端からの相対位置。[`Runway::offsets`] が返す。
 ///
@@ -109,6 +191,71 @@ impl Runway {
         }
     }
 
+    /// 進入端と反対端から、真方位と全長を導出して作る。
+    ///
+    /// 端点の高度は使わず、両方を `elevation` へ貼り直してから
+    /// [`LocalFrame`] で ECEF から進入端の NED へ変換する。これにより日付変更線と
+    /// 高緯度でも経度の単純な差を取らずに済む。全長は NED の水平成分、方位はその
+    /// bearing である。
+    ///
+    /// # Errors
+    ///
+    /// 緯度・経度・幅・標高が不正な場合、または両端が縮退している場合。
+    pub fn from_endpoints(
+        threshold: Geodetic,
+        opposite_threshold: Geodetic,
+        width: Meters,
+        elevation: Meters,
+    ) -> Result<Self, RunwayGeometryError> {
+        validate_horizontal_coordinate(threshold, "threshold")?;
+        validate_horizontal_coordinate(opposite_threshold, "opposite_threshold")?;
+
+        if !width.is_finite() || width.get() <= 0.0 {
+            return Err(RunwayGeometryError::InvalidWidth { value: width.get() });
+        }
+        if !elevation.is_finite() {
+            return Err(RunwayGeometryError::InvalidElevation {
+                value: elevation.get(),
+            });
+        }
+
+        let threshold = Geodetic::new(threshold.latitude, threshold.longitude, elevation);
+        let opposite_threshold = Geodetic::new(
+            opposite_threshold.latitude,
+            opposite_threshold.longitude,
+            elevation,
+        );
+        let displacement =
+            LocalFrame::new(threshold).ecef_to_ned_position(opposite_threshold.to_ecef());
+        let length = displacement.horizontal_magnitude();
+        if !length.is_finite() || length <= COLLAPSED_ENDPOINT_EPSILON_M {
+            return Err(RunwayGeometryError::CollapsedEndpoints);
+        }
+
+        Ok(Self::new(
+            threshold,
+            displacement.bearing(),
+            Meters(length),
+            width,
+            elevation,
+        ))
+    }
+
+    /// 緯度・経度・方位・寸法を保ったまま、滑走路面の楕円体高を貼り直す。
+    ///
+    /// OSM の実行時 DB は標高を持たない。選択した滑走路の進入端で DEM を引いた後、
+    /// その 1 つの値を滑走路全体へ適用するための境界である。
+    #[must_use]
+    pub const fn with_elevation(self, elevation: Meters) -> Self {
+        Self::new(
+            self.threshold,
+            self.heading,
+            self.length,
+            self.width,
+            elevation,
+        )
+    }
+
     /// 度・メートルで指定する。外部データや設定ファイルからの読み込み用。
     #[must_use]
     pub fn from_degrees(
@@ -167,14 +314,20 @@ impl Runway {
         Radians(self.heading.get() + core::f64::consts::PI).wrap_positive()
     }
 
-    /// 離陸開始位置。末端から 150 m 進んだ中心線上。
+    /// 離陸開始位置。末端から 150 m、または全長の半分の短い方へ進んだ中心線上。
     ///
     /// **アプリの既定開始地点はこれを使うこと。** 緯度経度を直接書くと、
     /// 滑走路を動かしたときに機体だけ取り残される。
     /// 150 m は末端をわずかに空けるための余裕であって、物理的な根拠はない。
+    /// 短い OSM 滑走路でその余裕が反対端を超えないよう、半分までに制限する。
     #[must_use]
     pub fn takeoff_start(&self) -> Geodetic {
-        self.point_at(Meters(150.0), Meters::ZERO)
+        let offset = if self.length.is_finite() && self.length.get() > 0.0 {
+            150.0_f64.min(self.length.get() * 0.5)
+        } else {
+            0.0
+        };
+        self.point_at(Meters(offset), Meters::ZERO)
     }
 
     /// 末端からの前方距離・横ずれで指定した点の測地座標。高度は [`Runway::elevation`]。
@@ -295,6 +448,35 @@ impl Runway {
         let rotation = Attitude::new(Radians::ZERO, Radians::ZERO, self.heading).to_quaternion();
         (rotation * DVec3::X, rotation * DVec3::Y)
     }
+}
+
+fn validate_horizontal_coordinate(
+    coordinate: Geodetic,
+    endpoint: &'static str,
+) -> Result<(), RunwayGeometryError> {
+    let latitude = coordinate.latitude.get();
+    if !latitude.is_finite()
+        || !(-core::f64::consts::FRAC_PI_2..=core::f64::consts::FRAC_PI_2).contains(&latitude)
+    {
+        return Err(RunwayGeometryError::InvalidCoordinate {
+            endpoint,
+            field: "latitude",
+            value: latitude,
+        });
+    }
+
+    let longitude = coordinate.longitude.get();
+    if !longitude.is_finite()
+        || !(-core::f64::consts::PI..=core::f64::consts::PI).contains(&longitude)
+    {
+        return Err(RunwayGeometryError::InvalidCoordinate {
+            endpoint,
+            field: "longitude",
+            value: longitude,
+        });
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -478,6 +660,16 @@ mod tests {
             0.0,
             1e-6
         );
+    }
+
+    #[test]
+    fn a_short_runway_keeps_the_takeoff_start_inside_its_bounds() {
+        let runway = Runway::from_degrees(35.0, 139.0, 90.0, 100.0, 20.0, 0.0);
+        let start = runway.takeoff_start();
+
+        assert!(runway.contains(start));
+        assert_close!(runway.longitudinal_offset(start).get(), 50.0, 1e-3);
+        assert_close!(runway.lateral_offset(start).get(), 0.0, 1e-6);
     }
 
     #[test]

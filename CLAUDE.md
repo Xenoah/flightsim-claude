@@ -19,6 +19,7 @@ cargo fmt --all                                         # 整形
 bash scripts/check-architecture.sh                      # 依存規約の検査
 cargo run -p flightsim-fdm --example aero_trace         # 空力の内訳を時系列表示
 cargo run -p flightsim-tilegen -- --help                # 地形タイルの焼き込み
+cargo run -p flightsim-tilegen --bin flightsim-airportgen -- --help  # OSM 滑走路 DB の焼き込み
 cargo run -p flightsim-assetgen -- --help               # 機体モデルの取得（要 .env の MESHY_API_KEY）
 cargo run -p flightsim-sim --bin flightsim-headless -- --help   # 実地形の上を飛ばす
 cargo bench --workspace                                 # 性能測定（criterion）
