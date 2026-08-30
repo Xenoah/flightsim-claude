@@ -32,6 +32,10 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   サンプリング、幾何誤差ベースの LOD 選択、フレーム予算つきストリーミング
 - **実地形の焼き込み** — Copernicus DEM の GeoTIFF から実行時タイルを生成する
   オフライン CLI。日付変更線と極、投影座標系の誤読、nodata を扱う
+- **OSM の滑走路を飛べる** — 利用者が用意した地域 `.osm.pbf` から
+  `aeroway=runway` の中心線を決定論的な `.fsairports` へ焼くオフライン CLI。
+  起動時に開始地点に最も近い 1 本を選び、離陸・進入・描画・灯火・着陸評価で共有する。
+  OSM 由来 DB を実際に読んだときだけ画面に帰属を表示する
 - **実地形の上をヘッドレスで飛べる** — 焼いたタイルから接地平面（標高と勾配）を作って
   FDM へ渡し、離陸 → 上昇 → 巡航 → 旋回 → 進入 → 接地までを軌跡 CSV に出力する
 - **機体 3D モデルを読める** — glTF / glb を機体軸へ合わせる補正層つき。モデルごとに
@@ -74,10 +78,16 @@ cargo run -p flightsim-fdm --example aero_trace   # 空力の内訳を時系列�
 
 cargo run -p flightsim-tilegen --     --input Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif     --output data/tiles --min-level 8 --max-level 12
 
+cargo run -p flightsim-tilegen --bin flightsim-airportgen -- \
+    --input japan-latest.osm.pbf --output data/japan.fsairports
+
 cargo run -p flightsim-sim --bin flightsim-headless --     --tiles data/tiles --start 35.553,139.781 --output flight.csv
 
 cargo run -p flightsim-app --release -- --tiles data/tiles \
     --cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300
+
+cargo run -p flightsim-app --release -- --tiles data/tiles \
+    --airports data/japan.fsairports --start 35.55,139.78
 
 cargo bench --workspace                           # 性能測定（criterion）
 ```
@@ -91,7 +101,8 @@ prerelease です。
 
 ## 未実装・未検証
 
-- コックピット内装（内装モデル）、OSM 空港データ、METAR、高品質なボリューム雲、難易度設定
+- コックピット内装（内装モデル）、OSM の taxiway・空港建物、METAR、
+  高品質なボリューム雲、難易度設定
 - HOTAS と軸の再割り当て、追加機体、リプレイ、ライブ交通、オンライン共有ワールド
 - ゲームパッドは変換ロジックとキーボード共存を自動テスト済みですが、実機での符号・
   感度確認は未実施
@@ -118,6 +129,7 @@ prerelease です。
 | [ADR-0005](docs/adr/0005-runtime-tile-format.md) | なぜ自前の `u16` 量子化タイル形式か |
 | [ADR-0006](docs/adr/0006-simulation-integration-layer.md) | なぜ結線を `flightsim-sim` に置くか |
 | [ADR-0007](docs/adr/0007-bevy-version.md) | なぜ Bevy 0.18.1 か |
+| [ADR-0008](docs/adr/0008-osm-airport-data.md) | OSM 滑走路の配布境界と実行時 DB |
 
 設計の要は 1 点に集約されます。
 

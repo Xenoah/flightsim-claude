@@ -1,6 +1,7 @@
 [package]
 name = "flightsim-tilegen"
 description = "Copernicus DEM の GeoTIFF から実行時タイル (.fsdem) を焼くオフライン CLI。"
+default-run = "flightsim-tilegen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +13,9 @@ license.workspace = true
 flightsim-core.workspace = true
 flightsim-world.workspace = true
 clap = { version = "4", features = ["derive"] }
+# OSM PBF はこのオフライン変換ツールだけで読む。実行時クレートへは入れない。
+# 0.3.7 は MIT OR Apache-2.0、MSRV 1.82 でワークスペースの MSRV 内。
+osmpbf = "=0.3.7"
 tiff = "0.11"
 
 [lints]

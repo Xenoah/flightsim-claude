@@ -4,6 +4,11 @@
 # 生成されたタイル・DEM キャッシュ。数百 GB になり得るのでコミットしない。
 /data/cache/
 /data/tiles/
+# 利用者が用意する OSM 地域抽出と、そこから焼いた実行時空港 DB。
+# ODbL の帰属・share-alike 条件は配布者ごとに判断が必要なため、リポジトリには同梱しない。
+/data/**/*.osm
+/data/**/*.osm.pbf
+/data/**/*.fsairports
 /assets/generated/
 # Meshy で生成した機体モデルのうち、同梱すると決めたものは追跡する
 # （有料プランで生成しており再配布可。ATTRIBUTION.md を参照）。
