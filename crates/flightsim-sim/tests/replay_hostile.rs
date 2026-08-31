@@ -125,6 +125,73 @@ fn flipping_any_single_byte_never_panics() {
 }
 
 #[test]
+fn a_valid_keyframe_orientation_survives_the_round_trip_bit_for_bit() {
+    // **読み込み側で無条件に正規化すると、割り算の丸めで最下位ビットが
+    // 変わる。** それだけで書いた記録と読んだ記録が別物になり、しかも
+    // OS によって結果が変わる（Linux で落ち、Windows で通った実績がある）。
+    let state = flightsim_fdm::RigidBodyState::from_geodetic(
+        flightsim_core::Geodetic::from_degrees(35.55, 139.78, 500.0),
+        flightsim_core::Attitude::new(
+            flightsim_core::Degrees(7.0).to_radians(),
+            flightsim_core::Degrees(-13.0).to_radians(),
+            flightsim_core::Degrees(241.0).to_radians(),
+        ),
+        flightsim_core::Ned::new(50.0, 3.0, -2.0),
+    );
+    let mut recorder = Recorder::new(Conditions::default());
+    recorder.record(Seconds(1.0 / 60.0), ControlInputs::neutral(), Some(&state));
+    let recording = recorder.finish();
+
+    let mut bytes = Vec::new();
+    recording
+        .write_to(&mut bytes)
+        .expect("writing to a Vec cannot fail");
+    let restored = read(&bytes).expect("the round trip must read back");
+
+    assert_eq!(
+        restored.keyframes()[0].state.orientation,
+        state.orientation,
+        "the orientation changed on the way through the file"
+    );
+    assert_eq!(&restored, &recording);
+}
+
+#[test]
+fn a_corrupt_keyframe_orientation_is_still_normalized() {
+    // 単位長を触らないからといって、壊れた回転まで通してはいけない。
+    // 長さ 0 や非有限のまま渡すと、そこから先の姿勢が全部壊れる。
+    let state = flightsim_fdm::RigidBodyState::from_geodetic(
+        flightsim_core::Geodetic::from_degrees(0.0, 0.0, 100.0),
+        flightsim_core::Attitude::new(
+            flightsim_core::Radians::ZERO,
+            flightsim_core::Radians::ZERO,
+            flightsim_core::Radians::ZERO,
+        ),
+        flightsim_core::Ned::new(0.0, 0.0, 0.0),
+    );
+    let mut recorder = Recorder::new(Conditions::default());
+    recorder.record(Seconds(1.0 / 60.0), ControlInputs::neutral(), Some(&state));
+    let mut bytes = Vec::new();
+    recorder
+        .finish()
+        .write_to(&mut bytes)
+        .expect("writing to a Vec cannot fail");
+
+    // キーフレームは末尾。フレーム番号 4 バイト + 位置 3 + 速度 3 のあとが回転。
+    let orientation = bytes.len() - 108 + 4 + 8 * 6;
+    for (index, value) in [10.0_f64, 0.0, 0.0, 0.0].into_iter().enumerate() {
+        let at = orientation + index * 8;
+        bytes[at..at + 8].copy_from_slice(&value.to_le_bytes());
+    }
+    let restored = read(&bytes).expect("an out-of-range rotation is repaired, not rejected");
+    let length = restored.keyframes()[0].state.orientation.length();
+    assert!(
+        (length - 1.0).abs() < 1e-9,
+        "the rotation should have been normalized, its length is {length}"
+    );
+}
+
+#[test]
 fn a_recording_with_no_frames_is_valid() {
     // 開始直後に保存した記録。**空を壊れていることにしない。**
     let recording = read(&sample_bytes(0)).expect("an empty recording is legitimate");

@@ -921,19 +921,30 @@ impl Recording {
     }
 }
 
-/// 正規化した回転。長さが 0 や非有限なら無回転に倒す。
+/// 単位長でない回転だけを直す。長さが 0 や非有限なら無回転に倒す。
+///
+/// **既に単位長なら 1 ビットも触らない。** 無条件に割ると、割り算の丸めで
+/// 最下位ビットが変わることがある。それだけで書き出した記録と読み戻した
+/// 記録が別物になり、往復の一致検査が落ちる。
+///
+/// 実際に落ちた: Linux で `length()` が厳密に 1.0 にならず、Windows では
+/// なっていたため、同じファイルが OS によって別の値に読めていた。
 fn normalized_or_identity(quaternion: DQuat) -> DQuat {
     let length = quaternion.length();
-    if length.is_finite() && length > 1e-9 {
-        DQuat::from_xyzw(
-            quaternion.x / length,
-            quaternion.y / length,
-            quaternion.z / length,
-            quaternion.w / length,
-        )
-    } else {
-        DQuat::IDENTITY
+    if !length.is_finite() || length <= 1e-9 {
+        return DQuat::IDENTITY;
     }
+    // 単位長からの許容。姿勢の積分で溜まる誤差より十分広く、
+    // 壊れた値を見逃すには十分狭い。
+    if (length - 1.0).abs() <= 1e-12 {
+        return quaternion;
+    }
+    DQuat::from_xyzw(
+        quaternion.x / length,
+        quaternion.y / length,
+        quaternion.z / length,
+        quaternion.w / length,
+    )
 }
 
 fn write_f64<W: Write>(writer: &mut W, value: f64) -> std::io::Result<()> {
