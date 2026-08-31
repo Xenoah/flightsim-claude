@@ -4,6 +4,7 @@
 
 use clap::Parser;
 use flightsim_core::Meters;
+use flightsim_tilegen::vertical_datum::VerticalDatumMismatch;
 use flightsim_tilegen::{RasterSet, Region, TileGenOptions, generate_tiles};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -44,6 +45,22 @@ struct Cli {
     /// 縁の崖が問題になる場合は 0.9 以上を指定する。
     #[arg(long, default_value_t = 0.0, value_name = "FRACTION")]
     min_coverage: f64,
+
+    /// 鉛直基準が WGS84 楕円体高でない DEM を、そのまま焼くことを許す。
+    ///
+    /// # 何を受け入れることになるか
+    ///
+    /// `.fsdem` は WGS84 楕円体高で保存する（ADR-0002）。ジオイド基準の
+    /// 高さをそのまま焼くと、**ジオイド高ぶんの系統誤差**が入ったまま
+    /// 実行時に「正しい標高」として扱われる。世界で -107〜+86 m、
+    /// 日本付近で約 +30〜+40 m。
+    ///
+    /// 局所的には気付けない。滑走路も機体も同じだけずれるので描画と接地は
+    /// 辻褄が合う。効くのは絶対高度と ECEF 半径。
+    ///
+    /// 合成 DEM のように**基準の無い試験データ**を焼くときは、これを付ける。
+    #[arg(long, default_value_t = false)]
+    assume_ellipsoidal: bool,
 
     /// 対象範囲 `west,south,east,north` [度]。省略時は入力ラスタの被覆範囲。
     ///
@@ -99,6 +116,27 @@ fn run(cli: &Cli) -> Result<(), String> {
             ""
         }
     );
+
+    // **鉛直基準を黙って誤用しない。** 焼いてしまうと、実行時からは
+    // 「正しい標高」と区別が付かない。
+    let mismatched = rasters.non_ellipsoidal_sources();
+    if !mismatched.is_empty() {
+        for (index, datum) in &mismatched {
+            let path = cli
+                .input
+                .get(*index)
+                .map_or_else(|| "<unknown>".to_owned(), |p| p.display().to_string());
+            eprintln!("vertical datum: {path} is {datum}");
+        }
+        if !cli.assume_ellipsoidal {
+            let (_, datum) = mismatched[0];
+            return Err(VerticalDatumMismatch { datum }.to_string());
+        }
+        eprintln!(
+            "warning: --assume-ellipsoidal was given, so the heights are baked unchanged.\n\
+             \x20        The geoid undulation stays in the tiles as a systematic error."
+        );
+    }
 
     // 深いレベルはタイル数が 4 倍ずつ増える。着手前に規模を見せる。
     let planned: usize = (cli.min_level..=cli.max_level)

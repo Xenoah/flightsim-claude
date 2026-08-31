@@ -37,6 +37,8 @@ pub struct GeoTiffBuilder {
     pixel_size: (f64, f64),
     convention: PixelConvention,
     model_type: u16,
+    /// `VerticalCSTypeGeoKey`（4096）。`None` なら書かない。
+    vertical_cs_type: Option<u16>,
     nodata: Option<f32>,
     georeferenced: bool,
 }
@@ -61,6 +63,8 @@ impl GeoTiffBuilder {
             convention: PixelConvention::Area,
             // 2 = ModelTypeGeographic (EPSG:4326)
             model_type: 2,
+            // 既定では書かない。**実務の DEM も書いていないことが多い。**
+            vertical_cs_type: None,
             nodata: None,
             georeferenced: true,
         }
@@ -81,6 +85,13 @@ impl GeoTiffBuilder {
     #[must_use]
     pub const fn convention(mut self, convention: PixelConvention) -> Self {
         self.convention = convention;
+        self
+    }
+
+    /// `VerticalCSTypeGeoKey` を書く。EPSG:3855 なら EGM2008。
+    #[must_use]
+    pub const fn vertical_cs_type(mut self, code: u16) -> Self {
+        self.vertical_cs_type = Some(code);
         self
     }
 
@@ -141,12 +152,14 @@ impl GeoTiffBuilder {
                 PixelConvention::Area => 1_u16,
                 PixelConvention::Point => 2,
             };
-            // ヘッダ 4 語 + キー 2 個。各キーは [KeyID, TIFFTagLocation, Count, Value]。
-            let keys: [u16; 12] = [
+            // ヘッダ 4 語 + キー。各キーは [KeyID, TIFFTagLocation, Count, Value]。
+            //
+            // **GeoKey は ID の昇順で並べる決まり。** 1024 → 1025 → 4096。
+            let mut keys: Vec<u16> = vec![
                 1,
                 1,
                 0,
-                2,
+                0, // キー数はあとで埋める
                 1024,
                 0,
                 1,
@@ -156,8 +169,15 @@ impl GeoTiffBuilder {
                 1,
                 raster_type,
             ];
+            if let Some(code) = self.vertical_cs_type {
+                keys.extend_from_slice(&[4096, 0, 1, code]);
+            }
+            #[allow(clippy::cast_possible_truncation, reason = "キーは数個。u16 に収まる")]
+            {
+                keys[3] = ((keys.len() - 4) / 4) as u16;
+            }
             let keys_offset = bytes.len() as u32;
-            for key in keys {
+            for key in keys.iter().copied() {
                 bytes.extend_from_slice(&key.to_le_bytes());
             }
 

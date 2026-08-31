@@ -29,6 +29,7 @@
 
 use flightsim_core::{Geodetic, Meters};
 use flightsim_tilegen::testing::GeoTiffBuilder;
+use flightsim_tilegen::vertical_datum::EPSG_WGS84_ELLIPSOIDAL_3D;
 use flightsim_world::Runway;
 use std::path::PathBuf;
 
@@ -154,6 +155,11 @@ fn main() {
     let bytes = GeoTiffBuilder::new(SAMPLES, SAMPLES, samples)
         .origin(WEST, NORTH)
         .pixel_size(step, step)
+        // **鉛直基準を明示する。** ここで作る高さは解析式の出力で、
+        // ジオイドとは無関係な「楕円体高そのもの」として定義する。
+        // 書かないと `flightsim-tilegen` に拒否される（基準の無い DEM を
+        // 楕円体高と決めつけないため）。
+        .vertical_cs_type(EPSG_WGS84_ELLIPSOIDAL_3D)
         .build();
 
     if let Some(parent) = output.parent()
