@@ -89,6 +89,9 @@
   - [x] `aeroway=runway` 中心線のオフライン変換、実行時 DB、最寄り選択
     （[Issue #21](../../../issues/21)）
   - [x] `aeroway=taxiway` 中心線の取り込み・描画（[Issue #25](../../../issues/25)）
+  - [x] apron（閉じた way / hole 付き multipolygon）、待機位置標示と ASCII 物理標識、
+    明示 TXE / TXC / RGL 灯火と `lit=no` を守る決定論的 fallback
+    （[Issue #27](../../../issues/27)）
 - [x] 計器一式（対気速度・姿勢・高度・昇降・方位・出力の 6 つ。コックピット視点で出る）
 - [x] 計器の照明（太陽高度に連動。夜に盤面が読める）
 - [ ] コックピット内装（内装モデル）

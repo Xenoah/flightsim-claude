@@ -9,6 +9,73 @@
 
 ---
 
+## [0.6.0-alpha.12] — 2026-08-30
+
+**OSM の apron、待機位置、物理標識、誘導路灯を FSAP v3 で一つの決定論的な
+空港地上設備パイプラインへ通した。**
+（#27 完了）
+
+### 追加 — OSM 空港地上設備
+
+- `aeroway=apron` の閉じた way と、`type=multipolygon` の outer / inner ring を
+  取り込む。hole を保ったまま三角形分割し、各辺を最大 75 m へ細分して DEM の起伏へ
+  追従できる密度にする。`surface=*` は asphalt / concrete / paved / grass / gravel /
+  dirt / sand を保持する
+- `aeroway=holding_position` の node / way と、
+  `aeroway=aerodrome_marking + aerodrome_marking=holding_position` の way を待機位置へ
+  変換する。種別は `holding_position:type` を正典とし、従来の `holding_position` tag も読む。
+  node は最寄りの誘導路へ関連付け、way は線の向き・幅から停止線 geometry を作る。有効な
+  明示停止線 way が holding node を member に持つ場合は way を優先し、不正 way なら node を
+  fallback として残す
+- 滑走路側を判定できる待機位置には 2 本の実線と 2 本の破線を描く。待機位置と関連誘導路の
+  `ref` が揃う場合は、外部フォントに依存しない 3x5 glyph の物理標識を中心線の右側へ立てる。
+  画面へ出す文字の ASCII 制約に合わせ、非 ASCII、8 文字超、未収録 glyph は DB には
+  保持しても標識にしない。盤面の winding・法線・文字の lift は接近側へ揃え、片面 culling
+  でも正面を読めるようにする
+- `aeroway=navigationaid + navigationaid=txe|txc|rgl` の node を、それぞれ青い誘導路
+  縁灯、緑の中心線灯、黄の滑走路警戒灯として保持・描画する
+- 明示灯火が無い誘導路には edge 60 m、centerline 30 m 間隔の灯火を決定論的に補う。
+  明示点がある channel だけ fallback を抑止し、`lit=no` の誘導路には一切補完しない
+- 誘導路の `ref`・`surface`・灯火 metadata を保持する。変換順と文字列表の順序は OSM ID
+  から決まり、同じ入力は同じ bytes になる
+
+### FSAP v3 と実行時統合
+
+- `.fsairports` FSAP v3 を追加。24-byte header と 32-byte directory entry を持ち、
+  section 1〜7 は core v2 record、apron triangle、holding position、ground light、
+  taxiway attribute、string index、string bytes である。既存 FSAP v1 / v2 の read / write
+  と byte 表現は変更しない
+- v3 reader / writer は固定長 record 合計 1,000,000、集約済み文字列と参照の
+  展開量をそれぞれ 16 MiB、payload を 96 MiB に制限する。section の kind 順・一意性・
+  連続範囲、schema、flags、record size、
+  `count * size`、予約領域、全 payload の FNV-1a checksum、末尾データを厳格に検査する
+- active runway の中心から 15 km 圏と交差する誘導路・apron、および圏内の待機位置・灯火
+  だけを選ぶ。apron は頂点だけでなく三角形と探索圏の交差、誘導路は線分との交差を使うため、
+  大きな geometry の頂点が圏外でも取りこぼさない
+- apron の各三角形頂点、誘導路の各 node、待機位置・標識・灯火ごとに DEM を引く。
+  surface は apron、誘導路、滑走路の順に lift を上げ、路面標示と灯火にも固定 lift を
+  割り当てて z-fighting を避ける
+- OSM 由来 DB を実際に使った場合だけ、従来どおり画面へ ASCII の ODbL 帰属を出す。
+  PBF と派生 DB はリポジトリおよび prerelease へ同梱しない
+
+### 実データと決定論の検証
+
+- Haneda 小領域 PBF（75,393 bytes、SHA-256
+  `075B94E8723336A8C1B32B271DE2EF3944717E5A60B98F34DC26A2264257B6B2`）を 2 回変換し、
+  滑走路 3、誘導路 113 way / 1,023 segment、apron 3 / 2,940 triangle、待機位置 16、
+  明示灯火 0 を 258,151 bytes へ出力した。両出力の SHA-256 は
+  `93ADF41982F15F26896FAF19F1BBB0CC3024AE15DF4C925E9371C476495DD87B` で一致した
+- 同じ実 DB の readback は滑走路 3、誘導路 113、apron 3 / 2,940 triangle、待機位置 16、
+  明示灯火 0。入力にあった待機位置 node 19 と路面標示 way 13 のうち、誘導路へ関連付け
+  られない node 3 件を除外し、way と OSM node を共有する 13 件は明示 way へ統合した
+- 同じ実 DB を昼 12:00 の free / cockpit view と夜 21:00 の free view で撮影し、apron、
+  単一の 2 実線 + 2 破線、`34L-16R` / `A11` の物理標識、夜間灯火、OSM 帰属を目視確認した
+- この実 extract には apron multipolygon と明示 TXE / TXC / RGL が無いため、hole の保持、
+  ring の反転接続、明示灯火と fallback の channel 単位重複排除、`lit=no` は合成 fixture で
+  境界を固定する
+
+---
+
 ## [0.6.0-alpha.11] — 2026-08-30
 
 **OpenStreetMap の誘導路が、実在滑走路の周囲で地形に沿って見えるようになった。**
@@ -1095,7 +1162,8 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.11...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.12...HEAD
+[0.6.0-alpha.12]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.11...v0.6.0-alpha.12
 [0.6.0-alpha.11]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.10...v0.6.0-alpha.11
 [0.6.0-alpha.10]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...v0.6.0-alpha.10
 [0.6.0-alpha.9]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.8...v0.6.0-alpha.9

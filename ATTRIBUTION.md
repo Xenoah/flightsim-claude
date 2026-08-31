@@ -22,10 +22,12 @@
 なお、リポジトリに実データは含まれていません（全球で数百 GB あるため）。
 テストは合成 GeoTIFF で動いており、CI は実データを必要としません。
 
-### 空港・滑走路・誘導路 — OpenStreetMap
+### 空港・滑走路・地上設備 — OpenStreetMap
 
 `flightsim-airportgen` は、利用者が用意した地域 `.osm.pbf` から
-`aeroway=runway` と `aeroway=taxiway` の中心線を実行時空港 DB へ変換します。
+滑走路・誘導路に加え、エプロン、待機位置、誘導路標識に使う `ref`、
+TXE / TXC / RGL 地上灯火を実行時空港 DB へ変換します。これらはすべて
+OpenStreetMap 由来データであり、変換後も ODbL の対象です。
 
 > Airport data: © OpenStreetMap contributors
 
@@ -40,7 +42,9 @@ OpenStreetMap のデータは Open Data Commons Open Database License
 OSM の PBF と変換後の派生 DB は、リポジトリにも prerelease にも**同梱しません**。
 OSM 空港 DB を実際に読み込んだ場合だけ、ゲーム画面にも
 `Airport data: (c) OpenStreetMap contributors (ODbL)` と表示します。
-派生 DB を公開・配布する人は ODbL の share-alike 条件を確認してください。
+画面表示は Bevy の既定フォントで欠けない ASCII に限定し、詳細 URL とライセンス本文は
+このファイルを Windows 配布物へ同梱して示します。派生 DB を公開・配布する人は、
+ODbL の attribution・notice・share-alike 条件を確認してください。
 
 ---
 

@@ -58,12 +58,16 @@ use flightsim_world::{
 use std::collections::HashMap;
 
 pub mod aircraft;
+pub mod apron;
 pub mod daylight;
+pub mod holding_position;
 pub mod model;
 pub mod runway;
 pub mod runway_lights;
 pub mod sun;
 pub mod taxiway;
+pub mod taxiway_lights;
+pub mod taxiway_sign;
 pub mod terrain;
 pub mod weather;
 

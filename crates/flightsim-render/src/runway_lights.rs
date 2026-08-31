@@ -74,12 +74,12 @@ const FULL_OFF_ELEVATION_DEGREES: f64 = 3.0;
 /// 逆算すると誤差が溜まるうえ、一度 0 にすると二度と戻らない。
 /// 常に「基準色 × 比率」で計算する。
 #[derive(Component, Debug, Clone, Copy)]
-pub struct RunwayLights {
+pub struct AirportLights {
     /// 全点灯時の線形 RGB。
     pub full_emissive: LinearRgba,
 }
 
-impl RunwayLights {
+impl AirportLights {
     /// 指定した比率での発光色。
     #[must_use]
     pub fn emissive_at(self, fraction: f32) -> LinearRgba {
@@ -95,6 +95,11 @@ impl RunwayLights {
         )
     }
 }
+
+/// 後方互換のための滑走路灯名。
+///
+/// 発光の明暗制御は空港面灯火で共通なので、実体は [`AirportLights`] である。
+pub type RunwayLights = AirportLights;
 
 /// 太陽高度から灯火の明るさの比率を出す。
 ///

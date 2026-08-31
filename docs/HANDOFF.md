@@ -1,7 +1,7 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-30（v0.6.0-alpha.11 = OSM 誘導路。alpha.10 は OSM 滑走路）
+更新: 2026-08-30（v0.6.0-alpha.12 = OSM apron・待機位置・標識・誘導路灯）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
@@ -16,7 +16,8 @@
 **M2 達成、M3 を実装中。ゲームとして一周し、雲中の計器飛行も練習できる。**
 引数なしで起動すると合成飛行場の滑走路中心線上から始まり、離陸して戻って
 降りると着陸が 5 段階で評価される。地域 OSM PBF をオフライン変換すれば、
-開始地点に最も近い実在滑走路で同じループを飛べ、その周囲の誘導路も表示される。
+開始地点に最も近い実在滑走路で同じループを飛べ、その 15 km 圏にある誘導路、apron、
+待機位置標示・物理標識、明示または決定論的に補った誘導路灯も地形に沿って表示される。
 
 ```bash
 # タイルが無ければ先に焼く（実 DEM は要らない。合成地形で動く）
@@ -43,7 +44,7 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 乱流 | `--turbulence light\|moderate\|severe` |
 | 時刻・太陽位置 | `--time 05:30`（地方平均太陽時）、`--time-rate 60`、実行中は `,` `.` |
 | 雲量・雲層・雲中視程 | `--cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300` |
-| OSM の最寄り滑走路と周辺誘導路 | PBF を `flightsim-airportgen` で焼き、`--airports <FILE>` |
+| OSM の最寄り滑走路と周辺地上設備 | PBF を `flightsim-airportgen` で焼き、`--airports <FILE>` |
 | チュートリアル導線 | 既定で出る。`H` で消せる |
 | ゲームパッド | 繋げば自動。キーボードと**軸ごとに**共存 |
 | 検証用: 空中から落として評価表示を通す | `--drop 15` |
@@ -80,8 +81,9 @@ CI が検査しないが、レビューで落とす規約:
 
 M1（ヘッドレスで妥当に飛ぶ）と M2（1 空港周辺で離陸→旋回→着陸）は達成済み。
 **いま M3 の途中。** 雲と雲中視程（[Issue #11](../../../issues/11)）と、
-OSM 滑走路（[Issue #21](../../../issues/21)）・誘導路（[Issue #25](../../../issues/25)）の
-取り込みと描画は完了。次の候補は TASK-C の難易度設定。
+OSM 滑走路（[Issue #21](../../../issues/21)）・誘導路（[Issue #25](../../../issues/25)）・
+apron / 待機位置 / 標識 / 誘導路灯（[Issue #27](../../../issues/27)）の取り込みと描画は完了。
+次の候補は TASK-C の難易度設定。
 継続課題は [ROADMAP](ROADMAP.md) に記録している。
 
 ### TASK-A: 計器盤（`flightsim-ui`）— 完了
@@ -106,37 +108,66 @@ OSM 滑走路（[Issue #21](../../../issues/21)）・誘導路（[Issue #25](../
 ### TASK-B: 空港データ — 完了
 
 2026-08-30、[Issue #21](../../../issues/21) で `aeroway=runway`、
-[Issue #25](../../../issues/25) で `aeroway=taxiway` の中心線まで完了。
+[Issue #25](../../../issues/25) で `aeroway=taxiway`、[Issue #27](../../../issues/27) で
+apron・待機位置・標識・誘導路灯まで完了。
 
-- `flightsim-airportgen` が地域 `.osm.pbf` をオフラインで `.fsairports`（FSAP v2）へ焼く。
+- `flightsim-airportgen` が地域 `.osm.pbf` をオフラインで `.fsairports`（FSAP v3）へ焼く。
   生 PBF と派生 DB は同梱しない（[ADR-0008](adr/0008-osm-airport-data.md)）
 - 滑走路は中心線 way の先頭・末尾 node から方位と長さを作る。幅欠落・不正は 45 m、
   面形状・端点欠落・縮退は理由別に除外する
 - 誘導路は `area=yes` を除外し、閉じた中心線を含む全 node を OSM 順に保持する。
-  幅欠落・不正は 15 m。node 欠落・不正座標・縮退が一つでもあれば way 全体を除外する
+  幅欠落・不正は 15 m。node 欠落・不正座標・縮退が一つでもあれば way 全体を除外する。
+  `ref`・`surface`・灯火 metadata も保持する
 - `width` は滑走路・誘導路とも数値、`m`、`ft` を扱う
+- apron は閉じた `aeroway=apron` way と hole 付き multipolygon を扱う。ring は member way
+  を OSM ID 順に反転も含めて接続し、hole を保って三角形分割する。各三角形辺は最大 75 m
+- 待機位置は `aeroway=holding_position` の node / way と、
+  `aeroway=aerodrome_marking + aerodrome_marking=holding_position` の way を扱う。
+  種別は `holding_position:type` を正典として従来 tag より優先する。有効な明示停止線 way が
+  holding node を member に持つ場合は way の geometry・幅・source を優先し、不正 way なら
+  node fallback を残す。近接距離だけでは統合しない
+  node は誘導路 node と共有されず、幅 + 1 m の corridor 内にも候補が無い場合に除外する。
+  候補が複数なら距離、way ID、segment index の順で決定論的に選ぶ
+- 明示灯火は `aeroway=navigationaid + navigationaid=txe|txc|rgl` の node。
+  明示点の無い channel は誘導路 metadata から決定論的に補うが、`lit=no` は補完しない
 - 入力 PBF と出力 DB が同じ実ファイルなら hard link 経由でも変換前に拒否する。
   出力は同じディレクトリで完全に書いて同期した一時ファイルから原子的に置換する
-- FSAP v2 は 64-byte 固定長 record に kind（0 = 滑走路、1 = 誘導路）、way ID、
-  segment index、両端、幅を持つ。v1 の read / write 互換性も維持する
-- reader は 24-byte header を先に検査し、宣言 payload は最大 1,000,000 record、
-  末尾は 1 byte だけ読む。未知 kind・予約値、途切れた segment index、不連続な端点、
-  way 内の幅不一致を含む不正 DB は読み込まない
+- FSAP v3 は 24-byte header と 32-byte directory entry を使う section 形式。section 1〜7 は
+  core v2 record / apron triangle / holding / ground light / taxiway attribute / string index /
+  string bytes。v1 / v2 の reader・writer と byte 表現はそのまま互換
+- reader / writer の上限は固定長 record 合計 1,000,000、集約済み文字列と
+  参照の展開量がそれぞれ 16 MiB、payload 96 MiB。
+  section の kind 順・一意性・連続範囲、schema、flags、record size、件数積、予約領域、
+  全 payload checksum、末尾データを厳格に検査し、不正 DB は読み込まない
 - app は `--start` から ECEF 中心距離が最小の 1 本を選び、開始・進入・描画・
   灯火・着陸評価で共有する。`--start` 省略時は選んだ滑走路上へ自動配置する
-- active runway の中心から 15 km 以内に point が一つでもある誘導路だけを描画する。
-  各 node で DEM を引き、地形に沿う asphalt 面と黄色中心線を way ごとに 1 mesh にする
+- active runway の中心から 15 km 圏と線分・三角形が交差する誘導路・apron、および圏内の
+  待機位置・灯火だけを描く。各 geometry 点で DEM を引き、surface は apron → 誘導路 →
+  滑走路の順に lift を上げ、路面標示・灯火にも固定 lift を割り当てて z-fighting を避ける
+- 滑走路側を判定できる待機位置は 2 実線 + 2 破線。待機位置と関連誘導路の `ref` が
+  揃えば、中心線右側へ 3x5 glyph の物理標識を置く。**画面文字は ASCII のみ**で、
+  非 ASCII、8 文字超、未収録 glyph は DB に保持しても標識へ描かない。盤面の winding・
+  法線・文字 lift は接近側へ揃え、片面 culling でも正面を読める
 - OSM 滑走路を実際に選んだ場合だけ、画面右下に ASCII の帰属を表示する。
-  詳細は `ATTRIBUTION.md`
+  詳細は `ATTRIBUTION.md`。PBF も派生 DB も ODbL 由来で、公開時は share-alike を確認する
 - alpha.10 では Haneda の実 PBF を滑走路 9 本 / 456 bytes へ変換し、2 回の SHA-256
   一致と実滑走路・帰属表示を目視済み
 - alpha.11 では Haneda 小領域 PBF（13,450 bytes）から滑走路 3 way、誘導路 113 way /
   1,023 segment を 65,688 bytes へ変換。2 回の出力 SHA-256
   `B29B8E599ABA81AFDBD130F4C2DC14E49382F47FF0914D7042A4594080C74D09` が一致し、free view の
   `--screenshot` で舗装・黄色中心線・曲線・junction・滑走路との重なり・帰属を目視済み
+- alpha.12 では Haneda 小領域 PBF（75,393 bytes、SHA-256
+  `075B94E8723336A8C1B32B271DE2EF3944717E5A60B98F34DC26A2264257B6B2`）から滑走路 3、
+  誘導路 113 / 1,023 segment、apron 3 / 2,940 triangle、待機位置 16、明示灯火 0 を
+  258,151 bytes へ変換した。2 回の出力 SHA-256 は
+  `93ADF41982F15F26896FAF19F1BBB0CC3024AE15DF4C925E9371C476495DD87B` で一致し、readback
+  件数も一致。待機位置 node 19 + marking way 13 のうち、誘導路へ関連しない node 3 件を
+  除外し、way と node を共有する 13 件は明示 way へ統合した。昼の free / cockpit view と
+  夜の free view で apron、単一の停止線、`34L-16R` / `A11` 標識、灯火、OSM 帰属を目視済み。
+  この extract に無い multipolygon hole と明示灯火は合成 fixture で検査する
 
-`surface`・灯火・空港名・滑走路 `ref`・建物は未実装。FSAP v2 は固定長 segment record
-だけで、これらの属性を追加する場合は次版または別テーブルを設計する。
+空港名・滑走路 `ref`・建物は未実装。OSM の `surface=*` は表示用の限定した列挙へ写像し、
+未知値は `Unknown` として保持する。PBF parser 自体の hardening は Issue #23 のまま。
 
 ### TASK-C: 難易度設定 — 未着手
 
@@ -296,8 +327,8 @@ ref が変わっていないことを確認し、PR コードを checkout せず
   実データが無い場所ほど細分化されるという逆転が起きる。
   当面は `--bounds` で被覆内に限定する。将来はフェザリングか低被覆タイルの除外
 - ダウンロード機能は無い。GeoTIFF は手元に用意する
-- このタスク完了時点では標高のみだった。現在は OSM 滑走路・誘導路に対応済み。
-  空港建物と地表画像は未対応
+- このタスク完了時点では標高のみだった。現在は OSM 滑走路・誘導路・apron・待機位置・
+  標識・誘導路灯に対応済み。空港建物と地表画像は未対応
 
 ### TASK-3: ヘッドレス統合ランナー — 完了
 
@@ -581,6 +612,13 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   平野が過剰に細分化される
 - **被覆外を定数で埋めると、その段差が崖として幾何誤差に乗る。**
   実測で被覆完全なタイル最大 10.7 m に対し fill を含むタイルは最大 375.3 m だった
+- **apron の active-airport 判定を頂点だけで行わない。** 大きな三角形は全頂点が 15 km
+  圏外でも面が探索円を横切る。点と三角形の最短距離で判定する。誘導路も同じ理由で
+  node だけでなく線分との距離を見る
+- **OSM の明示灯火と procedural fallback を重ねない。** `txe` / `txc` は channel ごとに
+  抑止し、`lit=no` は必ず `None` のままにする。入力順や `HashMap` 順で配置を変えない
+- **画面文字列の ASCII 制約は物理標識にも適用する。** OSM の `ref` 自体は UTF-8 のまま
+  FSAP v3 に保持するが、3x5 glyph にできない非 ASCII・8 文字超・未収録文字は描画しない
 
 ### テスト
 
@@ -628,6 +666,7 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 
 エージェント別の詳細な指示は [.claude/agents/](../.claude/agents/) にある。
 TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 と M2 の Bevy 統合は完了。
-現在は M3。TASK-A（計器盤）、雲・雲中視程、TASK-B（OSM 滑走路・誘導路）は完了。
+現在は M3。TASK-A（計器盤）、雲・雲中視程、TASK-B（OSM 滑走路・誘導路・apron・
+待機位置・標識・誘導路灯）は完了。
 次は TASK-C（難易度設定）が第一候補。
 結線を触る場合は `flightsim-sim` の公開 API を先に読むこと。
