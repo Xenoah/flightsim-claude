@@ -746,11 +746,16 @@ fn discover_pbf(
     })?;
     let mut discovery = PbfDiscovery::default();
     let mut discovery_error = None;
+    // **要素を 1 つも見なかった入力を「成功」にしない。**
+    // 0 バイトの PBF でも osmpbf は静かに何も返さないので、そのままだと
+    // 空の DB を書いて成功したことになる。ダウンロード失敗に気付けない。
+    let mut elements_seen: u64 = 0;
     reader
         .for_each(|element| {
             if discovery_error.is_some() {
                 return;
             }
+            elements_seen = elements_seen.saturating_add(1);
             let result = match element {
                 Element::Node(node) => discover_node(
                     node.id(),
@@ -785,6 +790,19 @@ fn discover_pbf(
         })?;
     if let Some(error) = discovery_error {
         return Err(error);
+    }
+    if elements_seen == 0 {
+        // **空の DB を黙って書かない。** 0 バイトや壊れた PBF でも
+        // osmpbf は静かに何も返す。そのまま成功にすると、利用者は
+        // 「空港の無い世界」を正しい結果だと思い込む。
+        //
+        // 空港が 1 つも無い正当な PBF とは区別できる: そちらは要素
+        // （node / way / relation）自体は存在する。
+        return Err(AirportGenError::ReadPbf {
+            path: path.to_path_buf(),
+            message: "the file contains no OSM elements; it is empty or not a usable PBF"
+                .to_owned(),
+        });
     }
     discovery
         .apron_relations

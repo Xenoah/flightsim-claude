@@ -53,6 +53,7 @@ pub mod generate;
 pub mod geotiff;
 pub mod region;
 pub mod testing;
+pub mod vertical_datum;
 
 pub use airport::{AirportGenError, AirportGenerationReport, generate_airport_database};
 pub use generate::{

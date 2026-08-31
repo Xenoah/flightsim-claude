@@ -11,6 +11,7 @@
 //! 単バンド浮動小数点ラスタ**のみを読む。投影座標系のラスタを度として読むと
 //! 静かに全く違う場所の地形になるため、`GTModelTypeGeoKey` を検査して弾く。
 
+use crate::vertical_datum::{VERTICAL_CS_TYPE_GEO_KEY, VerticalDatum};
 use core::f64::consts::{PI, TAU};
 use flightsim_core::{Degrees, Geodetic, Meters, Radians};
 use std::path::{Path, PathBuf};
@@ -115,6 +116,11 @@ pub struct GeoRaster {
     /// 南向き 1 画素あたりの緯度差（正）。
     pixel_latitude: f64,
     nodata: Option<f32>,
+    /// 高さが何を基準にしているか。
+    ///
+    /// **読み取るだけで、ここでは変換しない。** 変換にはジオイドモデルが
+    /// 要る（[`crate::vertical_datum`]）。
+    vertical_datum: VerticalDatum,
 }
 
 impl GeoRaster {
@@ -195,6 +201,11 @@ impl GeoRaster {
                 });
             }
         }
+
+        // 鉛直基準。**ここでは弾かない。** 焼くかどうかは呼び出し側の判断で、
+        // 読むこと自体は妨げない（検査や比較に使えるため）。
+        let vertical_datum =
+            VerticalDatum::from_geo_key(geo_key(&geo_keys, VERTICAL_CS_TYPE_GEO_KEY));
 
         let convention = match geo_key(&geo_keys, GT_RASTER_TYPE_GEO_KEY) {
             Some(2) => RasterPixelConvention::Point,
@@ -285,7 +296,17 @@ impl GeoRaster {
             pixel_longitude: Degrees(pixel_longitude).to_radians().get(),
             pixel_latitude: Degrees(pixel_latitude).to_radians().get(),
             nodata,
+            vertical_datum,
         })
+    }
+
+    /// 高さが何を基準にしているか。
+    ///
+    /// **そのまま楕円体高として使ってよいのは
+    /// [`VerticalDatum::Ellipsoidal`] のときだけ。**
+    #[must_use]
+    pub const fn vertical_datum(&self) -> VerticalDatum {
+        self.vertical_datum
     }
 
     #[must_use]

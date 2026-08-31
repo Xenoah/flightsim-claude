@@ -7,6 +7,7 @@
 
 use crate::geotiff::{GeoRaster, RasterError};
 use crate::region::Region;
+use crate::vertical_datum::VerticalDatum;
 use flightsim_core::{Meters, Radians};
 use flightsim_world::dem::io::{TileWriteError, tile_relative_path, write_tile};
 use flightsim_world::{HeightGrid, TileId};
@@ -70,6 +71,28 @@ impl RasterSet {
     #[must_use]
     pub const fn new(rasters: Vec<GeoRaster>) -> Self {
         Self { rasters }
+    }
+
+    /// 契約と合わない鉛直基準を持つラスタを挙げる。
+    ///
+    /// # なぜ焼く前に見るのか
+    ///
+    /// `.fsdem` は WGS84 楕円体高で保存する（`Geodetic::altitude` の契約、
+    /// ADR-0002）。ジオイド基準の高さをそのまま焼くと、**ジオイド高ぶんの
+    /// 系統誤差が入ったまま実行時に「正しい標高」として扱われる。**
+    ///
+    /// 局所的には気付けない。滑走路も機体も同じだけずれるので描画と接地は
+    /// 辻褄が合う。効くのは絶対高度と ECEF 半径で、**焼き直すまで直らない。**
+    ///
+    /// 返すのは (入力の並び順, 基準) の組。空なら全部そのまま使える。
+    #[must_use]
+    pub fn non_ellipsoidal_sources(&self) -> Vec<(usize, VerticalDatum)> {
+        self.rasters
+            .iter()
+            .enumerate()
+            .filter(|(_, raster)| !raster.vertical_datum().is_ellipsoidal())
+            .map(|(index, raster)| (index, raster.vertical_datum()))
+            .collect()
     }
 
     /// GeoTIFF を順に読み込む。
