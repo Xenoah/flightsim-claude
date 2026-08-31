@@ -165,6 +165,11 @@ struct ReplayPlayback {
     elapsed: Seconds,
     /// 記録全体の長さ。
     total: Seconds,
+    /// 直近に流した操縦入力。
+    ///
+    /// **HUD と計器はこれを見る。** ここを渡さないと、機体が加速しているのに
+    /// スロットル 0% と表示され、計器が嘘をつく（スクリーンショットで発覚）。
+    last_controls: flightsim_fdm::ControlInputs,
 }
 
 /// 実行時に差し替えられる地形供給元。
@@ -424,6 +429,7 @@ fn main() {
     let playback = recording.map(|recording| ReplayPlayback {
         elapsed: Seconds(0.0),
         total: recording.duration(),
+        last_controls: flightsim_fdm::ControlInputs::neutral(),
         player: flightsim_sim::Player::new(recording),
     });
     let data_attribution = match startup.runway_source {
@@ -1537,6 +1543,7 @@ fn rewind_replay(playback: &mut ReplayPlayback, simulation: &mut FlightSimulatio
             break;
         };
         simulation.0.advance(frame.frame_time, frame.controls);
+        playback.last_controls = frame.controls;
         elapsed += frame.frame_time.get();
     }
     playback.elapsed = Seconds(elapsed);
@@ -1696,6 +1703,11 @@ fn setup(
     sun: Res<SunDirection>,
 ) {
     info!("difficulty: {}", startup.difficulty.name());
+    if startup.replay.is_some() {
+        // 記録の再生に「今すぐ離陸しろ」と指示しても意味がない。**指示どおりに
+        // 操作しても何も起きないので、壊れているように見える。**
+        commands.insert_resource(flightsim_ui::TutorialVisibility(false));
+    }
     // 案内の既定は難易度が決める。**進入練習はこの後で上書きする**
     // （離陸の案内は進入練習では誤った指示になるため）。
     if !startup.difficulty.shows_tutorial() {
@@ -2332,6 +2344,7 @@ fn advance_simulation(
             while let Some(frame) = playback.player.next_due() {
                 let report = simulation.0.advance(frame.frame_time, frame.controls);
                 playback.elapsed = Seconds(playback.elapsed.get() + frame.frame_time.get());
+                playback.last_controls = frame.controls;
                 if report.diverged {
                     diverged = true;
                     break;
@@ -2579,10 +2592,22 @@ fn capture_screenshot(
 fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
+    playback: Option<Res<ReplayPlayback>>,
     mode: Res<ViewMode>,
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
 ) {
+    // 再生中に手元の操縦桿を映すと、機体が加速しているのにスロットル 0% と
+    // 出る。**表示は今飛んでいる機体のものでなければ意味がない。**
+    let shown = playback.map_or_else(
+        || (controls.throttle.value(), controls.flaps.value()),
+        |playback| {
+            (
+                playback.last_controls.throttle(),
+                playback.last_controls.flaps(),
+            )
+        },
+    );
     let state = simulation.0.state();
     let interpolated = simulation.0.interpolated();
     let ground = simulation.0.ground();
@@ -2598,8 +2623,8 @@ fn publish_hud(
         heading: interpolated.attitude.yaw,
         pitch: interpolated.attitude.pitch,
         roll: interpolated.attitude.roll,
-        throttle: controls.throttle.value(),
-        flaps: controls.flaps.value(),
+        throttle: shown.0,
+        flaps: shown.1,
         // 脚の長さぶん余裕を見る。重心の対地高度なので接地時でも 1 m 前後ある。
         on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
         terrain_available: ground.from_terrain,

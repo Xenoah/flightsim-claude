@@ -32,9 +32,12 @@ pub struct ReplayBanner;
 
 /// 画面上部中央に再生の状態を出す。
 ///
-/// 上部中央はチュートリアル導線と同じ帯だが、**再生中はチュートリアルを
+/// 上部中央はチュートリアル導線と同じ帯。**再生中はチュートリアルを
 /// 出さない**（記録の再生に「今すぐ離陸しろ」と指示しても意味がない）ので
-/// 重ならない。
+/// 重ならない。app が `--replay` のときに黙らせる。
+///
+/// 幅は画面の中央 60% ではなく 76% を取る。**30% ずつ空けると 1 行に
+/// 収まらず折り返した**（実機のスクリーンショットで発覚）。
 pub fn spawn_replay_banner(mut commands: Commands) {
     commands.spawn((
         Text::new(""),
@@ -48,8 +51,8 @@ pub fn spawn_replay_banner(mut commands: Commands) {
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(12.0),
-            left: Val::Percent(30.0),
-            right: Val::Percent(30.0),
+            left: Val::Percent(12.0),
+            right: Val::Percent(12.0),
             padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
             ..default()
         },
@@ -91,7 +94,7 @@ pub fn format_replay_banner(status: &ReplayStatus) -> String {
         1.0
     };
     format!(
-        "{state}  x{speed:.1}  {} / {}   [F5] pause  [F6/F7] speed  [F8] back 10s",
+        "{state}  x{speed:.1}  {} / {}   F5 pause   F6/F7 speed   F8 back 10s",
         clock(status.elapsed),
         clock(status.total)
     )
