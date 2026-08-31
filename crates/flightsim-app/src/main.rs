@@ -149,6 +149,29 @@ impl Difficulty {
     }
 }
 
+/// 飛行の記録。**常に回している。**
+///
+/// 「今のを保存したい」と思うのは飛んだ**後**なので、押してから
+/// 記録を始める作りでは間に合わない。1 フレーム 56 バイトなので、
+/// 上限（約 4.6 時間）まで溜めても数十 MB。
+#[derive(Resource)]
+struct FlightRecorder(flightsim_sim::Recorder);
+
+/// 再生中の状態。**再生していないときはリソースごと存在しない。**
+#[derive(Resource)]
+struct ReplayPlayback {
+    player: flightsim_sim::Player,
+    /// 再生済みの飛行時間。表示に使う。
+    elapsed: Seconds,
+    /// 記録全体の長さ。
+    total: Seconds,
+    /// 直近に流した操縦入力。
+    ///
+    /// **HUD と計器はこれを見る。** ここを渡さないと、機体が加速しているのに
+    /// スロットル 0% と表示され、計器が嘘をつく（スクリーンショットで発覚）。
+    last_controls: flightsim_fdm::ControlInputs,
+}
+
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
 
@@ -244,6 +267,8 @@ struct Startup {
     turbulence: flightsim_fdm::Turbulence,
     /// 難易度。風・乱流・案内の既定を決める。
     difficulty: Difficulty,
+    /// `--replay <FILE>` で再生する記録。指定があれば操縦を受け付けない。
+    replay: Option<PathBuf>,
     /// `--wind` が明示されたか。**難易度の既定で上書きしないため。**
     wind_was_given: bool,
     /// `--turbulence` が明示されたか。
@@ -307,6 +332,7 @@ impl Default for Startup {
             wind: flightsim_sim::Wind::CALM,
             turbulence: flightsim_fdm::Turbulence::CALM,
             difficulty: Difficulty::default(),
+            replay: None,
             wind_was_given: false,
             turbulence_was_given: false,
             start_hour: None,
@@ -361,6 +387,9 @@ struct PendingModelFit(ModelFit);
 fn main() {
     let (mut startup, mut diagnostics) = parse_arguments();
     resolve_airport_database(&mut startup, &mut diagnostics);
+    // **記録の条件は空港より後に当てる。** 空港の解決が開始位置と方位を
+    // 書き換えるので、先に当てると上書きされて別の場所を再生してしまう。
+    let recording = resolve_replay(&mut startup, &mut diagnostics);
 
     // アセットの置き場所を先に決める。**Bevy の既定はこのリポジトリを指さない。**
     let mut asset_plugin = AssetPlugin::default();
@@ -386,59 +415,165 @@ fn main() {
             },
         );
         clock.rate = flightsim_render::TimeRate(startup.time_rate);
+        // 再生では記録された暦上の一点へ合わせる。**時分だけ合わせても
+        // 日付がずれれば太陽高度が変わり、昼夜も影の向きも別物になる。**
+        if let Some(recording) = recording.as_ref()
+            && recording.conditions().start_epoch > 0.0
+        {
+            clock.utc = flightsim_render::JulianDate(recording.conditions().start_epoch);
+        }
         clock
     };
     let clouds = startup.clouds;
+    let conditions = recording_conditions(&startup, &clock);
+    let playback = recording.map(|recording| ReplayPlayback {
+        elapsed: Seconds(0.0),
+        total: recording.duration(),
+        last_controls: flightsim_fdm::ControlInputs::neutral(),
+        player: flightsim_sim::Player::new(recording),
+    });
     let data_attribution = match startup.runway_source {
         RunwaySource::Synthetic => DataAttribution::default(),
         RunwaySource::OpenStreetMap { .. } => DataAttribution::new(OSM_AIRPORT_ATTRIBUTION),
     };
 
-    App::new()
-        .add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "flightsim-claude".to_owned(),
-                ..default()
-            }),
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "flightsim-claude".to_owned(),
             ..default()
-        }))
-        .add_plugins((
-            FlightsimRenderPlugin,
-            FlightsimInputPlugin,
-            FlightsimUiPlugin,
-        ))
-        .insert_resource(clock)
-        .insert_resource(clouds)
-        .insert_resource(data_attribution)
-        .insert_resource(startup)
-        .insert_resource(diagnostics)
-        .init_resource::<CameraRig>()
-        // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
-        .add_systems(Startup, (report_arguments, setup).chain())
-        .add_systems(
-            Update,
-            (
-                advance_simulation,
-                update_camera.after(advance_simulation),
-                publish_hud.after(advance_simulation),
-            )
-                .before(RenderSet::Rebase),
+        }),
+        ..default()
+    }))
+    .add_plugins((
+        FlightsimRenderPlugin,
+        FlightsimInputPlugin,
+        FlightsimUiPlugin,
+    ))
+    .insert_resource(clock)
+    .insert_resource(clouds)
+    .insert_resource(data_attribution)
+    .insert_resource(startup)
+    .insert_resource(diagnostics)
+    .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+    .init_resource::<CameraRig>()
+    // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
+    .add_systems(Startup, (report_arguments, setup).chain())
+    .add_systems(
+        Update,
+        (
+            advance_simulation,
+            update_camera.after(advance_simulation),
+            publish_hud.after(advance_simulation),
         )
-        .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
-        .add_systems(
-            Update,
-            (
-                capture_screenshot,
-                report_terrain,
-                fit_loaded_model,
-                update_model_visibility,
-                report_landings.after(advance_simulation),
-                adjust_time_rate,
-                toggle_tutorial,
-                update_airport_lights,
-            ),
-        )
-        .run();
+            .before(RenderSet::Rebase),
+    )
+    .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
+    .add_systems(
+        Update,
+        (
+            capture_screenshot,
+            report_terrain,
+            fit_loaded_model,
+            update_model_visibility,
+            report_landings.after(advance_simulation),
+            adjust_time_rate,
+            toggle_tutorial,
+            update_airport_lights,
+            control_replay.before(advance_simulation),
+            publish_replay_status.after(advance_simulation),
+        ),
+    );
+
+    if let Some(playback) = playback {
+        app.insert_resource(playback);
+    }
+
+    app.run();
+}
+
+/// `--replay` のファイルを読み、記録された条件を起動設定へ写す。
+///
+/// **読めなければ再生しない。** 条件だけ当てて中身を捨てると、
+/// 「再生したつもりが普通に飛べる」という一番分かりにくい状態になる。
+fn resolve_replay(
+    startup: &mut Startup,
+    diagnostics: &mut StartupDiagnostics,
+) -> Option<flightsim_sim::Recording> {
+    let path = startup.replay.clone()?;
+    let file = match std::fs::File::open(&path) {
+        Ok(file) => file,
+        Err(error) => {
+            diagnostics
+                .0
+                .push(format!("could not open `{}`: {error}", path.display()));
+            startup.replay = None;
+            return None;
+        }
+    };
+    let recording = match flightsim_sim::Recording::read_from(&mut std::io::BufReader::new(file)) {
+        Ok(recording) => recording,
+        Err(error) => {
+            diagnostics
+                .0
+                .push(format!("could not read `{}`: {error}", path.display()));
+            startup.replay = None;
+            return None;
+        }
+    };
+
+    // 記録した機体で再生できるか。**違う機体なら別の軌跡になる。**
+    if let Err(error) = recording.check_reproducible_with(&AircraftConfig::light_single()) {
+        diagnostics
+            .0
+            .push(format!("`{}` cannot be replayed: {error}", path.display()));
+        startup.replay = None;
+        return None;
+    }
+
+    // 条件を写す。ここを飛ばすと、同じ入力を流しても別の飛行になる。
+    let conditions = recording.conditions();
+    startup.start = conditions.start;
+    startup.heading = conditions.heading;
+    startup.wind = conditions.wind;
+    startup.turbulence = conditions.turbulence;
+    startup.time_rate = conditions.time_rate;
+    // 時刻は `clock` を直接置き換える（下記）。start_hour は触らない。
+    // 進入練習と落下試験は開始状態を作り替えてしまう。再生では使わない。
+    startup.approach = None;
+    startup.drop_height = None;
+    Some(recording)
+}
+
+/// これから飛ぶぶんの記録条件。
+fn recording_conditions(
+    startup: &Startup,
+    clock: &flightsim_render::TimeOfDay,
+) -> flightsim_sim::replay::Conditions {
+    flightsim_sim::replay::Conditions {
+        start: startup.start,
+        heading: startup.heading,
+        wind: startup.wind,
+        turbulence: startup.turbulence,
+        start_epoch: clock.utc.get(),
+        time_rate: startup.time_rate,
+        ..flightsim_sim::replay::Conditions::default()
+    }
+    .with_aircraft(&AircraftConfig::light_single())
+}
+
+/// 保存先を決める。既にある名前は上書きしない。
+///
+/// **上書きすると、直前の良い着陸が次のフライトで消える。**
+fn next_replay_path() -> PathBuf {
+    for index in 1..1_000 {
+        let path = PathBuf::from(format!("flight-{index:03}.fsreplay"));
+        if !path.exists() {
+            return path;
+        }
+    }
+    // 999 本溜まっているなら、もう名前で管理する話ではない。
+    PathBuf::from("flight-overflow.fsreplay")
 }
 
 /// `--tiles <DIR>`、`--airports <FILE>`、`--start <LAT,LON>` を読む。
@@ -493,6 +628,10 @@ fn parse_arguments_from(
             "--tiles" => match next_argument_value(&mut arguments) {
                 Some(path) => startup.tiles = Some(PathBuf::from(path)),
                 None => notes.push("--tiles needs a directory".to_owned()),
+            },
+            "--replay" => match next_argument_value(&mut arguments) {
+                Some(path) => startup.replay = Some(PathBuf::from(path)),
+                None => notes.push("--replay needs a file".to_owned()),
             },
             "--difficulty" => match next_argument_value(&mut arguments) {
                 Some(text) => match Difficulty::parse(&text) {
@@ -1318,6 +1457,149 @@ fn adjust_time_rate(
     }
 }
 
+/// リプレイの保存と再生操作。
+///
+/// # なぜ app に置くのか
+///
+/// キー入力は `flightsim-input`、記録は `flightsim-sim`、表示は
+/// `flightsim-ui`。**この 3 つは直接依存できない**（規約 2）。
+/// 3 つとも知っているのは app だけ。
+///
+/// - `F9` — ここまでの飛行を保存する（再生中は効かない）
+/// - `F5` — 一時停止・再開
+/// - `F6` / `F7` — 遅く / 速く
+/// - `F8` — 10 秒戻る
+fn control_replay(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    recorder: Res<FlightRecorder>,
+    mut simulation: ResMut<FlightSimulation>,
+    playback: Option<ResMut<ReplayPlayback>>,
+) {
+    let Some(mut playback) = playback else {
+        if keyboard.just_pressed(KeyCode::F9) {
+            save_recording(recorder.0.recording());
+        }
+        return;
+    };
+
+    if keyboard.just_pressed(KeyCode::F5) {
+        let paused = !playback.player.is_paused();
+        playback.player.set_paused(paused);
+        info!("replay: {}", if paused { "paused" } else { "resumed" });
+    }
+    if keyboard.just_pressed(KeyCode::F6) {
+        let speed = playback.player.speed() / 2.0;
+        playback.player.set_speed(speed);
+        info!("replay speed: x{:.2}", playback.player.speed());
+    }
+    if keyboard.just_pressed(KeyCode::F7) {
+        let speed = playback.player.speed() * 2.0;
+        playback.player.set_speed(speed);
+        info!("replay speed: x{:.2}", playback.player.speed());
+    }
+    if keyboard.just_pressed(KeyCode::F8) {
+        rewind_replay(&mut playback, &mut simulation);
+    }
+}
+
+/// 10 秒ぶん戻して、キーフレームから流し直す。
+///
+/// **積分は戻せない。** キーフレームまで巻き戻し、そこから目標まで
+/// 一気に回し直す。10 秒ぶんの空回しは 1 フレームで終わる。
+fn rewind_replay(playback: &mut ReplayPlayback, simulation: &mut FlightSimulation) {
+    let recording = playback.player.recording();
+    // フレーム時間は一定ではないので、時間から番号を数え直す。
+    let target_time = (playback.elapsed.get() - 10.0).max(0.0);
+    let mut accumulated = 0.0;
+    let mut target = 0_u32;
+    for (index, frame) in recording.frames().iter().enumerate() {
+        if accumulated >= target_time {
+            target = u32::try_from(index).unwrap_or(u32::MAX);
+            break;
+        }
+        accumulated += frame.frame_time.get();
+        target = u32::try_from(index).unwrap_or(u32::MAX);
+    }
+
+    let Some(plan) = playback.player.seek(target) else {
+        warn!("replay: this recording has no keyframes; cannot rewind");
+        return;
+    };
+    simulation.0.rewind_to(plan.state);
+
+    // キーフレームから目標まで詰める。ここは表示せずに一気に回す。
+    let mut elapsed = 0.0;
+    for frame in playback
+        .player
+        .recording()
+        .frames()
+        .iter()
+        .take(plan.replay_from as usize)
+    {
+        elapsed += frame.frame_time.get();
+    }
+    while playback.player.cursor() < plan.target {
+        let Some(frame) = playback.player.step_once() else {
+            break;
+        };
+        simulation.0.advance(frame.frame_time, frame.controls);
+        playback.last_controls = frame.controls;
+        elapsed += frame.frame_time.get();
+    }
+    playback.elapsed = Seconds(elapsed);
+    info!("replay: rewound to {:.1} s", elapsed);
+}
+
+/// 記録をファイルへ書く。
+fn save_recording(recording: &flightsim_sim::Recording) {
+    if recording.frames().is_empty() {
+        warn!("nothing to save yet");
+        return;
+    }
+    let path = next_replay_path();
+    let file = match std::fs::File::create(&path) {
+        Ok(file) => file,
+        Err(error) => {
+            error!("could not create `{}`: {error}", path.display());
+            return;
+        }
+    };
+    let mut writer = std::io::BufWriter::new(file);
+    match recording.write_to(&mut writer) {
+        // **flush を確かめる。** BufWriter は drop 時の失敗を握り潰すので、
+        // ここを省くと「保存しました」と言った直後に中身が欠ける。
+        Ok(()) => match std::io::Write::flush(&mut writer) {
+            Ok(()) => info!(
+                "saved {} frames ({:.0} s) to {}",
+                recording.frames().len(),
+                recording.duration().get(),
+                path.display()
+            ),
+            Err(error) => error!("could not finish writing `{}`: {error}", path.display()),
+        },
+        Err(error) => error!("could not write `{}`: {error}", path.display()),
+    }
+}
+
+/// 再生状態を UI へ渡す。
+fn publish_replay_status(
+    playback: Option<Res<ReplayPlayback>>,
+    mut status: ResMut<flightsim_ui::ReplayStatus>,
+) {
+    let next = playback.map_or_else(flightsim_ui::ReplayStatus::default, |playback| {
+        flightsim_ui::ReplayStatus {
+            active: true,
+            paused: playback.player.is_paused(),
+            speed: playback.player.speed(),
+            elapsed: playback.elapsed,
+            total: playback.total,
+        }
+    });
+    if *status != next {
+        *status = next;
+    }
+}
+
 /// 新しい接地を着陸評価へ流す。
 ///
 /// `touchdown_count` の増分で「新しい接地」を検出する。bool の
@@ -1421,6 +1703,11 @@ fn setup(
     sun: Res<SunDirection>,
 ) {
     info!("difficulty: {}", startup.difficulty.name());
+    if startup.replay.is_some() {
+        // 記録の再生に「今すぐ離陸しろ」と指示しても意味がない。**指示どおりに
+        // 操作しても何も起きないので、壊れているように見える。**
+        commands.insert_resource(flightsim_ui::TutorialVisibility(false));
+    }
     // 案内の既定は難易度が決める。**進入練習はこの後で上書きする**
     // （離陸の案内は進入練習では誤った指示になるため）。
     if !startup.difficulty.shows_tutorial() {
@@ -2035,18 +2322,47 @@ fn setup(
 }
 
 /// 1 描画フレームぶんシミュレーションを進める。
+///
+/// 再生中は**操縦入力を見ない**。記録されたフレームをそのまま流す。
+/// 操縦を混ぜると軌跡が記録から外れ、再生が別の飛行になる。
 fn advance_simulation(
     time: Res<Time>,
     controls: Res<PilotControls>,
     mut simulation: ResMut<FlightSimulation>,
     mut camera_position: ResMut<CameraWorldPosition>,
+    mut recorder: ResMut<FlightRecorder>,
+    playback: Option<ResMut<ReplayPlayback>>,
     mut aircraft: Query<(&mut WorldPosition, &mut WorldOrientation), With<Aircraft>>,
 ) {
-    let report = simulation.0.advance(
-        Seconds(f64::from(time.delta_secs())),
-        controls.to_control_inputs(),
-    );
-    if report.diverged {
+    let frame_time = Seconds(f64::from(time.delta_secs()));
+    let diverged = match playback {
+        Some(mut playback) => {
+            playback.player.accumulate(frame_time);
+            let mut diverged = false;
+            // 予算のぶんだけ記録を流す。速度を上げれば 1 描画フレームで
+            // 複数フレーム進む。
+            while let Some(frame) = playback.player.next_due() {
+                let report = simulation.0.advance(frame.frame_time, frame.controls);
+                playback.elapsed = Seconds(playback.elapsed.get() + frame.frame_time.get());
+                playback.last_controls = frame.controls;
+                if report.diverged {
+                    diverged = true;
+                    break;
+                }
+            }
+            diverged
+        }
+        None => {
+            let input = controls.to_control_inputs();
+            // **進める前に記録する。** 後だと、そのフレームの入力に対応する
+            // 状態が 1 フレームずれる。
+            recorder
+                .0
+                .record(frame_time, input, Some(simulation.0.state()));
+            simulation.0.advance(frame_time, input).diverged
+        }
+    };
+    if diverged {
         // 発散した状態で飛び続けても意味が無い。原因が分かるよう一度だけ出す。
         error!("the simulation diverged; the aircraft state is no longer trustworthy");
         return;
@@ -2276,10 +2592,22 @@ fn capture_screenshot(
 fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
+    playback: Option<Res<ReplayPlayback>>,
     mode: Res<ViewMode>,
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
 ) {
+    // 再生中に手元の操縦桿を映すと、機体が加速しているのにスロットル 0% と
+    // 出る。**表示は今飛んでいる機体のものでなければ意味がない。**
+    let shown = playback.map_or_else(
+        || (controls.throttle.value(), controls.flaps.value()),
+        |playback| {
+            (
+                playback.last_controls.throttle(),
+                playback.last_controls.flaps(),
+            )
+        },
+    );
     let state = simulation.0.state();
     let interpolated = simulation.0.interpolated();
     let ground = simulation.0.ground();
@@ -2295,8 +2623,8 @@ fn publish_hud(
         heading: interpolated.attitude.yaw,
         pitch: interpolated.attitude.pitch,
         roll: interpolated.attitude.roll,
-        throttle: controls.throttle.value(),
-        flaps: controls.flaps.value(),
+        throttle: shown.0,
+        flaps: shown.1,
         // 脚の長さぶん余裕を見る。重心の対地高度なので接地時でも 1 m 前後ある。
         on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
         terrain_available: ground.from_terrain,
@@ -2898,6 +3226,70 @@ mod tests {
                 "{args:?}: {notes:?}"
             );
         }
+    }
+
+    // --- リプレイ ---
+
+    #[test]
+    fn the_replay_flag_takes_a_path() {
+        let (startup, notes) = parse(&["--replay", "flight-001.fsreplay"]);
+        assert_eq!(startup.replay, Some(PathBuf::from("flight-001.fsreplay")));
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn a_replay_flag_without_a_path_is_reported() {
+        // 値を食べずに次の option を飲み込むと、そちらが黙って消える。
+        let (startup, notes) = parse(&["--replay", "--difficulty", "beginner"]);
+        assert!(startup.replay.is_none());
+        assert_eq!(startup.difficulty, Difficulty::Beginner);
+        assert!(
+            notes.iter().any(|note| note.contains("--replay")),
+            "{notes:?}"
+        );
+    }
+
+    #[test]
+    fn without_the_flag_nothing_is_replayed() {
+        assert!(Startup::default().replay.is_none());
+    }
+
+    #[test]
+    fn the_recorded_conditions_describe_this_flight() {
+        // 条件が抜けると、同じ入力を流しても別の飛行になる。
+        let mut startup = Startup {
+            heading: Degrees(210.0).to_radians(),
+            time_rate: 4.0,
+            ..Startup::default()
+        };
+        startup.start = Geodetic::from_degrees(35.55, 139.78, 12.0);
+        startup.wind = flightsim_sim::Wind {
+            from: Degrees(270.0).to_radians(),
+            speed: flightsim_core::Knots(10.0).to_meters_per_second(),
+        };
+        startup.turbulence = flightsim_fdm::Turbulence::moderate(3);
+
+        let clock = flightsim_render::TimeOfDay::default();
+        let conditions = recording_conditions(&startup, &clock);
+
+        assert_eq!(conditions.start, startup.start);
+        assert_eq!(conditions.heading, startup.heading);
+        assert_eq!(conditions.wind, startup.wind);
+        assert_eq!(conditions.turbulence, startup.turbulence);
+        // 暦上の一点をそのまま持つ。**丸めると日付をまたぐ瞬間がずれる。**
+        assert!(
+            (conditions.start_epoch - clock.utc.get()).abs() < f64::EPSILON,
+            "the recorded epoch must be the clock's epoch"
+        );
+        assert!(
+            conditions.aircraft_fingerprint != 0,
+            "the aircraft must be identified, otherwise any aircraft would replay it"
+        );
+        // 同じ機体で記録した飛行は、同じ機体で再生できること。
+        flightsim_sim::Recorder::new(conditions)
+            .finish()
+            .check_reproducible_with(&AircraftConfig::light_single())
+            .expect("the recording must be reproducible with the aircraft it names");
     }
 
     // --- 難易度 ---

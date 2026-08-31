@@ -41,6 +41,7 @@ use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radian
 
 pub mod instruments;
 mod landing;
+pub mod replay;
 mod tutorial;
 
 pub use landing::{
@@ -49,6 +50,7 @@ pub use landing::{
     format_landing_report, grade_for_sink_rate, spawn_landing_report_display,
     update_landing_report_display,
 };
+pub use replay::{ReplayBanner, ReplayStatus, format_replay_banner};
 pub use tutorial::{
     TutorialProgress, TutorialPrompt, TutorialStage, TutorialState, TutorialVisibility,
     spawn_tutorial_prompt, update_tutorial_prompt,
@@ -278,6 +280,10 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<TutorialVisibility>()
             .add_systems(Startup, spawn_tutorial_prompt)
             .add_systems(Update, update_tutorial_prompt)
+            // 再生中の表示。app が `ReplayStatus` を埋めなければ出ない。
+            .init_resource::<replay::ReplayStatus>()
+            .add_systems(Startup, replay::spawn_replay_banner)
+            .add_systems(Update, replay::update_replay_banner)
             // 計器盤。コックピット視点のときだけ出る。
             .add_systems(Startup, instruments::spawn_instrument_panel)
             .add_systems(
@@ -423,6 +429,7 @@ pub fn help_text() -> String {
         "C ................. change view",
         "H ................. hide / show the guide",
         ", / . ............. time faster / slower",
+        "F9 ................ save this flight as a replay",
         "",
         "Takeoff: throttle to full, hold S at about 60 kt.",
     ]

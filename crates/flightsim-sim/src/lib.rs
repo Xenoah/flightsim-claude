@@ -31,6 +31,7 @@
 //! | [`director`] | 決定論的な PD フライトディレクタ。回帰テストの駆動装置 |
 //! | [`flight`] | フェーズ遷移、固定ステップ駆動、軌跡の記録（バッチ実行） |
 //! | [`simulation`] | 1 描画フレームぶんだけ進める逐次 API。Bevy 層はこれを呼ぶ |
+//! | [`replay`] | 操縦入力の記録と再生。決定論に乗せて軌跡を再現する |
 //!
 //! ## 使い方
 //!
@@ -62,6 +63,7 @@
 pub mod director;
 pub mod flight;
 pub mod ground;
+pub mod replay;
 pub mod simulation;
 
 pub use director::{DirectorGains, DirectorTargets, FlightDirector, VerticalTarget};
@@ -70,4 +72,5 @@ pub use flight::{
     gear_height, parked_state,
 };
 pub use ground::{GroundPlane, GroundSampler};
+pub use replay::{Player, Recorder, Recording, ReplayError};
 pub use simulation::{FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind};
