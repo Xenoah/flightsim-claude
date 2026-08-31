@@ -77,6 +77,78 @@ const MAX_TAXIWAY_SURFACE_POINTS: usize =
 /// OSM 明示灯と中心線から作った灯火を同一点とみなす ECEF 距離。
 const GROUND_LIGHT_DEDUP_DISTANCE: f64 = 0.25;
 
+/// 難易度。
+///
+/// # 何を変えて、何を変えないか
+///
+/// 変えるのは**環境の厳しさ**（風・乱流）と**案内の量**（チュートリアル）だけ。
+///
+/// **着陸の採点は変えない。** 難易度で甘くすると、同じ操縦に違う点が付く。
+/// 上達したのか設定を下げただけなのかが分からなくなり、点が意味を失う。
+/// 沈下率 1 m/s の接地は、初心者が出しても熟練者が出しても同じ 1 m/s。
+///
+/// 風と乱流は `--wind` / `--turbulence` で個別に上書きできる。
+/// **難易度は既定値を決めるだけ**で、明示指定を打ち消さない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Difficulty {
+    /// 無風・無乱流。案内を出す。**初めて飛ぶ人向け。**
+    Beginner,
+    /// 弱い乱流。案内を出す。
+    #[default]
+    Normal,
+    /// 横風と中程度の乱流。案内を出さない。
+    Realistic,
+}
+
+impl Difficulty {
+    /// 名前から読む。
+    fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_lowercase().as_str() {
+            "beginner" | "easy" => Some(Self::Beginner),
+            "normal" => Some(Self::Normal),
+            "realistic" | "hard" => Some(Self::Realistic),
+            _ => None,
+        }
+    }
+
+    /// この難易度が既定にする風。
+    ///
+    /// `Realistic` は滑走路に対して斜め 40 度の風にする。**真横だと
+    /// 着陸できず、真正面だと横風の練習にならない。**
+    fn default_wind(self, runway_heading: Radians) -> flightsim_sim::Wind {
+        match self {
+            Self::Beginner | Self::Normal => flightsim_sim::Wind::CALM,
+            Self::Realistic => flightsim_sim::Wind {
+                from: Radians(runway_heading.get() + Degrees(40.0).to_radians().get()),
+                speed: flightsim_core::Knots(12.0).to_meters_per_second(),
+            },
+        }
+    }
+
+    /// この難易度が既定にする乱流。
+    const fn default_turbulence(self) -> flightsim_fdm::Turbulence {
+        match self {
+            Self::Beginner => flightsim_fdm::Turbulence::CALM,
+            Self::Normal => flightsim_fdm::Turbulence::light(1),
+            Self::Realistic => flightsim_fdm::Turbulence::moderate(1),
+        }
+    }
+
+    /// チュートリアルの案内を出すか。
+    const fn shows_tutorial(self) -> bool {
+        !matches!(self, Self::Realistic)
+    }
+
+    /// 表示名。**ASCII のみ**（既定フォントの都合）。
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Beginner => "beginner",
+            Self::Normal => "normal",
+            Self::Realistic => "realistic",
+        }
+    }
+}
+
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
 
@@ -170,6 +242,12 @@ struct Startup {
     wind: flightsim_sim::Wind,
     /// 乱流。`--turbulence light|moderate|severe` で指定する。
     turbulence: flightsim_fdm::Turbulence,
+    /// 難易度。風・乱流・案内の既定を決める。
+    difficulty: Difficulty,
+    /// `--wind` が明示されたか。**難易度の既定で上書きしないため。**
+    wind_was_given: bool,
+    /// `--turbulence` が明示されたか。
+    turbulence_was_given: bool,
     /// 開始時刻（地方平均太陽時）。`None` なら render 側の既定。
     ///
     /// **地方平均太陽時にするのは、経度がどこでも「9 時なら朝」だから。**
@@ -228,6 +306,9 @@ impl Default for Startup {
             },
             wind: flightsim_sim::Wind::CALM,
             turbulence: flightsim_fdm::Turbulence::CALM,
+            difficulty: Difficulty::default(),
+            wind_was_given: false,
+            turbulence_was_given: false,
             start_hour: None,
             time_rate: 1.0,
             clouds: CloudLayer::default(),
@@ -413,6 +494,15 @@ fn parse_arguments_from(
                 Some(path) => startup.tiles = Some(PathBuf::from(path)),
                 None => notes.push("--tiles needs a directory".to_owned()),
             },
+            "--difficulty" => match next_argument_value(&mut arguments) {
+                Some(text) => match Difficulty::parse(&text) {
+                    Some(level) => startup.difficulty = level,
+                    None => notes.push(format!(
+                        "unknown difficulty `{text}`; expected beginner, normal or realistic"
+                    )),
+                },
+                None => notes.push("--difficulty needs a level".to_owned()),
+            },
             "--airports" => match next_argument_value(&mut arguments) {
                 Some(path) => startup.airports = Some(PathBuf::from(path)),
                 None => notes.push("--airports needs a .fsairports file".to_owned()),
@@ -493,7 +583,10 @@ fn parse_arguments_from(
             // 航空の慣習に合わせて `270/10`（西から 10 kt）。
             "--wind" => match next_argument_value(&mut arguments) {
                 Some(text) => match parse_wind(&text) {
-                    Ok(wind) => startup.wind = wind,
+                    Ok(wind) => {
+                        startup.wind = wind;
+                        startup.wind_was_given = true;
+                    }
                     Err(message) => notes.push(message),
                 },
                 None => notes.push("--wind needs `<bearing>/<knots>`, e.g. 270/10".to_owned()),
@@ -502,10 +595,22 @@ fn parse_arguments_from(
                 Some(text) => match text.to_lowercase().as_str() {
                     // 種は固定。**同じ指定なら毎回同じ大気**になり、
                     // 「さっきの着陸が難しかったのは運か腕か」を切り分けられる。
-                    "calm" | "none" => startup.turbulence = flightsim_fdm::Turbulence::CALM,
-                    "light" => startup.turbulence = flightsim_fdm::Turbulence::light(1),
-                    "moderate" => startup.turbulence = flightsim_fdm::Turbulence::moderate(1),
-                    "severe" => startup.turbulence = flightsim_fdm::Turbulence::severe(1),
+                    "calm" | "none" => {
+                        startup.turbulence = flightsim_fdm::Turbulence::CALM;
+                        startup.turbulence_was_given = true;
+                    }
+                    "light" => {
+                        startup.turbulence = flightsim_fdm::Turbulence::light(1);
+                        startup.turbulence_was_given = true;
+                    }
+                    "moderate" => {
+                        startup.turbulence = flightsim_fdm::Turbulence::moderate(1);
+                        startup.turbulence_was_given = true;
+                    }
+                    "severe" => {
+                        startup.turbulence = flightsim_fdm::Turbulence::severe(1);
+                        startup.turbulence_was_given = true;
+                    }
                     other => notes.push(format!(
                         "unknown turbulence `{other}`; expected calm, light, moderate or severe"
                     )),
@@ -630,6 +735,8 @@ fn parse_arguments_from(
     let (model, fit) = resolve_model(requested_model, placeholder, forward, up, &mut notes);
     startup.model = model;
     startup.model_fit = fit;
+
+    apply_difficulty(&mut startup);
 
     if cloud_arguments_valid {
         match CloudLayer::try_new(cloud_cover, cloud_base, cloud_top, cloud_visibility, 1) {
@@ -1007,6 +1114,21 @@ fn parse_wind(text: &str) -> Result<flightsim_sim::Wind, String> {
     })
 }
 
+/// 難易度の既定値を、明示指定されていない項目にだけ入れる。
+///
+/// **`--wind` / `--turbulence` を打ち消さない。** 難易度は「何も言わなかった
+/// ときにどうするか」を決めるだけで、利用者の明示指定より強くはない。
+///
+/// 着陸の採点には触れない（[`Difficulty`] の doc を参照）。
+fn apply_difficulty(startup: &mut Startup) {
+    if !startup.wind_was_given {
+        startup.wind = startup.difficulty.default_wind(startup.heading);
+    }
+    if !startup.turbulence_was_given {
+        startup.turbulence = startup.difficulty.default_turbulence();
+    }
+}
+
 /// どのモデルを、どの軸で使うかを決める。
 ///
 /// - `--no-model` → プレースホルダ
@@ -1298,6 +1420,13 @@ fn setup(
     lighting: Res<flightsim_render::SunLighting>,
     sun: Res<SunDirection>,
 ) {
+    info!("difficulty: {}", startup.difficulty.name());
+    // 案内の既定は難易度が決める。**進入練習はこの後で上書きする**
+    // （離陸の案内は進入練習では誤った指示になるため）。
+    if !startup.difficulty.shows_tutorial() {
+        commands.insert_resource(flightsim_ui::TutorialVisibility(false));
+    }
+
     match &startup.tiles {
         Some(path) => info!("terrain: {}", path.display()),
         None => info!("terrain: none — the whole world is at sea level"),
@@ -2768,6 +2897,145 @@ mod tests {
                     .any(|note| note.contains("using the clear default")),
                 "{args:?}: {notes:?}"
             );
+        }
+    }
+
+    // --- 難易度 ---
+
+    fn startup_at(difficulty: Difficulty) -> Startup {
+        Startup {
+            difficulty,
+            ..Startup::default()
+        }
+    }
+
+    #[test]
+    fn difficulty_names_are_parsed_including_common_aliases() {
+        assert_eq!(Difficulty::parse("beginner"), Some(Difficulty::Beginner));
+        assert_eq!(Difficulty::parse("easy"), Some(Difficulty::Beginner));
+        assert_eq!(Difficulty::parse("normal"), Some(Difficulty::Normal));
+        assert_eq!(Difficulty::parse("realistic"), Some(Difficulty::Realistic));
+        assert_eq!(Difficulty::parse("hard"), Some(Difficulty::Realistic));
+        // 大文字と余分な空白も受ける。
+        assert_eq!(Difficulty::parse("  NORMAL "), Some(Difficulty::Normal));
+        assert_eq!(Difficulty::parse("insane"), None);
+    }
+
+    #[test]
+    fn the_difficulty_ladder_gets_harder_in_one_direction() {
+        // 段が入れ替わっていると、上げたのに楽になる。
+        let calm = Difficulty::Beginner.default_turbulence().intensity.get();
+        let light = Difficulty::Normal.default_turbulence().intensity.get();
+        let moderate = Difficulty::Realistic.default_turbulence().intensity.get();
+        assert!(
+            calm < light && light < moderate,
+            "turbulence should increase with difficulty: {calm} / {light} / {moderate}"
+        );
+
+        let heading = Degrees(50.0).to_radians();
+        assert!(
+            Difficulty::Beginner.default_wind(heading).speed.get() < 0.01,
+            "beginners should start in calm air"
+        );
+        assert!(
+            Difficulty::Realistic.default_wind(heading).speed.get() > 5.0,
+            "the realistic preset should actually blow"
+        );
+    }
+
+    #[test]
+    fn the_realistic_wind_is_neither_head_on_nor_straight_across() {
+        // **真横だと着陸できず、真正面だと横風の練習にならない。**
+        let heading = Degrees(50.0).to_radians();
+        let wind = Difficulty::Realistic.default_wind(heading);
+        let mut offset = (wind.from.get() - heading.get()).to_degrees() % 360.0;
+        if offset > 180.0 {
+            offset -= 360.0;
+        }
+        assert!(
+            (20.0..=70.0).contains(&offset.abs()),
+            "the crosswind component should be meaningful but landable, got {offset} deg"
+        );
+    }
+
+    #[test]
+    fn only_the_realistic_preset_hides_the_guidance() {
+        assert!(Difficulty::Beginner.shows_tutorial());
+        assert!(Difficulty::Normal.shows_tutorial());
+        assert!(!Difficulty::Realistic.shows_tutorial());
+    }
+
+    #[test]
+    fn difficulty_fills_in_the_defaults() {
+        let mut startup = startup_at(Difficulty::Realistic);
+        apply_difficulty(&mut startup);
+        assert!(
+            startup.wind.speed.get() > 5.0,
+            "the realistic preset should set a wind"
+        );
+        assert!(startup.turbulence.intensity.get() > 0.0);
+    }
+
+    #[test]
+    fn an_explicit_wind_survives_the_difficulty_preset() {
+        // **利用者の明示指定を打ち消さない。** ここが逆になると
+        // `--wind` が黙って無視され、原因を掴めない。
+        let mut startup = startup_at(Difficulty::Realistic);
+        startup.wind = flightsim_sim::Wind {
+            from: Degrees(180.0).to_radians(),
+            speed: flightsim_core::Knots(3.0).to_meters_per_second(),
+        };
+        startup.wind_was_given = true;
+        apply_difficulty(&mut startup);
+
+        assert!(
+            (startup.wind.from.to_degrees().get() - 180.0).abs() < 1e-6,
+            "the explicit wind bearing was overwritten"
+        );
+        assert!(
+            (startup.wind.speed.to_knots().get() - 3.0).abs() < 1e-6,
+            "the explicit wind speed was overwritten"
+        );
+    }
+
+    #[test]
+    fn an_explicit_calm_survives_the_hardest_preset() {
+        // `--turbulence calm` は「静かにしてくれ」という明示の意思。
+        // 難易度が上書きすると、指定が効かない理由が分からない。
+        let mut startup = startup_at(Difficulty::Realistic);
+        startup.turbulence = flightsim_fdm::Turbulence::CALM;
+        startup.turbulence_was_given = true;
+        apply_difficulty(&mut startup);
+        assert!(
+            startup.turbulence.intensity.get() < 1e-9,
+            "an explicit calm was overwritten by the difficulty preset"
+        );
+    }
+
+    #[test]
+    fn the_default_difficulty_is_playable_without_arguments() {
+        // 引数なしで起動したときの姿。**いきなり横風は出さない。**
+        let startup = Startup::default();
+        assert_eq!(startup.difficulty, Difficulty::Normal);
+        assert!(
+            startup.difficulty.shows_tutorial(),
+            "a first-time player needs the guidance"
+        );
+        assert!(
+            startup.difficulty.default_wind(startup.heading).speed.get() < 0.01,
+            "the default should not start with a crosswind"
+        );
+    }
+
+    #[test]
+    fn difficulty_names_are_ascii() {
+        // ログと画面に出る。既定フォントに字形の無い記号を混ぜない。
+        for level in [
+            Difficulty::Beginner,
+            Difficulty::Normal,
+            Difficulty::Realistic,
+        ] {
+            assert!(level.name().is_ascii(), "{}", level.name());
         }
     }
 
