@@ -180,13 +180,10 @@ fn seeking_backward_lands_on_the_same_state_as_flying_there() {
         "the seek should start from a nearby keyframe, got {plan:?}"
     );
 
-    let mut sought = Simulation::from_state(
-        AircraftConfig::light_single(),
-        plan.state,
-        flat_world(),
-        GroundSampler::default(),
-    );
+    // 地形を作り直さずに巻き戻す。app 側も同じ経路を通る。
+    let mut sought = new_simulation();
     sought.set_turbulence(recording.conditions().turbulence);
+    sought.rewind_to(plan.state);
     while let Some(frame) = player.step_once() {
         if player.cursor() > plan.target {
             break;

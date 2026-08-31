@@ -145,8 +145,12 @@ pub struct Conditions {
     pub wind: Wind,
     /// 乱流。
     pub turbulence: Turbulence,
-    /// 開始時の地方平均太陽時（0 時からの秒）。太陽位置と灯火の再現に要る。
-    pub start_time_of_day: Seconds,
+    /// 開始時刻の UTC ユリウス日。太陽位置と灯火の再現に要る。
+    ///
+    /// **「時刻」ではなく暦上の一点**を持つ。時分だけだと日付が落ち、
+    /// 夏至と冬至で太陽高度が変わってしまう。
+    /// 0 は「記録側が時刻を持っていない」印で、再生側は既定の時刻を使う。
+    pub start_epoch: f64,
     /// 記録時の時間加速率。
     pub time_rate: f64,
 }
@@ -160,7 +164,7 @@ impl Default for Conditions {
             heading: Radians(0.0),
             wind: Wind::CALM,
             turbulence: Turbulence::CALM,
-            start_time_of_day: Seconds(0.0),
+            start_epoch: 0.0,
             time_rate: 1.0,
         }
     }
@@ -708,7 +712,7 @@ impl Recording {
         write_f64(writer, self.conditions.wind.speed.get())?;
         write_f64(writer, self.conditions.turbulence.intensity.get())?;
         writer.write_all(&self.conditions.turbulence.seed.to_le_bytes())?;
-        write_f64(writer, self.conditions.start_time_of_day.get())?;
+        write_f64(writer, self.conditions.start_epoch)?;
         write_f64(writer, self.conditions.time_rate)?;
 
         let frame_count = u32::try_from(self.frames.len()).unwrap_or(u32::MAX);
@@ -802,7 +806,7 @@ impl Recording {
         let wind_speed = read_f64(reader)?;
         let turbulence_intensity = read_f64(reader)?;
         let turbulence_seed = read_u64(reader)?;
-        let start_time_of_day = read_f64(reader)?;
+        let start_epoch = read_f64(reader)?;
         let time_rate = read_f64(reader)?;
 
         let conditions = Conditions {
@@ -822,7 +826,7 @@ impl Recording {
                 intensity: MetersPerSecond(turbulence_intensity),
                 seed: turbulence_seed,
             },
-            start_time_of_day: Seconds(start_time_of_day),
+            start_epoch,
             time_rate,
         };
 

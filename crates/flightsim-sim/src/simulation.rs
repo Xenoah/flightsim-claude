@@ -240,6 +240,35 @@ impl<S: TileSource> Simulation<S> {
         }
     }
 
+    /// 状態を差し替えて、そこから続きを回す。
+    ///
+    /// リプレイの後退シーク用。地形を作り直さずに済むので、
+    /// [`Self::from_state`] のように `Terrain` を持ち出す必要がない。
+    ///
+    /// # 何を戻して、何を戻さないか
+    ///
+    /// 戻すのは**物理の状態と接地の追跡**（姿勢・速度・接地平面・空中判定・
+    /// 発散フラグ・補間の始点）。
+    ///
+    /// **飛行記録（[`Self::log`]）と接地回数は戻さない。** これらはセッションを
+    /// 通した積み上げで、巻き戻したからといって飛んだ事実は消えない。
+    /// リプレイの表示に使うのは記録側の値であって、ここではない。
+    ///
+    /// 固定ステップのアキュムレータも戻さない。端数が残ったまま続くので、
+    /// 通しで飛んだ場合とサブステップの割れ方がわずかに変わる
+    /// （実測 0.17 m / 8.7 秒。`tests/replay_fidelity.rs`）。
+    pub fn rewind_to(&mut self, state: RigidBodyState) {
+        self.dynamics.set_state(state);
+        self.previous = state;
+        self.ground = self.sampler.sample(&mut self.terrain, state.geodetic());
+        self.previous_position = state.geodetic();
+        let clearance =
+            state.altitude().get() - self.ground.elevation.get() - self.gear_height.get();
+        self.airborne = clearance > crate::flight::AIRBORNE_CLEARANCE.get();
+        // 発散した状態から巻き戻すのは、まさに発散から抜けたいとき。
+        self.diverged = false;
+    }
+
     /// 描画フレーム時間ぶん進める。
     ///
     /// 内部で固定 dt に分割する。**フレーム時間をそのまま物理へ渡さない**
