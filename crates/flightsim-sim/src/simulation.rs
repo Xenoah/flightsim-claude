@@ -269,6 +269,43 @@ impl<S: TileSource> Simulation<S> {
         self.diverged = false;
     }
 
+    /// 最初からやり直す。**記録も消える。**
+    ///
+    /// [`Self::rewind_to`] との違いは、飛行記録・接地回数・固定ステップの
+    /// アキュムレータまで初期化すること。
+    ///
+    /// # なぜ記録まで消すのか
+    ///
+    /// やり直しは「さっきの飛行は無かったことにする」という意思。
+    /// 積み上げを残すと、失敗を繰り返すほど飛行距離と接地回数が増え、
+    /// **記録が「何回やり直したか」を測る数字になってしまう。**
+    ///
+    /// リプレイの記録側も併せて捨てること。やり直しは記録に残らないので、
+    /// 残したまま続けると、再生時に同じ入力を流しても別の飛行になる。
+    pub fn restart_at(&mut self, state: RigidBodyState) {
+        self.rewind_to(state);
+        self.log = FlightLog::default();
+        self.last_touchdown = None;
+        self.touchdown_count = 0;
+        self.fixed = FixedStep::new(RECOMMENDED_FIXED_DT);
+    }
+
+    /// 滑走路上の静止状態からやり直す。
+    ///
+    /// 地形は持っているものをそのまま使い、標高と勾配だけ引き直す。
+    /// [`Self::parked`] と同じ姿勢になる。
+    pub fn restart_parked_at(&mut self, start: Geodetic, heading: flightsim_core::Radians) {
+        let ground = self.sampler.sample(&mut self.terrain, start);
+        let state = crate::flight::parked_state(
+            self.dynamics.config(),
+            start,
+            ground.elevation,
+            ground.slope,
+            heading,
+        );
+        self.restart_at(state);
+    }
+
     /// 描画フレーム時間ぶん進める。
     ///
     /// 内部で固定 dt に分割する。**フレーム時間をそのまま物理へ渡さない**
