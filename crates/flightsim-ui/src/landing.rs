@@ -329,6 +329,7 @@ pub fn spawn_landing_report_display(mut commands: Commands) {
 pub fn update_landing_report_display(
     time: Res<Time>,
     report: Option<Res<LandingReport>>,
+    crashed: Res<crate::crash::CrashNotice>,
     mut state: ResMut<LandingReportState>,
     mut query: Query<(&mut Text, &mut Visibility), With<LandingReportDisplay>>,
 ) {
@@ -339,7 +340,11 @@ pub fn update_landing_report_display(
         state.timer.restart();
     }
 
-    let visible = state.timer.tick(Seconds(f64::from(time.delta_secs())));
+    // **墜落を「危険な着陸」と採点しない。** 機体が壊れているのに
+    // 「機体を確認してください」と出ると、失敗の程度が過小に伝わる。
+    // 何が起きたかは墜落の表示（[`crate::crash`]）が数字つきで出す。
+    // 時計は進めておく。復帰したときに古い評価が残らないように。
+    let visible = state.timer.tick(Seconds(f64::from(time.delta_secs()))) && !crashed.is_crashed();
 
     for (mut text, mut visibility) in &mut query {
         if visible {

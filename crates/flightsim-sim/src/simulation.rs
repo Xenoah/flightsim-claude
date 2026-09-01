@@ -173,6 +173,10 @@ pub struct Simulation<S: TileSource> {
     last_touchdown: Option<Touchdown>,
     /// 接地の通算回数。呼び出し側は前回読んだ値との差で「新しい接地」を知る。
     touchdown_count: u32,
+    /// 墜落と判定する境界。
+    crash_limits: crate::CrashLimits,
+    /// 墜落したならその記録。**あれば以降は進めない。**
+    crash: Option<crate::Crash>,
 }
 
 impl<S: TileSource> Simulation<S> {
@@ -206,6 +210,8 @@ impl<S: TileSource> Simulation<S> {
             airborne: false,
             last_touchdown: None,
             touchdown_count: 0,
+            crash_limits: crate::CrashLimits::default(),
+            crash: None,
         }
     }
 
@@ -237,6 +243,8 @@ impl<S: TileSource> Simulation<S> {
             airborne: clearance > crate::flight::AIRBORNE_CLEARANCE.get(),
             last_touchdown: None,
             touchdown_count: 0,
+            crash_limits: crate::CrashLimits::default(),
+            crash: None,
         }
     }
 
@@ -267,6 +275,8 @@ impl<S: TileSource> Simulation<S> {
         self.airborne = clearance > crate::flight::AIRBORNE_CLEARANCE.get();
         // 発散した状態から巻き戻すのは、まさに発散から抜けたいとき。
         self.diverged = false;
+        // 墜落も同じ。**壊れたまま巻き戻しても何もできない。**
+        self.crash = None;
     }
 
     /// 最初からやり直す。**記録も消える。**
@@ -311,6 +321,15 @@ impl<S: TileSource> Simulation<S> {
     /// 内部で固定 dt に分割する。**フレーム時間をそのまま物理へ渡さない**
     /// のがこのメソッドの役目（ADR-0004）。
     pub fn advance(&mut self, frame_time: Seconds, controls: ControlInputs) -> StepReport {
+        if self.crash.is_some() {
+            // **壊れた機体を飛ばし続けない。** 転がり続けると「まだ飛べる」
+            // ように見えて、失敗が失敗として伝わらない。
+            return StepReport {
+                steps: 0,
+                diverged: false,
+                terrain_missing: !self.ground.from_terrain,
+            };
+        }
         if self.diverged {
             return StepReport {
                 steps: 0,
@@ -397,6 +416,19 @@ impl<S: TileSource> Simulation<S> {
                 });
                 self.touchdown_count = self.touchdown_count.saturating_add(1);
                 self.log.landings = self.touchdown_count;
+
+                // **接地の記録は墜落でも残す。** 何が起きたかを見るのに要る。
+                if let Some(cause) = self.crash_limits.evaluate(
+                    MetersPerSecond(-before.vertical_speed().get()),
+                    attitude.roll,
+                    attitude.pitch,
+                ) {
+                    self.crash = Some(crate::Crash {
+                        cause,
+                        position: state.geodetic(),
+                        elapsed: self.fixed.elapsed(),
+                    });
+                }
             }
         } else if clearance > crate::flight::AIRBORNE_CLEARANCE.get() {
             self.airborne = true;
@@ -471,6 +503,32 @@ impl<S: TileSource> Simulation<S> {
     #[must_use]
     pub const fn wind(&self) -> Wind {
         self.wind
+    }
+
+    /// 墜落したならその記録。**あれば機体はもう進まない。**
+    #[must_use]
+    pub const fn crash(&self) -> Option<&crate::Crash> {
+        self.crash.as_ref()
+    }
+
+    /// 墜落したか。
+    #[must_use]
+    pub const fn crashed(&self) -> bool {
+        self.crash.is_some()
+    }
+
+    /// 墜落と判定する境界を差し替える。
+    ///
+    /// **難易度で変えないこと。** 理由は [`crate::crash`] の doc にある。
+    /// 回帰テストで機体を壊したくないときは [`crate::CrashLimits::NONE`]。
+    pub const fn set_crash_limits(&mut self, limits: crate::CrashLimits) {
+        self.crash_limits = limits;
+    }
+
+    /// 現在の墜落判定の境界。
+    #[must_use]
+    pub const fn crash_limits(&self) -> crate::CrashLimits {
+        self.crash_limits
     }
 
     /// 最後に記録した接地。

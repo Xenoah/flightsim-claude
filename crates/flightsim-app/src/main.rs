@@ -500,6 +500,7 @@ fn main() {
             update_airport_lights,
             control_replay.before(advance_simulation),
             control_flight.before(advance_simulation),
+            publish_crash.after(advance_simulation),
             publish_replay_status.after(advance_simulation),
         ),
     );
@@ -1515,7 +1516,9 @@ fn control_flight(
         return;
     }
 
-    if keyboard.just_pressed(KeyCode::Escape) {
+    // 墜落中は止められない。**止まっているものを止めても何も起きず、
+    // 帯が 2 枚重なるだけ。** やり直し（`R`）は効く。
+    if keyboard.just_pressed(KeyCode::Escape) && !simulation.0.crashed() {
         paused.toggle();
         // 止めたのに日が暮れるのはおかしい。時刻も一緒に止める。
         if paused.is_paused() {
@@ -1715,6 +1718,40 @@ fn save_recording(recording: &flightsim_sim::Recording) {
             Err(error) => error!("could not finish writing `{}`: {error}", path.display()),
         },
         Err(error) => error!("could not write `{}`: {error}", path.display()),
+    }
+}
+
+/// 墜落を UI へ渡し、一度だけログに出す。
+///
+/// `flightsim-ui` は `flightsim-sim` に依存できない（依存は一方向）ので、
+/// 原因の文言を作るのは app の仕事。
+fn publish_crash(
+    simulation: Res<FlightSimulation>,
+    mut notice: ResMut<flightsim_ui::CrashNotice>,
+    mut reported: Local<bool>,
+) {
+    match simulation.0.crash() {
+        Some(crash) => {
+            if !*reported {
+                *reported = true;
+                let headline = crash.cause.headline();
+                // **何が起きたかを数字で残す。** 「墜落した」だけでは
+                // 次に何を直せばいいか分からない。
+                error!(
+                    "{headline} (at {:.5}, {:.5} after {:.0} s)",
+                    crash.position.latitude_degrees(),
+                    crash.position.longitude_degrees(),
+                    crash.elapsed.get()
+                );
+                notice.set(headline);
+            }
+        }
+        None => {
+            if *reported {
+                *reported = false;
+                notice.clear();
+            }
+        }
     }
 }
 

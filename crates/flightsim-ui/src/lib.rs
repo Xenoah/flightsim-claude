@@ -39,12 +39,14 @@
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
 
+pub mod crash;
 pub mod instruments;
 mod landing;
 pub mod pause;
 pub mod replay;
 mod tutorial;
 
+pub use crash::{CrashNotice, CrashOverlay, crash_text};
 pub use landing::{
     LANDING_REPORT_DISPLAY_DURATION, LandingEvaluation, LandingGrade, LandingReport,
     LandingReportDisplay, LandingReportState, LandingReportTimer, evaluate_landing,
@@ -290,6 +292,10 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<pause::Paused>()
             .add_systems(Startup, pause::spawn_pause_overlay)
             .add_systems(Update, pause::update_pause_overlay)
+            // 墜落。app が `CrashNotice` を埋めなければ出ない。
+            .init_resource::<crash::CrashNotice>()
+            .add_systems(Startup, crash::spawn_crash_overlay)
+            .add_systems(Update, crash::update_crash_overlay)
             // 計器盤。コックピット視点のときだけ出る。
             .add_systems(Startup, instruments::spawn_instrument_panel)
             .add_systems(
