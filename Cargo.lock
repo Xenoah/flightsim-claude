@@ -2377,7 +2377,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-app"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "bevy",
  "flightsim-audio",
@@ -2392,7 +2392,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-assetgen"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "serde_json",
  "ureq",
@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-audio"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2408,7 +2408,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-core"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "criterion",
  "glam",
@@ -2416,7 +2416,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-fdm"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "criterion",
  "flightsim-core",
@@ -2425,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-input"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2434,7 +2434,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-render"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-sim"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "clap",
  "flightsim-core",
@@ -2458,7 +2458,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-tilegen"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "clap",
  "earcutr",
@@ -2472,7 +2472,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-ui"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "bevy",
  "flightsim-core",
@@ -2481,7 +2481,7 @@ dependencies = [
 
 [[package]]
 name = "flightsim-world"
-version = "0.6.0-alpha.13"
+version = "0.6.0-alpha.14"
 dependencies = [
  "criterion",
  "flightsim-core",
