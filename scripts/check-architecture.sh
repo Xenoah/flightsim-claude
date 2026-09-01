@@ -69,7 +69,7 @@ done
 # core ← fdm / world ← render / input / ui ← app
 # 逆流も横断も禁止（ARCHITECTURE.md §2）。
 # --------------------------------------------------------------------------
-if deps_of flightsim-core | grep -qE '^flightsim-(fdm|world|render|input|ui|app|net)$'; then
+if deps_of flightsim-core | grep -qE '^flightsim-(fdm|world|render|input|ui|audio|app|net)$'; then
     fail "flightsim-core depends on a higher-level crate" \
          "core is the bottom of the dependency graph and must depend on nothing in this workspace."
 fi
@@ -106,6 +106,23 @@ for crate in flightsim-core flightsim-fdm flightsim-world; do
         fail "$crate depends on flightsim-sim" \
              "sim is the integration layer above fdm and world. Depending on it upwards defeats the fdm/world separation (ADR-0006)."
     fi
+done
+
+# --------------------------------------------------------------------------
+# Bevy 依存層（render / input / ui / audio）は互いに依存しない。
+#
+# 同階層どうしが繋がると、片方を差し替えるのにもう片方が付いてくる。
+# 例: 音が ui に依存すると、HUD を持たない構成で音が鳴らせなくなる。
+# 繋ぐ必要があるものは app が両方を知って結線する（ARCHITECTURE.md §2）。
+# --------------------------------------------------------------------------
+SIBLINGS=(flightsim-render flightsim-input flightsim-ui flightsim-audio)
+for crate in "${SIBLINGS[@]}"; do
+    for other in "${SIBLINGS[@]}"; do
+        [ "$crate" = "$other" ] && continue
+        if deps_of "$crate" | grep -qE "^$other\$"; then
+            fail "$crate depends on its sibling $other"                  "render / input / ui / audio are siblings. Wire them together in app instead (ARCHITECTURE.md 2)."
+        fi
+    done
 done
 
 # --------------------------------------------------------------------------

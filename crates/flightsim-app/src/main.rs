@@ -467,6 +467,7 @@ fn main() {
         FlightsimRenderPlugin,
         FlightsimInputPlugin,
         FlightsimUiPlugin,
+        flightsim_audio::FlightAudioPlugin,
     ))
     .insert_resource(clock)
     .insert_resource(clouds)
@@ -501,6 +502,7 @@ fn main() {
             control_replay.before(advance_simulation),
             control_flight.before(advance_simulation),
             publish_crash.after(advance_simulation),
+            publish_sound.after(advance_simulation),
             publish_replay_status.after(advance_simulation),
         ),
     );
@@ -1719,6 +1721,59 @@ fn save_recording(recording: &flightsim_sim::Recording) {
         },
         Err(error) => error!("could not write `{}`: {error}", path.display()),
     }
+}
+
+/// 失速警報を出し始める、失速角に対する迎角の割合。
+///
+/// 実機の失速警報は失速速度の 5〜10 kt 手前で鳴る。迎角で言えば失速角の
+/// 手前で、**余裕を持って鳴らないと警報の意味がない**（鳴った時点で
+/// 失速していては回復操作が間に合わない）。
+const STALL_WARNING_FRACTION: f64 = 0.85;
+
+/// 警報を止める割合。**鳴り始める点より低くする。**
+///
+/// 同じ値にすると、境界上で迎角が揺れるたびに鳴ったり止まったりして
+/// 耳障りなうえ、本当に近いのかが分からなくなる。
+const STALL_WARNING_RELEASE: f64 = 0.78;
+
+/// 機体の状態を音へ渡す。
+///
+/// `flightsim-audio` は `flightsim-sim` に依存できない（依存は一方向）ので、
+/// 値を取り出すのは app の仕事。
+fn publish_sound(
+    simulation: Res<FlightSimulation>,
+    controls: Res<PilotControls>,
+    paused: Res<flightsim_ui::Paused>,
+    playback: Option<Res<ReplayPlayback>>,
+    mut sound: ResMut<flightsim_audio::AircraftSound>,
+    mut warning: Local<bool>,
+) {
+    // 再生中は流している側の出力を映す。手元の操縦桿ではない
+    // （HUD と同じ理由。`publish_hud` を参照）。
+    let throttle = playback.as_ref().map_or_else(
+        || controls.throttle.value(),
+        |playback| playback.last_controls.throttle(),
+    );
+
+    // ヒステリシス。**同じ閾値で入り切りすると境界で鳴り続ける。**
+    let fraction = simulation.0.stall_fraction();
+    if *warning {
+        if fraction < STALL_WARNING_RELEASE {
+            *warning = false;
+        }
+    } else if fraction >= STALL_WARNING_FRACTION {
+        *warning = true;
+    }
+
+    let crashed = simulation.0.crashed();
+    *sound = flightsim_audio::AircraftSound {
+        throttle,
+        airspeed: simulation.0.airspeed(),
+        // 壊れた機体は失速しない。**止まっているのに警報が鳴り続けない。**
+        stall_warning: *warning && !crashed,
+        // 一時停止と墜落では黙る。動いていないのに音がするのは変。
+        muted: paused.is_paused() || crashed,
+    };
 }
 
 /// 墜落を UI へ渡し、一度だけログに出す。

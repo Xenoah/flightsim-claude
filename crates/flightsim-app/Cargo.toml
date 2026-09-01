@@ -15,6 +15,7 @@ flightsim-world.workspace = true
 flightsim-sim.workspace = true
 flightsim-render.workspace = true
 flightsim-input.workspace = true
+flightsim-audio.workspace = true
 flightsim-ui.workspace = true
 bevy.workspace = true
 

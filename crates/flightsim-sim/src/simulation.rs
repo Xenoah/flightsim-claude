@@ -357,17 +357,7 @@ impl<S: TileSource> Simulation<S> {
             // 擬似乱数列で、ここではなく Wind の生成側で行う）。
             // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
             // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
-            let environment = Environment::with_wind_ned(
-                Atmosphere::standard(),
-                state.geodetic(),
-                self.wind.to_ned(),
-            )
-            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
-            .with_ground_plane(
-                self.ground.reference,
-                self.ground.elevation,
-                self.ground.slope,
-            );
+            let environment = self.environment_for(&state);
             self.dynamics
                 .step(self.fixed.fixed_dt(), controls, &environment);
             self.update_contact();
@@ -503,6 +493,56 @@ impl<S: TileSource> Simulation<S> {
     #[must_use]
     pub const fn wind(&self) -> Wind {
         self.wind
+    }
+
+    /// このステップの環境（大気・風・乱流・接地平面）。
+    ///
+    /// **積分と、外から状態を読むときで同じものを使う。** 2 箇所に書くと
+    /// 片方だけ直されて、警報が鳴るのと実際に失速するのがずれる。
+    fn environment_for(&self, state: &RigidBodyState) -> Environment {
+        // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
+        // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
+        // 擬似乱数列で、ここではなく Wind の生成側で行う）。
+        // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
+        // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
+        Environment::with_wind_ned(Atmosphere::standard(), state.geodetic(), self.wind.to_ned())
+            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
+            .with_ground_plane(
+                self.ground.reference,
+                self.ground.elevation,
+                self.ground.slope,
+            )
+    }
+
+    /// 今の空力角（迎角・横滑り角・真対気速度）。
+    ///
+    /// 風と乱流を含んだ相対風から求める。**対地速度からではない。**
+    #[must_use]
+    pub fn aero_angles(&self) -> flightsim_fdm::AeroAngles {
+        let state = self.dynamics.state();
+        flightsim_fdm::aero_angles_of(state, &self.environment_for(state))
+    }
+
+    /// 失速までの余裕。迎角が失速角の何割まで来たかを `[0, 1]` で返す。
+    ///
+    /// 1.0 で失速角ちょうど。**それ以上でも 1.0 に頭打ちしない**ので、
+    /// 呼び出し側は 1 を超えた値を見て「もう失速している」と判断できる。
+    ///
+    /// 対気速度がほぼ 0 のときは 0 を返す。**駐機中に警報を鳴らさない。**
+    /// 静止時の迎角は定義できず、`aero_angles` も 0 を返す。
+    #[must_use]
+    pub fn stall_fraction(&self) -> f64 {
+        let angles = self.aero_angles();
+        let stall = self.dynamics.config().aero.stall_angle.get().abs();
+        if !angles.is_finite() || stall <= f64::EPSILON {
+            return 0.0;
+        }
+        // 迎角が十分に定義できる速度でだけ見る。**低速では
+        // わずかな速度成分で迎角が跳ね、警報がちらつく。**
+        if angles.true_airspeed.get() < 5.0 {
+            return 0.0;
+        }
+        angles.angle_of_attack.get().abs() / stall
     }
 
     /// 墜落したならその記録。**あれば機体はもう進まない。**

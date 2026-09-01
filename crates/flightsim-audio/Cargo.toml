@@ -1,0 +1,16 @@
+[package]
+name = "flightsim-audio"
+description = "エンジン音・風切り音・失速警報。波形はコードで合成する。"
+version.workspace = true
+edition.workspace = true
+# ADR-0007: Bevy 0.18.1 の MSRV。
+rust-version = "1.89"
+license.workspace = true
+
+# render / input / ui と同階層。互いに依存しない（ARCHITECTURE.md §2）。
+[dependencies]
+flightsim-core.workspace = true
+bevy.workspace = true
+
+[lints]
+workspace = true
