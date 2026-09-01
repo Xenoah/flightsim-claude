@@ -84,7 +84,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # winit の x11 バックエンドが要求するもの。
-      # 音声の feature は切ってあるので libasound2-dev は不要（ADR-0007）。
+      # libasound2-dev は音（bevy_audio → alsa-sys）が要求する。
+      # ADR-0009 で音を入れるまでは feature ごと切ってあり不要だった。
       # libudev-dev はゲームパッド（bevy_gilrs → libudev-sys）が要求する。
       # 無いとコンパイルではなく build.rs の pkg-config が落ちる。
       # cargo doc でも build.rs は走るので、docs ジョブにも要る。
@@ -93,7 +94,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev libasound2-dev
 
       - uses: dtolnay/rust-toolchain@1.93.0
         with:
@@ -134,7 +135,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev libasound2-dev
 
       - uses: dtolnay/rust-toolchain@1.93.0
       - uses: Swatinem/rust-cache@v2
@@ -160,7 +161,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev libasound2-dev \
             mesa-vulkan-drivers vulkan-tools xvfb xauth
 
       - uses: dtolnay/rust-toolchain@1.93.0

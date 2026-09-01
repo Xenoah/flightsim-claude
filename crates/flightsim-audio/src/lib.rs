@@ -155,14 +155,14 @@ pub fn spawn_sound_sources(
         // rodio はエラーを出さず、ただ無音になる。作った物の大きさを
         // 出しておくと、少なくとも「生成はできている」ことが分かる。
         info!(
-            "audio: {} = {} samples ({:.1} kB)",
+            "audio: {} = {} samples, {} bytes of wav",
             match channel {
                 SoundChannel::Engine => "engine",
                 SoundChannel::Wind => "wind",
                 SoundChannel::StallWarning => "stall warning",
             },
             samples.len(),
-            wav.len() as f64 / 1024.0
+            wav.len()
         );
         let source = sources.add(AudioSource { bytes: wav.into() });
         commands.spawn((
