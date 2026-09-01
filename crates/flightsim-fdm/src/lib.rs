@@ -203,6 +203,20 @@ impl Environment {
     }
 }
 
+/// 状態と環境から空力角を求める。
+///
+/// **失速警報が要る。** 迎角が失速角へ近づいたことを、計器ではなく音で
+/// 知らせるには、積分の外からこの値を読めなければならない。
+///
+/// 積分の中で使っている式と同じものを呼ぶ。**別に書き直さないこと。**
+/// 片方だけ直されると、警報が鳴るのと実際に失速するのがずれる。
+#[must_use]
+pub fn aero_angles_of(state: &RigidBodyState, environment: &Environment) -> aero::AeroAngles {
+    // 風は「空気の動き」なので、機体から見た相対風は速度から風を引いたもの。
+    let relative_velocity_ecef = state.velocity - environment.wind_ecef;
+    aero::aero_angles(state.orientation.inverse() * relative_velocity_ecef)
+}
+
 /// 飛行力学モデル本体。
 #[derive(Debug, Clone)]
 pub struct FlightDynamics {
@@ -332,10 +346,7 @@ impl FlightDynamics {
         let air = environment.atmosphere.sample(position.altitude);
 
         // --- 対気速度 ---
-        // 風は「空気の動き」なので、機体から見た相対風は速度から風を引いたもの。
-        let relative_velocity_ecef = state.velocity - environment.wind_ecef;
-        let body_airspeed = state.orientation.inverse() * relative_velocity_ecef;
-        let angles = aero::aero_angles(body_airspeed);
+        let angles = aero_angles_of(state, environment);
 
         // --- 空気力 ---
         let (aero_force, aero_moment) = aero::body_force_and_moment(

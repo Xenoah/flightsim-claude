@@ -45,6 +45,9 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 着陸だけ練習（進入の途中から始まる） | `--approach <海里>` |
 | 風 | `--wind 270/10`（方位/ノット） |
 | 乱流 | `--turbulence light\|moderate\|severe` |
+| 音（エンジン・風切り・失速警報） | 既定で鳴る。波形は合成（ADR-0009）。ログに `audio: ... is playing` が出れば再生に届いている |
+| 墜落 | 沈下率 5 m/s・バンク 20 度・機首下げ 15 度を超えた接地。`--drop 40` で通せる |
+| 一時停止 / やり直し | `Esc` / `R`。やり直しは記録・評価・案内も戻す。再生中は効かない |
 | リプレイ用の記録を GUI 無しで作る | `cargo run -p flightsim-sim --example record_takeoff -- flight-001.fsreplay` |
 | 飛行の保存と再生 | 常に記録中。`F9` で保存、`--replay <FILE>` で再生。再生中は `F5` 停止 / `F6`・`F7` 速度 / `F8` 10 秒戻る |
 | 難易度（風・乱流・案内の既定をまとめて） | `--difficulty beginner\|normal\|realistic`。明示した `--wind` / `--turbulence` が勝つ。**採点には効かない** |

@@ -39,17 +39,21 @@
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
 
+pub mod crash;
 pub mod instruments;
 mod landing;
+pub mod pause;
 pub mod replay;
 mod tutorial;
 
+pub use crash::{CrashNotice, CrashOverlay, crash_text};
 pub use landing::{
     LANDING_REPORT_DISPLAY_DURATION, LandingEvaluation, LandingGrade, LandingReport,
     LandingReportDisplay, LandingReportState, LandingReportTimer, evaluate_landing,
     format_landing_report, grade_for_sink_rate, spawn_landing_report_display,
     update_landing_report_display,
 };
+pub use pause::{PauseOverlay, Paused, pause_text};
 pub use replay::{ReplayBanner, ReplayStatus, format_replay_banner};
 pub use tutorial::{
     TutorialProgress, TutorialPrompt, TutorialStage, TutorialState, TutorialVisibility,
@@ -284,6 +288,14 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<replay::ReplayStatus>()
             .add_systems(Startup, replay::spawn_replay_banner)
             .add_systems(Update, replay::update_replay_banner)
+            // 一時停止。app が `Esc` で `Paused` を切り替える。
+            .init_resource::<pause::Paused>()
+            .add_systems(Startup, pause::spawn_pause_overlay)
+            .add_systems(Update, pause::update_pause_overlay)
+            // 墜落。app が `CrashNotice` を埋めなければ出ない。
+            .init_resource::<crash::CrashNotice>()
+            .add_systems(Startup, crash::spawn_crash_overlay)
+            .add_systems(Update, crash::update_crash_overlay)
             // 計器盤。コックピット視点のときだけ出る。
             .add_systems(Startup, instruments::spawn_instrument_panel)
             .add_systems(
@@ -429,6 +441,8 @@ pub fn help_text() -> String {
         "C ................. change view",
         "H ................. hide / show the guide",
         ", / . ............. time faster / slower",
+        "Esc ............... pause",
+        "R ................. restart this flight",
         "F9 ................ save this flight as a replay",
         "",
         "Takeoff: throttle to full, hold S at about 60 kt.",

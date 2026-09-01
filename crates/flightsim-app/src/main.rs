@@ -149,6 +149,24 @@ impl Difficulty {
     }
 }
 
+/// やり直したときに戻る場所。
+///
+/// **`setup` が作った開始状態をそのまま覚えておく。** 引数から作り直すと、
+/// 空港 DB の解決や地形のサンプリングをもう一度通ることになり、
+/// 「同じところに戻る」保証が計算の再現性頼みになる。
+#[derive(Resource, Debug, Clone, Copy)]
+enum StartCondition {
+    /// 滑走路上の静止。標高と勾配はやり直しのたびに引き直す。
+    Parked {
+        /// 滑走路上の開始位置。
+        position: Geodetic,
+        /// 滑走路の方位。
+        heading: flightsim_core::Radians,
+    },
+    /// 空中の任意状態。進入練習と落下試験。
+    InFlight(flightsim_fdm::RigidBodyState),
+}
+
 /// 飛行の記録。**常に回している。**
 ///
 /// 「今のを保存したい」と思うのは飛んだ**後**なので、押してから
@@ -449,6 +467,7 @@ fn main() {
         FlightsimRenderPlugin,
         FlightsimInputPlugin,
         FlightsimUiPlugin,
+        flightsim_audio::FlightAudioPlugin,
     ))
     .insert_resource(clock)
     .insert_resource(clouds)
@@ -481,6 +500,9 @@ fn main() {
             toggle_tutorial,
             update_airport_lights,
             control_replay.before(advance_simulation),
+            control_flight.before(advance_simulation),
+            publish_crash.after(advance_simulation),
+            publish_sound.after(advance_simulation),
             publish_replay_status.after(advance_simulation),
         ),
     );
@@ -1445,8 +1467,14 @@ fn toggle_tutorial(
 /// `,` で遅く、`.` で速く。日の出を待つのに実時間を使わせない。
 fn adjust_time_rate(
     keyboard: Res<ButtonInput<KeyCode>>,
+    paused: Res<flightsim_ui::Paused>,
     mut clock: ResMut<flightsim_render::TimeOfDay>,
 ) {
+    // 一時停止中は触らせない。ここで倍率を変えると、再開時に復元する値と
+    // 食い違って**押した設定が黙って消える**。
+    if paused.is_paused() {
+        return;
+    }
     if keyboard.just_pressed(KeyCode::Period) {
         clock.rate = clock.rate.faster();
         info!("time rate: {}x", clock.rate.0);
@@ -1455,6 +1483,120 @@ fn adjust_time_rate(
         clock.rate = clock.rate.slower();
         info!("time rate: {}x", clock.rate.0);
     }
+}
+
+/// `Esc` で一時停止、`R` でやり直し。
+///
+/// # なぜ app に置くのか
+///
+/// キー入力は `flightsim-input`、状態は `flightsim-sim`、表示は
+/// `flightsim-ui`。**この 3 つは直接依存できない**（規約 2）。
+///
+/// 再生中は効かない。記録を止めたり巻き戻したりするのは `F5` / `F8` の
+/// 仕事で、そちらと二重に効くと状態が食い違う。
+#[expect(
+    clippy::too_many_arguments,
+    reason = "やり直しは機体・操縦・記録・時刻・案内・評価を同時に戻す。まとめると誰が何を戻すのか読めなくなる"
+)]
+fn control_flight(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    start: Res<StartCondition>,
+    playback: Option<Res<ReplayPlayback>>,
+    mut paused: ResMut<flightsim_ui::Paused>,
+    mut simulation: ResMut<FlightSimulation>,
+    mut controls: ResMut<PilotControls>,
+    mut recorder: ResMut<FlightRecorder>,
+    mut clock: ResMut<flightsim_render::TimeOfDay>,
+    mut tutorial: ResMut<flightsim_ui::TutorialState>,
+    mut landing: ResMut<flightsim_ui::LandingReportState>,
+    // 止める直前の時間加速。**再開で 1 倍に戻さないため。**
+    // `--time-rate 60` で夜明けを待っていた人を、一時停止のたびに
+    // 実時間へ引き戻すことになる。
+    mut rate_before_pause: Local<Option<flightsim_render::TimeRate>>,
+) {
+    if playback.is_some() {
+        return;
+    }
+
+    // 墜落中は止められない。**止まっているものを止めても何も起きず、
+    // 帯が 2 枚重なるだけ。** やり直し（`R`）は効く。
+    if keyboard.just_pressed(KeyCode::Escape) && !simulation.0.crashed() {
+        paused.toggle();
+        // 止めたのに日が暮れるのはおかしい。時刻も一緒に止める。
+        if paused.is_paused() {
+            *rate_before_pause = Some(clock.rate);
+            clock.rate = flightsim_render::TimeRate::PAUSED;
+        } else {
+            clock.rate = rate_before_pause
+                .take()
+                .unwrap_or(flightsim_render::TimeRate::REAL_TIME);
+        }
+        info!(
+            "{}",
+            if paused.is_paused() {
+                "paused"
+            } else {
+                "resumed"
+            }
+        );
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyR) {
+        restart_flight(
+            &start,
+            &mut simulation,
+            &mut controls,
+            &mut recorder,
+            &mut tutorial,
+            &mut landing,
+        );
+        // やり直したら止まったままにしない。**押してから Esc を探させない。**
+        // 時間加速は止める前のものへ戻す。やり直しは時刻の設定を変える操作ではない。
+        if paused.is_paused() {
+            clock.rate = rate_before_pause
+                .take()
+                .unwrap_or(flightsim_render::TimeRate::REAL_TIME);
+        }
+        paused.0 = false;
+        info!("restarted");
+    }
+}
+
+/// 開始状態へ戻す。
+///
+/// **記録も評価も案内も一緒に戻す。** 機体だけ戻すと、飛んだ距離や
+/// 直前の着陸評価が残り、やり直したのに前回の結果が画面に出続ける。
+fn restart_flight(
+    start: &StartCondition,
+    simulation: &mut FlightSimulation,
+    controls: &mut PilotControls,
+    recorder: &mut FlightRecorder,
+    tutorial: &mut flightsim_ui::TutorialState,
+    landing: &mut flightsim_ui::LandingReportState,
+) {
+    match *start {
+        StartCondition::Parked { position, heading } => {
+            simulation.0.restart_parked_at(position, heading);
+            *controls = PilotControls::default();
+        }
+        StartCondition::InFlight(state) => {
+            simulation.0.restart_at(state);
+            // 進入の途中から始まるので、`setup` と同じ出力とフラップで置く。
+            // 全閉・フラップ 0 で放り出すと即座に落ちる。
+            let mut fresh = PilotControls::default();
+            fresh.throttle.set_absolute(APPROACH_THROTTLE);
+            fresh.flaps.set_absolute(APPROACH_FLAPS);
+            *controls = fresh;
+        }
+    }
+
+    // **記録は捨てる。** やり直しは記録に残らないので、残したまま続けると
+    // 再生時に同じ入力を流しても別の飛行になる。
+    let conditions = recorder.0.recording().conditions().clone();
+    recorder.0 = flightsim_sim::Recorder::new(conditions);
+
+    *tutorial = flightsim_ui::TutorialState::default();
+    *landing = flightsim_ui::LandingReportState::default();
 }
 
 /// リプレイの保存と再生操作。
@@ -1578,6 +1720,93 @@ fn save_recording(recording: &flightsim_sim::Recording) {
             Err(error) => error!("could not finish writing `{}`: {error}", path.display()),
         },
         Err(error) => error!("could not write `{}`: {error}", path.display()),
+    }
+}
+
+/// 失速警報を出し始める、失速角に対する迎角の割合。
+///
+/// 実機の失速警報は失速速度の 5〜10 kt 手前で鳴る。迎角で言えば失速角の
+/// 手前で、**余裕を持って鳴らないと警報の意味がない**（鳴った時点で
+/// 失速していては回復操作が間に合わない）。
+const STALL_WARNING_FRACTION: f64 = 0.85;
+
+/// 警報を止める割合。**鳴り始める点より低くする。**
+///
+/// 同じ値にすると、境界上で迎角が揺れるたびに鳴ったり止まったりして
+/// 耳障りなうえ、本当に近いのかが分からなくなる。
+const STALL_WARNING_RELEASE: f64 = 0.78;
+
+/// 機体の状態を音へ渡す。
+///
+/// `flightsim-audio` は `flightsim-sim` に依存できない（依存は一方向）ので、
+/// 値を取り出すのは app の仕事。
+fn publish_sound(
+    simulation: Res<FlightSimulation>,
+    controls: Res<PilotControls>,
+    paused: Res<flightsim_ui::Paused>,
+    playback: Option<Res<ReplayPlayback>>,
+    mut sound: ResMut<flightsim_audio::AircraftSound>,
+    mut warning: Local<bool>,
+) {
+    // 再生中は流している側の出力を映す。手元の操縦桿ではない
+    // （HUD と同じ理由。`publish_hud` を参照）。
+    let throttle = playback.as_ref().map_or_else(
+        || controls.throttle.value(),
+        |playback| playback.last_controls.throttle(),
+    );
+
+    // ヒステリシス。**同じ閾値で入り切りすると境界で鳴り続ける。**
+    let fraction = simulation.0.stall_fraction();
+    if *warning {
+        if fraction < STALL_WARNING_RELEASE {
+            *warning = false;
+        }
+    } else if fraction >= STALL_WARNING_FRACTION {
+        *warning = true;
+    }
+
+    let crashed = simulation.0.crashed();
+    *sound = flightsim_audio::AircraftSound {
+        throttle,
+        airspeed: simulation.0.airspeed(),
+        // 壊れた機体は失速しない。**止まっているのに警報が鳴り続けない。**
+        stall_warning: *warning && !crashed,
+        // 一時停止と墜落では黙る。動いていないのに音がするのは変。
+        muted: paused.is_paused() || crashed,
+    };
+}
+
+/// 墜落を UI へ渡し、一度だけログに出す。
+///
+/// `flightsim-ui` は `flightsim-sim` に依存できない（依存は一方向）ので、
+/// 原因の文言を作るのは app の仕事。
+fn publish_crash(
+    simulation: Res<FlightSimulation>,
+    mut notice: ResMut<flightsim_ui::CrashNotice>,
+    mut reported: Local<bool>,
+) {
+    match simulation.0.crash() {
+        Some(crash) => {
+            if !*reported {
+                *reported = true;
+                let headline = crash.cause.headline();
+                // **何が起きたかを数字で残す。** 「墜落した」だけでは
+                // 次に何を直せばいいか分からない。
+                error!(
+                    "{headline} (at {:.5}, {:.5} after {:.0} s)",
+                    crash.position.latitude_degrees(),
+                    crash.position.longitude_degrees(),
+                    crash.elapsed.get()
+                );
+                notice.set(headline);
+            }
+        }
+        None => {
+            if *reported {
+                *reported = false;
+                notice.clear();
+            }
+        }
     }
 }
 
@@ -1768,6 +1997,10 @@ fn setup(
         commands.insert_resource(flightsim_ui::TutorialVisibility(false));
     }
 
+    let mut start_condition = StartCondition::Parked {
+        position: startup.start,
+        heading: startup.heading,
+    };
     let simulation = if let Some(miles) = startup.approach {
         let state = flightsim_sim::approach_state(
             &runway,
@@ -1775,6 +2008,7 @@ fn setup(
             Degrees(3.0).to_radians(),
             flightsim_core::MetersPerSecond(35.0),
         );
+        start_condition = StartCondition::InFlight(state);
         Simulation::from_state(
             AircraftConfig::light_single(),
             state,
@@ -1806,6 +2040,7 @@ fn setup(
                     ),
                     flightsim_core::Ned::new(0.0, 0.0, 0.0),
                 );
+                start_condition = StartCondition::InFlight(state);
                 Simulation::from_state(
                     AircraftConfig::light_single(),
                     state,
@@ -2284,6 +2519,7 @@ fn setup(
         .add_children(&parts);
 
     commands.insert_resource(FlightSimulation(simulation));
+    commands.insert_resource(start_condition);
 
     // --- 地形 ---
 
@@ -2325,15 +2561,25 @@ fn setup(
 ///
 /// 再生中は**操縦入力を見ない**。記録されたフレームをそのまま流す。
 /// 操縦を混ぜると軌跡が記録から外れ、再生が別の飛行になる。
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy のシステム引数。分けると1フレームの進行が2箇所に散る"
+)]
 fn advance_simulation(
     time: Res<Time>,
     controls: Res<PilotControls>,
+    paused: Res<flightsim_ui::Paused>,
     mut simulation: ResMut<FlightSimulation>,
     mut camera_position: ResMut<CameraWorldPosition>,
     mut recorder: ResMut<FlightRecorder>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut aircraft: Query<(&mut WorldPosition, &mut WorldOrientation), With<Aircraft>>,
 ) {
+    if paused.is_paused() {
+        // **物理も記録も進めない。** 止めている間に記録が伸びると、
+        // 再生したときに何もしていない時間が入る。
+        return;
+    }
     let frame_time = Seconds(f64::from(time.delta_secs()));
     let diverged = match playback {
         Some(mut playback) => {

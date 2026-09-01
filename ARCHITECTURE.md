@@ -14,7 +14,7 @@
 |---|---|---|
 | 地球規模の座標精度 | `f32` で ECEF を扱うと地表で約 0.5m 量子化し、機体が振動する | 世界座標は **`f64` ECEF 固定**。描画直前に **floating origin** で `f32` ローカル座標へ落とす（[ADR-0002](docs/adr/0002-coordinate-system.md)） |
 | 時間ステップの安定性 | 可変 dt で剛体積分すると失速・接地時に発散する | FDM は **固定 dt の内部サブステップ + RK4**。描画フレームレートから完全に分離（[ADR-0004](docs/adr/0004-simulation-loop.md)） |
-| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world`/`sim`/`tilegen` はエンジン非依存の純 Rust**。Bevy は `render`/`input`/`ui`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
+| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world`/`sim`/`tilegen` はエンジン非依存の純 Rust**。Bevy は `render`/`input`/`ui`/`audio`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
 
 3番目が今回の技術選定の実利そのもの。`cargo test -p flightsim-fdm` が GUI もアセットもなしに数秒で回るからこそ、QA エージェントが回帰網を維持できる。**この境界を壊す PR はレビューで落とす。**
 
@@ -28,12 +28,12 @@
                     ┌─────────────────┐
                     │ flightsim-app   │  統合バイナリ・シーン構築・状態遷移
                     └────────┬────────┘
-          ┌──────────────┬───┴───┬──────────────┐
-          ▼              ▼       ▼              ▼
-    ┌──────────┐  ┌──────────┐ ┌──────┐  ┌──────────┐
-    │  render  │  │  input   │ │  ui  │  │ net(後) │   ← Bevy 依存層
-    └────┬─────┘  └────┬─────┘ └──┬───┘  └────┬─────┘
-         └─────────────┴──────┬───┴───────────┘
+       ┌─────────┬────────┬──┴──┬────────┬─────────┐
+       ▼         ▼        ▼     ▼        ▼         ▼
+  ┌────────┐ ┌───────┐ ┌────┐ ┌───────┐ ┌────────┐
+  │ render │ │ input │ │ ui │ │ audio │ │ net(後)│   ← Bevy 依存層
+  └───┬────┘ └───┬───┘ └─┬──┘ └───┬───┘ └───┬────┘
+      └──────────┴───────┴────┬───┴─────────┘
                               ▼
               ┌───────────────┴───────────────┐
               ▼                               ▼
@@ -55,6 +55,7 @@
 | `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
+| `flightsim-audio` | エンジン音・風切り音・失速警報。**波形はコードで合成する**（[ADR-0009](docs/adr/0009-synthesised-audio.md)） | ✓ | ux |
 | `flightsim-sim` | **地形と FDM の結線。** 接地平面の生成、固定ステップ駆動、ヘッドレス実行 | ✗ | architect |
 | `flightsim-app` | 全体統合、実行バイナリ | ✓ | orchestrator |
 | `flightsim-tilegen` | **オフライン CLI。** GeoTIFF → 実行時タイル `.fsdem` の焼き込み | ✗ | world |
@@ -197,7 +198,8 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 | `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
 | `flightsim-render` | 地形・滑走路・誘導路・apron・待機位置標示・ASCII 物理標識・滑走路/誘導路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、決定論的な雲層と雲中視程、glTF の軸・倍率補正 |
 | `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
-| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤、利用中データの帰属表示 |
+| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤、利用中データの帰属表示、一時停止・墜落の表示 |
+| `flightsim-audio` | 出力に連動するエンジン音、対気速度に連動する風切り音、迎角で鳴る失速警報 |
 | `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
 
 雲場は固定 seed の周期的な 2D value/fBm noise を緯度・経度と `TimeOfDay` から

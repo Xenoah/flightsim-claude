@@ -32,6 +32,7 @@
 //! | [`flight`] | フェーズ遷移、固定ステップ駆動、軌跡の記録（バッチ実行） |
 //! | [`simulation`] | 1 描画フレームぶんだけ進める逐次 API。Bevy 層はこれを呼ぶ |
 //! | [`replay`] | 操縦入力の記録と再生。決定論に乗せて軌跡を再現する |
+//! | [`crash`] | 接地が機体の持つ範囲を超えたかの判定 |
 //!
 //! ## 使い方
 //!
@@ -60,12 +61,14 @@
 //! [ARCHITECTURE.md §2]: https://github.com/Xenoah/flightsim-claude/blob/main/ARCHITECTURE.md
 //! [ADR-0006]: https://github.com/Xenoah/flightsim-claude/blob/main/docs/adr/0006-simulation-integration-layer.md
 
+pub mod crash;
 pub mod director;
 pub mod flight;
 pub mod ground;
 pub mod replay;
 pub mod simulation;
 
+pub use crash::{Crash, CrashCause, CrashLimits};
 pub use director::{DirectorGains, DirectorTargets, FlightDirector, VerticalTarget};
 pub use flight::{
     CircuitPlan, Phase, SimulationOptions, Trajectory, TrajectorySample, approach_state, fly,

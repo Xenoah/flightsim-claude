@@ -173,6 +173,10 @@ pub struct Simulation<S: TileSource> {
     last_touchdown: Option<Touchdown>,
     /// 接地の通算回数。呼び出し側は前回読んだ値との差で「新しい接地」を知る。
     touchdown_count: u32,
+    /// 墜落と判定する境界。
+    crash_limits: crate::CrashLimits,
+    /// 墜落したならその記録。**あれば以降は進めない。**
+    crash: Option<crate::Crash>,
 }
 
 impl<S: TileSource> Simulation<S> {
@@ -206,6 +210,8 @@ impl<S: TileSource> Simulation<S> {
             airborne: false,
             last_touchdown: None,
             touchdown_count: 0,
+            crash_limits: crate::CrashLimits::default(),
+            crash: None,
         }
     }
 
@@ -237,6 +243,8 @@ impl<S: TileSource> Simulation<S> {
             airborne: clearance > crate::flight::AIRBORNE_CLEARANCE.get(),
             last_touchdown: None,
             touchdown_count: 0,
+            crash_limits: crate::CrashLimits::default(),
+            crash: None,
         }
     }
 
@@ -267,6 +275,45 @@ impl<S: TileSource> Simulation<S> {
         self.airborne = clearance > crate::flight::AIRBORNE_CLEARANCE.get();
         // 発散した状態から巻き戻すのは、まさに発散から抜けたいとき。
         self.diverged = false;
+        // 墜落も同じ。**壊れたまま巻き戻しても何もできない。**
+        self.crash = None;
+    }
+
+    /// 最初からやり直す。**記録も消える。**
+    ///
+    /// [`Self::rewind_to`] との違いは、飛行記録・接地回数・固定ステップの
+    /// アキュムレータまで初期化すること。
+    ///
+    /// # なぜ記録まで消すのか
+    ///
+    /// やり直しは「さっきの飛行は無かったことにする」という意思。
+    /// 積み上げを残すと、失敗を繰り返すほど飛行距離と接地回数が増え、
+    /// **記録が「何回やり直したか」を測る数字になってしまう。**
+    ///
+    /// リプレイの記録側も併せて捨てること。やり直しは記録に残らないので、
+    /// 残したまま続けると、再生時に同じ入力を流しても別の飛行になる。
+    pub fn restart_at(&mut self, state: RigidBodyState) {
+        self.rewind_to(state);
+        self.log = FlightLog::default();
+        self.last_touchdown = None;
+        self.touchdown_count = 0;
+        self.fixed = FixedStep::new(RECOMMENDED_FIXED_DT);
+    }
+
+    /// 滑走路上の静止状態からやり直す。
+    ///
+    /// 地形は持っているものをそのまま使い、標高と勾配だけ引き直す。
+    /// [`Self::parked`] と同じ姿勢になる。
+    pub fn restart_parked_at(&mut self, start: Geodetic, heading: flightsim_core::Radians) {
+        let ground = self.sampler.sample(&mut self.terrain, start);
+        let state = crate::flight::parked_state(
+            self.dynamics.config(),
+            start,
+            ground.elevation,
+            ground.slope,
+            heading,
+        );
+        self.restart_at(state);
     }
 
     /// 描画フレーム時間ぶん進める。
@@ -274,6 +321,15 @@ impl<S: TileSource> Simulation<S> {
     /// 内部で固定 dt に分割する。**フレーム時間をそのまま物理へ渡さない**
     /// のがこのメソッドの役目（ADR-0004）。
     pub fn advance(&mut self, frame_time: Seconds, controls: ControlInputs) -> StepReport {
+        if self.crash.is_some() {
+            // **壊れた機体を飛ばし続けない。** 転がり続けると「まだ飛べる」
+            // ように見えて、失敗が失敗として伝わらない。
+            return StepReport {
+                steps: 0,
+                diverged: false,
+                terrain_missing: !self.ground.from_terrain,
+            };
+        }
         if self.diverged {
             return StepReport {
                 steps: 0,
@@ -301,17 +357,7 @@ impl<S: TileSource> Simulation<S> {
             // 擬似乱数列で、ここではなく Wind の生成側で行う）。
             // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
             // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
-            let environment = Environment::with_wind_ned(
-                Atmosphere::standard(),
-                state.geodetic(),
-                self.wind.to_ned(),
-            )
-            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
-            .with_ground_plane(
-                self.ground.reference,
-                self.ground.elevation,
-                self.ground.slope,
-            );
+            let environment = self.environment_for(&state);
             self.dynamics
                 .step(self.fixed.fixed_dt(), controls, &environment);
             self.update_contact();
@@ -360,6 +406,19 @@ impl<S: TileSource> Simulation<S> {
                 });
                 self.touchdown_count = self.touchdown_count.saturating_add(1);
                 self.log.landings = self.touchdown_count;
+
+                // **接地の記録は墜落でも残す。** 何が起きたかを見るのに要る。
+                if let Some(cause) = self.crash_limits.evaluate(
+                    MetersPerSecond(-before.vertical_speed().get()),
+                    attitude.roll,
+                    attitude.pitch,
+                ) {
+                    self.crash = Some(crate::Crash {
+                        cause,
+                        position: state.geodetic(),
+                        elapsed: self.fixed.elapsed(),
+                    });
+                }
             }
         } else if clearance > crate::flight::AIRBORNE_CLEARANCE.get() {
             self.airborne = true;
@@ -434,6 +493,82 @@ impl<S: TileSource> Simulation<S> {
     #[must_use]
     pub const fn wind(&self) -> Wind {
         self.wind
+    }
+
+    /// このステップの環境（大気・風・乱流・接地平面）。
+    ///
+    /// **積分と、外から状態を読むときで同じものを使う。** 2 箇所に書くと
+    /// 片方だけ直されて、警報が鳴るのと実際に失速するのがずれる。
+    fn environment_for(&self, state: &RigidBodyState) -> Environment {
+        // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
+        // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
+        // 擬似乱数列で、ここではなく Wind の生成側で行う）。
+        // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
+        // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
+        Environment::with_wind_ned(Atmosphere::standard(), state.geodetic(), self.wind.to_ned())
+            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
+            .with_ground_plane(
+                self.ground.reference,
+                self.ground.elevation,
+                self.ground.slope,
+            )
+    }
+
+    /// 今の空力角（迎角・横滑り角・真対気速度）。
+    ///
+    /// 風と乱流を含んだ相対風から求める。**対地速度からではない。**
+    #[must_use]
+    pub fn aero_angles(&self) -> flightsim_fdm::AeroAngles {
+        let state = self.dynamics.state();
+        flightsim_fdm::aero_angles_of(state, &self.environment_for(state))
+    }
+
+    /// 失速までの余裕。迎角が失速角の何割まで来たかを `[0, 1]` で返す。
+    ///
+    /// 1.0 で失速角ちょうど。**それ以上でも 1.0 に頭打ちしない**ので、
+    /// 呼び出し側は 1 を超えた値を見て「もう失速している」と判断できる。
+    ///
+    /// 対気速度がほぼ 0 のときは 0 を返す。**駐機中に警報を鳴らさない。**
+    /// 静止時の迎角は定義できず、`aero_angles` も 0 を返す。
+    #[must_use]
+    pub fn stall_fraction(&self) -> f64 {
+        let angles = self.aero_angles();
+        let stall = self.dynamics.config().aero.stall_angle.get().abs();
+        if !angles.is_finite() || stall <= f64::EPSILON {
+            return 0.0;
+        }
+        // 迎角が十分に定義できる速度でだけ見る。**低速では
+        // わずかな速度成分で迎角が跳ね、警報がちらつく。**
+        if angles.true_airspeed.get() < 5.0 {
+            return 0.0;
+        }
+        angles.angle_of_attack.get().abs() / stall
+    }
+
+    /// 墜落したならその記録。**あれば機体はもう進まない。**
+    #[must_use]
+    pub const fn crash(&self) -> Option<&crate::Crash> {
+        self.crash.as_ref()
+    }
+
+    /// 墜落したか。
+    #[must_use]
+    pub const fn crashed(&self) -> bool {
+        self.crash.is_some()
+    }
+
+    /// 墜落と判定する境界を差し替える。
+    ///
+    /// **難易度で変えないこと。** 理由は [`crate::crash`] の doc にある。
+    /// 回帰テストで機体を壊したくないときは [`crate::CrashLimits::NONE`]。
+    pub const fn set_crash_limits(&mut self, limits: crate::CrashLimits) {
+        self.crash_limits = limits;
+    }
+
+    /// 現在の墜落判定の境界。
+    #[must_use]
+    pub const fn crash_limits(&self) -> crate::CrashLimits {
+        self.crash_limits
     }
 
     /// 最後に記録した接地。

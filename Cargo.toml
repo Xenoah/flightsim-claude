@@ -9,6 +9,7 @@ members = [
     "crates/flightsim-sim",
     "crates/flightsim-render",
     "crates/flightsim-app",
+    "crates/flightsim-audio",
     "crates/flightsim-ui",
     "crates/flightsim-input",
 ]
@@ -27,6 +28,7 @@ flightsim-tilegen = { path = "crates/flightsim-tilegen" }
 flightsim-sim = { path = "crates/flightsim-sim" }
 flightsim-render = { path = "crates/flightsim-render" }
 flightsim-app = { path = "crates/flightsim-app" }
+flightsim-audio = { path = "crates/flightsim-audio" }
 flightsim-ui = { path = "crates/flightsim-ui" }
 flightsim-input = { path = "crates/flightsim-input" }
 
@@ -71,6 +73,11 @@ bevy = { version = "0.18.1", default-features = false, features = [
     # ゲームパッド。M2 の残項目。キーボードの舵は矩形入力しかできず、
     # 着陸の当て舵が実質不可能。アナログ軸はゲームとしての操縦性に直結する。
     "bevy_gilrs",
+    # 音。**エンジン音・風切り音・失速警報に要る。** 失速が近いことを
+    # 視覚以外で知る手段が他に無い（計器を見ていないと分からない）。
+    "bevy_audio",
+    # 合成した波形を WAV として渡すため。音声ファイルは同梱しない（ADR-0009）。
+    "wav",
     "multi_threaded",
     "tonemapping_luts",
     "zstd_rust",

@@ -372,11 +372,19 @@ pub fn spawn_tutorial_prompt(mut commands: Commands) {
 pub fn update_tutorial_prompt(
     hud: Res<HudState>,
     visibility: Res<TutorialVisibility>,
+    paused: Res<crate::pause::Paused>,
+    crashed: Res<crate::crash::CrashNotice>,
     mut state: ResMut<TutorialState>,
     mut query: Query<(&mut Text, &mut Visibility), With<TutorialPrompt>>,
 ) {
     let stage = state.0.update(&hud);
-    let show = visibility.0 && stage != TutorialStage::Complete;
+    // **止まっている間と壊れている間は指示を出さない。** 「PageUp を押せ」と
+    // 出しておいて押しても何も起きないと、案内ではなく不具合に見える。
+    // 状態機械は裏で進み続けるので、再開したときは今の段階が出る。
+    let show = visibility.0
+        && !paused.is_paused()
+        && !crashed.is_crashed()
+        && stage != TutorialStage::Complete;
 
     for (mut text, mut node_visibility) in &mut query {
         if show {
