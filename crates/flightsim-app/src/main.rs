@@ -1509,6 +1509,7 @@ fn control_flight(
     mut clock: ResMut<flightsim_render::TimeOfDay>,
     mut tutorial: ResMut<flightsim_ui::TutorialState>,
     mut landing: ResMut<flightsim_ui::LandingReportState>,
+    sound: Res<flightsim_audio::SoundBridge>,
     // 止める直前の時間加速。**再開で 1 倍に戻さないため。**
     // `--time-rate 60` で夜明けを待っていた人を、一時停止のたびに
     // 実時間へ引き戻すことになる。
@@ -1550,6 +1551,9 @@ fn control_flight(
             &mut tutorial,
             &mut landing,
         );
+        // 音も開始状態へ飛ばす。**滑らかに追わせると、全開から
+        // アイドルへ数秒かけて落ちていく音が残り、やり直した感じが出ない。**
+        sound.0.request_reset();
         // やり直したら止まったままにしない。**押してから Esc を探させない。**
         // 時間加速は止める前のものへ戻す。やり直しは時刻の設定を変える操作ではない。
         if paused.is_paused() {
