@@ -1,6 +1,6 @@
 [package]
 name = "flightsim-audio"
-description = "エンジン音・風切り音・失速警報。波形はコードで合成する。"
+description = "エンジン音・風切り音・失速警報。波形は毎標本その場で合成する。"
 version.workspace = true
 edition.workspace = true
 # ADR-0007: Bevy 0.18.1 の MSRV。
@@ -11,6 +11,9 @@ license.workspace = true
 [dependencies]
 flightsim-core.workspace = true
 bevy.workspace = true
+# Bevy が音の再生に使っている実装。`rodio::Source` を実装するために要る。
+# **版は bevy_audio が使っているものに合わせること**（型が合わなくなる）。
+rodio = { version = "0.20", default-features = false }
 
 [lints]
 workspace = true
