@@ -73,10 +73,12 @@ pub mod dsp;
 pub mod engine;
 pub mod mixer;
 pub mod source;
+pub mod turbine;
 
 pub use engine::{EngineSpec, estimate_rpm};
-pub use mixer::{DEFAULT_MASTER, FlightSound};
+pub use mixer::{DEFAULT_MASTER, EngineKind, FlightSound};
 pub use source::{FlightAudio, SharedSound};
+pub use turbine::{TurbineSpec, estimate_n1};
 
 /// 機体が今どういう音を出しているか。app が毎フレーム埋める。
 ///
@@ -114,6 +116,8 @@ pub struct AudioSettings {
     pub master: f64,
     /// 音を出すか。偽なら音源自体を作らない。
     pub enabled: bool,
+    /// どの動力を鳴らすか。**音だけの選択で、飛び方は変わらない。**
+    pub engine: EngineKind,
 }
 
 impl Default for AudioSettings {
@@ -121,6 +125,7 @@ impl Default for AudioSettings {
         Self {
             master: DEFAULT_MASTER,
             enabled: true,
+            engine: EngineKind::default(),
         }
     }
 }
@@ -161,25 +166,36 @@ pub fn spawn_sound_source(
         info!("audio: disabled");
         return;
     }
-    let spec = EngineSpec::default();
-    let handle = sources.add(FlightAudio::new(Arc::clone(&bridge.0), spec));
+    let kind = settings.engine;
+    let handle = sources.add(FlightAudio::new(Arc::clone(&bridge.0), kind));
     bridge.0.set_master(settings.master);
 
     // 諸元と、そこから出る周波数を出す。**「音が違う」と思ったとき、
     // 諸元が意図どおりかをまず確かめられる。**
-    info!(
-        "audio: {} cylinder {}-stroke, {} blade prop, {:.0}-{:.0} rpm \
-         (firing {:.0}-{:.0} Hz, blade passage {:.0}-{:.0} Hz)",
-        spec.cylinders,
-        spec.strokes,
-        spec.blades,
-        spec.idle_rpm,
-        spec.max_rpm,
-        spec.firing_hz(spec.idle_rpm),
-        spec.firing_hz(spec.max_rpm),
-        spec.blade_passage_hz(spec.idle_rpm),
-        spec.blade_passage_hz(spec.max_rpm),
-    );
+    match kind {
+        EngineKind::Piston(spec) => info!(
+            "audio: piston, {} cylinder {}-stroke, {} blade prop, {:.0}-{:.0} rpm (firing {:.0}-{:.0} Hz)",
+            spec.cylinders,
+            spec.strokes,
+            spec.blades,
+            spec.idle_rpm,
+            spec.max_rpm,
+            spec.firing_hz(spec.idle_rpm),
+            spec.firing_hz(spec.max_rpm),
+        ),
+        EngineKind::Turbine(spec) => info!(
+            "audio: turbofan, {} fan blades, N1 {:.0}-{:.0} rpm (fan tone {:.0}-{:.0} Hz, tip mach {:.2}-{:.2}, jet peak {:.0}-{:.0} Hz)",
+            spec.fan_blades,
+            spec.idle_n1,
+            spec.max_n1,
+            spec.fan_blade_passage_hz(spec.idle_n1),
+            spec.fan_blade_passage_hz(spec.max_n1),
+            spec.tip_mach(spec.idle_n1),
+            spec.tip_mach(spec.max_n1),
+            spec.jet_peak_hz(0.0),
+            spec.jet_peak_hz(1.0),
+        ),
+    }
 
     commands.spawn((
         AudioPlayer(handle),

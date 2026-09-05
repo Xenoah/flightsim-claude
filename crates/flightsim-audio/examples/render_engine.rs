@@ -1,7 +1,7 @@
 //! 飛行の音を WAV に書き出して、耳と目で確かめる。
 //!
 //! ```text
-//! cargo run -p flightsim-audio --example render_engine -- flight.wav
+//! cargo run -p flightsim-audio --example render_engine -- flight.wav [piston|turbine]
 //! ```
 //!
 //! **音は聞かないと分からない。** 検査は「狙った周波数に山があるか」までしか
@@ -30,8 +30,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use flightsim_audio::dsp::SAMPLE_RATE;
-use flightsim_audio::engine::{EngineSpec, estimate_rpm};
-use flightsim_audio::mixer::{DEFAULT_MASTER, FlightSound, Mixer};
+use flightsim_audio::mixer::{DEFAULT_MASTER, EngineKind, FlightSound, Mixer};
 
 /// 書き出す長さ `秒`。
 const SECONDS: f64 = 20.0;
@@ -41,8 +40,16 @@ fn main() -> ExitCode {
         .nth(1)
         .map_or_else(|| PathBuf::from("engine.wav"), PathBuf::from);
 
-    let spec = EngineSpec::default();
-    let mut mixer = Mixer::new(spec, DEFAULT_MASTER);
+    // 第 2 引数で機種を選ぶ。既定はタービン（戦闘機）。
+    let kind = std::env::args()
+        .nth(2)
+        .map_or_else(EngineKind::default, |name| {
+            EngineKind::parse(&name).unwrap_or_else(|| {
+                eprintln!("unknown engine `{name}`; expected piston or turbine");
+                EngineKind::default()
+            })
+        });
+    let mut mixer = Mixer::new(kind, DEFAULT_MASTER);
     let count = (SAMPLE_RATE * SECONDS) as usize;
     let mut samples = Vec::with_capacity(count);
 
@@ -69,17 +76,23 @@ fn main() -> ExitCode {
         path.display(),
         wav.len()
     );
-    eprintln!(
-        "idle {:.0} rpm -> firing {:.1} Hz;  full {:.0} rpm -> firing {:.1} Hz",
-        spec.idle_rpm,
-        spec.firing_hz(spec.idle_rpm),
-        spec.max_rpm,
-        spec.firing_hz(spec.max_rpm),
-    );
-    eprintln!(
-        "cruise: {:.0} rpm at full throttle and 55 m/s",
-        estimate_rpm(spec, 1.0, 55.0)
-    );
+    match kind {
+        EngineKind::Piston(spec) => eprintln!(
+            "piston: firing {:.0} Hz at idle, {:.0} Hz at {:.0} rpm",
+            spec.firing_hz(spec.idle_rpm),
+            spec.firing_hz(spec.max_rpm),
+            spec.max_rpm,
+        ),
+        EngineKind::Turbine(spec) => eprintln!(
+            "turbofan: fan tone {:.0}-{:.0} Hz, tip mach {:.2}-{:.2}, jet peak {:.0}-{:.0} Hz",
+            spec.fan_blade_passage_hz(spec.idle_n1),
+            spec.fan_blade_passage_hz(spec.max_n1),
+            spec.tip_mach(spec.idle_n1),
+            spec.tip_mach(spec.max_n1),
+            spec.jet_peak_hz(0.0),
+            spec.jet_peak_hz(1.0),
+        ),
+    }
     ExitCode::SUCCESS
 }
 
@@ -92,13 +105,18 @@ fn flight_at(seconds: f64) -> FlightSound {
     let key_frames = [
         (0.0, 0.0, 0.0, false),
         (2.0, 0.0, 0.0, false),
-        (4.0, 1.0, 30.0, false),
-        (6.0, 1.0, 50.0, false),
-        (12.0, 0.75, 62.0, false),
-        (14.0, 0.15, 30.0, false),
-        (16.0, 0.15, 24.0, true),
-        (18.0, 0.9, 45.0, false),
-        (SECONDS, 0.9, 50.0, false),
+        // 離陸。**アフターバーナー全開**（タービンではここで点火する）。
+        (5.0, 1.0, 40.0, false),
+        (8.0, 1.0, 75.0, false),
+        // 軍用推力へ戻す。点火が切れるのが分かること。
+        (10.0, 0.75, 85.0, false),
+        (13.0, 0.75, 90.0, false),
+        // 減速して失速警報。
+        (15.0, 0.15, 40.0, false),
+        (17.0, 0.15, 30.0, true),
+        // 復行。**再点火の立ち上がりが聞きどころ。**
+        (19.0, 1.0, 55.0, false),
+        (SECONDS, 1.0, 80.0, false),
     ];
 
     let mut previous = key_frames[0];

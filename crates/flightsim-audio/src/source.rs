@@ -30,8 +30,7 @@ use bevy::audio::Decodable;
 use bevy::reflect::TypePath;
 
 use crate::dsp::SAMPLE_RATE;
-use crate::engine::EngineSpec;
-use crate::mixer::{DEFAULT_MASTER, FlightSound, Mixer};
+use crate::mixer::{DEFAULT_MASTER, EngineKind, FlightSound, Mixer};
 
 /// ECS と音の thread で共有する値。
 ///
@@ -122,14 +121,20 @@ fn load(slot: &AtomicU32) -> f64 {
 #[derive(Asset, TypePath, Debug, Clone)]
 pub struct FlightAudio {
     shared: Arc<SharedSound>,
-    spec: EngineSpec,
+    kind: EngineKind,
 }
 
 impl FlightAudio {
-    /// 共有状態と諸元から作る。
+    /// 共有状態と機種から作る。
     #[must_use]
-    pub const fn new(shared: Arc<SharedSound>, spec: EngineSpec) -> Self {
-        Self { shared, spec }
+    pub const fn new(shared: Arc<SharedSound>, kind: EngineKind) -> Self {
+        Self { shared, kind }
+    }
+
+    /// どの動力を鳴らすか。
+    #[must_use]
+    pub const fn kind(&self) -> EngineKind {
+        self.kind
     }
 
     /// 共有状態。
@@ -145,7 +150,7 @@ impl Decodable for FlightAudio {
 
     fn decoder(&self) -> Self::Decoder {
         FlightAudioStream {
-            mixer: Mixer::new(self.spec, DEFAULT_MASTER),
+            mixer: Mixer::new(self.kind, DEFAULT_MASTER),
             shared: Arc::clone(&self.shared),
         }
     }
@@ -207,7 +212,7 @@ mod tests {
     #[test]
     fn the_stream_never_ends() {
         // **終わる音源にすると、鳴り終わったあと二度と鳴らない。**
-        let audio = FlightAudio::new(shared(), EngineSpec::default());
+        let audio = FlightAudio::new(shared(), EngineKind::default());
         let stream = audio.decoder();
         assert_eq!(stream.total_duration(), None);
         assert_eq!(stream.current_frame_len(), None);
@@ -217,7 +222,7 @@ mod tests {
 
     #[test]
     fn the_stream_keeps_producing_samples() {
-        let audio = FlightAudio::new(shared(), EngineSpec::default());
+        let audio = FlightAudio::new(shared(), EngineKind::default());
         let mut stream = audio.decoder();
         for _ in 0..100_000 {
             let sample = stream.next().expect("the stream must not end");
@@ -270,7 +275,7 @@ mod tests {
     #[test]
     fn muting_through_the_shared_state_silences_the_stream() {
         let shared = shared();
-        let audio = FlightAudio::new(Arc::clone(&shared), EngineSpec::default());
+        let audio = FlightAudio::new(Arc::clone(&shared), EngineKind::default());
         let mut stream = audio.decoder();
         shared.set(FlightSound {
             throttle: 1.0,
@@ -304,7 +309,7 @@ mod tests {
     #[test]
     fn the_master_volume_reaches_the_stream() {
         let shared = shared();
-        let audio = FlightAudio::new(Arc::clone(&shared), EngineSpec::default());
+        let audio = FlightAudio::new(Arc::clone(&shared), EngineKind::default());
         let mut stream = audio.decoder();
         shared.set(FlightSound {
             throttle: 1.0,
