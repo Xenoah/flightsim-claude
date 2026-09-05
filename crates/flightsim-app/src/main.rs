@@ -287,6 +287,8 @@ struct Startup {
     difficulty: Difficulty,
     /// `--replay <FILE>` で再生する記録。指定があれば操縦を受け付けない。
     replay: Option<PathBuf>,
+    /// どの動力の音を鳴らすか。**音だけ。飛び方は変わらない。**
+    engine_sound: flightsim_audio::EngineKind,
     /// `--wind` が明示されたか。**難易度の既定で上書きしないため。**
     wind_was_given: bool,
     /// `--turbulence` が明示されたか。
@@ -351,6 +353,7 @@ impl Default for Startup {
             turbulence: flightsim_fdm::Turbulence::CALM,
             difficulty: Difficulty::default(),
             replay: None,
+            engine_sound: flightsim_audio::EngineKind::default(),
             wind_was_given: false,
             turbulence_was_given: false,
             start_hour: None,
@@ -443,6 +446,7 @@ fn main() {
         clock
     };
     let clouds = startup.clouds;
+    let engine_sound = startup.engine_sound;
     let conditions = recording_conditions(&startup, &clock);
     let playback = recording.map(|recording| ReplayPlayback {
         elapsed: Seconds(0.0),
@@ -475,6 +479,10 @@ fn main() {
     .insert_resource(startup)
     .insert_resource(diagnostics)
     .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+    .insert_resource(flightsim_audio::AudioSettings {
+        engine: engine_sound,
+        ..flightsim_audio::AudioSettings::default()
+    })
     .init_resource::<CameraRig>()
     // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
     .add_systems(Startup, (report_arguments, setup).chain())
@@ -650,6 +658,15 @@ fn parse_arguments_from(
             "--tiles" => match next_argument_value(&mut arguments) {
                 Some(path) => startup.tiles = Some(PathBuf::from(path)),
                 None => notes.push("--tiles needs a directory".to_owned()),
+            },
+            "--engine" => match next_argument_value(&mut arguments) {
+                Some(text) => match flightsim_audio::EngineKind::parse(&text) {
+                    Some(kind) => startup.engine_sound = kind,
+                    None => notes.push(format!(
+                        "unknown engine `{text}`; expected turbine or piston"
+                    )),
+                },
+                None => notes.push("--engine needs a kind".to_owned()),
             },
             "--replay" => match next_argument_value(&mut arguments) {
                 Some(path) => startup.replay = Some(PathBuf::from(path)),
@@ -3476,6 +3493,51 @@ mod tests {
                 "{args:?}: {notes:?}"
             );
         }
+    }
+
+    // --- 音の機種 ---
+
+    #[test]
+    fn the_engine_sound_can_be_chosen() {
+        let (startup, notes) = parse(&["--engine", "piston"]);
+        assert!(matches!(
+            startup.engine_sound,
+            flightsim_audio::EngineKind::Piston(_)
+        ));
+        assert!(notes.is_empty(), "{notes:?}");
+    }
+
+    #[test]
+    fn the_default_engine_sound_is_the_fighter() {
+        assert!(matches!(
+            Startup::default().engine_sound,
+            flightsim_audio::EngineKind::Turbine(_)
+        ));
+    }
+
+    #[test]
+    fn an_unknown_engine_is_reported_and_does_not_change_the_sound() {
+        // **黙って既定に戻さない。** 指定したのに効いていないことに
+        // 気付けないと、音が違う理由を探すことになる。
+        let (startup, notes) = parse(&["--engine", "rocket"]);
+        assert!(matches!(
+            startup.engine_sound,
+            flightsim_audio::EngineKind::Turbine(_)
+        ));
+        assert!(
+            notes.iter().any(|note| note.contains("rocket")),
+            "{notes:?}"
+        );
+    }
+
+    #[test]
+    fn an_engine_flag_without_a_kind_is_reported() {
+        let (startup, notes) = parse(&["--engine", "--difficulty", "beginner"]);
+        assert_eq!(startup.difficulty, Difficulty::Beginner);
+        assert!(
+            notes.iter().any(|note| note.contains("--engine")),
+            "{notes:?}"
+        );
     }
 
     // --- リプレイ ---
