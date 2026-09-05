@@ -32,3 +32,8 @@ desktop.ini
 
 # 合成 DEM とそこから焼いたタイル。作り直せるのでコミットしない。
 /data/synthetic.tif
+
+# 実行して作った飛行の記録と音。**成果物であって、ソースではない。**
+# `F9` の保存と `record_takeoff` / `render_engine` の例が既定でここへ書く。
+*.fsreplay
+*.wav
