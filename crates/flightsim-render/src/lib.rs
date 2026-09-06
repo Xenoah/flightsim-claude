@@ -59,6 +59,7 @@ use std::collections::HashMap;
 
 pub mod aircraft;
 pub mod apron;
+pub mod cockpit;
 pub mod daylight;
 pub mod holding_position;
 pub mod model;

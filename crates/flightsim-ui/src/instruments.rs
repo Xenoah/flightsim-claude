@@ -36,10 +36,14 @@ pub const INSTRUMENT_COUNT: usize = 6;
 /// **左下の操作説明と右下の飛行記録に挟まれる幅に収める。** 96 px だと
 /// 6 個並べて 606 px になり、画面中央に置くと操作説明へ食い込む
 /// （実機のスクリーンショットで確認した）。
-const DIAL_SIZE: f32 = 80.0;
+/// **3D の計器盤に開いた座ぐりと同じ間隔になる大きさ。**
+/// 実機の計器は 3.125 インチで、隣との中心間隔はその 1.12 倍。
+/// 目から 0.78 m・視野角 60 度・高さ 720 px の画面では 71 px になる。
+/// **ここを変えると盤の穴と計器がずれる。**
+const DIAL_SIZE: f32 = 64.0;
 
-/// 計器のあいだの隙間。
-const DIAL_GAP: f32 = 6.0;
+/// 計器のあいだの隙間。`DIAL_SIZE` と足して中心間隔 71 px になる値。
+const DIAL_GAP: f32 = 7.0;
 
 /// 針の長さ（直径に対する比）。
 const NEEDLE_LENGTH: f32 = 0.38;
@@ -108,16 +112,33 @@ impl Instrument {
 
     /// 実機の T 字配置での並び順。
     #[must_use]
+    /// 実機のシックスパックの並び。**上段の 3 つ、下段の 3 つ**の順。
+    ///
+    /// ```text
+    ///   IAS  ATT  ALT     上段
+    ///   PWR  HDG  V/S     下段
+    /// ```
+    ///
+    /// 実機（Cessna 172）の並びは上段が対気速度・姿勢・高度、下段が
+    /// **旋回計**・方位・昇降。**T 字配置**と呼ばれるのは、姿勢の真下に
+    /// 方位が来て縦棒を作るため。
+    ///
+    /// 下段左は実機なら旋回計だが、このシミュレータは旋回計を持たないので
+    /// **出力計を置いてある**。実機の 172 では出力計（回転計）は盤の右側に
+    /// あり、シックスパックの中には入らない。**ここは実機と違う。**
     pub const fn all() -> [Self; INSTRUMENT_COUNT] {
         [
             Self::Airspeed,
             Self::Attitude,
             Self::Altitude,
-            Self::VerticalSpeed,
-            Self::Heading,
             Self::Power,
+            Self::Heading,
+            Self::VerticalSpeed,
         ]
     }
+
+    /// 1 段に並ぶ数。**実機のシックスパックは 3 列 2 段。**
+    pub const COLUMNS: usize = 3;
 }
 
 /// 針 1 本の向き。**時計回りが正、真上が 0。**
@@ -361,18 +382,35 @@ pub struct DialFace;
 pub fn spawn_instrument_panel(mut commands: Commands) {
     #[allow(clippy::cast_precision_loss, reason = "計器は 6 個")]
     let panel_width =
-        DIAL_SIZE * INSTRUMENT_COUNT as f32 + DIAL_GAP * (INSTRUMENT_COUNT as f32 - 1.0);
+        DIAL_SIZE * Instrument::COLUMNS as f32 + DIAL_GAP * (Instrument::COLUMNS as f32 - 1.0);
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                // **操作説明（左下・9 行）の上へ逃がす。** 画面下端に置くと
-                // 幅を詰めても重なる（実機のスクリーンショットで確認した）。
-                // ウィンドウ幅に依らず衝突しない位置。
-                bottom: Val::Px(190.0),
+                // **3D の計器盤の上に載せる位置。**
+                //
+                // コックピット内装（`flightsim_render::cockpit`）の盤に
+                // 開いた 6 つの座ぐりへ重なるよう置いてある。あちらの
+                // `SIX_PACK_DROP`（目から 0.25 m 下）と対で決めた値で、
+                // **片方だけ動かすと計器が盤から浮く。**
+                //
+                // 実機の盤はもっと下にあるが、視野角 60 度では画面外へ
+                // 出てしまう。**人の視野（約 120 度）より狭いレンズで
+                // 見ているぶん、幾何どおりには置けない。**
+                //
+                // 左下の操作説明とはわずかに重なる領域があるが、
+                // その高さの行は短いので実害が無い（画面で確認した）。
+                bottom: Val::Px(93.0),
                 left: Val::Percent(50.0),
                 margin: UiRect::left(Val::Px(-panel_width / 2.0)),
+                // **3 列 2 段。** 実機のシックスパックの形。
+                display: Display::Grid,
+                grid_template_columns: vec![RepeatedGridTrack::px(
+                    u16::try_from(Instrument::COLUMNS).unwrap_or(3),
+                    DIAL_SIZE,
+                )],
                 column_gap: Val::Px(DIAL_GAP),
+                row_gap: Val::Px(DIAL_GAP),
                 ..default()
             },
             Visibility::Hidden,
