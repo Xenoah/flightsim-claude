@@ -68,7 +68,13 @@ impl TutorialStage {
             Self::Parked => "TAKE OFF\nPress PageUp to open the throttle.",
             Self::Accelerate => "ACCELERATING\nHold the runway heading straight ahead.",
             Self::Rotate => "ROTATE\nHold S to raise the nose and lift off.",
-            Self::Climb => "CLIMBING\nHold a steady climb with S.",
+            // **「S を握り続けろ」とは言わない。** 握り続けると機首が
+            // 上がりすぎて速度を失い、離した瞬間に落ちる。トリムを使えば
+            // 手を離していられることを、ここで教える。
+            Self::Climb => {
+                "CLIMBING
+Ease off S. Press ] to trim for hands-off flight."
+            }
             Self::Circuit => "PATTERN ALTITUDE\nTurn back toward the runway with A/D.",
             Self::Descend => "HEADING BACK\nEase off S and reduce throttle with PageDown.",
             Self::Approach => "FINAL APPROACH\nLine up on the runway and ease the throttle back.",
@@ -412,6 +418,7 @@ mod tests {
             roll: Radians(0.0),
             throttle,
             flaps: 0.0,
+            trim: 0.0,
             on_ground,
             terrain_available: true,
             view_mode: "CHASE",

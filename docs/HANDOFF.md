@@ -46,6 +46,7 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 風 | `--wind 270/10`（方位/ノット） |
 | 乱流 | `--turbulence light\|moderate\|severe` |
 | 音（エンジン・風切り・失速警報） | 既定で鳴る。毎標本その場で合成（ADR-0009）。ログに `audio: ... is playing` が出れば再生に届いている |
+| 昇降舵トリム | `[` / `]`。既定 0.09（約 75 kt）。**手を離したときの釣り合い速度**を決める |
 | 音の機種を選ぶ | `--engine turbine`（既定・戦闘機）/ `--engine piston`。**飛び方は変わらない**——FDM は 160 hp のピストン単発 |
 | 音を GUI 無しで聞く | `cargo run -p flightsim-audio --example render_engine -- flight.wav [piston\|turbine]` |
 | 墜落 | 沈下率 5 m/s・バンク 20 度・機首下げ 15 度を超えた接地。`--drop 40` で通せる |

@@ -72,6 +72,11 @@ pub struct HudState {
     pub roll: Radians,
     pub throttle: f64,
     pub flaps: f64,
+    /// 昇降舵トリム `[-1, 1]`。正で機首上げ＝遅い速度で釣り合う。
+    ///
+    /// **手を離したときの挙動を決めるのはこれ。** 見えないと、
+    /// なぜ勝手に機首が上がる（下がる）のかが分からない。
+    pub trim: f64,
     pub on_ground: bool,
     pub terrain_available: bool,
     pub view_mode: &'static str,
@@ -437,6 +442,7 @@ pub fn help_text() -> String {
         "Q/E ............... rudder",
         "PageUp/PageDown ... throttle",
         "F/G ............... flaps out / in",
+        "[ / ] ............. trim (hands-off speed)",
         "Space ............. wheel brakes",
         "C ................. change view",
         "H ................. hide / show the guide",
@@ -445,7 +451,8 @@ pub fn help_text() -> String {
         "R ................. restart this flight",
         "F9 ................ save this flight as a replay",
         "",
-        "Takeoff: throttle to full, hold S at about 60 kt.",
+        "Takeoff: throttle to full, hold S at about 60 kt,",
+        "then ease off. Trim with ] so it flies hands-off.",
     ]
     .join("\n")
 }
@@ -462,6 +469,16 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         "  [no terrain data]"
     };
 
+    // トリムが中立から離れているときだけ向きを添える。**符号だけでは
+    // どちらが機首上げか分からない。**
+    let trim_hint = if state.trim > 0.02 {
+        "  nose up"
+    } else if state.trim < -0.02 {
+        "  nose down"
+    } else {
+        ""
+    };
+
     format!(
         "IAS  {:>5.0} kt\n\
          ALT  {:>5.0} ft\n\
@@ -472,6 +489,8 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
          BNK  {:>5.1} deg\n\
          THR  {:>5.0} %\n\
          FLP  {:>5.0} %\n\
+         TRM  {:>5.2}{trim_hint}
+\
          WND  {}\n\
          VIEW {}{terrain}",
         values.airspeed.get(),
@@ -483,6 +502,7 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         values.roll_degrees,
         state.throttle * 100.0,
         state.flaps * 100.0,
+        state.trim,
         format_wind(state.wind_from, state.wind_speed),
         state.view_mode,
     )
@@ -563,6 +583,7 @@ mod tests {
             roll: Radians(-0.1),
             throttle: 0.75,
             flaps: 0.0,
+            trim: 0.0,
             on_ground: false,
             terrain_available: true,
             view_mode: "COCKPIT",

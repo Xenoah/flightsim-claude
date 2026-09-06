@@ -195,6 +195,87 @@ pub struct PilotKeys {
     pub flaps_extend: bool,
     pub flaps_retract: bool,
     pub brakes: bool,
+    /// トリムを機首上げ側へ（遅い速度で釣り合う）。
+    pub trim_up: bool,
+    /// トリムを機首下げ側へ（速い速度で釣り合う）。
+    pub trim_down: bool,
+}
+
+/// 昇降舵トリム。
+///
+/// # なぜ要るのか
+///
+/// **舵から手を離すと機体は「舵中立で釣り合う速度」へ向かう。** この機体では
+/// それが約 107 kt で、離陸直後の 75 kt からは大きく機首を下げて加速しようと
+/// する。高度があれば長周期振動が減衰して落ち着くが、**離陸直後は最初の
+/// 一振りで地面に届く**（実測: 60 m で手を離すと 8.8 秒後に接地）。
+///
+/// 実機に必ずトリムが付いているのはこのためで、無いほうが不自然だった。
+///
+/// # 何をするものか
+///
+/// 昇降舵に足し込まれる、中立へ戻らない量。**これで釣り合う速度が決まる。**
+/// 正で機首上げ＝遅い速度で釣り合う。
+///
+/// | トリム | 釣り合う迎角 | おおよその速度 |
+/// |---|---|---|
+/// | 0.00 | 0.97° | 107 kt |
+/// | 0.09 | 4.3° | 75 kt |
+/// | 0.20 | 8.4° | 58 kt |
+///
+/// 値は `AircraftConfig::light_single` の係数から解いたもの
+/// （`Cm = pitch_zero + pitch_alpha·α + pitch_elevator·δe = 0`）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElevatorTrim {
+    value: f64,
+    /// キー 1 秒あたりの変化量。**速すぎると狙った速度に置けない。**
+    rate: f64,
+}
+
+impl Default for ElevatorTrim {
+    fn default() -> Self {
+        // 0.09 で約 75 kt。**離陸直後に手を離しても落ちない**ところに置く。
+        // 0 のままだと 107 kt へ向かって機首を下げる。
+        Self::new(0.09, 0.12)
+    }
+}
+
+impl ElevatorTrim {
+    /// 初期値と変化率から作る。
+    ///
+    /// # Panics
+    ///
+    /// `rate` が有限の非負値でない場合。
+    #[must_use]
+    pub fn new(initial: f64, rate: f64) -> Self {
+        assert!(
+            rate.is_finite() && rate >= 0.0,
+            "trim rate must be finite and non-negative, got {rate}"
+        );
+        Self {
+            value: sanitise(initial),
+            rate,
+        }
+    }
+
+    /// 現在のトリム。
+    #[must_use]
+    pub const fn value(self) -> f64 {
+        self.value
+    }
+
+    /// 直接置く。**やり直しと自動トリムが使う。**
+    pub fn set(&mut self, value: f64) {
+        self.value = sanitise(value);
+    }
+
+    /// キー入力で 1 フレームぶん動かす。
+    pub fn update(&mut self, dt: Seconds, nose_up: bool, nose_down: bool) {
+        let direction = f64::from(i8::from(nose_up) - i8::from(nose_down));
+        if direction.abs() > 0.0 {
+            self.value = sanitise(self.value + direction * self.rate * dt.get());
+        }
+    }
 }
 
 /// 操縦入力の現在値。
@@ -205,6 +286,8 @@ pub struct PilotControls {
     pub rudder: AxisState,
     pub throttle: RampAxis,
     pub flaps: RampAxis,
+    /// 昇降舵トリム。**中立へ戻らない。**
+    pub trim: ElevatorTrim,
     brakes: f64,
 }
 
@@ -218,6 +301,7 @@ impl Default for PilotControls {
             throttle: RampAxis::new(0.0, 0.25),
             // フラップは 5 秒で全展開。
             flaps: RampAxis::new(0.0, 0.2),
+            trim: ElevatorTrim::default(),
             brakes: 0.0,
         }
     }
@@ -232,6 +316,7 @@ impl PilotControls {
         self.throttle
             .update(dt, keys.throttle_up, keys.throttle_down);
         self.flaps.update(dt, keys.flaps_extend, keys.flaps_retract);
+        self.trim.update(dt, keys.trim_up, keys.trim_down);
         // ブレーキは踏んでいる間だけ。中間状態を持たせても操作感が悪くなるだけ。
         self.brakes = f64::from(u8::from(keys.brakes));
     }
@@ -315,12 +400,22 @@ impl PilotControls {
     pub fn to_control_inputs(self) -> ControlInputs {
         ControlInputs::new(
             self.aileron.value(),
-            self.elevator.value(),
+            self.effective_elevator(),
             self.rudder.value(),
             self.throttle.value(),
             self.flaps.value(),
         )
         .with_brakes(self.brakes)
+    }
+
+    /// 実際に舵面へ行く昇降舵。**操縦桿 + トリム。**
+    ///
+    /// 範囲外は `ControlInputs` 側で丸められるが、ここでも丸めておく。
+    /// **足した結果を見たいのは操縦する側**（HUD と自動トリム）なので、
+    /// 丸めた値を返す。
+    #[must_use]
+    pub fn effective_elevator(self) -> f64 {
+        sanitise(self.elevator.value() + self.trim.value())
     }
 }
 
@@ -395,6 +490,9 @@ pub fn read_pilot_keys(
         yaw_left: keyboard.pressed(KeyCode::KeyQ),
         throttle_up: keyboard.pressed(KeyCode::PageUp) || keyboard.pressed(KeyCode::Equal),
         throttle_down: keyboard.pressed(KeyCode::PageDown) || keyboard.pressed(KeyCode::Minus),
+        // トリム。**手を離しても釣り合う速度を決める。**
+        trim_up: keyboard.pressed(KeyCode::BracketRight),
+        trim_down: keyboard.pressed(KeyCode::BracketLeft),
         flaps_extend: keyboard.pressed(KeyCode::KeyF),
         flaps_retract: keyboard.pressed(KeyCode::KeyG),
         brakes: keyboard.pressed(KeyCode::Space),
@@ -641,6 +739,94 @@ mod tests {
             "the surface settled at {} instead of neutral",
             axis.value()
         );
+    }
+
+    // --- 昇降舵トリム ---
+
+    #[test]
+    fn the_trim_does_not_return_to_neutral() {
+        // **中立へ戻ったらトリムではない。** 手を離しても効き続けることが要点。
+        let mut trim = ElevatorTrim::new(0.0, 0.12);
+        trim.update(Seconds(1.0), true, false);
+        let set = trim.value();
+        assert!(set > 0.0);
+        for _ in 0..600 {
+            trim.update(Seconds(1.0 / 60.0), false, false);
+        }
+        assert!(
+            (trim.value() - set).abs() < 1e-12,
+            "the trim drifted from {set} to {}",
+            trim.value()
+        );
+    }
+
+    #[test]
+    fn the_trim_moves_both_ways_and_stays_in_range() {
+        let mut trim = ElevatorTrim::new(0.0, 0.5);
+        for _ in 0..600 {
+            trim.update(Seconds(1.0 / 60.0), true, false);
+        }
+        assert!((trim.value() - 1.0).abs() < 1e-9, "got {}", trim.value());
+        for _ in 0..1_200 {
+            trim.update(Seconds(1.0 / 60.0), false, true);
+        }
+        assert!((trim.value() + 1.0).abs() < 1e-9, "got {}", trim.value());
+    }
+
+    #[test]
+    fn pressing_both_trim_keys_cancels_out() {
+        let mut trim = ElevatorTrim::new(0.2, 0.5);
+        trim.update(Seconds(1.0), true, true);
+        assert!((trim.value() - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_default_trim_is_nose_up_so_it_flies_hands_off() {
+        // **0 のままだと、手を離した機体は 107 kt へ向けて機首を下げる。**
+        // 離陸直後の高度ではそれが接地になる（`flightsim-sim` の
+        // `tests/hands_off.rs` で測ってある）。
+        let trim = ElevatorTrim::default();
+        assert!(
+            trim.value() > 0.0,
+            "the default trim must hold the nose up, got {}",
+            trim.value()
+        );
+        assert!(
+            trim.value() < 0.2,
+            "but not so much that it interferes with the take-off roll, got {}",
+            trim.value()
+        );
+    }
+
+    #[test]
+    fn the_trim_is_added_to_the_stick() {
+        let mut controls = PilotControls::default();
+        controls.trim.set(0.1);
+        controls.elevator.set_absolute(0.3);
+        assert!((controls.effective_elevator() - 0.4).abs() < 1e-12);
+        // 舵面へ渡る値にも入っていること。**ここが抜けるとトリックが効かない。**
+        assert!((controls.to_control_inputs().elevator() - 0.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_effective_elevator_never_leaves_the_surface_range() {
+        // トリムと操縦桿を足すと 1 を超えうる。**舵は 1 までしか動かない。**
+        let mut controls = PilotControls::default();
+        controls.trim.set(0.8);
+        controls.elevator.set_absolute(1.0);
+        assert!((controls.effective_elevator() - 1.0).abs() < 1e-12);
+        controls.trim.set(-0.8);
+        controls.elevator.set_absolute(-1.0);
+        assert!((controls.effective_elevator() + 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_broken_trim_value_is_refused() {
+        let mut trim = ElevatorTrim::default();
+        trim.set(f64::NAN);
+        assert!(trim.value().is_finite(), "got {}", trim.value());
+        trim.set(f64::INFINITY);
+        assert!((-1.0..=1.0).contains(&trim.value()), "got {}", trim.value());
     }
 
     #[test]
