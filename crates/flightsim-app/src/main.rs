@@ -2866,6 +2866,7 @@ fn publish_hud(
 ) {
     // 再生中に手元の操縦桿を映すと、機体が加速しているのにスロットル 0% と
     // 出る。**表示は今飛んでいる機体のものでなければ意味がない。**
+    let playback_active = playback.is_some();
     let shown = playback.map_or_else(
         || (controls.throttle.value(), controls.flaps.value()),
         |playback| {
@@ -2892,6 +2893,13 @@ fn publish_hud(
         roll: interpolated.attitude.roll,
         throttle: shown.0,
         flaps: shown.1,
+        // **再生中も手元のトリムを映さない。** 記録側の実効舵に
+        // トリムが含まれているので、ここで足すと二重になる。
+        trim: if playback_active {
+            0.0
+        } else {
+            controls.trim.value()
+        },
         // 脚の長さぶん余裕を見る。重心の対地高度なので接地時でも 1 m 前後ある。
         on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
         terrain_available: ground.from_terrain,
