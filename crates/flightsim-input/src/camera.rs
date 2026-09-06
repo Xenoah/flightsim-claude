@@ -71,7 +71,12 @@ impl Default for CameraRig {
             chase_height: Meters(10.0),
             follow_time_constant: Seconds(0.25),
             // 軽single機の目線。重心より少し前、やや上。
-            eye_offset: [Meters(0.6), Meters::ZERO, Meters(-0.9)],
+            //
+            // **左席に座る。** Cessna 172 は左が機長席で、計器盤の
+            // シックスパックもその正面に並ぶ。中心線に座らせると、
+            // 内装の計器盤が右にずれて見える
+            // （`flightsim_render::cockpit::PILOT_SEAT_OFFSET` と揃えてある）。
+            eye_offset: [Meters(0.6), Meters(-0.25), Meters(-0.9)],
             smoothed: Vec3::ZERO,
             initialised: false,
         }

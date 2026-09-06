@@ -398,6 +398,13 @@ struct Aircraft;
 #[derive(Component, Debug, Clone, Copy)]
 struct ExteriorModel;
 
+/// コックピット内装の印。
+///
+/// **外形とは逆で、コックピット視点でだけ出す。** 外から見えると、
+/// 機体の中に箱が浮いているように見える。
+#[derive(Component, Debug, Clone, Copy)]
+struct InteriorModel;
+
 /// 読み込み待ちのモデル。寸法が分かった時点で倍率を決める。
 ///
 /// glTF は非同期に読み込まれるので、spawn した瞬間には大きさが分からない。
@@ -1407,20 +1414,34 @@ const fn shows_exterior(mode: ViewMode) -> bool {
     !matches!(mode, ViewMode::Cockpit)
 }
 
-/// 視点に応じて機体の外形を出し入れする。
+/// 視点に応じて機体の外形と内装を出し入れする。
+///
+/// **外形と内装は排他。** 同時に出すと、外からは箱が浮いて見え、
+/// 中からは自分の胴体で視界が塞がる。
 fn update_model_visibility(
     mode: Res<ViewMode>,
-    mut models: Query<&mut Visibility, With<ExteriorModel>>,
+    mut models: Query<&mut Visibility, (With<ExteriorModel>, Without<InteriorModel>)>,
+    mut interior: Query<&mut Visibility, (With<InteriorModel>, Without<ExteriorModel>)>,
 ) {
-    let wanted = if shows_exterior(*mode) {
+    let exterior_wanted = if shows_exterior(*mode) {
         Visibility::Inherited
     } else {
         Visibility::Hidden
     };
+    let interior_wanted = if shows_exterior(*mode) {
+        Visibility::Hidden
+    } else {
+        Visibility::Inherited
+    };
+    for mut visibility in &mut interior {
+        if *visibility != interior_wanted {
+            *visibility = interior_wanted;
+        }
+    }
     for mut visibility in &mut models {
         // 毎フレーム書き込むと変更検知が無駄に走る。
-        if *visibility != wanted {
-            *visibility = wanted;
+        if *visibility != exterior_wanted {
+            *visibility = exterior_wanted;
         }
     }
 }
@@ -1931,7 +1952,9 @@ fn make_source(startup: &Startup) -> BoxedSource {
 fn perspective() -> PerspectiveProjection {
     PerspectiveProjection {
         fov: Degrees(60.0).to_radians().get() as f32,
-        near: 0.5,
+        // **内装が入るので近くまで映す必要がある。** 0.5 m だと
+        // 操縦輪（目から 0.48 m）が切り取られて消えた。
+        near: 0.05,
         far: flightsim_render::default_far_plane().get() as f32,
         ..default()
     }
@@ -1945,6 +1968,7 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     startup: Res<Startup>,
+    camera_rig: Res<CameraRig>,
     config: Res<TerrainRenderConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -2528,6 +2552,36 @@ fn setup(
             .collect(),
     };
 
+    // コックピット内装。**目の位置を渡す**（重心基準に置くと、目を
+    // 動かしたときに顔が計器盤にめり込む）。
+    let mut parts = parts;
+    let interior = flightsim_render::cockpit::interior_parts(camera_rig.eye_offset);
+    info!("cockpit: {} interior parts", interior.len());
+    for part in interior {
+        parts.push(
+            commands
+                .spawn((
+                    Mesh3d(meshes.add(part.mesh)),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: part.color,
+                        // 内装は艶を抑える。**光沢があると樹脂に見えない。**
+                        perceptual_roughness: 0.85,
+                        emissive: if part.emissive {
+                            LinearRgba::from(part.color) * 0.6
+                        } else {
+                            LinearRgba::BLACK
+                        },
+                        ..default()
+                    })),
+                    InteriorModel,
+                    part.transform,
+                    Visibility::Hidden,
+                    Name::new(part.name),
+                ))
+                .id(),
+        );
+    }
+
     commands
         .spawn((
             Aircraft,
@@ -2672,14 +2726,23 @@ fn update_camera(
     match *mode {
         ViewMode::Cockpit => {
             // 機体に固定。平滑化しない（頭が揺れると酔う）。
+            //
+            // **`eye_offset` は機体軸（前・右・下）のまま渡す。**
+            // `aircraft.rotation` は `rotation_to_render` が作った
+            // 「機体軸 → 描画座標」の回転なので、ここで軸を組み替えると
+            // 二重に変換される。
+            //
+            // 以前ここで `(前, -下, -右)` に並べ替えていた。既定の
+            // `[0.6, 0, -0.9]` では目が「上 0.9 m」ではなく
+            // **「右 0.9 m」** に置かれていた（内装を入れて初めて分かった）。
             #[allow(
                 clippy::cast_possible_truncation,
                 reason = "目線オフセットは数メートル。f32 で十分"
             )]
             let offset = Vec3::new(
                 rig.eye_offset[0].get() as f32,
-                -rig.eye_offset[2].get() as f32,
-                -rig.eye_offset[1].get() as f32,
+                rig.eye_offset[1].get() as f32,
+                rig.eye_offset[2].get() as f32,
             );
             camera.translation = aircraft.translation + aircraft.rotation * offset;
             camera.rotation = aircraft.rotation * flightsim_render::body_to_camera_rotation();
