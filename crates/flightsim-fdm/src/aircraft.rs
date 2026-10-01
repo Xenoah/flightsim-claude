@@ -300,11 +300,17 @@ impl MassProperties {
         moment_zz: f64,
         product_xz: f64,
     ) -> Self {
-        assert!(mass.get() > 0.0, "mass must be positive, got {mass}");
         assert!(
-            moment_xx > 0.0 && moment_yy > 0.0 && moment_zz > 0.0,
+            mass.get().is_finite() && mass.get() > 0.0,
+            "mass must be positive and finite, got {mass}"
+        );
+        assert!(
+            [moment_xx, moment_yy, moment_zz]
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0),
             "principal moments of inertia must be positive, got ({moment_xx}, {moment_yy}, {moment_zz})"
         );
+        assert!(product_xz.is_finite(), "product of inertia must be finite");
 
         // 慣性テンソル。慣性乗積は定義上マイナス符号で入る。
         let inertia = DMat3::from_cols_array(&[
@@ -321,8 +327,8 @@ impl MassProperties {
 
         let determinant = inertia.determinant();
         assert!(
-            determinant.abs() > f64::EPSILON,
-            "inertia tensor is singular (determinant {determinant}); \
+            determinant.is_finite() && determinant > f64::EPSILON,
+            "inertia tensor is singular or not positive definite (determinant {determinant}); \
              check that the product of inertia is smaller than the principal moments"
         );
 
@@ -629,6 +635,18 @@ mod tests {
     #[should_panic(expected = "principal moments of inertia must be positive")]
     fn zero_inertia_is_rejected() {
         let _ = MassProperties::new(Kilograms(1.0), 0.0, 1.0, 1.0, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "mass must be positive")]
+    fn infinite_mass_is_rejected() {
+        let _ = MassProperties::new(Kilograms(f64::INFINITY), 1.0, 1.0, 1.0, 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "not positive definite")]
+    fn invertible_but_indefinite_inertia_is_rejected() {
+        let _ = MassProperties::new(Kilograms(1000.0), 10.0, 10.0, 10.0, 20.0);
     }
 
     #[test]

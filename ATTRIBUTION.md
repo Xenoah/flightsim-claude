@@ -111,3 +111,9 @@ CC BY 4.0。https://esa-worldcover.org/
 `flightsim-app` の実行時依存には載らない（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
 本プロジェクト自体は [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) です。
+
+## Original Swift Sport aircraft (2026-10-01)
+
+`assets/aircraft/swift_sport.glb` and its editable `.blend` are original procedural geometry created for this repository in Blender 4.3.2. The reproducible source is `tools/blender/build_swift_sport.py`. No third-party mesh, texture, logo or branded aircraft design is included. These assets and the source script use this repository's MIT OR Apache-2.0 license.
+
+Swift Sport is a generic two-seat sport aircraft, not certified data for any real aircraft. Its representative dynamics, camera and input settings are in `assets/aircraft/swift_sport.json`; the external model measures approximately 7.12 m long and 9.4 m span. The legacy Light Single model keeps its existing attribution and redistribution terms.
