@@ -35,3 +35,5 @@ Only the active pure-Rust zlib backend is exposed by this local fork. Optional
 native zlib/zlib-ng feature switches are omitted to avoid adding unused native
 build dependencies to the workspace lockfile. Decoding behavior of the existing
 default rust-zlib feature is unchanged.
+
+The fork is stored at repository-root vendor/osmpbf, outside workspace member directories. Cargo issue #6745 makes excludes nested below a member ineffective; cargo metadata confirms this fork is not an application workspace member. The inherited Some(None) rustdoc link was corrected to a code span.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-exclude = ["crates/flightsim-tilegen/vendor/osmpbf"]
+exclude = ["vendor/osmpbf"]
 members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
