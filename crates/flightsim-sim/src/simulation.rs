@@ -153,6 +153,10 @@ pub struct Simulation<S: TileSource> {
     terrain: Terrain<S>,
     sampler: GroundSampler,
     fixed: FixedStep,
+    /// 消化した物理ステップの時刻。フレーム単位で先に進む `fixed.elapsed()` を
+    /// 乱流に使うと、同じ入力でも描画フレームの割り方で突風が変わってしまう。
+    /// 1 ステップずつ同じ順序で加算し、浮動小数点の丸めもフレームから独立させる。
+    physics_elapsed: Seconds,
     /// 補間の始点。物理を進める直前の状態。
     previous: RigidBodyState,
     ground: GroundPlane,
@@ -198,6 +202,7 @@ impl<S: TileSource> Simulation<S> {
             terrain,
             sampler,
             fixed: FixedStep::new(RECOMMENDED_FIXED_DT),
+            physics_elapsed: Seconds::ZERO,
             previous: state,
             ground,
             diverged: false,
@@ -231,6 +236,7 @@ impl<S: TileSource> Simulation<S> {
             terrain,
             sampler,
             fixed: FixedStep::new(RECOMMENDED_FIXED_DT),
+            physics_elapsed: Seconds::ZERO,
             previous: state,
             ground,
             diverged: false,
@@ -298,6 +304,7 @@ impl<S: TileSource> Simulation<S> {
         self.last_touchdown = None;
         self.touchdown_count = 0;
         self.fixed = FixedStep::new(RECOMMENDED_FIXED_DT);
+        self.physics_elapsed = Seconds::ZERO;
     }
 
     /// 滑走路上の静止状態からやり直す。
@@ -352,6 +359,10 @@ impl<S: TileSource> Simulation<S> {
             self.ground = self.sampler.sample(&mut self.terrain, state.geodetic());
             terrain_missing |= !self.ground.from_terrain;
 
+            // 既存の 120 Hz 呼び出しと同じくステップ終端の時刻で場をサンプルする。
+            // フレーム内に複数ステップあっても、それぞれ別の時刻を使う。
+            self.physics_elapsed += self.fixed.fixed_dt();
+
             // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
             // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
             // 擬似乱数列で、ここではなく Wind の生成側で行う）。
@@ -402,7 +413,7 @@ impl<S: TileSource> Simulation<S> {
                     ground_speed: before.ground_speed(),
                     bank: attitude.roll,
                     heading: attitude.yaw,
-                    elapsed: self.fixed.elapsed(),
+                    elapsed: self.physics_elapsed,
                 });
                 self.touchdown_count = self.touchdown_count.saturating_add(1);
                 self.log.landings = self.touchdown_count;
@@ -416,7 +427,7 @@ impl<S: TileSource> Simulation<S> {
                     self.crash = Some(crate::Crash {
                         cause,
                         position: state.geodetic(),
-                        elapsed: self.fixed.elapsed(),
+                        elapsed: self.physics_elapsed,
                     });
                 }
             }
@@ -468,9 +479,8 @@ impl<S: TileSource> Simulation<S> {
     /// 失速も揚力も対気速度で決まるので、計器に出すのはこちら。
     #[must_use]
     pub fn airspeed(&self) -> MetersPerSecond {
-        let wind = flightsim_core::LocalFrame::new(self.dynamics.state().geodetic())
-            .ned_to_ecef_vector(self.wind.to_ned());
-        MetersPerSecond((self.dynamics.state().velocity - wind).length())
+        // 計器も空力・失速判定と同じ瞬間の定常風と乱流を差し引く。
+        self.aero_angles().true_airspeed
     }
 
     /// 乱流を設定する。
@@ -506,7 +516,7 @@ impl<S: TileSource> Simulation<S> {
         // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
         // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
         Environment::with_wind_ned(Atmosphere::standard(), state.geodetic(), self.wind.to_ned())
-            .with_turbulence(self.turbulence, self.fixed.elapsed(), state.geodetic())
+            .with_turbulence(self.turbulence, self.physics_elapsed, state.geodetic())
             .with_ground_plane(
                 self.ground.reference,
                 self.ground.elevation,
@@ -666,7 +676,7 @@ impl<S: TileSource> Simulation<S> {
     /// 経過したシミュレーション時間。
     #[must_use]
     pub const fn elapsed(&self) -> Seconds {
-        self.fixed.elapsed()
+        self.physics_elapsed
     }
 
     /// 状態が非有限になったか。

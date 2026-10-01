@@ -20,11 +20,20 @@
 //!
 //! # 強度の目安
 //!
-//! 航空気象の慣習に倣い、RMS 風速（m/s）で段階を決める。
-//! 実機の目安は Light が 1〜2、Moderate が 2〜4、Severe が 4 以上。
+//! Light / Moderate / Severe はゲーム内の強度プリセットであり、気象の実測値や
+//! 航空機の運動に基づく乱気流区分へ校正したものではない。
+//! `intensity` は水平各成分の振幅上限（m/s）。補間した値ノイズの RMS ではなく、
+//! 実際の RMS は飛行経路・時刻・シードによってこの値より小さくなる。
+//!
+//! # 場の互換性
+//!
+//! 2026-10-01 に座標とベクトルの基準を ECEF へ変更し、日付変更線と極の不連続を
+//! 修正した。同じ seed でも旧版とは別の場になるため、旧版の乱流入りリプレイの
+//! 軌跡は一致しない。同一版・同一入力の決定論は維持する。
 
 use crate::Environment;
-use flightsim_core::{Geodetic, MetersPerSecond, Ned, Seconds};
+use flightsim_core::{Geodetic, LocalFrame, MetersPerSecond, Ned, Seconds};
+use glam::DVec3;
 
 /// 空間相関長。この距離だけ離れると擾乱がほぼ無相関になる。
 ///
@@ -48,7 +57,8 @@ const VERTICAL_RATIO: f64 = 0.7;
 /// 乱流の強さ。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Turbulence {
-    /// 擾乱の RMS 風速。0 なら無乱流。
+    /// 水平各成分の振幅上限（RMS ではない）。上下成分の上限はこの 0.7 倍。
+    /// 0 以下または非有限なら無乱流。
     pub intensity: MetersPerSecond,
     /// 場を決める種。**変えると別の大気になる。**
     pub seed: u64,
@@ -127,23 +137,48 @@ impl Turbulence {
             return Ned::new(0.0, 0.0, 0.0);
         }
 
-        // 測地座標をおおよそのメートルへ。**厳密な変換は要らない**
-        // （乱流の場は元より恣意的で、必要なのは滑らかさと相関長だけ）。
-        // 緯度 1 rad ≒ 6.37e6 m、経度は cos(緯度) 倍。
-        const EARTH_RADIUS: f64 = 6_371_000.0;
-        let north = latitude * EARTH_RADIUS / CORRELATION_LENGTH;
-        let east = longitude * EARTH_RADIUS * latitude.cos() / CORRELATION_LENGTH;
-        let up = altitude / CORRELATION_LENGTH;
+        // 世界で連続な ECEF 座標を core から得る。緯度・経度を直接ノイズ座標に
+        // すると日付変更線で場が切れ、NED 成分として生成すると極でベクトルが回る。
+        // 座標だけでなく、生成するベクトルの基準も ECEF に固定する。
+        let point = position.to_ecef().as_vec() / CORRELATION_LENGTH;
+        if !point.is_finite() {
+            return Ned::new(0.0, 0.0, 0.0);
+        }
         let phase = time / CORRELATION_TIME;
 
         // 3 軸それぞれ別の種で引く。同じ種だと 3 成分が同位相になり、
         // 揺れが一直線になる。
-        let horizontal = intensity;
-        let vertical = intensity * VERTICAL_RATIO;
+        let field = DVec3::new(
+            noise4(
+                self.seed ^ 0x9E37_79B9_7F4A_7C15,
+                point.x,
+                point.y,
+                point.z,
+                phase,
+            ),
+            noise4(
+                self.seed ^ 0xBF58_476D_1CE4_E5B9,
+                point.x,
+                point.y,
+                point.z,
+                phase,
+            ),
+            noise4(
+                self.seed ^ 0x94D0_49BB_1331_11EB,
+                point.x,
+                point.y,
+                point.z,
+                phase,
+            ),
+        )
+        // 回転後の各成分も [-1, 1] に収める。NED で成分ごとにクランプすると
+        // 極の任意なローカル軸に依存するため、世界ベクトルの長さを制限する。
+        .clamp_length_max(1.0);
+        let local = LocalFrame::new(position).ecef_to_ned_vector(field);
         Ned::new(
-            horizontal * noise4(self.seed ^ 0x9E37_79B9_7F4A_7C15, north, east, up, phase),
-            horizontal * noise4(self.seed ^ 0xBF58_476D_1CE4_E5B9, north, east, up, phase),
-            vertical * noise4(self.seed ^ 0x94D0_49BB_1331_11EB, north, east, up, phase),
+            intensity * local.north(),
+            intensity * local.east(),
+            intensity * VERTICAL_RATIO * local.down(),
         )
     }
 }
