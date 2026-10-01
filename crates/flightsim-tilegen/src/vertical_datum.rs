@@ -17,9 +17,9 @@
 //!
 //! # ここで扱う範囲
 //!
-//! **識別と、黙って誤用しないこと**までを扱う。実際のジオイド高の
-//! 適用（EGM2008 の展開、またはジオイド格子の読み込み）は、
-//! データ源とその権利を決めてからの別の作業。
+//! 識別と、黙って誤用しないことを扱う。EGM2008 / EGM96 の変換には
+//! [`crate::geoid`] で利用者が指定した GeographicLib PGM 格子を使う。
+//! 格子を同梱・自動取得はしない。
 //!
 //! 「変換できないので楕円体高として使う」を**利用者が明示的に選んだ**
 //! ときだけ通す。既定では拒否する。
@@ -32,7 +32,7 @@ pub const VERTICAL_CS_TYPE_GEO_KEY: u16 = 4096;
 /// EPSG:4979 — WGS84 の 3 次元測地座標系。高さは楕円体高。
 pub const EPSG_WGS84_ELLIPSOIDAL_3D: u16 = 4979;
 
-/// EPSG:5030 — WGS84 楕円体を鉛直基準として使う。
+/// Legacy GeoTIFF 1.0 code 5030 for WGS84 ellipsoidal height (not a current EPSG CRS).
 pub const EPSG_WGS84_ELLIPSOID_HEIGHT: u16 = 5030;
 
 /// EPSG:3855 — EGM2008 ジオイド高。**Copernicus DEM GLO-30 の基準。**
@@ -162,8 +162,9 @@ impl fmt::Display for VerticalDatumMismatch {
              `.fsdem` stores WGS84 ellipsoidal heights, because `Geodetic::altitude` \
              is defined that way (ADR-0002).\n\
              \n\
-             There is no geoid model in this build, so the conversion cannot be done here. \
-             Either supply a DEM already in ellipsoidal heights, or pass \
+             For EGM2008 or EGM96, supply a matching local GeographicLib PGM grid using \
+             `--geoid-grid <PGM> --geoid-model egm2008|egm96`, or supply a DEM already \
+             in ellipsoidal heights. Otherwise pass \
              `--assume-ellipsoidal` to bake the values unchanged and accept the \
              systematic error."
         )

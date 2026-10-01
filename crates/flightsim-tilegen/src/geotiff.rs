@@ -37,6 +37,8 @@ pub enum RasterError {
     UnsupportedSampleFormat { path: PathBuf, description: String },
     /// 画素サイズが 0 または負、寸法が 2 未満など。
     DegenerateGeometry { path: PathBuf, reason: String },
+    /// Malformed, unsupported or contradictory CRS/unit metadata.
+    UnsupportedGeoreference { path: PathBuf, reason: String },
 }
 
 impl core::fmt::Display for RasterError {
@@ -73,6 +75,11 @@ impl core::fmt::Display for RasterError {
                     path.display()
                 )
             }
+            Self::UnsupportedGeoreference { path, reason } => write!(
+                formatter,
+                "{} has unsupported georeference: {reason}",
+                path.display()
+            ),
         }
     }
 }
@@ -118,8 +125,8 @@ pub struct GeoRaster {
     nodata: Option<f32>,
     /// 高さが何を基準にしているか。
     ///
-    /// **読み取るだけで、ここでは変換しない。** 変換にはジオイドモデルが
-    /// 要る（[`crate::vertical_datum`]）。
+    /// Decoding records the source datum; explicit normalization changes it
+    /// only after all pixels have been corrected with a matching geoid model.
     vertical_datum: VerticalDatum,
 }
 
@@ -177,11 +184,11 @@ impl GeoRaster {
                 tag: "ModelTiepointTag (33922)",
             })?;
 
-        if scale.len() < 2 || tiepoint.len() < 6 {
+        if scale.len() != 3 || tiepoint.len() != 6 {
             return Err(RasterError::DegenerateGeometry {
                 path: path.to_path_buf(),
                 reason: format!(
-                    "ModelPixelScale has {} values and ModelTiepoint has {}; expected >= 2 and >= 6",
+                    "ModelPixelScale has {} values and ModelTiepoint has {}; expected 3 and 6",
                     scale.len(),
                     tiepoint.len()
                 ),
@@ -189,11 +196,41 @@ impl GeoRaster {
         }
 
         // GeoTIFF は投影座標系も表せる。度として読むと全く違う場所になるので検査する。
+        let metadata_error = |reason| RasterError::UnsupportedGeoreference {
+            path: path.to_path_buf(),
+            reason,
+        };
+        // GeoTIFF can map elevation samples with ScaleZ and the tiepoint's
+        // raster/model Z coordinates. This reader uses samples as metres, so
+        // only conventional unspecified (zero) or identity Z scaling is safe.
+        // Reject other transforms rather than silently dropping their height
+        // offset/scale, including when an explicit datum override is requested.
+        #[allow(
+            clippy::float_cmp,
+            reason = "exact identity metadata, not measured values"
+        )]
+        if !matches!(scale[2], 0.0 | 1.0) || tiepoint[2] != 0.0 || tiepoint[5] != 0.0 {
+            return Err(metadata_error(
+                "nontrivial or non-finite vertical georeference is unsupported; require ScaleZ 0 or 1 and zero raster/model tiepoint Z".to_owned(),
+            ));
+        }
+        if decoder
+            .find_tag(Tag::ModelTransformationTag)
+            .map_err(tiff_error)?
+            .is_some()
+        {
+            return Err(metadata_error(
+                "ModelTransformationTag is not supported; provide a north-up WGS84 raster"
+                    .to_owned(),
+            ));
+        }
         let geo_keys = decoder
             .get_tag_u16_vec(Tag::GeoKeyDirectoryTag)
-            .unwrap_or_default();
+            .map_err(|_| metadata_error("missing or unreadable GeoKeyDirectoryTag".to_owned()))?;
+        validate_geo_keys(&geo_keys).map_err(metadata_error)?;
         match geo_key(&geo_keys, GT_MODEL_TYPE_GEO_KEY) {
-            Some(MODEL_TYPE_GEOGRAPHIC) | None => {}
+            Some(MODEL_TYPE_GEOGRAPHIC) => {}
+            None => return Err(metadata_error("missing GTModelTypeGeoKey".to_owned())),
             Some(model_type) => {
                 return Err(RasterError::NotGeographic {
                     path: path.to_path_buf(),
@@ -201,27 +238,62 @@ impl GeoRaster {
                 });
             }
         }
+        let geographic_type = geo_key(&geo_keys, 2048);
+        if !matches!(geographic_type, Some(4326 | 4979)) {
+            return Err(metadata_error(format!(
+                "GeodeticCRSGeoKey {geographic_type:?}; only WGS84 EPSG:4326/4979 is supported"
+            )));
+        }
+        if !matches!(geo_key(&geo_keys, 2054), None | Some(9102)) {
+            return Err(metadata_error(
+                "angular units must be degrees (EPSG:9102)".to_owned(),
+            ));
+        }
+        if !matches!(geo_key(&geo_keys, 4099), None | Some(9001)) {
+            return Err(metadata_error(
+                "vertical units must be metres (EPSG:9001); convert the input units first"
+                    .to_owned(),
+            ));
+        }
 
         // 鉛直基準。**ここでは弾かない。** 焼くかどうかは呼び出し側の判断で、
         // 読むこと自体は妨げない（検査や比較に使えるため）。
-        let vertical_datum =
-            VerticalDatum::from_geo_key(geo_key(&geo_keys, VERTICAL_CS_TYPE_GEO_KEY));
+        let vertical_key = geo_key(&geo_keys, VERTICAL_CS_TYPE_GEO_KEY);
+        let vertical_datum = if geographic_type == Some(4979) && vertical_key.is_none() {
+            VerticalDatum::Ellipsoidal
+        } else {
+            VerticalDatum::from_geo_key(vertical_key)
+        };
+        if geographic_type == Some(4979) && !vertical_datum.is_ellipsoidal() {
+            return Err(metadata_error(
+                "EPSG:4979 conflicts with the vertical datum".to_owned(),
+            ));
+        }
 
         let convention = match geo_key(&geo_keys, GT_RASTER_TYPE_GEO_KEY) {
             Some(2) => RasterPixelConvention::Point,
             // GeoTIFF の既定は PixelIsArea。キーが無い場合もこちら。
-            _ => RasterPixelConvention::Area,
+            None | Some(1) => RasterPixelConvention::Area,
+            Some(code) => {
+                return Err(metadata_error(format!(
+                    "unsupported raster convention {code}"
+                )));
+            }
         };
 
         let (pixel_longitude, pixel_latitude) = (scale[0], scale[1]);
+        let pixel_longitude_radians = Degrees(pixel_longitude).to_radians().get();
+        let pixel_latitude_radians = Degrees(pixel_latitude).to_radians().get();
         if !(pixel_longitude.is_finite() && pixel_latitude.is_finite())
             || pixel_longitude <= 0.0
             || pixel_latitude <= 0.0
+            || pixel_longitude_radians <= 0.0
+            || pixel_latitude_radians <= 0.0
         {
             return Err(RasterError::DegenerateGeometry {
                 path: path.to_path_buf(),
                 reason: format!(
-                    "ModelPixelScale is ({pixel_longitude}, {pixel_latitude}); both must be positive and finite"
+                    "ModelPixelScale is ({pixel_longitude}, {pixel_latitude}); both must be finite and remain positive in radians"
                 ),
             });
         }
@@ -247,6 +319,26 @@ impl GeoRaster {
         };
         let origin_longitude_degrees = tie_longitude - (raster_i - half) * pixel_longitude;
         let origin_latitude_degrees = tie_latitude + (raster_j - half) * pixel_latitude;
+        let south = origin_latitude_degrees - f64::from(height - 1) * pixel_latitude;
+        let longitude_span = f64::from(width - 1) * pixel_longitude;
+        if ![
+            origin_longitude_degrees,
+            origin_latitude_degrees,
+            south,
+            longitude_span,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+            || !(-90.0..=90.0).contains(&origin_latitude_degrees)
+            || !(-90.0..=90.0).contains(&south)
+            || !(-360.0..=360.0).contains(&origin_longitude_degrees)
+            || longitude_span > 360.0
+        {
+            return Err(RasterError::DegenerateGeometry {
+                path: path.to_path_buf(),
+                reason: "pixel centres must be finite, within latitude -90..90 and span at most 360 degrees longitude".to_owned(),
+            });
+        }
 
         // --- 画素 ---
 
@@ -270,7 +362,9 @@ impl GeoRaster {
             }
         };
 
-        let expected = (width as usize) * (height as usize);
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .ok_or_else(|| metadata_error("raster dimensions overflow address space".to_owned()))?;
         if samples.len() != expected {
             return Err(RasterError::UnsupportedSampleFormat {
                 path: path.to_path_buf(),
@@ -282,10 +376,24 @@ impl GeoRaster {
             });
         }
 
-        let nodata = decoder
-            .get_tag_ascii_string(Tag::GdalNodata)
-            .ok()
-            .and_then(|text| text.trim().trim_end_matches('\0').parse::<f32>().ok());
+        let nodata = if decoder
+            .find_tag(Tag::GdalNodata)
+            .map_err(tiff_error)?
+            .is_some()
+        {
+            let text = decoder
+                .get_tag_ascii_string(Tag::GdalNodata)
+                .map_err(tiff_error)?;
+            Some(
+                text.trim()
+                    .trim_end_matches('\0')
+                    .trim()
+                    .parse::<f32>()
+                    .map_err(|_| metadata_error("invalid GDAL_NODATA numeric value".to_owned()))?,
+            )
+        } else {
+            None
+        };
 
         Ok(Self {
             width,
@@ -293,8 +401,8 @@ impl GeoRaster {
             samples,
             origin_longitude: Degrees(origin_longitude_degrees).to_radians().get(),
             origin_latitude: Degrees(origin_latitude_degrees).to_radians().get(),
-            pixel_longitude: Degrees(pixel_longitude).to_radians().get(),
-            pixel_latitude: Degrees(pixel_latitude).to_radians().get(),
+            pixel_longitude: pixel_longitude_radians,
+            pixel_latitude: pixel_latitude_radians,
             nodata,
             vertical_datum,
         })
@@ -307,6 +415,102 @@ impl GeoRaster {
     #[must_use]
     pub const fn vertical_datum(&self) -> VerticalDatum {
         self.vertical_datum
+    }
+
+    /// Explicitly accept these values as ellipsoidal without correcting them.
+    ///
+    /// This is an escape hatch for externally verified or synthetic data. For a
+    /// geoid-referenced DEM it retains the systematic height error; callers must
+    /// record the override in provenance. It never bypasses CRS/unit validation.
+    #[must_use]
+    pub fn assume_ellipsoidal(mut self) -> Self {
+        self.vertical_datum = VerticalDatum::Ellipsoidal;
+        self
+    }
+
+    /// Declare missing vertical metadata using independently verified source
+    /// documentation. Existing, conflicting metadata cannot be overridden.
+    ///
+    /// # Errors
+    /// A missing/unsupported declaration or a conflict with source metadata.
+    pub fn declare_vertical_datum(mut self, datum: VerticalDatum) -> std::io::Result<Self> {
+        if !matches!(
+            datum,
+            VerticalDatum::Ellipsoidal
+                | VerticalDatum::Geoid(
+                    crate::vertical_datum::GeoidModel::Egm2008
+                        | crate::vertical_datum::GeoidModel::Egm96
+                )
+        ) {
+            return Err(crate::geoid::invalid(
+                "source declaration must identify WGS84 ellipsoidal, EGM2008 or EGM96 heights",
+            ));
+        }
+        if self.vertical_datum != VerticalDatum::Unspecified && self.vertical_datum != datum {
+            return Err(crate::geoid::invalid(format!(
+                "source declaration {datum} conflicts with GeoTIFF datum {}",
+                self.vertical_datum
+            )));
+        }
+        self.vertical_datum = datum;
+        Ok(self)
+    }
+
+    /// Convert orthometric pixel heights to WGS84 ellipsoidal heights (`h = H + N`).
+    ///
+    /// Correction occurs at each original pixel centre before any resampling.
+    /// Nodata stays nodata. Already-ellipsoidal rasters pass through unchanged.
+    ///
+    /// # Errors
+    /// Unknown or mismatched source/model datums, invalid coordinates, or a
+    /// correction that cannot be represented as a finite f32 are rejected.
+    pub fn normalize_to_ellipsoid(
+        mut self,
+        grid: &crate::geoid::GeoidGrid,
+    ) -> std::io::Result<Self> {
+        if self.vertical_datum.is_ellipsoidal() {
+            return Ok(self);
+        }
+        if self.vertical_datum != VerticalDatum::Geoid(grid.model()) {
+            return Err(crate::geoid::invalid(format!(
+                "source datum {} does not match the {} geoid grid",
+                self.vertical_datum,
+                grid.model().name()
+            )));
+        }
+        for row in 0..self.height {
+            for column in 0..self.width {
+                let index = row as usize * self.width as usize + column as usize;
+                let Some(height) = self.pixel(i64::from(column), i64::from(row)) else {
+                    self.samples[index] = f32::NAN;
+                    continue;
+                };
+                let position = Geodetic::new(
+                    Radians(self.origin_latitude - f64::from(row) * self.pixel_latitude),
+                    Radians(self.origin_longitude + f64::from(column) * self.pixel_longitude),
+                    Meters::ZERO,
+                );
+                let undulation = grid
+                    .undulation(position)
+                    .ok_or_else(|| crate::geoid::invalid("invalid geoid sample coordinate"))?;
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "DEM storage is f32; finiteness checked below"
+                )]
+                let corrected = (f64::from(height) + undulation.get()) as f32;
+                if !corrected.is_finite() {
+                    return Err(crate::geoid::invalid(
+                        "normalized elevation exceeds f32 range",
+                    ));
+                }
+                self.samples[index] = corrected;
+            }
+        }
+        self.vertical_datum = VerticalDatum::Ellipsoidal;
+        // Valid corrected pixels can equal the old sentinel; missing ones were
+        // changed to NaN above so clearing the sentinel preserves both cases.
+        self.nodata = None;
+        Ok(self)
     }
 
     #[must_use]
@@ -389,6 +593,14 @@ impl GeoRaster {
     pub fn sample(&self, position: Geodetic, footprint: (Radians, Radians)) -> Option<Meters> {
         let longitude = position.longitude.get();
         let latitude = position.latitude.get();
+        if ![longitude, latitude, footprint.0.get(), footprint.1.get()]
+            .iter()
+            .all(|value| value.is_finite())
+            || footprint.0.get() < 0.0
+            || footprint.1.get() < 0.0
+        {
+            return None;
+        }
 
         let spans_multiple_pixels =
             footprint.0.get() > self.pixel_longitude || footprint.1.get() > self.pixel_latitude;
@@ -407,7 +619,13 @@ impl GeoRaster {
     /// 単純な引き算だと、日付変更線をまたぐ位置（+180° と -180° は同じ場所）で
     /// 地球一周ぶんの差が出て、範囲外と判定されてしまう。
     fn column_of(&self, longitude: f64) -> f64 {
-        let delta = (longitude - self.origin_longitude + PI).rem_euclid(TAU) - PI;
+        let mut delta = (longitude - self.origin_longitude + PI).rem_euclid(TAU) - PI;
+        // A raster can cover more than half a globe. Its eastern half is a
+        // positive delta even when the shortest angular difference is negative.
+        let span = f64::from(self.width - 1) * self.pixel_longitude;
+        if delta < 0.0 && delta + TAU <= span + self.pixel_longitude {
+            delta += TAU;
+        }
         delta / self.pixel_longitude
     }
 
@@ -415,6 +633,12 @@ impl GeoRaster {
         let x = self.column_of(longitude);
         let y = (self.origin_latitude - latitude) / self.pixel_latitude;
         if !x.is_finite() || !y.is_finite() {
+            return None;
+        }
+        // Bound before float-to-int conversion and before adding one. Rust's
+        // saturating float cast could otherwise turn a tiny pixel size into
+        // i64::MAX, making column + 1 panic in debug or wrap in release.
+        if x < -1.0 || y < -1.0 || x >= f64::from(self.width) || y >= f64::from(self.height) {
             return None;
         }
 
@@ -487,15 +711,21 @@ impl GeoRaster {
             clippy::cast_possible_truncation,
             reason = "有限性は直前に検査済み。範囲外は pixel() が None を返す"
         )]
-        let (first_column, last_column) = (x_start.round() as i64, x_end.round() as i64);
+        let (first_column, last_column) = (
+            x_start.round().max(0.0) as i64,
+            x_end.round().min(f64::from(self.width - 1)) as i64,
+        );
         #[allow(
             clippy::cast_possible_truncation,
             reason = "有限性は直前に検査済み。範囲外は pixel() が None を返す"
         )]
-        let (first_row, last_row) = (y_start.round() as i64, y_end.round() as i64);
+        let (first_row, last_row) = (
+            y_start.round().max(0.0) as i64,
+            y_end.round().min(f64::from(self.height - 1)) as i64,
+        );
 
         let mut total = 0.0_f64;
-        let mut count = 0_u32;
+        let mut count = 0_u64;
         for row in first_row..=last_row {
             for column in first_column..=last_column {
                 if let Some(value) = self.pixel(column, row) {
@@ -514,9 +744,10 @@ impl GeoRaster {
         #[allow(
             clippy::cast_possible_truncation,
             clippy::cast_lossless,
+            clippy::cast_precision_loss,
             reason = "標高は ±9000 m の範囲。f32 の分解能は約 0.001 m で十分"
         )]
-        let averaged = (total / f64::from(count)) as f32;
+        let averaged = (total / count as f64) as f32;
         Some(averaged)
     }
 }
@@ -534,6 +765,29 @@ pub struct RasterCoverage {
 const GT_MODEL_TYPE_GEO_KEY: u16 = 1024;
 const GT_RASTER_TYPE_GEO_KEY: u16 = 1025;
 const MODEL_TYPE_GEOGRAPHIC: u16 = 2;
+
+fn validate_geo_keys(keys: &[u16]) -> Result<(), String> {
+    if keys.len() < 4 || keys[0] != 1 || keys[1] != 1 || keys[2] > 1 {
+        return Err("invalid GeoKey directory version/header".to_owned());
+    }
+    let end = 4 + usize::from(keys[3]) * 4;
+    if keys.len() < end {
+        return Err("truncated GeoKey directory".to_owned());
+    }
+    let mut previous = None;
+    for entry in keys[4..end].chunks_exact(4) {
+        if previous.is_some_and(|id| id >= entry[0]) {
+            return Err("duplicate or unsorted GeoKey ids".to_owned());
+        }
+        previous = Some(entry[0]);
+        if matches!(entry[0], 1024 | 1025 | 2048 | 2054 | 4096 | 4099)
+            && (entry[1] != 0 || entry[2] != 1)
+        {
+            return Err(format!("GeoKey {} must be one inline SHORT", entry[0]));
+        }
+    }
+    Ok(())
+}
 
 /// `GeoKeyDirectoryTag` から短整数キーを引く。
 ///

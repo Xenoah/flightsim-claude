@@ -63,6 +63,7 @@ fn write_ramp_geotiff(
     let bytes = GeoTiffBuilder::new(size, size, samples)
         .origin(west, north)
         .pixel_size(pixel, pixel)
+        .vertical_cs_type(4979)
         .build();
 
     let path = directory.join(name);
@@ -287,6 +288,7 @@ fn a_plain_tiff_is_rejected_with_a_useful_message() {
     let workspace = TempDir::new("plain");
     let bytes = GeoTiffBuilder::new(4, 4, vec![1.0; 16])
         .without_georeference()
+        .vertical_cs_type(4979)
         .build();
     let path = workspace.path().join("plain.tif");
     std::fs::write(&path, bytes).expect("writable");
