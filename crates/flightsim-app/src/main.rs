@@ -39,7 +39,7 @@ use flightsim_render::{
     CameraWorldPosition, CloudLayer, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin,
     RenderSet, SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
     extents_in_model_space,
-    terrain::{TerrainTile, despawn_tile, spawn_tile},
+    terrain::{apply_terrain_update, spawn_tile},
     update_terrain_selection,
 };
 use flightsim_sim::{GroundSampler, Simulation};
@@ -47,7 +47,7 @@ use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
 use flightsim_world::{
     AirportApron, AirportDatabase, AirportGroundLight, AirportHoldingPosition, AirportTaxiway,
     DiskTileSource, GroundLightKind, LodSelector, MemoryTileSource, Runway, RunwaySide, Terrain,
-    TileCache, TileId, TileSource,
+    TileCache, TileSource,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -406,7 +406,7 @@ struct TerrainStreaming {
     selector: LodSelector,
     source: BoxedSource,
     cache: TileCache,
-    live: HashMap<TileId, ()>,
+    live: flightsim_render::TerrainSelectionState,
     material: Handle<StandardMaterial>,
 }
 
@@ -3027,7 +3027,7 @@ fn setup(
         ),
         source: make_source(&startup),
         cache: TileCache::new(config.cache_bytes),
-        live: HashMap::new(),
+        live: flightsim_render::TerrainSelectionState::default(),
         material: materials.add(flightsim_render::default_terrain_material()),
     });
 
@@ -3242,12 +3242,12 @@ fn stream_terrain(
     mut streaming: ResMut<TerrainStreaming>,
     mut tiles: ResMut<TerrainTiles>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mesh_query: Query<&Mesh3d, With<TerrainTile>>,
+    origin: Res<RenderOrigin>,
 ) {
     let camera = camera_position.0.to_ecef();
     let streaming = &mut *streaming;
 
-    let mut spawned: Vec<(TileId, Entity)> = Vec::new();
+    let mut prepared = Vec::new();
     let update = update_terrain_selection(
         &streaming.selector,
         &streaming.source,
@@ -3256,23 +3256,22 @@ fn stream_terrain(
         camera,
         config.load_budget_per_frame,
         &mut |id, dem| {
-            let entity = spawn_tile(
+            let (entity, mesh) = spawn_tile(
                 &mut commands,
                 &mut meshes,
                 streaming.material.clone(),
+                &origin.0,
                 id,
                 dem,
             );
-            spawned.push((id, entity));
+            prepared.push((id, entity, mesh));
         },
     );
 
-    for (id, entity) in spawned {
-        tiles.insert(id, entity);
+    for (id, entity, mesh) in prepared {
+        tiles.insert(id, entity, mesh);
     }
-    for id in update.despawned {
-        despawn_tile(&mut commands, &mut meshes, &mesh_query, &mut tiles, id);
-    }
+    apply_terrain_update(&mut commands, &mut meshes, &mut tiles, update);
 }
 
 /// 読み込みが終わったモデルの倍率を決める。
@@ -3319,7 +3318,7 @@ fn fit_loaded_model(
 /// 原因の当たりが付けられない。変化時だけ出す作りにして実際に詰まった。
 fn report_terrain(
     time: Res<Time>,
-    tiles: Res<TerrainTiles>,
+    streaming: Res<TerrainStreaming>,
     camera_position: Res<CameraWorldPosition>,
     mut elapsed: Local<f64>,
 ) {
@@ -3330,8 +3329,9 @@ fn report_terrain(
     *elapsed = 0.0;
 
     info!(
-        "terrain: {} tile(s) live, camera {:.4}, {:.4} at {:.0} m",
-        tiles.len(),
+        "terrain: {} tile(s) live, {} resident, camera {:.4}, {:.4} at {:.0} m",
+        streaming.live.len(),
+        streaming.live.resident_len(),
         camera_position.0.latitude_degrees(),
         camera_position.0.longitude_degrees(),
         camera_position.0.altitude.get(),
