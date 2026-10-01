@@ -11,6 +11,8 @@ license.workspace = true
 [dependencies]
 flightsim-core.workspace = true
 glam.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 # 単体テストのバイナリをベンチ対象から外す。
 # これが無いと `cargo bench -- --quick` のような引数が届かない。

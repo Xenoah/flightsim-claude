@@ -15,6 +15,10 @@
 # preview 段階の中間生成物は refine すれば作り直せるので入れない。
 /assets/aircraft/*
 !/assets/aircraft/light_single.glb
+!/assets/aircraft/light_single.json
+!/assets/aircraft/swift_sport.glb
+!/assets/aircraft/swift_sport.json
+!/assets/aircraft/swift_sport.blend
 
 # API キー。**中身を絶対にコミットしない。**
 # 書き方は .env.example を参照（そちらは追跡する）。

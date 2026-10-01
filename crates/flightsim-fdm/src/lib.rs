@@ -41,6 +41,7 @@ pub mod aero;
 pub mod aircraft;
 pub mod atmosphere;
 pub mod controls;
+pub mod definition;
 pub mod gravity;
 mod landing_gear;
 pub mod state;
