@@ -13,6 +13,7 @@ members = [
     "crates/flightsim-audio",
     "crates/flightsim-ui",
     "crates/flightsim-input",
+    "crates/flightsim-net",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ flightsim-app = { path = "crates/flightsim-app" }
 flightsim-audio = { path = "crates/flightsim-audio" }
 flightsim-ui = { path = "crates/flightsim-ui" }
 flightsim-input = { path = "crates/flightsim-input" }
+flightsim-net = { path = "crates/flightsim-net" }
 
 glam = "0.30"
 

@@ -18,7 +18,7 @@ fail() {
 }
 
 # 検査対象のクレート。
-CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim flightsim-assetgen)
+CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim flightsim-assetgen flightsim-net)
 
 # `cargo tree` の出力からパッケージ名の一覧を得る。
 # --edges normal で dev-dependencies と build-dependencies を除外する
@@ -105,6 +105,17 @@ for crate in flightsim-core flightsim-fdm flightsim-world; do
     if deps_of "$crate" | grep -qE '^flightsim-sim$'; then
         fail "$crate depends on flightsim-sim" \
              "sim is the integration layer above fdm and world. Depending on it upwards defeats the fdm/world separation (ADR-0006)."
+    fi
+done
+
+# Traffic/session transport owns no physics or terrain. App connects its f64
+# ECEF observations to presentation; a network import must not drag in Bevy.
+if deps_of flightsim-net | grep -qE '^flightsim-(fdm|world|sim|tilegen|render|input|ui|audio)$'; then
+    fail "flightsim-net depends on a runtime sibling" "net may depend on core only; app owns integration (ADR-0010)."
+fi
+for crate in flightsim-core flightsim-fdm flightsim-world flightsim-sim; do
+    if deps_of "$crate" | grep -qE '^flightsim-net$'; then
+        fail "$crate depends on flightsim-net" "Physics/world are deterministic offline libraries; app owns session integration."
     fi
 done
 
