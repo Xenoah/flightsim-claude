@@ -419,7 +419,7 @@ struct InteriorModel;
 #[derive(Component, Debug, Clone, Copy)]
 struct PendingModelFit(ModelFit);
 
-fn main() {
+fn main() -> bevy::app::AppExit {
     let (mut startup, mut diagnostics) = parse_arguments();
     resolve_airport_database(&mut startup, &mut diagnostics);
     // **記録の条件は空港より後に当てる。** 空港の解決が開始位置と方位を
@@ -550,7 +550,7 @@ fn main() {
         app.insert_resource(playback);
     }
 
-    app.run();
+    app.run()
 }
 
 /// `--replay` のファイルを読み、記録された条件を起動設定へ写す。
