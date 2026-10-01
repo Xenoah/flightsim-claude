@@ -36,9 +36,12 @@ OSM の別系統の高さを滑走路だけに入れても、使用中の地形�
 将来こちらで地域 DB を配布する場合は、取得元・スナップショット日・ODbL の
 share-alike 提供方法を決めた別 ADR が必要である。
 
-入力 PBF は信頼できる提供元から取得したものに限る。固定した `osmpbf 0.3.7` は
-オフライン境界には置くが sandbox ではなく、細工・破損した protobuf の全経路を
-panic-free にする保証はない。恒久対応は [Issue #23](../../../issues/23) で追跡する。
+入力 PBF は信頼できる提供元の地域 snapshot を使う。固定した `osmpbf 0.3.7` に
+局所的な安全修正を vendor し、PrimitiveBlock の delta/scale 演算、配列長、文字列、
+enum を公開 iterator の前に検証する。zlib の完全な終端・全入力消費も要求する。
+17件の敵対的回帰テストと既存の正常 FSAP bytes を検証したが、パーサーは sandbox
+ではなく、全ファイル index 等の総メモリや未知の入力経路まで安全とは主張しない。
+履歴 PBF / required_features の完全な解釈は対象外。
 変換側が所有する候補・node collection は fallible に確保し、FSAP の候補 record 数を
 PBF 走査中から 1,000,000 以下へ制限する。これは `osmpbf` 内部の allocation まで保証する
 ものではない。変換結果は一時ファイルへ完全に書いてから置換するため、parser・上限・

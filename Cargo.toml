@@ -1,5 +1,6 @@
 [workspace]
 resolver = "3"
+exclude = ["vendor/osmpbf"]
 members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
