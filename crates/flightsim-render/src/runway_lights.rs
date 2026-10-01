@@ -19,25 +19,33 @@
 //! | 末端灯 | 赤 | ここで終わる |
 //!
 //! **進入端と末端は同じ灯器を両側から見たもの**で、実機では片面が緑・
-//! 反対面が赤に見える。ここでは面の向きを持たない発光板で近似し、
+//! 反対面が赤に見える。ここでは全方向から見える低い発光灯器で近似し、
 //! 進入端側を緑、末端側を赤に塗り分ける。
 //!
 //! # 発光の表現
 //!
 //! 光源（`PointLight`）を灯火の数だけ置くと、Bevy の前方クラスタリングの
-//! 上限を軽く超える（滑走路 1 本で 100 個以上になる）。**自己発光する板**
+//! 上限を軽く超える（滑走路 1 本で 100 個以上になる）。**自己発光する小さな灯器**
 //! （`StandardMaterial::emissive`）で表す。地面を照らさないが、
 //! 遠方から滑走路の位置と向きが読める、という目的には足りる。
 
 use bevy::prelude::*;
 use flightsim_core::{Ecef, Geodetic, Meters, Radians};
 
-/// 灯火を舗装面からどれだけ浮かせるか。実機の埋込灯とほぼ同じ高さ。
+use crate::runway::{
+    lifted, runway_point, safe_origin, sampled_point, valid_dimensions, valid_point, valid_runway,
+};
+
+/// 灯器の下端を地形からどれだけ浮かせるか。空港面の既存 lift 順を保つ。
 const LIGHT_LIFT: f64 = 0.12;
 
 /// 灯火 1 つの大きさ。実機の灯器より大きいが、**遠方から見えないと
 /// 意味が無い**ので視認性を優先する。
 const LIGHT_SIZE: f64 = 1.6;
+
+/// 低い立体にして、水平な板の投影面積が消える浅い進入角でも面を見せる。
+/// 光度を増やす代わりの幾何学的な修正。実際の灯器形状や配光の再現ではない。
+const LIGHT_HEIGHT: f64 = 0.35;
 
 /// 縁灯の間隔。実機の規格は 60 m 以下。
 const EDGE_SPACING: f64 = 60.0;
@@ -134,14 +142,11 @@ pub struct RunwayLight {
 /// 滑走路灯の配置を決める。**Bevy に依存しない純関数。**
 ///
 /// 縁灯は両縁に `EDGE_SPACING` 間隔、進入端に緑、末端に赤を並べる。
-/// 長さか幅が非有限・非正なら空を返す（灯火の無い滑走路になるだけで、
+/// 長さか幅が非有限・非正、長さ 10 km・幅 200 m 超なら空を返す（灯火の無い滑走路になるだけで、
 /// 描画は壊れない）。
 #[must_use]
 pub fn runway_light_layout(length: Meters, width: Meters) -> Vec<RunwayLight> {
-    if !length.get().is_finite() || length.get() <= 0.0 {
-        return Vec::new();
-    }
-    if !width.get().is_finite() || width.get() <= 0.0 {
+    if !valid_dimensions(length, width) {
         return Vec::new();
     }
     let length = length.get();
@@ -211,12 +216,33 @@ pub fn runway_light_meshes(
     length: Meters,
     width: Meters,
 ) -> (Vec<RunwayLightGroup>, Ecef) {
-    let layout = runway_light_layout(length, width);
-    let centre = light_point(threshold, heading, length.get() * 0.5, 0.0);
-    let origin = centre.to_ecef();
-    if layout.is_empty() {
-        return (Vec::new(), origin);
+    runway_light_meshes_with_elevation(threshold, heading, length, width, |_| threshold.altitude)
+}
+
+/// app が渡す地面楕円体高へ灯器を沿わせる。描画側は DEM / sim を参照しない。
+///
+/// `elevation` の入力・非有限標本時の扱いは
+/// [`crate::runway::runway_mesh_with_elevation`] と同じ。各灯器の四隅で取得し、
+/// 底面を ground +0.12 m、上面を +0.47 m とする。上面と四側面を色ごとに束ね、
+/// emissive の強度・色・点灯曲線は変えない。側面により浅い進入角でも見える。
+/// 不正な runway は空の群と有限原点を返す。
+#[must_use]
+pub fn runway_light_meshes_with_elevation(
+    threshold: Geodetic,
+    heading: Radians,
+    length: Meters,
+    width: Meters,
+    mut elevation: impl FnMut(Geodetic) -> Meters,
+) -> (Vec<RunwayLightGroup>, Ecef) {
+    if !valid_runway(threshold, heading, length, width) {
+        return (Vec::new(), safe_origin(threshold));
     }
+    let layout = runway_light_layout(length, width);
+    let centre = runway_point(threshold, heading, length.get() * 0.5, 0.0);
+    if !valid_point(centre) {
+        return (Vec::new(), safe_origin(threshold));
+    }
+    let origin = lifted(sampled_point(centre, &mut elevation), LIGHT_LIFT).to_ecef();
 
     // 色ごとに束ねる。色は 3 種類しかないので線形探索で足りる。
     //
@@ -238,7 +264,7 @@ pub fn runway_light_meshes(
     let meshes = groups
         .into_iter()
         .map(|(color, lights)| {
-            let mesh = quads_for(threshold, heading, origin, &lights);
+            let mesh = fixtures_for(threshold, heading, origin, &lights, &mut elevation);
             let emissive = LinearRgba::rgb(
                 crate::srgb_to_linear(color[0]) * EMISSIVE_STRENGTH,
                 crate::srgb_to_linear(color[1]) * EMISSIVE_STRENGTH,
@@ -266,51 +292,69 @@ pub fn runway_light_meshes(
     (meshes, origin)
 }
 
-/// 灯火の板を並べたメッシュ。
-fn quads_for(threshold: Geodetic, heading: Radians, origin: Ecef, lights: &[RunwayLight]) -> Mesh {
+/// 上面と四側面。背面カリングを維持したまま、全水平方位へ正の投影面積を持つ。
+fn fixtures_for(
+    threshold: Geodetic,
+    heading: Radians,
+    origin: Ecef,
+    lights: &[RunwayLight],
+    elevation: &mut impl FnMut(Geodetic) -> Meters,
+) -> Mesh {
     use bevy::asset::RenderAssetUsages;
     use bevy::mesh::{Indices, PrimitiveTopology};
 
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    let mut normals: Vec<[f32; 3]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(lights.len() * 20);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(lights.len() * 20);
+    let mut indices: Vec<u32> = Vec::with_capacity(lights.len() * 30);
     let half = LIGHT_SIZE * 0.5;
     for light in lights {
-        let base = u32::try_from(positions.len()).unwrap_or(u32::MAX);
-        for (along_offset, across_offset) in
-            [(-half, -half), (-half, half), (half, half), (half, -half)]
-        {
-            let point = light_point(
-                threshold,
-                heading,
-                light.along.get() + along_offset,
-                light.across.get() + across_offset,
-            );
-            let ecef = point.to_ecef();
-            let above = Geodetic::new(
-                point.latitude,
-                point.longitude,
-                Meters(point.altitude.get() + 1.0),
-            )
-            .to_ecef();
-            let up = (above.as_vec() - ecef.as_vec()).normalize();
-            let relative = ecef.as_vec() - origin.as_vec();
-
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "原点相対で数 km 以内。f32 の分解能は mm 未満"
-            )]
-            {
-                positions.push([relative.x as f32, relative.y as f32, relative.z as f32]);
-                normals.push([up.x as f32, up.y as f32, up.z as f32]);
-            }
+        let points = [(-half, -half), (-half, half), (half, half), (half, -half)].map(
+            |(along_offset, across_offset)| {
+                runway_point(
+                    threshold,
+                    heading,
+                    light.along.get() + along_offset,
+                    light.across.get() + across_offset,
+                )
+            },
+        );
+        if points.iter().any(|point| !valid_point(*point)) {
+            continue;
         }
-        // 滑走路の舗装と同じ巻き順。前方 × 右方 = 下向きなので、
-        // (0,1,2)/(0,2,3) で上を向く。
-        indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        let ground = points.map(|point| sampled_point(point, elevation));
+        let bottom =
+            ground.map(|point| lifted(point, LIGHT_LIFT).to_ecef().as_vec() - origin.as_vec());
+        let top = ground.map(|point| {
+            lifted(point, LIGHT_LIFT + LIGHT_HEIGHT).to_ecef().as_vec() - origin.as_vec()
+        });
+        let faces = [
+            top,
+            [bottom[0], bottom[1], top[1], top[0]],
+            [bottom[1], bottom[2], top[2], top[1]],
+            [bottom[2], bottom[3], top[3], top[2]],
+            [bottom[3], bottom[0], top[0], top[3]],
+        ];
+        for face in faces {
+            let normal = (face[1] - face[0])
+                .cross(face[2] - face[0])
+                .normalize_or_zero();
+            if normal.length_squared() < 0.5 {
+                continue;
+            }
+            let base = u32::try_from(positions.len()).expect("bounded runway light vertex count");
+            for relative in face {
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "bounded airport-relative positions and unit normals"
+                )]
+                {
+                    positions.push([relative.x as f32, relative.y as f32, relative.z as f32]);
+                    normals.push([normal.x as f32, normal.y as f32, normal.z as f32]);
+                }
+            }
+            indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        }
     }
-
     Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
@@ -328,19 +372,6 @@ fn same_color(a: [f32; 3], b: [f32; 3]) -> bool {
     a.iter()
         .zip(b.iter())
         .all(|(left, right)| left.to_bits() == right.to_bits())
-}
-
-/// 滑走路基準の座標から測地点を作る。舗装より少し高い位置。
-fn light_point(threshold: Geodetic, heading: Radians, along: f64, across: f64) -> Geodetic {
-    let (sin, cos) = heading.get().sin_cos();
-    let north = along * cos - across * sin;
-    let east = along * sin + across * cos;
-    let moved = threshold.offset_by(Meters(north), Meters(east));
-    Geodetic::new(
-        moved.latitude,
-        moved.longitude,
-        Meters(moved.altitude.get() + LIGHT_LIFT),
-    )
 }
 
 #[cfg(test)]
@@ -569,7 +600,11 @@ mod tests {
         );
         assert_eq!(groups.len(), 3, "expected white, green and red groups");
         let total: usize = groups.iter().map(|group| group.mesh.count_vertices()).sum();
-        assert_eq!(total, layout().len() * 4, "each light is one quad");
+        assert_eq!(
+            total,
+            layout().len() * 20,
+            "each light has a top and four sides"
+        );
     }
 
     #[test]
@@ -679,7 +714,8 @@ mod tests {
                 );
                 let altitude = world.to_geodetic().altitude.get();
                 assert!(
-                    (altitude - elevation - LIGHT_LIFT).abs() < 0.3,
+                    (LIGHT_LIFT - 0.01..=LIGHT_LIFT + LIGHT_HEIGHT + 0.01)
+                        .contains(&(altitude - elevation)),
                     "a light sits at {altitude} m, expected about {}",
                     elevation + LIGHT_LIFT
                 );
@@ -698,5 +734,222 @@ mod tests {
         );
         assert!(groups.is_empty());
         assert!(origin.as_vec().is_finite());
+    }
+
+    fn positions(mesh: &Mesh) -> Vec<glam::DVec3> {
+        match mesh.attribute(Mesh::ATTRIBUTE_POSITION) {
+            Some(bevy::mesh::VertexAttributeValues::Float32x3(values)) => values
+                .iter()
+                .map(|v| glam::DVec3::new(f64::from(v[0]), f64::from(v[1]), f64::from(v[2])))
+                .collect(),
+            _ => panic!("positions must be f32x3"),
+        }
+    }
+
+    fn terrain_height(point: Geodetic) -> Meters {
+        let north = (point.latitude_degrees() - 35.548) * 10_000.0;
+        let east = (point.longitude_degrees() - 139.775) * 10_000.0;
+        Meters(8.0 + 0.08 * north + 0.02 * east + (north * 0.12).sin() * 2.0)
+    }
+
+    #[test]
+    fn lights_follow_local_terrain_at_each_corner_and_retain_lift() {
+        let (groups, origin) = runway_light_meshes_with_elevation(
+            Geodetic::from_degrees(35.548, 139.775, 8.0),
+            Radians(0.0),
+            LENGTH,
+            WIDTH,
+            terrain_height,
+        );
+        let mut lowest = f64::INFINITY;
+        let mut highest = f64::NEG_INFINITY;
+        for group in groups {
+            for position in positions(&group.mesh) {
+                let point = Ecef::from_vec(origin.as_vec() + position).to_geodetic();
+                let lift = point.altitude.get() - terrain_height(point).get();
+                assert!(
+                    (lift - LIGHT_LIFT).abs() < 0.002
+                        || (lift - LIGHT_LIFT - LIGHT_HEIGHT).abs() < 0.002,
+                    "fixture corner has wrong terrain-relative lift: {lift}"
+                );
+                lowest = lowest.min(point.altitude.get());
+                highest = highest.max(point.altitude.get());
+            }
+        }
+        assert!(
+            highest - lowest > 10.0,
+            "lights must not retain the threshold altitude"
+        );
+    }
+
+    #[test]
+    fn emitting_faces_point_outward_for_backface_culling() {
+        let threshold = Geodetic::from_degrees(35.548, 139.775, 8.0);
+        let origin = threshold.to_ecef();
+        let mesh = fixtures_for(
+            threshold,
+            Radians(0.0),
+            origin,
+            &[RunwayLight {
+                along: Meters(0.0),
+                across: Meters(0.0),
+                color: EDGE_COLOR,
+            }],
+            &mut |_| threshold.altitude,
+        );
+        let vertices = positions(&mesh);
+        let centre = lifted(threshold, LIGHT_LIFT + LIGHT_HEIGHT * 0.5)
+            .to_ecef()
+            .as_vec()
+            - origin.as_vec();
+        for face in vertices.chunks_exact(4) {
+            let face_centre = face.iter().copied().sum::<glam::DVec3>() * 0.25;
+            for [a, b, c] in [[0, 1, 2], [0, 2, 3]] {
+                let normal = (face[b] - face[a]).cross(face[c] - face[a]);
+                assert!(
+                    normal.dot(face_centre - centre) > 0.0,
+                    "emitting face points into the fixture"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn lights_have_projected_area_at_shallow_angles_from_every_heading() {
+        let threshold = Geodetic::from_degrees(35.548, 139.775, 8.0);
+        let mesh = fixtures_for(
+            threshold,
+            Radians(0.0),
+            threshold.to_ecef(),
+            &[RunwayLight {
+                along: Meters(0.0),
+                across: Meters(0.0),
+                color: EDGE_COLOR,
+            }],
+            &mut |_| threshold.altitude,
+        );
+        let vertices = positions(&mesh);
+        let frame = flightsim_core::LocalFrame::new(threshold);
+        for bearing in (0..360).step_by(15) {
+            for elevation in [0.0_f64, 0.5, 3.0, 10.0, 90.0] {
+                let bearing = f64::from(bearing).to_radians();
+                let elevation = elevation.to_radians();
+                let view = frame.ned_to_ecef_vector(flightsim_core::Ned::new(
+                    bearing.cos() * elevation.cos(),
+                    bearing.sin() * elevation.cos(),
+                    -elevation.sin(),
+                ));
+                let area: f64 = vertices
+                    .chunks_exact(4)
+                    .map(|face| {
+                        [[0, 1, 2], [0, 2, 3]]
+                            .iter()
+                            .map(|&[a, b, c]| {
+                                (face[b] - face[a])
+                                    .cross(face[c] - face[a])
+                                    .dot(view)
+                                    .max(0.0)
+                                    * 0.5
+                            })
+                            .sum::<f64>()
+                    })
+                    .sum();
+                // 0.35 m side × 1.6 m width is the minimum silhouette, including at 0°.
+                assert!(
+                    area > LIGHT_SIZE * LIGHT_HEIGHT * 0.99,
+                    "fixture vanishes from bearing {bearing}, elevation {elevation}: {area} m²"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_geometry_fix_does_not_raise_radiance_or_change_dimming() {
+        let (groups, _) = runway_light_meshes_with_elevation(
+            Geodetic::from_degrees(35.548, 139.775, 8.0),
+            Radians(0.0),
+            LENGTH,
+            WIDTH,
+            terrain_height,
+        );
+        for group in groups {
+            let full = group.marker.emissive_at(1.0);
+            for (channel, srgb) in [full.red, full.green, full.blue]
+                .into_iter()
+                .zip(group.color)
+            {
+                assert!((channel - crate::srgb_to_linear(srgb) * 6000.0).abs() < 0.001);
+            }
+            let off = group
+                .marker
+                .emissive_at(light_intensity_fraction(Degrees(10.0).to_radians()));
+            assert!(off.red + off.green + off.blue < 1e-6);
+        }
+    }
+
+    #[test]
+    fn bad_geometry_is_rejected_before_sampling_and_stays_finite() {
+        for (threshold, heading, length, width) in [
+            (
+                Geodetic::from_degrees(35.548, 139.775, 8.0),
+                Radians(f64::NAN),
+                LENGTH,
+                WIDTH,
+            ),
+            (
+                Geodetic::from_degrees(f64::NAN, 139.775, 8.0),
+                Radians(0.0),
+                LENGTH,
+                WIDTH,
+            ),
+            (
+                Geodetic::from_degrees(35.548, 139.775, f64::INFINITY),
+                Radians(0.0),
+                LENGTH,
+                WIDTH,
+            ),
+            (
+                Geodetic::from_degrees(35.548, 139.775, 8.0),
+                Radians(0.0),
+                Meters(f64::MAX),
+                WIDTH,
+            ),
+            (
+                Geodetic::from_degrees(35.548, 139.775, 8.0),
+                Radians(0.0),
+                LENGTH,
+                Meters(f64::MAX),
+            ),
+        ] {
+            let (groups, origin) =
+                runway_light_meshes_with_elevation(threshold, heading, length, width, |_| {
+                    panic!("invalid geometry must be rejected before sampling")
+                });
+            assert!(groups.is_empty());
+            assert!(origin.as_vec().is_finite());
+        }
+    }
+
+    #[test]
+    fn bad_elevation_samples_fall_back_to_the_threshold() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::MAX] {
+            let (groups, origin) = runway_light_meshes_with_elevation(
+                Geodetic::from_degrees(35.548, 139.775, 8.0),
+                Radians(0.0),
+                LENGTH,
+                WIDTH,
+                |_| Meters(value),
+            );
+            for group in groups {
+                for position in positions(&group.mesh) {
+                    assert!(position.is_finite());
+                    let altitude = Ecef::from_vec(origin.as_vec() + position)
+                        .to_geodetic()
+                        .altitude
+                        .get();
+                    assert!((8.11..8.48).contains(&altitude));
+                }
+            }
+        }
     }
 }
