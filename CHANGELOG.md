@@ -5,6 +5,17 @@
 
 ---
 
+## 0.6.0-alpha.19 — 2026-10-01
+
+- Fix keyboard elevator trim being ignored by the runtime gamepad input path, including when no controller is connected
+- Add actual-scene offscreen capture: `--headless-screenshot proof.png` renders terrain, aircraft, atmosphere and UI without a display server
+- Add `--exit-after-screenshot`; successful exit now follows completed PNG encoding, and screenshot write failure returns a failure status
+- Reject nonfinite, negative and excessive screenshot delays; wait for the aircraft model to finish fitting before capturing
+- Fix Windows release smoke's 90-second/stable-poll race by waiting for explicit application completion with a 180-second budget
+- Attach the verified Windows software-D3D12 screenshot to releases alongside the ZIP and checksum
+
+Software render checks do not certify physical GPUs, drivers, controller hardware or frame rate.
+
 ## [Unreleased]
 
 ---
