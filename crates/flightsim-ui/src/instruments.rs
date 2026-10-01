@@ -307,7 +307,8 @@ pub fn instrument_readout(instrument: Instrument, state: &HudReadout) -> String 
             }
         }
         Instrument::Heading => format!("{:.0} deg", state.heading_degrees),
-        Instrument::Power => format!("{:.0} / {:.0} %", state.throttle, state.flaps),
+        // Keep both percentages within the 64 px dial, including 100/100%.
+        Instrument::Power => format!("{:.0}/{:.0}%", state.throttle, state.flaps),
     }
 }
 
@@ -990,6 +991,28 @@ mod tests {
     }
 
     // --- 表示 ---
+
+    #[test]
+    fn power_readouts_fit_the_dial_at_full_throttle_and_flaps() {
+        for (throttle, flaps, expected) in [
+            (0.0, 0.0, "0/0%"),
+            (1.0, 0.0, "100/0%"),
+            (0.0, 1.0, "0/100%"),
+            (0.39, 1.0, "39/100%"),
+            (0.996, 0.996, "100/100%"),
+            (1.0, 1.0, "100/100%"),
+        ] {
+            let state = crate::HudState {
+                throttle,
+                flaps,
+                ..crate::HudState::default()
+            };
+            let text = instrument_readout(Instrument::Power, &HudReadout::from_state(&state));
+            assert_eq!(text, expected);
+            assert!(text.is_ascii() && text.len() <= 8);
+        }
+        assert_eq!(Instrument::Power.label(), "PWR");
+    }
 
     #[test]
     fn vertical_speed_readouts_fit_the_dial_in_extreme_descent() {
