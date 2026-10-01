@@ -342,6 +342,10 @@ impl PilotControls {
     ) {
         let gp = gamepad.unwrap_or_default();
 
+        // Trim belongs to the keyboard in both paths. It must keep working even
+        // when no gamepad is connected: this method is the runtime entry point.
+        self.trim.update(dt, keys.trim_up, keys.trim_down);
+
         if gamepad.is_some() && gamepad::is_axis_touched(gp.left_stick_x, mappings.aileron.deadzone)
         {
             self.aileron
@@ -688,6 +692,7 @@ mod tests {
         let keys = PilotKeys {
             pitch_up: true,
             throttle_up: true,
+            trim_up: true,
             ..PilotKeys::default()
         };
         let mut via_gamepad_api = PilotControls::default();
@@ -701,6 +706,37 @@ mod tests {
             plain.to_control_inputs(),
             "with no gamepad connected the two paths must be identical"
         );
+    }
+
+    #[test]
+    fn trim_keys_work_while_an_analog_axis_is_active() {
+        let mut controls = PilotControls::default();
+        let initial = controls.trim.value();
+        controls.update_with_gamepad(
+            Seconds(1.0),
+            PilotKeys {
+                trim_up: true,
+                ..PilotKeys::default()
+            },
+            Some(PilotGamepad {
+                left_stick_x: 0.5,
+                ..PilotGamepad::default()
+            }),
+            &GamepadAxisMappings::default(),
+        );
+        assert!((controls.trim.value() - initial - 0.12).abs() < 1e-12);
+        assert!(controls.aileron.value() > 0.0);
+
+        controls.update_with_gamepad(
+            Seconds(1.0),
+            PilotKeys {
+                trim_down: true,
+                ..PilotKeys::default()
+            },
+            Some(PilotGamepad::default()),
+            &GamepadAxisMappings::default(),
+        );
+        assert!((controls.trim.value() - initial).abs() < 1e-12);
     }
 
     // --- キーボードの舵 ---
