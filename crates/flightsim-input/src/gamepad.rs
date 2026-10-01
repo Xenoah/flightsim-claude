@@ -20,7 +20,8 @@
 /// 1 軸ぶんのデッドゾーンと感度カーブの設定。
 ///
 /// 再バインド可能にするため、軸ごとに独立して持つ。
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AxisCurve {
     /// この大きさ以下の入力は 0 として扱う。放置したスティックのドリフト対策。
     /// 目安は 0.1。

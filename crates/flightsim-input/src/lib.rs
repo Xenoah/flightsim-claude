@@ -25,10 +25,16 @@ use flightsim_core::{Radians, Seconds};
 use flightsim_fdm::ControlInputs;
 
 pub mod camera;
+pub mod configuration;
+pub mod controllers;
 pub mod gamepad;
+pub mod native;
 
 pub use camera::{CameraRig, ViewMode};
+pub use configuration::{InputConfiguration, InputConfigurationError};
+pub use controllers::{InputDevices, InputDiagnostics, InputSettings, InputSystems};
 pub use gamepad::{AxisCurve, GamepadAxisMappings, PilotGamepad};
+pub use native::NativeControllersPlugin;
 
 /// 1 本の操縦軸。キーボード入力を連続量へ変える。
 ///
@@ -399,6 +405,68 @@ impl PilotControls {
         self.brakes = f64::from(u8::from(keys.brakes || gp.brakes));
     }
 
+    /// Sample any configured axes/buttons across all connected controllers.
+    /// Centered sticks yield to keys inside their deadzone. Absolute lever
+    /// endpoints remain meaningful, but explicit keyboard input takes priority
+    /// over a lever while held. Disconnection always restores keyboard control.
+    pub fn update_with_bindings(
+        &mut self,
+        dt: Seconds,
+        keys: PilotKeys,
+        configuration: &InputConfiguration,
+        devices: &InputDevices,
+    ) {
+        let dt = Seconds(if dt.get().is_finite() {
+            dt.get().max(0.0)
+        } else {
+            0.0
+        });
+        let sample = |binding: &Option<configuration::ControlBinding>, unipolar| {
+            binding
+                .as_ref()
+                .and_then(|binding| controllers::evaluate_binding(binding, devices, unipolar))
+        };
+        apply_mapped_surface(
+            &mut self.aileron,
+            dt,
+            keys.roll_right,
+            keys.roll_left,
+            sample(&configuration.roll, false),
+        );
+        apply_mapped_surface(
+            &mut self.elevator,
+            dt,
+            keys.pitch_up,
+            keys.pitch_down,
+            sample(&configuration.pitch, false),
+        );
+        apply_mapped_surface(
+            &mut self.rudder,
+            dt,
+            keys.yaw_right,
+            keys.yaw_left,
+            sample(&configuration.yaw, false),
+        );
+        apply_mapped_ramp(
+            &mut self.throttle,
+            dt,
+            keys.throttle_up,
+            keys.throttle_down,
+            sample(&configuration.throttle, true),
+        );
+        apply_mapped_ramp(
+            &mut self.flaps,
+            dt,
+            keys.flaps_extend,
+            keys.flaps_retract,
+            sample(&configuration.flaps, true),
+        );
+        self.trim.update(dt, keys.trim_up, keys.trim_down);
+        let brake =
+            sample(&configuration.brake, true).map_or(0.0, |sample| sample.value.clamp(0.0, 1.0));
+        self.brakes = brake.max(f64::from(u8::from(keys.brakes)));
+    }
+
     /// FDM へ渡す形にする。
     #[must_use]
     pub fn to_control_inputs(self) -> ControlInputs {
@@ -423,6 +491,45 @@ impl PilotControls {
     }
 }
 
+fn apply_mapped_surface(
+    axis: &mut AxisState,
+    dt: Seconds,
+    positive: bool,
+    negative: bool,
+    sample: Option<controllers::MappedControl>,
+) {
+    match sample.filter(|sample| sample.active) {
+        Some(sample) if sample.mode == configuration::BindingMode::Absolute => {
+            axis.set_absolute(sample.value)
+        }
+        Some(sample) if sample.value.abs() > 0.0 => {
+            axis.set_absolute(axis.value() + sample.value * axis.rate * dt.get())
+        }
+        Some(_) => axis.update(dt, false, false),
+        _ => axis.update(dt, positive, negative),
+    }
+}
+
+fn apply_mapped_ramp(
+    axis: &mut RampAxis,
+    dt: Seconds,
+    positive: bool,
+    negative: bool,
+    sample: Option<controllers::MappedControl>,
+) {
+    match sample.filter(|sample| sample.active) {
+        Some(sample)
+            if sample.mode == configuration::BindingMode::Absolute && !positive && !negative =>
+        {
+            axis.set_absolute(sample.value)
+        }
+        Some(sample) if sample.mode == configuration::BindingMode::Rate => {
+            axis.update_analog(dt, sample.value)
+        }
+        _ => axis.update(dt, positive, negative),
+    }
+}
+
 /// 視点の見回し量（コックピット視点で首を振る）。
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct LookAround {
@@ -439,8 +546,31 @@ impl Plugin for FlightsimInputPlugin {
         app.init_resource::<PilotControls>()
             .init_resource::<LookAround>()
             .init_resource::<ViewMode>()
-            .init_resource::<GamepadSettings>()
-            .add_systems(Update, (read_pilot_keys, cycle_view_mode));
+            .init_resource::<InputSettings>()
+            .init_resource::<InputDevices>()
+            .add_message::<native::NativeInputEvent>()
+            .init_resource::<InputDiagnostics>()
+            .configure_sets(
+                Update,
+                (
+                    InputSystems::Devices,
+                    InputSystems::Sample,
+                    InputSystems::Diagnostics,
+                )
+                    .chain(),
+            )
+            .add_systems(
+                Update,
+                controllers::collect_input_devices.in_set(InputSystems::Devices),
+            )
+            .add_systems(
+                Update,
+                (read_pilot_keys, controllers::cycle_mapped_view_mode).in_set(InputSystems::Sample),
+            )
+            .add_systems(
+                Update,
+                controllers::update_input_diagnostics.in_set(InputSystems::Diagnostics),
+            );
     }
 }
 
@@ -448,30 +578,11 @@ impl Plugin for FlightsimInputPlugin {
 ///
 /// [`GamepadAxisMappings`] は Bevy 非依存の純データなので、
 /// リソースにするための包みだけをこちら側に置く。
+///
+/// Legacy helper for callers of [`PilotControls::update_with_gamepad`]. The
+/// runtime plugin now uses [`InputSettings`] for multi-device mapping instead.
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct GamepadSettings(pub GamepadAxisMappings);
-
-/// 接続中のゲームパッドから 1 フレームぶんの生入力を読む。
-///
-/// 複数繋がっている場合は最初の 1 台。**未接続なら `None`** を返し、
-/// 呼び出し側はキーボードだけで更新する。
-fn read_gamepad(gamepads: &Query<&Gamepad>) -> Option<PilotGamepad> {
-    let gamepad = gamepads.iter().next()?;
-    let axis = |axis: GamepadAxis| f64::from(gamepad.get(axis).unwrap_or(0.0));
-    let trigger = |button: GamepadButton| f64::from(gamepad.get(button).unwrap_or(0.0));
-
-    Some(PilotGamepad {
-        left_stick_x: axis(GamepadAxis::LeftStickX),
-        left_stick_y: axis(GamepadAxis::LeftStickY),
-        right_stick_x: axis(GamepadAxis::RightStickX),
-        right_trigger: trigger(GamepadButton::RightTrigger2),
-        left_trigger: trigger(GamepadButton::LeftTrigger2),
-        // フラップは下げる方向が「出す」。十字キーの下 = 出す、が直感に合う。
-        flaps_extend: gamepad.pressed(GamepadButton::DPadDown),
-        flaps_retract: gamepad.pressed(GamepadButton::DPadUp),
-        brakes: gamepad.pressed(GamepadButton::South),
-    })
-}
 
 /// キーボードとゲームパッドを読んで [`PilotControls`] を更新する。
 ///
@@ -479,8 +590,8 @@ fn read_gamepad(gamepads: &Query<&Gamepad>) -> Option<PilotGamepad> {
 /// （[`PilotControls::update_with_gamepad`]）。
 pub fn read_pilot_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
-    gamepads: Query<&Gamepad>,
-    settings: Res<GamepadSettings>,
+    devices: Res<InputDevices>,
+    settings: Res<InputSettings>,
     time: Res<Time>,
     mut controls: ResMut<PilotControls>,
 ) {
@@ -501,11 +612,11 @@ pub fn read_pilot_keys(
         flaps_retract: keyboard.pressed(KeyCode::KeyG),
         brakes: keyboard.pressed(KeyCode::Space),
     };
-    controls.update_with_gamepad(
+    controls.update_with_bindings(
         Seconds(f64::from(time.delta_secs())),
         keys,
-        read_gamepad(&gamepads),
-        &settings.0,
+        &settings.configuration,
+        &devices,
     );
 }
 
