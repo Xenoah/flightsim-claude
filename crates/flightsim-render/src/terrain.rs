@@ -5,14 +5,14 @@
 //! `Commands` に反映するだけ。
 
 use bevy::prelude::*;
-use flightsim_core::Meters;
+use flightsim_core::{Meters, RenderFrame};
 use flightsim_world::{TileId, build_mesh};
 use std::collections::HashMap;
 
 /// 地形描画の調整値。
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct TerrainRenderConfig {
-    /// 1 フレームで新たに読み込むタイル数の上限。
+    /// 1 フレームの読込試行数とメッシュ準備数それぞれの上限（欠落・失敗も含む）。
     ///
     /// **ここを無制限にすると、高速で飛んだ瞬間にスタッターになる。**
     /// タイル復号の実測は 65×65 で 10.5 µs（`cargo bench -p flightsim-world`）。
@@ -43,7 +43,7 @@ impl Default for TerrainRenderConfig {
 /// 現在 ECS に存在する地形タイル。
 #[derive(Resource, Debug, Default)]
 pub struct TerrainTiles {
-    entities: HashMap<TileId, Entity>,
+    entities: HashMap<TileId, (Entity, Handle<Mesh>)>,
 }
 
 impl TerrainTiles {
@@ -62,11 +62,16 @@ impl TerrainTiles {
         self.entities.contains_key(&id)
     }
 
-    pub fn insert(&mut self, id: TileId, entity: Entity) {
-        self.entities.insert(id, entity);
+    pub fn insert(&mut self, id: TileId, entity: Entity, mesh: Handle<Mesh>) {
+        self.entities.insert(id, (entity, mesh));
     }
 
-    pub fn remove(&mut self, id: TileId) -> Option<Entity> {
+    #[must_use]
+    pub fn entity(&self, id: TileId) -> Option<Entity> {
+        self.entities.get(&id).map(|(entity, _)| *entity)
+    }
+
+    pub fn remove(&mut self, id: TileId) -> Option<(Entity, Handle<Mesh>)> {
         self.entities.remove(&id)
     }
 
@@ -79,7 +84,7 @@ impl TerrainTiles {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct TerrainTile(pub TileId);
 
-/// タイル 1 枚ぶんの実体を作る。
+/// タイル 1 枚ぶんの実体を非表示で準備する。
 ///
 /// メッシュ生成は `flightsim-world::build_mesh`（純 Rust、テスト済み）。
 /// ここは GPU 資産への登録と spawn だけ。
@@ -87,19 +92,29 @@ pub fn spawn_tile(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     material: Handle<StandardMaterial>,
+    frame: &RenderFrame,
     id: TileId,
     dem: &flightsim_world::DemTile,
-) -> Entity {
+) -> (Entity, Handle<Mesh>) {
     let source = build_mesh(id, dem, &crate::mesh_options_for(id.level));
     let handle = meshes.add(crate::to_bevy_mesh(&source));
 
-    commands
+    // Terrain runs after the regular Transforms set. Give a tile its correct
+    // initial frame immediately, even if it becomes visible in this update.
+    let transform = Transform {
+        translation: frame.to_render(source.origin),
+        rotation: frame.rotation_to_render(glam::DQuat::IDENTITY),
+        ..default()
+    };
+    let entity = commands
         .spawn((
-            crate::terrain_mesh_bundle(handle, material, source.origin),
+            crate::terrain_mesh_bundle(handle.clone(), material, source.origin),
             TerrainTile(id),
             Name::new(format!("terrain {}/{}/{}", id.level, id.x, id.y)),
         ))
-        .id()
+        .insert((transform, Visibility::Hidden))
+        .id();
+    (entity, handle)
 }
 
 /// 描画対象から外れたタイルを片付ける。
@@ -109,17 +124,39 @@ pub fn spawn_tile(
 pub fn despawn_tile(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    mesh_query: &Query<&Mesh3d, With<TerrainTile>>,
     tiles: &mut TerrainTiles,
     id: TileId,
 ) {
-    let Some(entity) = tiles.remove(id) else {
+    let Some((entity, mesh)) = tiles.remove(id) else {
         return;
     };
-    if let Ok(mesh) = mesh_query.get(entity) {
-        meshes.remove(&mesh.0);
-    }
+    // Keep the handle with the entity: a prepared mesh may become obsolete in
+    // the same Commands batch, before a Query can see the new entity.
+    meshes.remove(&mesh);
     commands.entity(entity).despawn();
+}
+
+/// Apply a complete visibility cut and release obsolete prepared meshes.
+/// Run once after registering this update's prepared entities in `TerrainTiles`.
+pub fn apply_terrain_update(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    tiles: &mut TerrainTiles,
+    update: crate::TerrainUpdate,
+) {
+    for id in update.hidden {
+        if let Some(entity) = tiles.entity(id) {
+            commands.entity(entity).insert(Visibility::Hidden);
+        }
+    }
+    for id in update.spawned {
+        if let Some(entity) = tiles.entity(id) {
+            commands.entity(entity).insert(Visibility::Inherited);
+        }
+    }
+    for id in update.despawned {
+        despawn_tile(commands, meshes, tiles, id);
+    }
 }
 
 #[cfg(test)]
@@ -150,7 +187,11 @@ mod tests {
         assert!(tiles.is_empty());
 
         let id = TileId::new(10, 1, 1);
-        tiles.insert(id, Entity::from_raw_u32(1).expect("valid entity id"));
+        tiles.insert(
+            id,
+            Entity::from_raw_u32(1).expect("valid entity id"),
+            Handle::default(),
+        );
         assert!(tiles.contains(id));
         assert_eq!(tiles.len(), 1);
         assert_eq!(tiles.ids().collect::<Vec<_>>(), vec![id]);

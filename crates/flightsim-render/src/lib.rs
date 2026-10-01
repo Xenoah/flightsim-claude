@@ -51,11 +51,7 @@
 
 use bevy::prelude::*;
 use flightsim_core::{Ecef, Geodetic, Meters, RenderFrame};
-use flightsim_world::lod::distance_to_bounds;
-use flightsim_world::{
-    DemTile, LodSelector, MeshOptions, TerrainMesh, TileCache, TileId, TileSource,
-};
-use std::collections::HashMap;
+use flightsim_world::{MeshOptions, TerrainMesh};
 
 pub mod aircraft;
 pub mod apron;
@@ -70,6 +66,7 @@ pub mod taxiway;
 pub mod taxiway_lights;
 pub mod taxiway_sign;
 pub mod terrain;
+mod terrain_selection;
 pub mod weather;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
@@ -79,6 +76,7 @@ pub use daylight::{
 pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
 pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
+pub use terrain_selection::{TerrainSelectionState, TerrainUpdate, update_terrain_selection};
 pub use weather::{CloudDeckSurface, CloudDistanceFog, CloudLayer, CloudLayerError};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**
@@ -317,85 +315,6 @@ pub fn sun_light_bundle(lighting: &SunLighting, sun: SunDirection) -> impl Bundl
     )
 }
 
-/// LOD 選択とストリーミングの結果。
-#[derive(Debug, Clone, Default)]
-pub struct TerrainUpdate {
-    /// 今フレーム新たに描画対象になったタイル。
-    pub spawned: Vec<TileId>,
-    /// 描画対象から外れたタイル。
-    pub despawned: Vec<TileId>,
-    /// 今フレーム読み込んだタイル数。
-    pub loaded: usize,
-}
-
-/// 描画対象のタイル集合を 1 フレームぶん更新する。
-///
-/// Bevy に依存しない純粋な処理として切り出してある。**テストできるようにするため。**
-/// ECS への反映は `terrain` モジュールが行う。
-///
-/// # Errors
-///
-/// タイルの読み込みに失敗した場合。読めなかったタイルは描画対象から外れるだけで、
-/// 飛行そのものは続く。
-pub fn update_terrain_selection<S: TileSource>(
-    selector: &LodSelector,
-    source: &S,
-    cache: &mut TileCache,
-    live: &mut HashMap<TileId, ()>,
-    camera: Ecef,
-    load_budget: usize,
-    mesh_sink: &mut dyn FnMut(TileId, &DemTile),
-) -> TerrainUpdate {
-    let selection = selector.select(camera);
-    let camera_geodetic = camera.to_geodetic();
-
-    let mut wanted: Vec<TileId> = selection.tiles;
-    // 近いタイルから処理する。予算が尽きても手前が優先される。
-    wanted.sort_by(|a, b| {
-        let da = distance_to_bounds(camera, camera_geodetic, a.bounds()).get();
-        let db = distance_to_bounds(camera, camera_geodetic, b.bounds()).get();
-        da.total_cmp(&db)
-    });
-
-    let mut update = TerrainUpdate::default();
-
-    for id in &wanted {
-        if live.contains_key(id) {
-            continue;
-        }
-        if update.loaded >= load_budget {
-            // 予算を超えたぶんは次フレームへ回す。ここを無制限にすると
-            // 高速で飛んだ瞬間にスタッターになる。
-            break;
-        }
-        if !cache.contains(*id) {
-            match source.load(*id) {
-                Ok(Some(tile)) => cache.insert(*id, tile),
-                // 焼かれていないタイルは存在しないのが正常（海上など）。
-                Ok(None) => continue,
-                Err(_) => continue,
-            }
-            update.loaded += 1;
-        }
-        if let Some(tile) = cache.get(*id) {
-            mesh_sink(*id, tile);
-            live.insert(*id, ());
-            update.spawned.push(*id);
-        }
-    }
-
-    let keep: std::collections::HashSet<TileId> = wanted.into_iter().collect();
-    live.retain(|id, ()| {
-        let retained = keep.contains(id);
-        if !retained {
-            update.despawned.push(*id);
-        }
-        retained
-    });
-
-    update
-}
-
 /// タイルのメッシュ生成設定を LOD レベルから決める。
 ///
 /// 深いタイルほど狭いので、同じ頂点数でも実効解像度は上がる。
@@ -611,7 +530,7 @@ mod tests {
     use super::*;
     use flightsim_core::{Degrees, Radians};
     use flightsim_world::dem::HeightGrid;
-    use flightsim_world::{MemoryTileSource, build_mesh};
+    use flightsim_world::{DemTile, LodSelector, MemoryTileSource, TileCache, TileId, build_mesh};
 
     // --- 地表の色 ---
 
@@ -864,7 +783,7 @@ mod tests {
         }
 
         let mut cache = TileCache::new(256 * 1024 * 1024);
-        let mut live = HashMap::new();
+        let mut live = TerrainSelectionState::default();
         let budget = 4;
 
         for _ in 0..3 {
@@ -910,7 +829,7 @@ mod tests {
         }
 
         let mut cache = TileCache::new(256 * 1024 * 1024);
-        let mut live = HashMap::new();
+        let mut live = TerrainSelectionState::default();
 
         // 十分な予算で東京周辺を埋める。
         for _ in 0..40 {
@@ -966,7 +885,7 @@ mod tests {
         }
 
         let mut cache = TileCache::new(64 * 1024 * 1024);
-        let mut live = HashMap::new();
+        let mut live = TerrainSelectionState::default();
         let mut meshed = 0_usize;
         for _ in 0..20 {
             update_terrain_selection(
