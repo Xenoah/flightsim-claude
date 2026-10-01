@@ -31,7 +31,6 @@ use bevy::camera::Exposure;
 use bevy::camera::primitives::Aabb;
 use bevy::pbr::{Atmosphere, ScatteringMedium};
 use bevy::prelude::*;
-use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Meters, Ned, Radians, Seconds};
 use flightsim_fdm::AircraftConfig;
 use flightsim_input::{CameraRig, FlightsimInputPlugin, PilotControls, ViewMode};
@@ -51,6 +50,8 @@ use flightsim_world::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+mod screen_capture;
 
 /// 進入練習を始めるときのスロットル。
 ///
@@ -271,6 +272,10 @@ struct Startup {
     screenshot: Option<PathBuf>,
     /// 撮るまでの待ち時間。地形の読み込みが進むのを待つ。
     screenshot_delay: f64,
+    /// Render the actual scene and UI to an image without opening a window.
+    headless_screenshot: bool,
+    /// Exit only after the PNG encoder has finished successfully.
+    exit_after_screenshot: bool,
     /// 起動時の視点。実行中は `C` で切り替えられる。
     view: ViewMode,
     /// 機体の 3D モデル。`assets/` からの相対パス。
@@ -341,6 +346,8 @@ impl Default for Startup {
             max_level: 13,
             screenshot: None,
             screenshot_delay: 5.0,
+            headless_screenshot: false,
+            exit_after_screenshot: false,
             view: ViewMode::default(),
             // 既定は同梱モデル。軸も同梱ぶんの実測値に合わせる。
             model: Some(BUNDLED_MODEL.to_owned()),
@@ -412,7 +419,7 @@ struct InteriorModel;
 #[derive(Component, Debug, Clone, Copy)]
 struct PendingModelFit(ModelFit);
 
-fn main() {
+fn main() -> bevy::app::AppExit {
     let (mut startup, mut diagnostics) = parse_arguments();
     resolve_airport_database(&mut startup, &mut diagnostics);
     // **記録の条件は空港より後に当てる。** 空港の解決が開始位置と方位を
@@ -466,67 +473,84 @@ fn main() {
         RunwaySource::OpenStreetMap { .. } => DataAttribution::new(OSM_AIRPORT_ATTRIBUTION),
     };
 
-    let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(asset_plugin).set(WindowPlugin {
-        primary_window: Some(Window {
+    let headless = startup.headless_screenshot;
+    let mut plugins = DefaultPlugins.set(asset_plugin).set(WindowPlugin {
+        primary_window: (!headless).then(|| Window {
             title: "flightsim-claude".to_owned(),
             ..default()
         }),
+        exit_condition: if headless {
+            bevy::window::ExitCondition::DontExit
+        } else {
+            bevy::window::ExitCondition::OnAllClosed
+        },
         ..default()
-    }))
-    .add_plugins((
-        FlightsimRenderPlugin,
-        FlightsimInputPlugin,
-        FlightsimUiPlugin,
-        flightsim_audio::FlightAudioPlugin,
-    ))
-    .insert_resource(clock)
-    .insert_resource(clouds)
-    .insert_resource(data_attribution)
-    .insert_resource(startup)
-    .insert_resource(diagnostics)
-    .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
-    .insert_resource(flightsim_audio::AudioSettings {
-        engine: engine_sound,
-        ..flightsim_audio::AudioSettings::default()
-    })
-    .init_resource::<CameraRig>()
-    // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
-    .add_systems(Startup, (report_arguments, setup).chain())
-    .add_systems(
-        Update,
-        (
-            advance_simulation,
-            update_camera.after(advance_simulation),
-            publish_hud.after(advance_simulation),
+    });
+    if headless {
+        plugins = plugins.disable::<bevy::winit::WinitPlugin>();
+    }
+    let mut app = App::new();
+    app.add_plugins(plugins)
+        .add_plugins((
+            FlightsimRenderPlugin,
+            FlightsimInputPlugin,
+            FlightsimUiPlugin,
+            flightsim_audio::FlightAudioPlugin,
+        ))
+        .insert_resource(clock)
+        .insert_resource(clouds)
+        .insert_resource(data_attribution)
+        .insert_resource(startup)
+        .insert_resource(diagnostics)
+        .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+        .insert_resource(flightsim_audio::AudioSettings {
+            engine: engine_sound,
+            ..flightsim_audio::AudioSettings::default()
+        })
+        .init_resource::<CameraRig>()
+        // 指摘を先に出す。**設定の誤りは、その結果より前に見えるべき。**
+        .add_systems(Startup, (report_arguments, setup).chain())
+        .add_systems(PostStartup, screen_capture::setup_offscreen_target)
+        .add_systems(
+            Update,
+            (
+                advance_simulation,
+                update_camera.after(advance_simulation),
+                publish_hud.after(advance_simulation),
+            )
+                .before(RenderSet::Rebase),
         )
-            .before(RenderSet::Rebase),
-    )
-    .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
-    .add_systems(
-        Update,
-        (
-            capture_screenshot,
-            report_terrain,
-            fit_loaded_model,
-            update_model_visibility,
-            report_landings.after(advance_simulation),
-            adjust_time_rate,
-            toggle_tutorial,
-            update_airport_lights,
-            control_replay.before(advance_simulation),
-            control_flight.before(advance_simulation),
-            publish_crash.after(advance_simulation),
-            publish_sound.after(advance_simulation),
-            publish_replay_status.after(advance_simulation),
-        ),
-    );
+        .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
+        .add_systems(
+            Update,
+            (
+                screen_capture::capture_screenshot,
+                report_terrain,
+                fit_loaded_model,
+                update_model_visibility,
+                report_landings.after(advance_simulation),
+                adjust_time_rate,
+                toggle_tutorial,
+                update_airport_lights,
+                control_replay.before(advance_simulation),
+                control_flight.before(advance_simulation),
+                publish_crash.after(advance_simulation),
+                publish_sound.after(advance_simulation),
+                publish_replay_status.after(advance_simulation),
+            ),
+        );
+
+    if headless {
+        app.add_plugins(bevy::app::ScheduleRunnerPlugin::run_loop(
+            std::time::Duration::from_secs_f64(1.0 / 60.0),
+        ));
+    }
 
     if let Some(playback) = playback {
         app.insert_resource(playback);
     }
 
-    app.run();
+    app.run()
 }
 
 /// `--replay` のファイルを読み、記録された条件を起動設定へ写す。
@@ -898,16 +922,25 @@ fn parse_arguments_from(
                 },
                 None => notes.push("--drop needs a height in metres".to_owned()),
             },
-            "--screenshot" => match next_argument_value(&mut arguments) {
-                Some(path) => startup.screenshot = Some(PathBuf::from(path)),
-                None => notes.push("--screenshot needs a PNG path".to_owned()),
+            "--screenshot" | "--headless-screenshot" => match next_argument_value(&mut arguments) {
+                Some(path) => {
+                    startup.screenshot = Some(PathBuf::from(path));
+                    if flag == "--headless-screenshot" {
+                        startup.headless_screenshot = true;
+                        startup.exit_after_screenshot = true;
+                    }
+                }
+                None => notes.push(format!("{flag} needs a PNG path")),
             },
+            "--exit-after-screenshot" => startup.exit_after_screenshot = true,
             "--screenshot-delay" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
-                    Ok(value) => startup.screenshot_delay = value,
-                    Err(_) => {
+                    Ok(value) if value.is_finite() && (0.0..=600.0).contains(&value) => {
+                        startup.screenshot_delay = value;
+                    }
+                    _ => {
                         notes.push(format!(
-                            "--screenshot-delay expects seconds; ignoring `{text}`"
+                            "--screenshot-delay expects finite seconds in 0..=600; ignoring `{text}`"
                         ));
                     }
                 },
@@ -2892,32 +2925,6 @@ fn report_terrain(
     );
 }
 
-fn capture_screenshot(
-    time: Res<Time>,
-    startup: Res<Startup>,
-    mut commands: Commands,
-    mut elapsed: Local<f64>,
-    mut done: Local<bool>,
-) {
-    let Some(path) = startup.screenshot.as_ref() else {
-        return;
-    };
-    if *done {
-        return;
-    }
-
-    *elapsed += f64::from(time.delta_secs());
-    if *elapsed < startup.screenshot_delay {
-        return;
-    }
-
-    *done = true;
-    info!("capturing a screenshot to {}", path.display());
-    commands
-        .spawn(Screenshot::primary_window())
-        .observe(save_to_disk(path.clone()));
-}
-
 /// HUD に値を配る。
 fn publish_hud(
     simulation: Res<FlightSimulation>,
@@ -2993,6 +3000,36 @@ mod tests {
         let (startup, diagnostics) =
             parse_arguments_from(args.iter().map(|argument| (*argument).to_owned()));
         (startup, diagnostics.0)
+    }
+
+    #[test]
+    fn windowless_capture_selects_a_file_and_exits_after_encoding() {
+        let (startup, notes) = parse(&["--headless-screenshot", "proof.png"]);
+        assert!(startup.headless_screenshot);
+        assert!(startup.exit_after_screenshot);
+        assert_eq!(startup.screenshot, Some(PathBuf::from("proof.png")));
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn interactive_screenshot_does_not_change_the_app_lifetime_by_default() {
+        let (startup, notes) = parse(&["--screenshot", "proof.png"]);
+        assert!(!startup.headless_screenshot);
+        assert!(!startup.exit_after_screenshot);
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn screenshot_delay_rejects_nonfinite_negative_and_unbounded_values() {
+        for value in ["NaN", "inf", "-inf", "-1", "601"] {
+            let (startup, notes) = parse(&["--screenshot-delay", value]);
+            assert!((startup.screenshot_delay - 5.0).abs() < f64::EPSILON);
+            assert_eq!(notes.len(), 1, "{value}");
+        }
+        for value in ["0", "0.25", "600"] {
+            let (_, notes) = parse(&["--screenshot-delay", value]);
+            assert!(notes.is_empty(), "{value}: {notes:?}");
+        }
     }
 
     // --- 空港 DB と開始位置の CLI ---

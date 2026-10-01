@@ -237,46 +237,19 @@ jobs:
           try {
             $quotedScreenshot = '"' + $screenshot + '"'
             $process = Start-Process -FilePath $executable `
-              -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5') `
+              -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5', '--exit-after-screenshot') `
               -WorkingDirectory $packageRoot `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 
-            # Start-Process keeps redirected stdout/stderr buffered until the child
-            # exits on this runner. Use the screenshot file itself only as a wake-up
-            # signal, then validate its bytes and every log proof after termination.
-            $deadline = [DateTime]::UtcNow.AddSeconds(90)
-            $ready = $false
-            $lastScreenshotLength = -1
-            $stableLengthPolls = 0
-            while ([DateTime]::UtcNow -lt $deadline) {
-              $process.Refresh()
-              if ($process.HasExited) {
-                throw "application exited before the smoke proof (status $($process.ExitCode))"
-              }
-              if (Test-Path -LiteralPath $screenshot -PathType Leaf) {
-                try {
-                  $length = (Get-Item -LiteralPath $screenshot).Length
-                  if ($length -gt 24 -and $length -eq $lastScreenshotLength) {
-                    $stableLengthPolls += 1
-                  } else {
-                    $stableLengthPolls = 0
-                    $lastScreenshotLength = $length
-                  }
-                  # Observe the same non-empty size three polls in a row. File
-                  # existence alone can precede the encoder's final IEND write.
-                  if ($stableLengthPolls -ge 2) {
-                    $ready = $true
-                    break
-                  }
-                } catch {
-                  # The encoder can briefly hold the file while finishing the PNG.
-                }
-              }
-              Start-Sleep -Seconds 1
+            # The app exits only after the PNG has been encoded and closed.
+            # alpha.18 saved at ~89s, too late for three stable-size observations
+            # before a 90s deadline. Wait for explicit completion, then validate.
+            if (-not $process.WaitForExit(180000)) {
+              throw 'application did not complete its screenshot within 180 seconds'
             }
-
-            if (-not $ready) {
-              throw 'application did not create a non-empty screenshot in time'
+            $process.WaitForExit()
+            if ($process.ExitCode -ne 0) {
+              throw "application screenshot failed (status $($process.ExitCode))"
             }
           } finally {
             if ($null -ne $process) {
@@ -334,6 +307,14 @@ jobs:
             ${{ runner.temp }}/flightsim-windows-smoke.log
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Include the verified screenshot with the release
+        shell: pwsh
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.png') `
+            -Destination (Join-Path $env:GITHUB_WORKSPACE "release-artifact/flightsim-claude-$env:TAG-windows-smoke.png")
 
       - name: Upload the verified bundle for publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -424,12 +405,14 @@ jobs:
 
           archive="release-artifact/$BUNDLE"
           checksum="$archive.sha256"
+          screenshot="release-artifact/flightsim-claude-$TAG-windows-smoke.png"
+          test -s "$screenshot"
           if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" --repo "$REPOSITORY" \
               --title "$TAG" --prerelease
-            gh release upload "$TAG" "$archive" "$checksum" --repo "$REPOSITORY" --clobber
+            gh release upload "$TAG" "$archive" "$checksum" "$screenshot" --repo "$REPOSITORY" --clobber
           else
-            gh release create "$TAG" "$archive" "$checksum" --repo "$REPOSITORY" \
+            gh release create "$TAG" "$archive" "$checksum" "$screenshot" --repo "$REPOSITORY" \
               --verify-tag --target "$SOURCE_SHA" --title "$TAG" \
               --generate-notes --prerelease
           fi
