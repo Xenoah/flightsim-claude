@@ -23,6 +23,7 @@
 //! - 姿勢儀のバンクは、右バンクで地平線が左下がりに見える
 
 use crate::HudState;
+use crate::attitude::AttitudeMaterial;
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians};
 
@@ -40,7 +41,7 @@ pub const INSTRUMENT_COUNT: usize = 6;
 /// 実機の計器は 3.125 インチで、隣との中心間隔はその 1.12 倍。
 /// 目から 0.78 m・視野角 60 度・高さ 720 px の画面では 71 px になる。
 /// **ここを変えると盤の穴と計器がずれる。**
-const DIAL_SIZE: f32 = 64.0;
+pub(crate) const DIAL_SIZE: f32 = 64.0;
 
 /// 計器のあいだの隙間。`DIAL_SIZE` と足して中心間隔 71 px になる値。
 const DIAL_GAP: f32 = 7.0;
@@ -345,10 +346,6 @@ const DIAL_FACE: Color = Color::srgba(0.06, 0.07, 0.08, 0.88);
 const NEEDLE_COLOR: Color = Color::srgb(0.95, 0.95, 0.90);
 /// 補助針（高度計の短針）の色。
 const SECONDARY_NEEDLE_COLOR: Color = Color::srgb(0.75, 0.85, 1.0);
-/// 空の側。
-const HORIZON_SKY: Color = Color::srgb(0.20, 0.42, 0.70);
-/// 地面の側。
-const HORIZON_GROUND: Color = Color::srgb(0.35, 0.26, 0.16);
 
 /// 計器盤の根。コックピット視点でだけ出す。
 #[derive(Component, Debug, Clone, Copy)]
@@ -379,7 +376,10 @@ pub struct DialFace;
 /// **画面下端の中央**に横並び。左上の計器列・右上の着陸評価・
 /// 左下の操作説明・右下の飛行記録・中央上のチュートリアルのどれにも
 /// 重ならない場所。
-pub fn spawn_instrument_panel(mut commands: Commands) {
+pub fn spawn_instrument_panel(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<AttitudeMaterial>>,
+) {
     #[allow(clippy::cast_precision_loss, reason = "計器は 6 個")]
     let panel_width =
         DIAL_SIZE * Instrument::COLUMNS as f32 + DIAL_GAP * (Instrument::COLUMNS as f32 - 1.0);
@@ -419,13 +419,17 @@ pub fn spawn_instrument_panel(mut commands: Commands) {
         ))
         .with_children(|panel| {
             for instrument in Instrument::all() {
-                spawn_dial(panel, instrument);
+                spawn_dial(panel, instrument, &mut materials);
             }
         });
 }
 
 /// 計器 1 つ。
-fn spawn_dial(panel: &mut ChildSpawnerCommands, instrument: Instrument) {
+fn spawn_dial(
+    panel: &mut ChildSpawnerCommands,
+    instrument: Instrument,
+    materials: &mut Assets<AttitudeMaterial>,
+) {
     panel
         .spawn((
             Node {
@@ -433,6 +437,7 @@ fn spawn_dial(panel: &mut ChildSpawnerCommands, instrument: Instrument) {
                 height: Val::Px(DIAL_SIZE),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::MAX,
                 overflow: Overflow::clip(),
                 ..default()
             },
@@ -441,7 +446,7 @@ fn spawn_dial(panel: &mut ChildSpawnerCommands, instrument: Instrument) {
         ))
         .with_children(|dial| {
             if matches!(instrument, Instrument::Attitude) {
-                spawn_horizon(dial);
+                spawn_horizon(dial, materials);
             } else {
                 spawn_needles(dial, instrument);
             }
@@ -476,46 +481,21 @@ fn spawn_dial(panel: &mut ChildSpawnerCommands, instrument: Instrument) {
         });
 }
 
-/// 姿勢儀の地平線。空と地面の 2 色を持つ板を回転・上下させる。
-fn spawn_horizon(dial: &mut ChildSpawnerCommands) {
-    // **中心を明示する。** inset を省くと親の静的配置に依存し、
-    // 回転の中心が盤面中心からずれる（実機で針がはみ出した）。
-    let size = DIAL_SIZE * 2.0;
+/// The material changes the horizon inside a fixed dial-sized quad. Bevy's
+/// rotated-child clipping is deliberately not used (Issue #33 reproduction).
+fn spawn_horizon(dial: &mut ChildSpawnerCommands, materials: &mut Assets<AttitudeMaterial>) {
     dial.spawn((
         Node {
             position_type: PositionType::Absolute,
-            width: Val::Px(size),
-            height: Val::Px(size),
-            left: Val::Percent(50.0),
-            top: Val::Percent(50.0),
-            margin: UiRect {
-                left: Val::Px(-size / 2.0),
-                top: Val::Px(-size / 2.0),
-                ..default()
-            },
-            flex_direction: FlexDirection::Column,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
             ..default()
         },
         AttitudeHorizon,
-    ))
-    .with_children(|horizon| {
-        horizon.spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(50.0),
-                ..default()
-            },
-            BackgroundColor(HORIZON_SKY),
-        ));
-        horizon.spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(50.0),
-                ..default()
-            },
-            BackgroundColor(HORIZON_GROUND),
-        ));
-    });
+        MaterialNode(materials.add(AttitudeMaterial::default())),
+    ));
 }
 
 /// 針。回転の中心を盤面中心に置くため、針の長さの 2 倍の高さを持つ
@@ -589,7 +569,8 @@ pub fn update_instrument_visibility(
 pub fn update_instruments(
     state: Res<HudState>,
     mut needles: Query<(&InstrumentNeedle, &mut UiTransform)>,
-    mut horizons: Query<&mut UiTransform, (With<AttitudeHorizon>, Without<InstrumentNeedle>)>,
+    horizons: Query<&MaterialNode<AttitudeMaterial>, With<AttitudeHorizon>>,
+    mut materials: ResMut<Assets<AttitudeMaterial>>,
     mut readouts: Query<(&InstrumentReadout, &mut Text)>,
 ) {
     let readout = HudReadout::from_state(&state);
@@ -605,15 +586,10 @@ pub fn update_instruments(
         transform.rotation = Rot2::radians(-radians);
     }
 
-    let placement = horizon_placement(state.pitch, state.roll);
-    for mut transform in &mut horizons {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "角度は [0, 2pi)。f32 の分解能で十分"
-        )]
-        let radians = placement.roll.0.get() as f32;
-        transform.rotation = Rot2::radians(-radians);
-        transform.translation = Val2::px(0.0, placement.offset);
+    for handle in &horizons {
+        if let Some(material) = materials.get_mut(handle) {
+            material.set_attitude(state.pitch, state.roll);
+        }
     }
 
     for (target, mut text) in &mut readouts {

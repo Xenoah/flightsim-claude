@@ -39,6 +39,7 @@
 use bevy::prelude::*;
 use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radians, Seconds};
 
+pub mod attitude;
 pub mod crash;
 pub mod instruments;
 mod landing;
@@ -265,7 +266,8 @@ pub struct FlightsimUiPlugin;
 
 impl Plugin for FlightsimUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<HudState>()
+        app.add_plugins(attitude::AttitudeIndicatorPlugin)
+            .init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
             .init_resource::<DataAttribution>()
             .add_systems(Startup, spawn_hud)
