@@ -41,6 +41,7 @@ use flightsim_core::{Feet, FeetPerMinute, Knots, Meters, MetersPerSecond, Radian
 
 pub mod attitude;
 pub mod crash;
+pub mod input_diagnostics;
 pub mod instruments;
 mod landing;
 pub mod pause;
@@ -48,6 +49,7 @@ pub mod replay;
 mod tutorial;
 
 pub use crash::{CrashNotice, CrashOverlay, crash_text};
+pub use input_diagnostics::InputDiagnosticsPanel;
 pub use landing::{
     LANDING_REPORT_DISPLAY_DURATION, LandingEvaluation, LandingGrade, LandingReport,
     LandingReportDisplay, LandingReportState, LandingReportTimer, evaluate_landing,
@@ -270,6 +272,9 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
             .init_resource::<DataAttribution>()
+            .init_resource::<InputDiagnosticsPanel>()
+            .add_systems(Startup, input_diagnostics::spawn_input_diagnostics)
+            .add_systems(Update, input_diagnostics::update_input_diagnostics_panel)
             .add_systems(Startup, spawn_hud)
             .add_systems(
                 Update,
@@ -452,6 +457,7 @@ pub fn help_text() -> String {
         "Esc ............... pause",
         "R ................. restart this flight",
         "F9 ................ save this flight as a replay",
+        "F10 / F11 ......... input diagnostics / next page",
         "",
         "Takeoff: throttle to full, hold S at about 60 kt,",
         "then ease off. Trim with ] so it flies hands-off.",

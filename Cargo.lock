@@ -2431,6 +2431,9 @@ dependencies = [
  "bevy",
  "flightsim-core",
  "flightsim-fdm",
+ "gilrs",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
