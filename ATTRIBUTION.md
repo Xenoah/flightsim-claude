@@ -116,4 +116,4 @@ CC BY 4.0。https://esa-worldcover.org/
 
 `assets/aircraft/swift_sport.glb` and its editable `.blend` are original procedural geometry created for this repository in Blender 4.3.2. The reproducible source is `tools/blender/build_swift_sport.py`. No third-party mesh, texture, logo or branded aircraft design is included. These assets and the source script use this repository's MIT OR Apache-2.0 license.
 
-Swift Sport is a generic two-seat sport aircraft, not certified data for any real aircraft. Its representative dynamics, camera and input settings are in `assets/aircraft/swift_sport.json`; the external model measures approximately 7.12 m long and 9.4 m span. The legacy Light Single model keeps its existing attribution and redistribution terms.
+Swift Sport is a generic two-seat sport aircraft, not certified data for any real aircraft. Its representative dynamics, camera and input settings are in `assets/aircraft/swift_sport.json`; the external model measures approximately7.12m long and9.4m span. The legacy Light Single model keeps its existing attribution and redistribution terms.

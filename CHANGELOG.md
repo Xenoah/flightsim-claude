@@ -5,18 +5,102 @@
 
 ---
 
-## 0.6.0-alpha.19 — 2026-10-01
+## 0.6.0-alpha.21 — 統合内容 (2026-10-01)
 
-- Fix keyboard elevator trim being ignored by the runtime gamepad input path, including when no controller is connected
-- Add actual-scene offscreen capture: `--headless-screenshot proof.png` renders terrain, aircraft, atmosphere and UI without a display server
-- Add `--exit-after-screenshot`; successful exit now follows completed PNG encoding, and screenshot write failure returns a failure status
-- Reject nonfinite, negative and excessive screenshot delays; wait for the aircraft model to finish fitting before capturing
-- Fix Windows release smoke's 90-second/stable-poll race by waiting for explicit application completion with a 180-second budget
-- Attach the verified Windows software-D3D12 screenshot to releases alongside the ZIP and checksum
+**以下は alpha.21 の統合ソースの変更。配布の成否は Releases の公開アセットで確認する。**
+PBF #40・geoid #41・姿勢計 #43・入力 #44・乱流 #45・機体 #46・net #47・滑走路 #48 は
+それぞれ exact-head の全 CI と独立 review を経て staging に取り込み済み。
+Windows 配布は main の CI と展開した zip の 2 機種 smoke 成功を条件とする。
+実装・数値試験・画像確認・配布の根拠を [統合 QA](docs/qa/overnight-status-2026-10-01.md)
+に分けて記録する。
 
-Software render checks do not certify physical GPUs, drivers, controller hardware or frame rate.
+#### 追加
 
-## [Unreleased]
+- Light Single / オリジナル Swift Sport の version-1 JSON profile。
+  FDM・モデル・視点・音・入力 rate・進入初期値を選択し、不正値や model 欠落を起動時に拒否。
+  Swift Sport の Blender 生成スクリプト・編集用 `.blend`・`.glb` を含む
+- 複数 controller の軸/ボタン割り当て、校正・反転・deadzone・response の保存/再読込、
+  F10/F11 診断。stock gamepad が落とす native channel は明示 `--native-controllers` で扱う
+- `flightsim-net` の決定論的合成交通、識別・距離・方位・相対高度表示、version-1 UDP の
+  local/LAN 作成・参加・退出・再接続。受信状態は自機物理へ書き戻さない
+- EGM2008 / EGM96 の利用者提供 GeographicLib PGM グリッドによる offline `h = H + N`
+  正規化、CRS・単位・datum の検査、欠落 datum の明示指定、invocation provenance
+- 実 DEM 上の水平に近い 360 秒・17.533 km の visual-QA 用 replay fixture generator。
+  4 回の aircraft-anchor rebase、全 keyframe / 最終状態の exact replay を数値検査する
+- alpha.21 配布 workflow に両 profile / GLB と Swift `.blend` の同梱検査、展開 zip からの
+  Light Single cockpit / Swift Sport chase の個別撮影ゲートを追加。両ケースの成功後にだけ配布する
+
+#### 修正
+
+- 安全修正版 `vendor/osmpbf` が overflow、index、UTF-8、enum、配列長、zlib 終端を
+  iterator に渡す前に拒否。17 hostile fixture と正常 FSAP の byte 互換性を検査
+- tilegen の日付変更線・GeoTIFF metadata・出力 alias/失敗境界を修正。
+  タイルごとの原子的置換と INCOMPLETE / COMPLETE provenance を導入
+- 旧姿勢計の回転 child の clip 不具合を実 Bevy で再現し、固定円形 material mask へ置換。
+  正負 bank / 極端 pitch の 36 case の pixel 検査を追加
+- replay の frame-zero 初期状態、最大 240 frame/更新の後退再実行、時計・端数・飛行記録、
+  日照・pause/seek/fault/終了時の音と表示を同期。記録条件より live 初期設定が勝つ経路を修正
+- replay ファイルの非有限/領域外の数値、時間積・総和の overflow を読書き境界で拒否。
+  正しい v1 bytes と zero-dt は保存。app の in-memory record / visual epoch / drift も検査
+- F9 の保存名を原子的に確保し、既存記録や並行保存との競合による上書きを防止
+- 乱流を物理 step の時刻で評価し、空力と TAS の突風相対速度を一致させる。
+  ECEF の連続場で日付変更線と極の seam を修正。24 数値シナリオと 3 本の severe 10 分走行を検査
+- コックピットカメラを現フレーム Transform の後に更新。origin 変更・restart/rewind の
+  chase/free 平滑化履歴をリセットし、tower の world anchor と LOD 観測点を維持
+- 滑走路・標示を共通の最大 10 m DEM grid に沿わせ、灯火を地形追従・垂直発光面付きへ変更
+- 2 機種の進入専用 trim / pitch / throttle を設定し、30 秒の無操縦進入を検査。
+  速度計は実データに合わせて IAS から TAS の表示へ訂正。
+  極端な V/S の数値を短い k 表記へ変更し、符号・桁数・超過表示を回帰検査
+- replay の初期状態と step 後の座標が f32 描画・LOD 距離計算で有限になることを検査。
+  1e30 / 1e39 の有限だが描画不能な入力を実 CLI で起動前に終了コード 2 へ拒否
+
+#### 互換性と残る範囲
+
+- 乱流の seed が表す場と物理時計が変わるため、旧 build の乱流 replay は再現性を保証しない。
+  `.fsreplay` v1 / `.fsdem` の byte 形式は維持するが、不正 replay の暗黙修復は廃止
+- 旧 `.fsdem` は自動変換しない。正しい datum で別出力先へ焼き直す。
+  DEM / geoid / OSM 地域データは同梱しない。per-file atomic output は directory transaction ではない
+- 物理 controller / GPU / スピーカー、人の乱流操縦感、実複数マシン LAN は未検証。
+  汎用 aircraft / 数値進入試験は実機認証でも全飛行領域の保証でもない
+- local/LAN は信頼できる参加者専用。認証・暗号化・NAT・公開 Internet 対応や live ADS-B は含まない
+- 実 DEM の夜間・降下画像で発見した camera lag / runway burial は修正した。
+  360 秒巡航は native app で完走し、4 回の実 render-origin rebase と地形/地平線の完了画像を確認。
+  これは sampled visual evidence であり、全遷移を網羅しない。LOD mesh と DEM の差による
+  路面遮蔽と 1.5 NM 夜間進入での灯火視認性は残る。極端な V/S の短縮表示は数値試験と
+  最新 app の降下画像で再確認済み
+- 最終 candidate の native app 2 プロセスで join・8 秒 host 停止後の新 session 再参加・F12 退出を確認。
+  当初疑った文字欠けは針と小さい計器文字の重なりと切り分け、原寸画像・単独実行・native resize
+  で独立した欠落不具合を再現しなかった。全 UI pixel の正常性や未撮影の STALE badge は主張しない
+
+---
+
+## [0.6.0-alpha.20] — 2026-10-01
+
+**Windows の screenshot batch 終了を修正し、19:08:32 UTC に公開。**
+
+- PR #42 は PNG を所有する writer で書き切り、flush / sync / close と stdout/stderr flush の
+  後に batch のみ終了コード 0 / 1 で終える。graphics destructor の完了を待たない。
+  interactive mode が終了しないことも subprocess regression で確認
+- `workflow_run` の検査済み source SHA と現 main SHA が違う古い release 起動を抑止。
+  PNG の完結性、model、batch-completion marker、process exit を独立に検査
+- source `f3d32d816cc625d10e4309f3506c150280e749a5` の
+  [main CI](https://github.com/Xenoah/flightsim-claude/actions/runs/36907426362) と
+  [Windows release](https://github.com/Xenoah/flightsim-claude/actions/runs/36909649587) が成功。
+  実アーカイブを取得し、metadata / exe / model / license と公開 PNG を確認
+- zip SHA-256: `252a402b5eed5ba42722449dde3beff6acd5ce516aa000e04335e09e81919953`
+- 追加機能の alpha.21 配布を意味しない。実 GPU・通常の interactive Windows 終了は別検証
+
+---
+
+## 0.6.0-alpha.19 開発記録 — 2026-10-01（Windows 配布失敗）
+
+- 実行時の昇降舵 trim、表示サーバー無しの actual-scene capture、撮影失敗の非ゼロ終了、
+  screenshot 完了待ちを修正（#38 / #39）
+- source `5782496024b872e5b54eeb45c0c021fe41203201` の
+  [Windows release run](https://github.com/Xenoah/flightsim-claude/actions/runs/36898555726) は
+  約 104 秒で完全な PNG を保存したが、180 秒で process が終わらず smoke が失敗した。
+  PNG 保存だけを配布成功に数えない。alpha.20 の修正・公開と区別して履歴を残す
+- graphics teardown の停止はログからの推測で、stack trace による原因確定ではない
 
 ---
 
@@ -1460,7 +1544,8 @@ M2（描画）に入る前の欠陥掃除と、性能測定の基盤整備。
   両者は場所により最大 100m 程度ずれる
 - ベンチマークが未整備。性能について測定に基づく主張ができない
 
-[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.12...HEAD
+[Unreleased]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.20...HEAD
+[0.6.0-alpha.20]: https://github.com/Xenoah/flightsim-claude/releases/tag/v0.6.0-alpha.20
 [0.6.0-alpha.12]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.11...v0.6.0-alpha.12
 [0.6.0-alpha.11]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.10...v0.6.0-alpha.11
 [0.6.0-alpha.10]: https://github.com/Xenoah/flightsim-claude/compare/v0.6.0-alpha.9...v0.6.0-alpha.10

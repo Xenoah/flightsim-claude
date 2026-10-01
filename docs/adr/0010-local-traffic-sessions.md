@@ -33,6 +33,3 @@ not presented as live aircraft data.
 
 The core CI group and architecture script include net, keeping its test loop free of
 rendering dependencies. UI receives plain display data, preserving sibling separation.
-
-The library component supplies providers, transport and protocol validation. The
-opt-in app CLI, peer rendering and traffic panel are integrated separately.

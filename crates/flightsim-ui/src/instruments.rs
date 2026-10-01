@@ -102,10 +102,10 @@ impl Instrument {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Airspeed => "IAS",
+            Self::Airspeed => "TAS",
             Self::Attitude => "ATT",
             Self::Altitude => "ALT",
-            Self::VerticalSpeed => "V/S",
+            Self::VerticalSpeed => "V/S fpm",
             Self::Heading => "HDG",
             Self::Power => "PWR",
         }
@@ -296,7 +296,16 @@ pub fn instrument_readout(instrument: Instrument, state: &HudReadout) -> String 
         Instrument::Airspeed => format!("{:.0} kt", state.airspeed.get().max(0.0)),
         Instrument::Attitude => format!("{:.0} / {:.0}", state.pitch_degrees, state.roll_degrees),
         Instrument::Altitude => format!("{:.0} ft", state.altitude.get()),
-        Instrument::VerticalSpeed => format!("{:.0} fpm", state.vertical_speed.get()),
+        Instrument::VerticalSpeed => {
+            let value = finite_or_zero(state.vertical_speed.get());
+            if value.abs() > 999_999.0 {
+                "OVR".into()
+            } else if value.abs() >= 1000.0 {
+                format!("{:.1}k", value / 1000.0)
+            } else {
+                format!("{value:.0}")
+            }
+        }
         Instrument::Heading => format!("{:.0} deg", state.heading_degrees),
         Instrument::Power => format!("{:.0} / {:.0} %", state.throttle, state.flaps),
     }
@@ -981,6 +990,27 @@ mod tests {
     }
 
     // --- 表示 ---
+
+    #[test]
+    fn vertical_speed_readouts_fit_the_dial_in_extreme_descent() {
+        for (value, expected) in [
+            (-450.0, "-450"),
+            (1000.0, "1.0k"),
+            (-12_345.0, "-12.3k"),
+            (-999_999.0, "-1000.0k"),
+            (1_000_000.0, "OVR"),
+            (f64::NAN, "0"),
+        ] {
+            let state = HudReadout {
+                vertical_speed: FeetPerMinute(value),
+                ..HudReadout::default()
+            };
+            let text = instrument_readout(Instrument::VerticalSpeed, &state);
+            assert_eq!(text, expected);
+            assert!(text.is_ascii() && text.len() <= 8);
+        }
+        assert_eq!(Instrument::VerticalSpeed.label(), "V/S fpm");
+    }
 
     #[test]
     fn every_readout_is_ascii() {

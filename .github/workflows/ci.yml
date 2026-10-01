@@ -78,7 +78,7 @@ jobs:
         os: [windows-latest, ubuntu-latest]
 
     env:
-      RENDER: -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-app
+      RENDER: -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-audio -p flightsim-app
 
     steps:
       - uses: actions/checkout@v4

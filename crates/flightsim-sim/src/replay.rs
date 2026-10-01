@@ -89,6 +89,16 @@ pub const MAX_FRAMES: u32 = 1_000_000;
 /// 機体名として受け付けるバイト数の上限。
 pub const MAX_NAME_BYTES: u32 = 256;
 
+/// Largest supported visual-clock Julian date: UTC 2147483647-12-31 midnight.
+///
+/// The visual calendar uses an `i32` year. Reserving its final day provides
+/// rounding headroom, and this bound also keeps calendar and solar arithmetic
+/// finite. It is a representation limit, not a claim of astronomical accuracy
+/// at remote dates. Epoch zero in [`Conditions`] remains "not recorded".
+/// A caller resolving that sentinel must check its chosen origin plus the
+/// scaled recording duration against this same bound.
+pub const MAX_VISUAL_EPOCH: f64 = 784_354_017_363.5;
+
 /// 再生速度の下限。0 は「停止」であって速度ではないので [`Player::set_paused`] を使う。
 pub const MIN_SPEED: f64 = 0.1;
 
@@ -111,7 +121,7 @@ const KEYFRAME_BYTES: usize = 4 + 8 * 13;
 /// `frame_time` を渡せば同じ割り方になる。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Frame {
-    /// このフレームで進めた時間。
+    /// このフレームで進めた時間。ファイル境界では有限・非負（0 も有効）。
     pub frame_time: Seconds,
     /// このフレームで与えた操縦入力。
     pub controls: ControlInputs,
@@ -124,7 +134,7 @@ pub struct Frame {
 pub struct Keyframe {
     /// このキーフレームが対応するフレーム番号（このフレームを進める**前**の状態）。
     pub frame: u32,
-    /// そのときの剛体状態。
+    /// そのときの剛体状態。有限なベクトルと単位 quaternion を保存する。
     pub state: RigidBodyState,
 }
 
@@ -150,8 +160,9 @@ pub struct Conditions {
     /// **「時刻」ではなく暦上の一点**を持つ。時分だけだと日付が落ち、
     /// 夏至と冬至で太陽高度が変わってしまう。
     /// 0 は「記録側が時刻を持っていない」印で、再生側は既定の時刻を使う。
+    /// ファイルでは有限な `0..=MAX_VISUAL_EPOCH` に限る。
     pub start_epoch: f64,
-    /// 記録時の時間加速率。
+    /// 記録時の時間加速率。ファイルでは有限・非負に限る。
     pub time_rate: f64,
 }
 
@@ -292,7 +303,11 @@ impl Recording {
     /// **壁時計時間ではない。** 記録時に時間加速していれば実時間より長い。
     #[must_use]
     pub fn duration(&self) -> Seconds {
-        Seconds(self.frames.iter().map(|frame| frame.frame_time.get()).sum())
+        Seconds(
+            self.frames
+                .iter()
+                .fold(0.0, |elapsed, frame| elapsed + frame.frame_time.get()),
+        )
     }
 
     /// `frame` 以下で最も後ろのキーフレーム。後退シークの開始点。
@@ -364,6 +379,8 @@ impl Recorder {
     ///
     /// **上限に達したら黙って捨てる。** ここでエラーを返しても呼び出し側は
     /// 飛行中に何もできない。[`Self::is_full`] で先に気付ける。
+    /// 数値はここでは検証しない。不正な記録は [`Recording::write_to`] と
+    /// [`Recording::check_reproducible_with`] がエラーにする。
     pub fn record(
         &mut self,
         frame_time: Seconds,
@@ -515,7 +532,12 @@ impl Player {
         if self.paused || !real_frame_time.get().is_finite() || real_frame_time.get() <= 0.0 {
             return;
         }
-        self.budget = Seconds(self.budget.get() + real_frame_time.get() * self.speed);
+        let budget = self.budget.get() + real_frame_time.get() * self.speed;
+        // Finite operands can still overflow in either operation. Ignore that
+        // update, preserving the previous usable budget, just as for NaN input.
+        if budget.is_finite() {
+            self.budget = Seconds(budget);
+        }
     }
 
     /// 溜めた時間の範囲で次のフレームを 1 つ配る。無ければ `None`。
@@ -608,6 +630,15 @@ pub enum ReplayError {
         /// 問題のあったフレーム番号。
         frame: u32,
     },
+    /// 数値が非有限、定義域外、または計算結果が表現可能な範囲を超える。
+    InvalidValue {
+        /// 問題のあった項目。
+        field: &'static str,
+        /// フレーム内の項目なら、その番号。
+        frame: Option<u32>,
+        /// 満たすべき条件。
+        requirement: &'static str,
+    },
     /// 再生しようとした条件が記録と違う。
     ConditionsMismatch {
         /// 何が違うか。
@@ -644,6 +675,17 @@ impl std::fmt::Display for ReplayError {
                 formatter,
                 "keyframe {frame} is out of range or out of order; the file is corrupt"
             ),
+            Self::InvalidValue {
+                field,
+                frame,
+                requirement,
+            } => {
+                write!(formatter, "invalid replay {field}")?;
+                if let Some(frame) = frame {
+                    write!(formatter, " at frame {frame}")?;
+                }
+                write!(formatter, ": {requirement}")
+            }
             Self::ConditionsMismatch { detail } => {
                 write!(formatter, "this replay cannot be reproduced here: {detail}")
             }
@@ -667,6 +709,51 @@ impl From<std::io::Error> for ReplayError {
 }
 
 impl Recording {
+    // Recorder deliberately retains its infallible, permissive API. File
+    // boundaries and reproducibility checks validate the resulting recording.
+    fn validate(&self) -> Result<(), ReplayError> {
+        for (what, declared, maximum) in [
+            (
+                "bytes of aircraft name",
+                self.conditions.aircraft_name.len(),
+                MAX_NAME_BYTES as usize,
+            ),
+            ("frames", self.frames.len(), MAX_FRAMES as usize),
+            (
+                "keyframes",
+                self.keyframes.len(),
+                self.frames.len() / KEYFRAME_INTERVAL as usize + 1,
+            ),
+        ] {
+            if declared > maximum {
+                return Err(ReplayError::TooLarge {
+                    what,
+                    declared: u64::try_from(declared).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+                });
+            }
+        }
+        validate_conditions(&self.conditions)?;
+        let mut duration = 0.0;
+        for (index, frame) in (0_u32..).zip(&self.frames) {
+            validate_frame_values(&frame_values(frame), index)?;
+            duration = add_duration(duration, frame, index)?;
+        }
+        validate_visual_duration(&self.conditions, duration)?;
+        let mut previous = None;
+        for keyframe in &self.keyframes {
+            let frame = keyframe.frame;
+            if frame as usize >= self.frames.len().max(1)
+                || previous.is_some_and(|last| frame <= last)
+            {
+                return Err(ReplayError::InvalidKeyframe { frame });
+            }
+            validate_keyframe_state(&keyframe.state, frame)?;
+            previous = Some(frame);
+        }
+        Ok(())
+    }
+
     /// 再生しようとしている機体で、この記録が再現できるか調べる。
     ///
     /// **名前ではなく指紋で見る。** 同じ名前で係数を書き換えた機体で再生すると
@@ -674,8 +761,9 @@ impl Recording {
     ///
     /// # Errors
     ///
-    /// 諸元の指紋が一致しないとき [`ReplayError::ConditionsMismatch`]。
+    /// 記録の数値が不正なとき、または諸元の指紋が一致しないとき。
     pub fn check_reproducible_with(&self, config: &AircraftConfig) -> Result<(), ReplayError> {
+        self.validate()?;
         let actual = aircraft_fingerprint(config);
         if actual == self.conditions.aircraft_fingerprint {
             return Ok(());
@@ -693,13 +781,14 @@ impl Recording {
     ///
     /// # Errors
     ///
-    /// 書き込みに失敗したとき [`ReplayError::Io`]。
+    /// 数値・個数・名前長・キーフレームが不正なとき、および書き込みに失敗したとき。
+    /// データの検証は最初の書き込みより前に終える（I/O 自体は非 atomic）。
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ReplayError> {
+        self.validate()?;
         writer.write_all(&MAGIC)?;
         writer.write_all(&FORMAT_VERSION.to_le_bytes())?;
 
         let name = self.conditions.aircraft_name.as_bytes();
-        let name = &name[..name.len().min(MAX_NAME_BYTES as usize)];
         writer.write_all(&u32::try_from(name.len()).unwrap_or(0).to_le_bytes())?;
         writer.write_all(name)?;
 
@@ -722,16 +811,7 @@ impl Recording {
 
         for frame in &self.frames {
             let mut bytes = [0_u8; FRAME_BYTES];
-            let controls = frame.controls;
-            for (slot, value) in bytes.chunks_exact_mut(8).zip([
-                frame.frame_time.get(),
-                controls.aileron(),
-                controls.elevator(),
-                controls.rudder(),
-                controls.throttle(),
-                controls.flaps(),
-                controls.brakes(),
-            ]) {
+            for (slot, value) in bytes.chunks_exact_mut(8).zip(frame_values(frame)) {
                 slot.copy_from_slice(&value.to_le_bytes());
             }
             writer.write_all(&bytes)?;
@@ -769,7 +849,7 @@ impl Recording {
     ///
     /// # Errors
     ///
-    /// 識別子・版・個数・キーフレームの整合性のいずれかが崩れているとき、
+    /// 識別子・版・個数・数値の定義域・キーフレームの整合性が崩れているとき、
     /// および読み込みに失敗したとき。
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self, ReplayError> {
         let mut magic = [0_u8; 8];
@@ -829,6 +909,7 @@ impl Recording {
             start_epoch,
             time_rate,
         };
+        validate_conditions(&conditions)?;
 
         let frame_count = read_u32(reader)?;
         if frame_count > MAX_FRAMES {
@@ -857,7 +938,8 @@ impl Recording {
                 count: frame_count as usize,
             })?;
         let mut bytes = [0_u8; FRAME_BYTES];
-        for _ in 0..frame_count {
+        let mut duration = 0.0;
+        for index in 0..frame_count {
             reader.read_exact(&mut bytes)?;
             let mut values = [0.0_f64; 7];
             for (value, chunk) in values.iter_mut().zip(bytes.chunks_exact(8)) {
@@ -865,13 +947,17 @@ impl Recording {
                 eight.copy_from_slice(chunk);
                 *value = f64::from_le_bytes(eight);
             }
-            frames.push(Frame {
-                // 入力の範囲外・NaN は `ControlInputs` が潰す。
+            // Reject before ControlInputs can silently sanitize corruption.
+            validate_frame_values(&values, index)?;
+            let frame = Frame {
                 frame_time: Seconds(values[0]),
                 controls: ControlInputs::new(values[1], values[2], values[3], values[4], values[5])
                     .with_brakes(values[6]),
-            });
+            };
+            duration = add_duration(duration, &frame, index)?;
+            frames.push(frame);
         }
+        validate_visual_duration(&conditions, duration)?;
 
         let mut keyframes = Vec::new();
         keyframes
@@ -899,18 +985,14 @@ impl Recording {
                 eight.copy_from_slice(chunk);
                 *value = f64::from_le_bytes(eight);
             }
-            keyframes.push(Keyframe {
-                frame,
-                state: RigidBodyState {
-                    position: flightsim_core::Ecef::new(values[0], values[1], values[2]),
-                    velocity: DVec3::new(values[3], values[4], values[5]),
-                    // 正規化する。ビットが 1 つ壊れただけで回転が発散する。
-                    orientation: normalized_or_identity(DQuat::from_xyzw(
-                        values[6], values[7], values[8], values[9],
-                    )),
-                    angular_velocity: DVec3::new(values[10], values[11], values[12]),
-                },
-            });
+            let state = RigidBodyState {
+                position: flightsim_core::Ecef::new(values[0], values[1], values[2]),
+                velocity: DVec3::new(values[3], values[4], values[5]),
+                orientation: DQuat::from_xyzw(values[6], values[7], values[8], values[9]),
+                angular_velocity: DVec3::new(values[10], values[11], values[12]),
+            };
+            validate_keyframe_state(&state, frame)?;
+            keyframes.push(Keyframe { frame, state });
         }
 
         Ok(Self {
@@ -921,29 +1003,180 @@ impl Recording {
     }
 }
 
-/// 単位長でない回転だけを直す。長さが 0 や非有限なら無回転に倒す。
-///
-/// **既に単位長なら 1 ビットも触らない。** 無条件に割ると、割り算の丸めで
-/// 最下位ビットが変わることがある。それだけで書き出した記録と読み戻した
-/// 記録が別物になり、往復の一致検査が落ちる。
-///
-/// 実際に落ちた: Linux で `length()` が厳密に 1.0 にならず、Windows では
-/// なっていたため、同じファイルが OS によって別の値に読めていた。
-fn normalized_or_identity(quaternion: DQuat) -> DQuat {
-    let length = quaternion.length();
-    if !length.is_finite() || length <= 1e-9 {
-        return DQuat::IDENTITY;
+/// Validate without changing the stored bits: repairing corruption would make a
+/// different flight appear to be the original recording.
+fn require_valid(
+    valid: bool,
+    field: &'static str,
+    frame: Option<u32>,
+    requirement: &'static str,
+) -> Result<(), ReplayError> {
+    if valid {
+        Ok(())
+    } else {
+        Err(ReplayError::InvalidValue {
+            field,
+            frame,
+            requirement,
+        })
     }
-    // 単位長からの許容。姿勢の積分で溜まる誤差より十分広く、
-    // 壊れた値を見逃すには十分狭い。
-    if (length - 1.0).abs() <= 1e-12 {
-        return quaternion;
+}
+
+fn validate_conditions(conditions: &Conditions) -> Result<(), ReplayError> {
+    for (field, value) in [
+        ("start latitude", conditions.start.latitude.get()),
+        ("start longitude", conditions.start.longitude.get()),
+        ("start altitude", conditions.start.altitude.get()),
+        ("start heading", conditions.heading.get()),
+        ("wind direction", conditions.wind.from.get()),
+        ("wind speed", conditions.wind.speed.get()),
+        (
+            "turbulence intensity",
+            conditions.turbulence.intensity.get(),
+        ),
+        ("start epoch", conditions.start_epoch),
+        ("time rate", conditions.time_rate),
+    ] {
+        require_valid(value.is_finite(), field, None, "must be finite")?;
     }
-    DQuat::from_xyzw(
-        quaternion.x / length,
-        quaternion.y / length,
-        quaternion.z / length,
-        quaternion.w / length,
+    require_valid(
+        (-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2)
+            .contains(&conditions.start.latitude.get()),
+        "start latitude",
+        None,
+        "must be in [-pi/2, pi/2] radians",
+    )?;
+    require_valid(
+        (-std::f64::consts::PI..=std::f64::consts::PI).contains(&conditions.start.longitude.get()),
+        "start longitude",
+        None,
+        "must be in [-pi, pi] radians",
+    )?;
+    require_valid(
+        conditions.start.to_ecef().0.length_squared().is_finite(),
+        "start altitude",
+        None,
+        "must give a representable squared ECEF magnitude",
+    )?;
+    for (field, value) in [
+        ("wind speed", conditions.wind.speed.get()),
+        (
+            "turbulence intensity",
+            conditions.turbulence.intensity.get(),
+        ),
+    ] {
+        require_valid(
+            value >= 0.0 && (value * value).is_finite(),
+            field,
+            None,
+            "must be nonnegative with a representable squared magnitude",
+        )?;
+    }
+    require_valid(
+        (0.0..=MAX_VISUAL_EPOCH).contains(&conditions.start_epoch),
+        "start epoch",
+        None,
+        "must be zero (unspecified) or a supported positive Julian date",
+    )?;
+    require_valid(
+        conditions.time_rate >= 0.0,
+        "time rate",
+        None,
+        "must be nonnegative",
+    )
+}
+
+fn frame_values(frame: &Frame) -> [f64; 7] {
+    [
+        frame.frame_time.get(),
+        frame.controls.aileron(),
+        frame.controls.elevator(),
+        frame.controls.rudder(),
+        frame.controls.throttle(),
+        frame.controls.flaps(),
+        frame.controls.brakes(),
+    ]
+}
+
+fn validate_frame_values(values: &[f64; 7], frame: u32) -> Result<(), ReplayError> {
+    require_valid(
+        values[0].is_finite() && values[0] >= 0.0,
+        "frame duration",
+        Some(frame),
+        "must be finite and nonnegative",
+    )?;
+    for (index, field) in [
+        "aileron", "elevator", "rudder", "throttle", "flaps", "brakes",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let minimum = if index < 3 { -1.0 } else { 0.0 };
+        require_valid(
+            (minimum..=1.0).contains(&values[index + 1]),
+            field,
+            Some(frame),
+            if index < 3 {
+                "must be finite and in [-1, 1]"
+            } else {
+                "must be finite and in [0, 1]"
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn add_duration(elapsed: f64, frame: &Frame, index: u32) -> Result<f64, ReplayError> {
+    let total = elapsed + frame.frame_time.get();
+    require_valid(
+        total.is_finite(),
+        "recording duration",
+        Some(index),
+        "the cumulative duration must be finite",
+    )?;
+    Ok(total)
+}
+
+fn validate_visual_duration(conditions: &Conditions, duration: f64) -> Result<(), ReplayError> {
+    // Match the app's multiplication-before-division order. A finite epoch and
+    // finite rate alone do not protect the derived visual clock from overflow.
+    let elapsed = duration * conditions.time_rate;
+    require_valid(
+        elapsed.is_finite(),
+        "visual duration",
+        None,
+        "duration multiplied by time rate must remain finite",
+    )?;
+    let end = conditions.start_epoch + elapsed / 86_400.0;
+    require_valid(
+        end.is_finite() && end <= MAX_VISUAL_EPOCH,
+        "visual end epoch",
+        None,
+        "must remain within the supported Julian date range",
+    )
+}
+
+fn validate_keyframe_state(state: &RigidBodyState, frame: u32) -> Result<(), ReplayError> {
+    for (field, vector) in [
+        ("keyframe position", state.position.0),
+        ("keyframe velocity", state.velocity),
+        ("keyframe angular velocity", state.angular_velocity),
+    ] {
+        require_valid(
+            vector.is_finite() && vector.length_squared().is_finite(),
+            field,
+            Some(frame),
+            "components and squared magnitude must be finite",
+        )?;
+    }
+    // Preserve the old tolerance for already-unit quaternions, but reject
+    // corruption instead of normalizing it or silently substituting identity.
+    // In particular, never divide a valid quaternion: its bits are replay data.
+    require_valid(
+        state.orientation.is_finite() && (state.orientation.length() - 1.0).abs() <= 1e-12,
+        "keyframe orientation",
+        Some(frame),
+        "must be a finite unit quaternion (length tolerance 1e-12)",
     )
 }
 

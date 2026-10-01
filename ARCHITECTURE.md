@@ -14,7 +14,7 @@
 |---|---|---|
 | 地球規模の座標精度 | `f32` で ECEF を扱うと地表で約 0.5m 量子化し、機体が振動する | 世界座標は **`f64` ECEF 固定**。描画直前に **floating origin** で `f32` ローカル座標へ落とす（[ADR-0002](docs/adr/0002-coordinate-system.md)） |
 | 時間ステップの安定性 | 可変 dt で剛体積分すると失速・接地時に発散する | FDM は **固定 dt の内部サブステップ + RK4**。描画フレームレートから完全に分離（[ADR-0004](docs/adr/0004-simulation-loop.md)） |
-| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world`/`sim`/`tilegen` はエンジン非依存の純 Rust**。Bevy は `render`/`input`/`ui`/`audio`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
+| 依存の汚染 | 物理コードがレンダラを参照し始めるとテストもCIも不可能になる | **`core`/`fdm`/`world`/`sim`/`tilegen`/`net` はエンジン非依存の純 Rust**。Bevy は `render`/`input`/`ui`/`audio`/`app` のみ（[ADR-0001](docs/adr/0001-engine-selection.md)） |
 
 3番目が今回の技術選定の実利そのもの。`cargo test -p flightsim-fdm` が GUI もアセットもなしに数秒で回るからこそ、QA エージェントが回帰網を維持できる。**この境界を壊す PR はレビューで落とす。**
 
@@ -24,28 +24,25 @@
 
 依存は**下から上への一方向のみ**。逆流と横断は禁止。
 
+```text
+                         flightsim-app
+             /          /       |       \          \
+          render      input     ui     audio       net
+             \          \       |       /          |
+                         sim                      core
+                       /     \
+                    world    fdm
+                       \     /
+                         core
+
+     tilegen -> world/core (offline only)
+     assetgen (offline only)
 ```
-                    ┌─────────────────┐
-                    │ flightsim-app   │  統合バイナリ・シーン構築・状態遷移
-                    └────────┬────────┘
-       ┌─────────┬────────┬──┴──┬────────┬─────────┐
-       ▼         ▼        ▼     ▼        ▼         ▼
-  ┌────────┐ ┌───────┐ ┌────┐ ┌───────┐ ┌────────┐
-  │ render │ │ input │ │ ui │ │ audio │ │ net(後)│   ← Bevy 依存層
-  └───┬────┘ └───┬───┘ └─┬──┘ └───┬───┘ └───┬────┘
-      └──────────┴───────┴────┬───┴─────────┘
-                              ▼
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-        ┌──────────┐                    ┌──────────┐
-        │  world   │                    │   fdm    │      ← 純 Rust（Bevy 非依存）
-        └────┬─────┘                    └────┬─────┘
-             └──────────────┬────────────────┘
-                            ▼
-                     ┌─────────────┐
-                     │    core     │  座標系・単位・時刻。他に一切依存しない
-                     └─────────────┘
-```
+
+`net` は Bevy / FDM / world に依存しない純 Rust の UDP・交通データ層。
+ECEF のスナップショットと通信状態を app が描画・UI に結線する。
+通信時刻は `Time<Real>`、合成交通の時刻は simulation の固定時間を使い、
+通信の遅延や到着順を自機の物理積分へ混ぜない（[ADR-0010](docs/adr/0010-local-traffic-sessions.md)）。
 
 | クレート | 責務 | Bevy 依存 | 担当エージェント |
 |---|---|:---:|---|
@@ -57,6 +54,7 @@
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
 | `flightsim-audio` | エンジン音・風切り音・失速警報。**波形はコードで合成する**（[ADR-0009](docs/adr/0009-synthesised-audio.md)） | ✓ | ux |
 | `flightsim-sim` | **地形と FDM の結線。** 接地平面の生成、固定ステップ駆動、ヘッドレス実行 | ✗ | architect |
+| `flightsim-net` | 決定論的な合成交通、補間、ローカル/LAN セッション | ✗ | netcode |
 | `flightsim-app` | 全体統合、実行バイナリ | ✓ | orchestrator |
 | `flightsim-tilegen` | **オフライン CLI。** GeoTIFF → 実行時タイル `.fsdem` の焼き込み | ✗ | world |
 | `flightsim-assetgen` | **オフライン CLI。** Meshy から機体 3D モデルを取得 | ✗ | rendering |
@@ -66,7 +64,7 @@ GeoTIFF デコーダ（`tiff`）を抱えるのはこのツールだけ。**実�
 tilegen に依存してはならない**（デコーダが実行時に載ってしまう。ADR-0003）。
 
 **禁止事項（レビュー自動失格）**
-- `core` / `fdm` / `world` / `sim` / `tilegen` の `Cargo.toml` に `bevy` を追加すること
+- `core` / `fdm` / `world` / `sim` / `tilegen` / `net` の `Cargo.toml` に `bevy` を追加すること
 - `fdm` から `world` を参照すること（地形高度は `sim` が引数で渡す）
 - `core` / `fdm` / `world` から `sim` / `tilegen` を参照すること
 - Bevy 層（`app` / `render`）で地形と FDM の結線を再実装すること（`sim` を呼ぶ）
@@ -132,6 +130,20 @@ pub struct Radians(pub f64);
 - FDM は壁時計時間を一切参照しない。`step(dt)` の `dt` は常に定数。
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
+- 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を
+  まとめて使わない。同一ビルド・同一入力列で cadence の違いを回帰検査する。
+- app のリプレイは frame-zero 状態から開始し、後退時は最大 240 記録フレーム/更新で
+  再実行して端数・物理時計・飛行記録を復元する。state-only keyframe への代入を
+  完全な巻き戻しと見なさない。描画時計も再生時間へ同期する。
+- コックピットカメラは当該フレームの機体描画 Transform 更新後に追従する。
+  chase / free の平滑化履歴は origin 変更や restart / rewind 時にリセットする。
+  tower は地面で支えた world anchor を保ち、LOD の観測点も実カメラ位置を使う。
+- replay reader / writer は frame duration・操作量・keyframe・condition の有限性と
+  数値領域を検査する。正しい format-v1 bytes と zero-dt は保持し、不正値の丸め直しをしない。
+  app も in-memory record、再現状態・drift、未記録 epoch の解決と visual-time 積を防御する。
+  初期状態と step 後の座標は有限なだけでなく、f32 描画座標・LOD の距離計算で有限に
+  保てる領域かも確認する。異常時は最後の正常な world Transform を保って停止する。
+  再生の停止・seek・fault・終了中は音を停止し、live input が記録条件を上書きしない。
 
 ---
 
@@ -166,9 +178,28 @@ apron → 誘導路 → 滑走路の順に lift を上げ、各路面標示と�
 重なりを決定論的にする。
 元 PBF と派生 DB は同梱しない（[ADR-0008](docs/adr/0008-osm-airport-data.md)）。
 
-Copernicus DEM GLO-30 の鉛直基準は EGM2008 だが、現在の tilegen は WGS84 楕円体高へ
-変換していない。地形・接地・滑走路は同じ数値を共有するので局所的には整合するが、
-絶対高度の系統誤差は [Issue #22](../../issues/22) で追跡する。
+Copernicus DEM GLO-30 の EGM2008 標高は、利用者が別途用意した対応する
+GeographicLib 16-bit PGM グリッドで **`h = H + N`** として元の有効 pixel centre ごとに
+WGS84 楕円体高へ変換し、その後に再標本化する。EGM96 も同じ経路を持つが、
+入力 datum と model は必ず一致させる。unknown / 非対応 datum、CRS・単位の不整合は
+CLI と library の両方で拒否する。提供元仕様による欠落 datum の明示宣言と、
+値を変えない `--assume-ellipsoidal` は別の選択肢であり、変換の代用にしない。
+
+`.fsdem` の byte 形式は変えず、WGS84 楕円体高 m の契約を守る。runtime に geoid は要らない。
+各出力は同じディレクトリの一時ファイルから原子的に置換し、provenance は invocation の
+開始前に INCOMPLETE、全成功後に COMPLETE とする。旧タイルを自動変換せず、今回の
+対象外ファイルを attestation しない。ディレクトリ全体の transaction ではない
+（[ADR-0005](docs/adr/0005-runtime-tile-format.md)、[検証記録](docs/qa/data-boundaries-2026-10-01.md)）。
+
+PBF は root `vendor/osmpbf` の安全修正版 0.3.7 が算術・index・UTF-8・enum・配列・
+圧縮ストリームを検証してから iterator へ渡す。敵対的 fixture の通常エラーと正常入力の
+byte 互換性を検査するが、ファイル全体の索引・参照 node・apron 集約の総メモリは
+sandbox 化していない（[ADR-0008](docs/adr/0008-osm-airport-data.md)）。
+
+滑走路の舗装・標示は共有の最大 10 m グリッドで各頂点を DEM に沿わせる。灯火も
+角ごとの標高と垂直面を持つ。renderer は app からの標高 callback のみを使い、
+自ら地形と FDM を結線しない。描画 LOD と地面 sampler の三角形差による遮蔽は
+残り得る（[滑走路 QA](docs/qa/runway-terrain-drape-2026-10-01.md)）。
 
 ```text
 Copernicus DEM (GeoTIFF)  ──[flightsim-tilegen / オフライン]──>  tiles/{level}/{x}/{y}.fsdem
@@ -184,7 +215,9 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 
 ## 7. 現状のスコープ
 
-**この節はマイルストーンごとに更新する。** 実装済みでないものを「ある」と書かないこと。
+**2026-10-01 の統合ソースの状態。** 実装と検証範囲、配布状況は分ける。
+公開・CI の時点付き記録は [統合 QA](docs/qa/overnight-status-2026-10-01.md) を参照。
+実装済みでないものを「ある」と書かないこと。
 
 ### 実装済み
 
@@ -193,14 +226,15 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 | `flightsim-core` | 単位型、WGS84 測地系、ECEF/NED/ENU 変換、floating origin、固定ステップ、描画座標フレーム |
 | `flightsim-fdm` | ISA 標準大気、WGS84 正規重力、6DoF、失速、プロペラ推力、3 点式着陸装置、接地摩擦・ブレーキ、RK4、定常風と決定論的乱流 |
 | `flightsim-world` | 地理座標系クアッドツリー、DEM、SSE-LOD、予算制ストリーミング、LRU、`.fsdem`、スカート付き地形メッシュ、合成滑走路、`.fsairports` v1/v2/v3 の厳格検証と最寄り滑走路選択 |
-| `flightsim-tilegen` | GeoTIFF の地理参照解釈・地形タイル焼き込み、OSM PBF の滑走路・誘導路・apron・待機位置・地上灯火 DB 焼き込み CLI |
+| `flightsim-tilegen` | 厳格な GeoTIFF の基準・単位検査、ローカル geoid 正規化、原子的タイル保存と provenance、検証付き OSM PBF → 空港 DB |
 | `flightsim-assetgen` | `.env` から鍵を安全に読み、Meshy から glTF / glb を取得するオフライン CLI |
 | `flightsim-sim` | 地形と FDM の結線、固定ステップ、滑走路中心線を追うフライトディレクタ、場周飛行、進入初期化、軌跡・着陸・飛行記録 |
 | `flightsim-render` | 地形・滑走路・誘導路・apron・待機位置標示・ASCII 物理標識・滑走路/誘導路灯メッシュの GPU 投入、LOD 描画、floating origin、大気散乱、時刻・太陽、決定論的な雲層と雲中視程、glTF の軸・倍率補正 |
-| `flightsim-input` | キーボード・ゲームパッドの軸合成、舵のレート制御、視点切替、追従カメラ |
-| `flightsim-ui` | HUD、操作説明、チュートリアル、飛行記録、着陸の 5 段階評価、計器盤、利用中データの帰属表示、一時停止・墜落の表示 |
+| `flightsim-input` | 複数 controller、校正・軸/ボタン再割り当て・JSON 保存、opt-in native channel、キーボード共存、trim、視点切替・追従カメラ |
+| `flightsim-ui` | HUD、丸形 mask 付き姿勢計、操作説明・チュートリアル、記録・着陸評価・帰属、一時停止・墜落・リプレイ状態、入力診断、交通識別表示 |
 | `flightsim-audio` | 出力に連動するエンジン音、対気速度に連動する風切り音、迎角で鳴る失速警報 |
-| `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習・スクリーンショットの CLI |
+| `flightsim-net` | 決定論的な合成交通、補間、bounded UDP の作成・参加・退出・再接続 |
+| `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習、2 機体 profile、難易度、同一 build replay、windowed/offscreen capture CLI |
 
 雲場は固定 seed の周期的な 2D value/fBm noise を緯度・経度と `TimeOfDay` から
 サンプルするため、同じ設定なら同じ結果になる。雲底・雲頂は alpha mask 付きの
@@ -208,25 +242,40 @@ PBR 平面で表し、カメラが層内に入ったときだけ distance fog �
 `ClearColor` は変更しない。`--cloud-cover`、`--cloud-base`、`--cloud-top`、
 `--cloud-visibility` で設定し、既定は雲量 0 の快晴である。
 
-ワークスペースの全テストを CI の Windows / Linux で実行する。さらに
+CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
+`.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに
 `clippy -D warnings`、`fmt --check`、依存規約検査、
 `cargo doc -D warnings` に加え、Linux の Mesa/lavapipe で同梱 glTF を読み、
 スクリーンショットを 1 枚描画する起動スモークを行う。リリース時は Windows zip を
-新規ディレクトリに展開し、D3D12 のフォールバックアダプタで同じ検査を行う。
+新規ディレクトリに展開し、D3D12 のフォールバックアダプタで検査する。
+alpha.20 は exact source の CI・展開後 model / PNG / exit 0 と実公開物の確認が済んだ。
+alpha.21 向け workflow は profile JSON・両 GLB・Swift の `.blend` を必須同梱物とし、
+Light Single cockpit と Swift Sport chase を個別に起動して 2 枚を検査・公開する。
+この後者は未実行の最終配布ゲートで、現時点の公開成功を意味しない。
 
-### 未実装
+### 今後の範囲
 
-- コックピット内装の 3D モデル（計器盤・計器照明・滑走路灯は実装済み）
-- OSM の空港建物、地表画像、METAR、高品質なボリューム雲。
-- 難易度設定、HOTAS と軸の再割り当て、推力線オフセット
-- 追加機体、リプレイ、ライブ交通、オンライン共有ワールド
+- OSM の空港建物、衛星地表画像、METAR、高品質なボリューム雲、推力線オフセット
+- 実 ADS-B 交通、Internet 向け認証・暗号化・NAT 越え・マッチメイキング・衝突の権威制御
+- 写実的な機種別コックピット。現在は共通の手続き的内装を機体 profile の視点へ合わせる
 
 ### 実装済みだが検証を残すもの
 
-- ゲームパッドは純関数とキーボード共存をテスト済みだが、物理デバイスでの符号・感度は未確認
-- 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整
-- 実 Copernicus DEM での夜間・高高度表示は目視未検証
-- CI の描画スモークは CPU Vulkan、Windows 配布スモークは D3D12 フォールバックを使う。
-  実 GPU、ベンダードライバ、性能は保証しない
+- controller は software routing・保存・切断処理をテスト済み。物理機種の入力範囲、
+  native code、符号・感度・切断復帰は未確認。native code は OS ごとに異なる
+- 乱流は 24 の決定論的数値シナリオ、長時間 severe、global seam を検査済み。
+  人による操縦感評価は未実施。旧 seed の大気は変わるため旧乱流 replay に互換保証はない
+- 2 機体の離陸と無風・海面付近の 30 秒進入を検査済み。全飛行領域や実機性能の保証ではない
+- 実 Copernicus の夜間・約 3 km 落下試験の画像でカメラと滑走路・灯火の不具合を修正。
+  360 秒・17.533 km の巡航は数値 fixture に加え、native app の全再生・4 回の実 render-origin
+  rebase・完了画像の地形と地平線まで確認。sampled observation は全遷移の動画検査ではなく、
+  任意地域・視点・地形 clearance は未網羅。1.5 NM 夜間進入の灯火視認性は未確立で、
+  V/S の極端な値は短い k 表記へ修正し、回帰試験と最新 app の実降下画像で収まりを確認済み
+- CI の CPU Vulkan と Windows D3D12 fallback は物理 GPU・ベンダードライバ・FPS を
+  検証しない。batch 終了修正は alpha.20 で確認済み、追加機能の alpha.21 配布 gate は未完了
+- 実 app 2 プロセスの loopback では接続・host 停止/再起動・再参加・退出を確認。
+  当初疑った PNG の文字欠けは針と小さい計器文字の重なりと切り分けた。単独実行と native resize
+  でも help は読め、独立した欠落不具合は再現しなかった。スピーカー聴感、物理操縦装置、
+  複数実マシン LAN / WAN は未確認
 
-詳細は [docs/ROADMAP.md](docs/ROADMAP.md)。
+詳細は [docs/ROADMAP.md](docs/ROADMAP.md) と [統合 QA](docs/qa/overnight-status-2026-10-01.md)。

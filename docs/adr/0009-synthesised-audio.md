@@ -2,7 +2,7 @@
 
 - 状態: 採用
 - 日付: 2026-09-01
-- 関連: [ADR-0003](0003-terrain-data-source.md)（オープンデータ方針）、
+- 関連: [ADR-0003](0003-terrain-data.md)（オープンデータ方針）、
   [ADR-0007](0007-bevy-version.md)（Bevy の feature を明示列挙する）
 
 ## 背景
@@ -255,7 +255,7 @@ rodio は自前の thread で標本を取りに来る。**そこで鍵（Mutex�
   「気持ちよく聞こえるか」は測れない。音量の釣り合い、回転数の幅、
   フォルマントの位置は、鳴らして判断する必要がある
 
-[ADR-0001]: 0001-engine-choice.md
+[ADR-0001]: 0001-engine-selection.md
 [ARCHITECTURE.md]: ../../ARCHITECTURE.md
 [`engine`]: ../../crates/flightsim-audio/src/engine.rs
 [PTR 論文]: https://arxiv.org/html/2603.09391v1

@@ -23,6 +23,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_sha == github.sha &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: windows-latest
     timeout-minutes: 60
@@ -100,6 +101,10 @@ jobs:
           $required = @(
             $executable,
             (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/light_single.glb'),
+            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/light_single.json'),
+            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.glb'),
+            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.json'),
+            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.blend'),
             (Join-Path $env:GITHUB_WORKSPACE 'README.md'),
             (Join-Path $env:GITHUB_WORKSPACE 'CHANGELOG.md'),
             (Join-Path $env:GITHUB_WORKSPACE 'ATTRIBUTION.md'),
@@ -131,6 +136,10 @@ jobs:
             foreach ($suffix in @(
               '/flightsim-app.exe',
               '/assets/aircraft/light_single.glb',
+              '/assets/aircraft/light_single.json',
+              '/assets/aircraft/swift_sport.glb',
+              '/assets/aircraft/swift_sport.json',
+              '/assets/aircraft/swift_sport.blend',
               '/README.md',
               '/CHANGELOG.md',
               '/ATTRIBUTION.md',
@@ -168,10 +177,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $archive = Join-Path $env:GITHUB_WORKSPACE "release-artifact/$env:BUNDLE"
           $smokeRoot = Join-Path $env:RUNNER_TEMP 'flightsim-windows-extracted'
-          $screenshot = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.png'
-          $stdout = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.stdout.log'
-          $stderr = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.stderr.log'
-          $log = Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.log'
 
           New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
           Expand-Archive -LiteralPath $archive -DestinationPath $smokeRoot
@@ -182,8 +187,9 @@ jobs:
 
           $packageRoot = $packageDirectories[0].FullName
           $executable = Join-Path $packageRoot 'flightsim-app.exe'
-          $model = Join-Path $packageRoot 'assets/aircraft/light_single.glb'
-          foreach ($path in @($executable, $model)) {
+          foreach ($path in @($executable,
+            (Join-Path $packageRoot 'assets/aircraft/light_single.glb'),
+            (Join-Path $packageRoot 'assets/aircraft/swift_sport.glb'))) {
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
               throw "extracted release file is missing: $path"
             }
@@ -233,69 +239,83 @@ jobs:
 
           $env:WGPU_BACKEND = 'dx12'
           $env:WGPU_FORCE_FALLBACK_ADAPTER = '1'
-          $process = $null
-          try {
-            $quotedScreenshot = '"' + $screenshot + '"'
-            $process = Start-Process -FilePath $executable `
-              -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5', '--exit-after-screenshot') `
-              -WorkingDirectory $packageRoot `
-              -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          # Exercise both bundled profiles and their models from the extracted ZIP.
+          # The original smoke filename is retained for the cockpit proof.
+          foreach ($case in @(
+            @{ Aircraft = 'light-single'; View = 'cockpit'; Suffix = '' },
+            @{ Aircraft = 'swift-sport'; View = 'chase'; Suffix = '-swift' }
+          )) {
+            $stem = 'flightsim-windows-smoke' + $case.Suffix
+            $screenshot = Join-Path $env:RUNNER_TEMP ($stem + '.png')
+            $stdout = Join-Path $env:RUNNER_TEMP ($stem + '.stdout.log')
+            $stderr = Join-Path $env:RUNNER_TEMP ($stem + '.stderr.log')
+            $log = Join-Path $env:RUNNER_TEMP ($stem + '.log')
+            $process = $null
+            try {
+              $quotedScreenshot = '"' + $screenshot + '"'
+              $process = Start-Process -FilePath $executable `
+                -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5', '--exit-after-screenshot',
+                  '--aircraft', $case.Aircraft, '--view', $case.View, '--traffic', 'synthetic') `
+                -WorkingDirectory $packageRoot `
+                -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 
-            # The app exits only after the PNG has been encoded and closed.
-            # alpha.18 saved at ~89s, too late for three stable-size observations
-            # before a 90s deadline. Wait for explicit completion, then validate.
-            if (-not $process.WaitForExit(180000)) {
-              throw 'application did not complete its screenshot within 180 seconds'
-            }
-            $process.WaitForExit()
-            if ($process.ExitCode -ne 0) {
-              throw "application screenshot failed (status $($process.ExitCode))"
-            }
-          } finally {
-            if ($null -ne $process) {
-              $process.Refresh()
-              if (-not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              # The app exits only after the PNG has been encoded and closed.
+              # alpha.18 saved at ~89s, too late for three stable-size observations
+              # before a 90s deadline. Wait for explicit batch completion, then validate.
+              # Batch mode flushes/closes output and exits without graphics teardown.
+              if (-not $process.WaitForExit(180000)) {
+                throw 'application did not complete its screenshot within 180 seconds'
               }
-              if (-not $process.WaitForExit(10000)) {
-                throw 'application process did not terminate after the smoke run'
-              }
-              # The timed overload only waits for process termination. The
-              # parameterless call additionally drains Start-Process' redirected
-              # stdout/stderr before Read-SmokeLogs inspects their final markers.
               $process.WaitForExit()
+              if ($process.ExitCode -ne 0) {
+                throw "application screenshot failed (status $($process.ExitCode))"
+              }
+            } finally {
+              if ($null -ne $process) {
+                $process.Refresh()
+                if (-not $process.HasExited) {
+                  Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                }
+                if (-not $process.WaitForExit(10000)) {
+                  throw 'application process did not terminate after the smoke run'
+                }
+                # The timed overload only waits for process termination. The
+                # parameterless call additionally drains Start-Process' redirected
+                # stdout/stderr before Read-SmokeLogs inspects their final markers.
+                $process.WaitForExit()
+              }
+              $combinedLog = Read-SmokeLogs
+              [System.IO.File]::WriteAllText($log, $combinedLog)
+              if (Test-Path -LiteralPath $log -PathType Leaf) {
+                Get-Content -LiteralPath $log | Select-Object -Last 80
+              }
             }
-            $combinedLog = Read-SmokeLogs
-            [System.IO.File]::WriteAllText($log, $combinedLog)
-            if (Test-Path -LiteralPath $log -PathType Leaf) {
-              Get-Content -LiteralPath $log | Select-Object -Last 80
-            }
-          }
 
-          # Validate after process termination so an encoder-held file handle cannot
-          # turn a complete screenshot into a false negative. The first alpha.5 run
-          # produced a valid 1280x720 PNG with IEND but exposed precisely this race.
-          if (-not (Test-CompletePng $screenshot)) {
-            throw 'application screenshot is missing or not a complete PNG'
-          }
-          $logText = Read-SmokeLogs
-          foreach ($proof in @('aircraft model fitted:', 'Screenshot saved to')) {
-            if (-not $logText.Contains($proof)) {
-              throw "application log is missing the smoke proof: $proof"
+            # Validate after process termination so an encoder-held file handle cannot
+            # turn a complete screenshot into a false negative. The first alpha.5 run
+            # produced a valid 1280x720 PNG with IEND but exposed precisely this race.
+            if (-not (Test-CompletePng $screenshot)) {
+              throw 'application screenshot is missing or not a complete PNG'
             }
+            $logText = Read-SmokeLogs
+            foreach ($proof in @('aircraft model fitted:', ('(' + $case.Aircraft + ')'), 'Screenshot saved to', 'Batch capture complete: status 0')) {
+              if (-not $logText.Contains($proof)) {
+                throw "application log is missing the smoke proof: $proof"
+              }
+            }
+            $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
+            # PowerShell's -match is case-insensitive by default. Use -cmatch
+            # for the tracing level so warning text containing lowercase
+            # "error" does not turn a successful smoke run into a failure.
+            $hasFatalLog =
+              ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
+              ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
+              ($plainLog -match '(?im)Failed to load asset|unregistered type')
+            if ($hasFatalLog) {
+              throw 'application logged an error during the Windows smoke run'
+            }
+            Write-Host "software-D3D12 Windows bundle smoke passed: $($case.Aircraft)"
           }
-          $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
-          # PowerShell's -match is case-insensitive by default. Use -cmatch
-          # for the tracing level so warning text containing lowercase
-          # "error" does not turn a successful smoke run into a failure.
-          $hasFatalLog =
-            ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
-            ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
-            ($plainLog -match '(?im)Failed to load asset|unregistered type')
-          if ($hasFatalLog) {
-            throw 'application logged an error during the Windows smoke run'
-          }
-          Write-Host 'software-D3D12 Windows bundle smoke passed'
 
       - name: Upload Windows smoke screenshot and log
         if: always()
@@ -303,8 +323,8 @@ jobs:
         with:
           name: windows-smoke-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/flightsim-windows-smoke.png
-            ${{ runner.temp }}/flightsim-windows-smoke.log
+            ${{ runner.temp }}/flightsim-windows-smoke*.png
+            ${{ runner.temp }}/flightsim-windows-smoke*.log
           if-no-files-found: warn
           retention-days: 7
 
@@ -315,6 +335,8 @@ jobs:
         run: |
           Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.png') `
             -Destination (Join-Path $env:GITHUB_WORKSPACE "release-artifact/flightsim-claude-$env:TAG-windows-smoke.png")
+          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke-swift.png') `
+            -Destination (Join-Path $env:GITHUB_WORKSPACE "release-artifact/flightsim-claude-$env:TAG-windows-smoke-swift.png")
 
       - name: Upload the verified bundle for publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -406,13 +428,15 @@ jobs:
           archive="release-artifact/$BUNDLE"
           checksum="$archive.sha256"
           screenshot="release-artifact/flightsim-claude-$TAG-windows-smoke.png"
+          swift_screenshot="release-artifact/flightsim-claude-$TAG-windows-smoke-swift.png"
           test -s "$screenshot"
+          test -s "$swift_screenshot"
           if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" --repo "$REPOSITORY" \
               --title "$TAG" --prerelease
-            gh release upload "$TAG" "$archive" "$checksum" "$screenshot" --repo "$REPOSITORY" --clobber
+            gh release upload "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" --repo "$REPOSITORY" --clobber
           else
-            gh release create "$TAG" "$archive" "$checksum" "$screenshot" --repo "$REPOSITORY" \
+            gh release create "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" --repo "$REPOSITORY" \
               --verify-tag --target "$SOURCE_SHA" --title "$TAG" \
               --generate-notes --prerelease
           fi
