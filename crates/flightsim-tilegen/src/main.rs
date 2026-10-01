@@ -2,12 +2,45 @@
 //!
 //! 詳細は [`flightsim_tilegen`] のクレートドキュメントを参照。
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use flightsim_core::Meters;
-use flightsim_tilegen::vertical_datum::VerticalDatumMismatch;
+use flightsim_tilegen::geoid::GeoidGrid;
+use flightsim_tilegen::vertical_datum::{GeoidModel, VerticalDatum, VerticalDatumMismatch};
 use flightsim_tilegen::{RasterSet, Region, TileGenOptions, generate_tiles};
 use std::path::PathBuf;
 use std::process::ExitCode;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum GeoidKind {
+    Egm2008,
+    Egm96,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum SourceDatum {
+    Ellipsoidal,
+    Egm2008,
+    Egm96,
+}
+
+impl SourceDatum {
+    const fn datum(self) -> VerticalDatum {
+        match self {
+            Self::Ellipsoidal => VerticalDatum::Ellipsoidal,
+            Self::Egm2008 => VerticalDatum::Geoid(GeoidModel::Egm2008),
+            Self::Egm96 => VerticalDatum::Geoid(GeoidModel::Egm96),
+        }
+    }
+}
+
+impl GeoidKind {
+    const fn model(self) -> GeoidModel {
+        match self {
+            Self::Egm2008 => GeoidModel::Egm2008,
+            Self::Egm96 => GeoidModel::Egm96,
+        }
+    }
+}
 
 /// Copernicus DEM の GeoTIFF から実行時タイル (.fsdem) を焼く。
 #[derive(Debug, Parser)]
@@ -59,8 +92,21 @@ struct Cli {
     /// 辻褄が合う。効くのは絶対高度と ECEF 半径。
     ///
     /// 合成 DEM のように**基準の無い試験データ**を焼くときは、これを付ける。
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, conflicts_with = "geoid_grid")]
     assume_ellipsoidal: bool,
+
+    /// Local GeographicLib 16-bit PGM geoid grid. Applies h = H + N before resampling.
+    #[arg(long, value_name = "PGM", requires = "geoid_model")]
+    geoid_grid: Option<PathBuf>,
+
+    /// Model of the supplied grid; must match its Description and the DEM datum.
+    #[arg(long, value_enum, requires = "geoid_grid")]
+    geoid_model: Option<GeoidKind>,
+
+    /// Declare missing source vertical metadata from verified provider documentation.
+    /// Existing conflicting GeoTIFF metadata is rejected, never overwritten.
+    #[arg(long, value_enum, conflicts_with = "assume_ellipsoidal")]
+    source_vertical_datum: Option<SourceDatum>,
 
     /// 対象範囲 `west,south,east,north` [度]。省略時は入力ラスタの被覆範囲。
     ///
@@ -93,7 +139,29 @@ fn run(cli: &Cli) -> Result<(), String> {
     }
 
     eprintln!("reading {} raster(s)...", cli.input.len());
-    let rasters = RasterSet::load(&cli.input).map_err(|error| error.to_string())?;
+    let mut rasters = RasterSet::load(&cli.input).map_err(|error| error.to_string())?;
+    let original_datums = rasters.non_ellipsoidal_sources();
+    if let Some(datum) = cli.source_vertical_datum {
+        rasters = rasters
+            .declare_vertical_datum(datum.datum())
+            .map_err(|error| error.to_string())?;
+    }
+    let grid = match (&cli.geoid_grid, cli.geoid_model) {
+        (Some(path), Some(kind)) => Some(
+            GeoidGrid::open(path, kind.model())
+                .map_err(|error| format!("geoid {}: {error}", path.display()))?,
+        ),
+        _ => None,
+    };
+    if let Some(grid) = &grid {
+        eprintln!(
+            "normalizing heights with {} (bilinear; h = H + N)...",
+            grid.description()
+        );
+        rasters = rasters
+            .normalize_to_ellipsoid(grid)
+            .map_err(|error| error.to_string())?;
+    }
 
     let region = match &cli.bounds {
         Some(text) => parse_bounds(text)?,
@@ -136,12 +204,21 @@ fn run(cli: &Cli) -> Result<(), String> {
             "warning: --assume-ellipsoidal was given, so the heights are baked unchanged.\n\
              \x20        The geoid undulation stays in the tiles as a systematic error."
         );
+        rasters = rasters.assume_ellipsoidal();
     }
 
     // 深いレベルはタイル数が 4 倍ずつ増える。着手前に規模を見せる。
-    let planned: usize = (cli.min_level..=cli.max_level)
-        .map(|level| region.tiles(level).len())
-        .sum();
+    let options = TileGenOptions {
+        grid_size: cli.grid_size,
+        fill: Meters(cli.fill),
+        min_coverage: cli.min_coverage,
+    };
+    let planned = flightsim_tilegen::generate::planned_tile_count(
+        region,
+        cli.min_level..=cli.max_level,
+        &options,
+    )
+    .map_err(|error| error.to_string())?;
     eprintln!(
         "levels {}..={} cover {planned} tile(s){}",
         cli.min_level,
@@ -149,11 +226,18 @@ fn run(cli: &Cli) -> Result<(), String> {
         if cli.dry_run { " (dry run)" } else { "" }
     );
 
-    let options = TileGenOptions {
-        grid_size: cli.grid_size,
-        fill: Meters(cli.fill),
-        min_coverage: cli.min_coverage,
-    };
+    let provenance = generation_provenance(cli, &original_datums, grid.as_ref())?;
+    if !cli.dry_run {
+        // A batch may replace some tiles before a later write fails. Retire any
+        // old success attestation before touching its first tile, and leave this
+        // marker in place on errors or process interruption.
+        write_provenance(
+            &cli.output,
+            &format!(
+                "Generation status: INCOMPLETE\nTiles may be a partial mixture of this invocation and earlier output.\n{provenance}"
+            ),
+        )?;
+    }
     let report = generate_tiles(
         &rasters,
         region,
@@ -163,6 +247,12 @@ fn run(cli: &Cli) -> Result<(), String> {
         cli.dry_run,
     )
     .map_err(|error| error.to_string())?;
+    if !cli.dry_run {
+        write_provenance(
+            &cli.output,
+            &format!("Generation status: COMPLETE\n{provenance}"),
+        )?;
+    }
 
     #[allow(
         clippy::cast_precision_loss,
@@ -202,6 +292,95 @@ fn run(cli: &Cli) -> Result<(), String> {
         eprintln!("         to skip mostly-filled tiles (they read as real terrain at runtime).");
     }
 
+    Ok(())
+}
+
+/// This per-invocation record deliberately stays outside the runtime tile format.
+/// Fingerprints detect accidental input changes; they are not authentication.
+fn generation_provenance(
+    cli: &Cli,
+    mismatched: &[(usize, flightsim_tilegen::vertical_datum::VerticalDatum)],
+    grid: Option<&GeoidGrid>,
+) -> Result<String, String> {
+    use std::fmt::Write;
+    let destination = cli.output.join("terrain-provenance.txt");
+    let mut text = format!(
+        "flightsim-tilegen {}\nRuntime height contract: WGS84 ellipsoidal metres (ADR-0005)\n\
+         This record describes only the latest invocation; existing tiles outside its scope are not attested.\n\
+         Source fingerprint: FNV-1a 64-bit over file bytes (not cryptographic authentication)\n\
+         Levels: {}..={}\nGrid size: {}\nFill metres: {}\nMinimum coverage: {}\nBounds: {:?}\n\
+         Assume ellipsoidal without conversion: {}\nDeclared source datum: {:?}\n",
+        env!("CARGO_PKG_VERSION"),
+        cli.min_level,
+        cli.max_level,
+        cli.grid_size,
+        cli.fill,
+        cli.min_coverage,
+        cli.bounds,
+        cli.assume_ellipsoidal,
+        cli.source_vertical_datum
+    );
+    for (index, path) in cli.input.iter().enumerate() {
+        reject_provenance_alias(path, &destination)?;
+        let datum = mismatched
+            .iter()
+            .find(|(source, _)| *source == index)
+            .map_or(
+                flightsim_tilegen::vertical_datum::VerticalDatum::Ellipsoidal,
+                |(_, datum)| *datum,
+            );
+        let (length, fingerprint) = source_fingerprint(path)?;
+        writeln!(text, "Input {index}: {path:?}; bytes={length}; fnv1a64={fingerprint:016x}; source datum={datum}").expect("String write");
+    }
+    if let (Some(path), Some(grid)) = (&cli.geoid_grid, grid) {
+        reject_provenance_alias(path, &destination)?;
+        let (length, fingerprint) = source_fingerprint(path)?;
+        writeln!(text, "Geoid: {path:?}; bytes={length}; fnv1a64={fingerprint:016x}; description={:?}; dimensions={:?}", grid.description(), grid.dimensions()).expect("String write");
+        text.push_str("Conversion: h = H + N at source pixel centres before resampling; bilinear geoid interpolation\n");
+    }
+    Ok(text)
+}
+
+fn reject_provenance_alias(
+    source: &std::path::Path,
+    destination: &std::path::Path,
+) -> Result<(), String> {
+    if destination.exists()
+        && same_file::is_same_file(source, destination).map_err(|error| error.to_string())?
+    {
+        return Err("the provenance output would overwrite an input file".to_owned());
+    }
+    Ok(())
+}
+
+fn source_fingerprint(path: &std::path::Path) -> Result<(u64, u64), String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+    let (mut length, mut hash) = (0_u64, 0xcbf2_9ce4_8422_2325_u64);
+    let mut buffer = [0_u8; 16_384];
+    loop {
+        let count = file.read(&mut buffer).map_err(|error| error.to_string())?;
+        if count == 0 {
+            return Ok((length, hash));
+        }
+        length += count as u64;
+        for &byte in &buffer[..count] {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3);
+        }
+    }
+}
+
+fn write_provenance(directory: &std::path::Path, text: &str) -> Result<(), String> {
+    use std::io::Write;
+    std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+    let mut file = tempfile::NamedTempFile::new_in(directory).map_err(|error| error.to_string())?;
+    file.write_all(text.as_bytes())
+        .map_err(|error| error.to_string())?;
+    file.as_file()
+        .sync_all()
+        .map_err(|error| error.to_string())?;
+    file.persist(directory.join("terrain-provenance.txt"))
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 

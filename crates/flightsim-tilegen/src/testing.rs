@@ -37,6 +37,9 @@ pub struct GeoTiffBuilder {
     pixel_size: (f64, f64),
     convention: PixelConvention,
     model_type: u16,
+    geographic_type: u16,
+    angular_units: u16,
+    vertical_units: Option<u16>,
     /// `VerticalCSTypeGeoKey`（4096）。`None` なら書かない。
     vertical_cs_type: Option<u16>,
     nodata: Option<f32>,
@@ -63,6 +66,9 @@ impl GeoTiffBuilder {
             convention: PixelConvention::Area,
             // 2 = ModelTypeGeographic (EPSG:4326)
             model_type: 2,
+            geographic_type: 4326,
+            angular_units: 9102,
+            vertical_units: None,
             // 既定では書かない。**実務の DEM も書いていないことが多い。**
             vertical_cs_type: None,
             nodata: None,
@@ -99,6 +105,27 @@ impl GeoTiffBuilder {
     #[must_use]
     pub const fn model_type(mut self, model_type: u16) -> Self {
         self.model_type = model_type;
+        self
+    }
+
+    /// Horizontal CRS GeoKey. The production decoder accepts WGS84 only.
+    #[must_use]
+    pub const fn geographic_type(mut self, code: u16) -> Self {
+        self.geographic_type = code;
+        self
+    }
+
+    /// Angular coordinate units GeoKey (9102 = degrees).
+    #[must_use]
+    pub const fn angular_units(mut self, code: u16) -> Self {
+        self.angular_units = code;
+        self
+    }
+
+    /// Vertical units GeoKey (9001 = metres).
+    #[must_use]
+    pub const fn vertical_units(mut self, code: u16) -> Self {
+        self.vertical_units = Some(code);
         self
     }
 
@@ -168,9 +195,20 @@ impl GeoTiffBuilder {
                 0,
                 1,
                 raster_type,
+                2048,
+                0,
+                1,
+                self.geographic_type,
+                2054,
+                0,
+                1,
+                self.angular_units,
             ];
             if let Some(code) = self.vertical_cs_type {
                 keys.extend_from_slice(&[4096, 0, 1, code]);
+            }
+            if let Some(code) = self.vertical_units {
+                keys.extend_from_slice(&[4099, 0, 1, code]);
             }
             #[allow(clippy::cast_possible_truncation, reason = "キーは数個。u16 に収まる")]
             {
@@ -193,6 +231,11 @@ impl GeoTiffBuilder {
             pad_to(&mut bytes, 2);
             // GDAL は NUL 終端の ASCII で書く。カウントは NUL を含む。
             let text = format!("{value}\0");
+            if text.len() <= 4 {
+                let mut inline = [0_u8; 4];
+                inline[..text.len()].copy_from_slice(text.as_bytes());
+                return (u32::from_le_bytes(inline), text.len() as u32);
+            }
             let offset = bytes.len() as u32;
             bytes.extend_from_slice(text.as_bytes());
             (offset, text.len() as u32)

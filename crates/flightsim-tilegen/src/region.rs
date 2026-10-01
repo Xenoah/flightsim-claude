@@ -112,6 +112,32 @@ impl Region {
         }
     }
 
+    /// Normalize a raster extent whose east edge is unwrapped past its west
+    /// edge. Pixel outer edges can pass the dateline or poles even when every
+    /// source pixel centre is valid. Preserve full-world longitude coverage.
+    pub(crate) fn from_unwrapped_radians(
+        west: Radians,
+        south: Radians,
+        east: Radians,
+        north: Radians,
+    ) -> Self {
+        let width = east.get() - west.get();
+        let south = Radians(south.get().clamp(-FRAC_PI_2, FRAC_PI_2));
+        let north = Radians(north.get().clamp(-FRAC_PI_2, FRAC_PI_2));
+        if width >= TAU {
+            return Self::from_radians(Radians(-PI), south, Radians(PI), north);
+        }
+        // Avoid introducing rounding into already-canonical tile boundaries.
+        let west = if (-PI..PI).contains(&west.get()) {
+            west.get()
+        } else {
+            (west.get() + PI).rem_euclid(TAU) - PI
+        };
+        let east = west + width;
+        let east = if east > PI { east - TAU } else { east };
+        Self::from_radians(Radians(west), south, Radians(east), north)
+    }
+
     #[must_use]
     pub const fn west(self) -> Radians {
         self.west
@@ -137,13 +163,35 @@ impl Region {
         self.crosses_dateline
     }
 
-    /// 2 つの範囲を包含する矩形。日付変更線をまたぐ場合は扱わず、単純に広げる。
+    /// Smallest connected longitude arc containing both regions, with latitude
+    /// widened independently. Dateline crossings retain the covered side.
     #[must_use]
     pub fn union(self, other: Self) -> Self {
-        Self::from_radians(
-            Radians(self.west.get().min(other.west.get())),
+        let width = |region: Self| {
+            let span = region.east.get() - region.west.get();
+            if region.crosses_dateline {
+                span + TAU
+            } else {
+                span
+            }
+        };
+        // A minimal containing arc begins at one of the two input west edges.
+        // Try both; a wrapped displacement plus each arc's width gives its end.
+        let containing_width = |start: f64| {
+            ((self.west.get() - start).rem_euclid(TAU) + width(self))
+                .max((other.west.get() - start).rem_euclid(TAU) + width(other))
+        };
+        let a = (containing_width(self.west.get()), self.west.get());
+        let b = (containing_width(other.west.get()), other.west.get());
+        let (span, west) = if a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)).is_le() {
+            a
+        } else {
+            b
+        };
+        Self::from_unwrapped_radians(
+            Radians(west),
             Radians(self.south.get().min(other.south.get())),
-            Radians(self.east.get().max(other.east.get())),
+            Radians(west + span),
             Radians(self.north.get().max(other.north.get())),
         )
     }
@@ -186,6 +234,30 @@ impl Region {
         tiles.sort_unstable();
         tiles.dedup();
         tiles
+    }
+
+    /// Count intersecting tiles without allocating or enumerating them.
+    /// Returns `None` when `level` exceeds the runtime format's maximum.
+    #[must_use]
+    pub fn tile_count(self, level: u8) -> Option<u64> {
+        if level > flightsim_world::tile::MAX_LEVEL {
+            return None;
+        }
+        let columns = TileId::columns(level);
+        let rows = TileId::rows(level);
+        let first_row = index_floor((FRAC_PI_2 - self.north.get()) / PI, rows);
+        let last_row =
+            index_ceil_inclusive((FRAC_PI_2 - self.south.get()) / PI, rows).max(first_row);
+        let first = index_floor((self.west.get() + PI) / TAU, columns);
+        let last = index_ceil_inclusive((self.east.get() + PI) / TAU, columns);
+        let width = if self.crosses_dateline {
+            // Coarse levels can have both dateline ranges visit one column;
+            // tiles() deduplicates it, so count it only once here too.
+            (u64::from(columns - first) + u64::from(last) + 1).min(u64::from(columns))
+        } else {
+            u64::from(last.max(first) - first) + 1
+        };
+        Some(width * (u64::from(last_row - first_row) + 1))
     }
 }
 

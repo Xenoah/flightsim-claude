@@ -644,10 +644,11 @@ fn tiles_baked_by_the_tilegen_pipeline_can_be_flown_over() {
     let (west, north) = (139.70, 35.62);
     let (size, pixel) = (512_u32, 1.0 / 3600.0);
 
-    // 一定標高 300 m のラスタ。
+    // 一定の楕円体高 300 m の合成ラスタ。実 DEM の未指定 datum と区別する。
     let bytes = GeoTiffBuilder::new(size, size, vec![300.0_f32; (size * size) as usize])
         .origin(west, north)
         .pixel_size(pixel, pixel)
+        .vertical_cs_type(4979)
         .build();
     let source = workspace.path().join("terrain.tif");
     std::fs::write(&source, bytes).expect("writing the synthetic raster");

@@ -23,6 +23,8 @@
 //! flightsim-tilegen \
 //!     --input Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif \
 //!     --output data/tiles \
+//!     --source-vertical-datum egm2008 \
+//!     --geoid-grid data/egm2008-5.pgm --geoid-model egm2008 \
 //!     --min-level 8 --max-level 12
 //!
 //! flightsim-airportgen \
@@ -40,6 +42,7 @@
 //! |---|---|
 //! | [`airport`] | OSM PBF の滑走路中心線を `.fsairports` へ変換 |
 //! | [`geotiff`] | GeoTIFF の読み込みと地理参照。EPSG:4326 の単バンド浮動小数点のみ |
+//! | [`geoid`] | Local EGM2008/EGM96 PGM grid and offline ellipsoidal normalization |
 //! | [`region`] | 焼き込み範囲とタイル列挙。日付変更線・極を扱う |
 //! | [`generate`] | ラスタからタイルを焼き、`.fsdem` として書き出す |
 //! | [`testing`] | 合成 GeoTIFF の組み立て。CI が実データを必要としないため |
@@ -50,6 +53,7 @@
 
 pub mod airport;
 pub mod generate;
+pub mod geoid;
 pub mod geotiff;
 pub mod region;
 pub mod testing;

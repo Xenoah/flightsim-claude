@@ -9,9 +9,14 @@ use crate::geotiff::{GeoRaster, RasterError};
 use crate::region::Region;
 use crate::vertical_datum::VerticalDatum;
 use flightsim_core::{Meters, Radians};
-use flightsim_world::dem::io::{TileWriteError, tile_relative_path, write_tile};
+use flightsim_world::dem::io::{
+    MAX_GRID_DIMENSION, TileWriteError, tile_relative_path, write_tile,
+};
 use flightsim_world::{HeightGrid, TileId};
 use std::path::{Path, PathBuf};
+
+/// Safety limit per offline invocation, checked before enumerating tile ids.
+pub const MAX_TILES_PER_GENERATION: u64 = 1_000_000;
 
 /// 焼き込みの設定。
 #[derive(Debug, Clone, Copy)]
@@ -108,6 +113,43 @@ impl RasterSet {
             .map(Self::new)
     }
 
+    /// Normalize every source with one explicitly identified local geoid grid.
+    ///
+    /// # Errors
+    /// Any unknown/mismatched vertical datum or failed correction aborts before
+    /// tile generation. No partially normalized set is returned.
+    pub fn normalize_to_ellipsoid(self, grid: &crate::geoid::GeoidGrid) -> std::io::Result<Self> {
+        self.rasters
+            .into_iter()
+            .map(|raster| raster.normalize_to_ellipsoid(grid))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Self::new)
+    }
+
+    /// Explicitly waive vertical normalization for all sources. Values stay
+    /// unchanged; record this assumption in the output's provenance.
+    #[must_use]
+    pub fn assume_ellipsoidal(self) -> Self {
+        Self::new(
+            self.rasters
+                .into_iter()
+                .map(GeoRaster::assume_ellipsoidal)
+                .collect(),
+        )
+    }
+
+    /// Declare absent source vertical metadata from verified documentation.
+    ///
+    /// # Errors
+    /// A declaration inconsistent with any source's existing metadata fails.
+    pub fn declare_vertical_datum(self, datum: VerticalDatum) -> std::io::Result<Self> {
+        self.rasters
+            .into_iter()
+            .map(|raster| raster.declare_vertical_datum(datum))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Self::new)
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.rasters.is_empty()
@@ -136,7 +178,12 @@ impl RasterSet {
             .iter()
             .map(|raster| {
                 let coverage = raster.coverage();
-                Region::from_radians(coverage.west, coverage.south, coverage.east, coverage.north)
+                Region::from_unwrapped_radians(
+                    coverage.west,
+                    coverage.south,
+                    coverage.east,
+                    coverage.north,
+                )
             })
             .reduce(Region::union)
     }
@@ -225,8 +272,14 @@ pub enum GenerateError {
     InvalidGridSize(u32),
     /// `min_coverage` が `0.0..=1.0` の外、または非有限。
     InvalidMinCoverage(f64),
+    /// Fill must be representable as a finite runtime height.
+    InvalidFill(f64),
     /// `min_level > max_level`。
     InvalidLevelRange { min: u8, max: u8 },
+    /// Bound work before allocating the tile-id lists.
+    TooManyTiles(u64),
+    /// A caller attempted to write unnormalized, unacknowledged source heights.
+    NonEllipsoidalSource { index: usize, datum: VerticalDatum },
 }
 
 impl core::fmt::Display for GenerateError {
@@ -240,14 +293,29 @@ impl core::fmt::Display for GenerateError {
             }
             Self::InvalidGridSize(size) => write!(
                 formatter,
-                "grid size {size} is too small; bilinear interpolation needs at least 2 per axis"
+                "grid size {size} is invalid; expected 2..={MAX_GRID_DIMENSION} per axis"
             ),
             Self::InvalidMinCoverage(value) => {
                 write!(formatter, "minimum coverage {value} is outside 0.0..=1.0")
             }
             Self::InvalidLevelRange { min, max } => {
-                write!(formatter, "min level {min} is deeper than max level {max}")
+                write!(
+                    formatter,
+                    "invalid level range {min}..={max}; expected ascending levels within 0..={}",
+                    flightsim_world::tile::MAX_LEVEL
+                )
             }
+            Self::InvalidFill(value) => {
+                write!(formatter, "fill height {value} must be finite and fit f32")
+            }
+            Self::TooManyTiles(count) => write!(
+                formatter,
+                "{count} tiles exceed the per-invocation limit of {MAX_TILES_PER_GENERATION}; narrow --bounds or the level range"
+            ),
+            Self::NonEllipsoidalSource { index, datum } => write!(
+                formatter,
+                "input {index} has datum {datum}; normalize it or explicitly call assume_ellipsoidal before generating tiles"
+            ),
         }
     }
 }
@@ -290,17 +358,9 @@ pub fn generate_tiles(
     output: &Path,
     dry_run: bool,
 ) -> Result<GenerationReport, GenerateError> {
-    if options.grid_size < 2 {
-        return Err(GenerateError::InvalidGridSize(options.grid_size));
-    }
-    if !options.min_coverage.is_finite() || !(0.0..=1.0).contains(&options.min_coverage) {
-        return Err(GenerateError::InvalidMinCoverage(options.min_coverage));
-    }
-    if levels.start() > levels.end() {
-        return Err(GenerateError::InvalidLevelRange {
-            min: *levels.start(),
-            max: *levels.end(),
-        });
+    let _ = planned_tile_count(region, levels.clone(), options)?;
+    if let Some((index, datum)) = rasters.non_ellipsoidal_sources().into_iter().next() {
+        return Err(GenerateError::NonEllipsoidalSource { index, datum });
     }
 
     let mut report = GenerationReport::default();
@@ -340,7 +400,7 @@ pub fn generate_tiles(
                     source,
                 })?;
             }
-            std::fs::write(&path, &encoded).map_err(|source| GenerateError::Io {
+            write_tile_atomically(&path, &encoded).map_err(|source| GenerateError::Io {
                 path: path.clone(),
                 source,
             })?;
@@ -348,6 +408,54 @@ pub fn generate_tiles(
     }
 
     Ok(report)
+}
+
+// Replace each tile only after all bytes have reached a same-directory temporary
+// file. A failed write/rename leaves the previous tile intact; this is per-file
+// atomicity, not an all-or-nothing transaction for the entire output tree.
+fn write_tile_atomically(path: &Path, encoded: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut file = tempfile::NamedTempFile::new_in(parent)?;
+    file.write_all(encoded)?;
+    file.as_file().sync_all()?;
+    file.persist(path).map_err(|error| error.error)?;
+    Ok(())
+}
+
+/// Validate configuration and count planned tiles without allocating tile lists.
+///
+/// # Errors
+/// Invalid grid/level/coverage/fill settings and invocations above
+/// [`MAX_TILES_PER_GENERATION`] are rejected before processing.
+pub fn planned_tile_count(
+    region: Region,
+    levels: core::ops::RangeInclusive<u8>,
+    options: &TileGenOptions,
+) -> Result<u64, GenerateError> {
+    if !(2..=MAX_GRID_DIMENSION).contains(&options.grid_size) {
+        return Err(GenerateError::InvalidGridSize(options.grid_size));
+    }
+    if !options.min_coverage.is_finite() || !(0.0..=1.0).contains(&options.min_coverage) {
+        return Err(GenerateError::InvalidMinCoverage(options.min_coverage));
+    }
+    if !options.fill.get().is_finite() || options.fill.get().abs() > f64::from(f32::MAX) {
+        return Err(GenerateError::InvalidFill(options.fill.get()));
+    }
+    if levels.start() > levels.end() || *levels.end() > flightsim_world::tile::MAX_LEVEL {
+        return Err(GenerateError::InvalidLevelRange {
+            min: *levels.start(),
+            max: *levels.end(),
+        });
+    }
+
+    let planned = levels
+        .map(|level| region.tile_count(level).expect("validated level"))
+        .sum();
+    if planned > MAX_TILES_PER_GENERATION {
+        return Err(GenerateError::TooManyTiles(planned));
+    }
+    Ok(planned)
 }
 
 #[cfg(test)]
@@ -372,6 +480,7 @@ mod tests {
         let bytes = GeoTiffBuilder::new(size, size, samples)
             .origin(west, north)
             .pixel_size(pixel, pixel)
+            .vertical_cs_type(4979)
             .build();
         GeoRaster::decode(std::io::Cursor::new(bytes), StdPath::new("<memory>"))
             .expect("the synthetic raster should decode")
@@ -474,6 +583,7 @@ mod tests {
         let bytes = GeoTiffBuilder::new(size, size, samples)
             .origin(139.0, 36.0)
             .pixel_size(0.05, 0.05)
+            .vertical_cs_type(4979)
             .build();
         let raster = GeoRaster::decode(std::io::Cursor::new(bytes), StdPath::new("<memory>"))
             .expect("decode");
