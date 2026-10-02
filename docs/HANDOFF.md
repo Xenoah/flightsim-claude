@@ -1,30 +1,45 @@
 # HANDOFF — 次の担当者への引き継ぎ
 
 作成: 2026-08-01（v0.1.0 リリース直後）
-更新: 2026-08-30（v0.6.0-alpha.12 = OSM apron・待機位置・標識・誘導路灯）
+更新: 2026-10-01 20:03 UTC（alpha.20 公開確認、alpha.21 統合ソース・検証範囲の整理）
 
 このプロジェクトは文脈ゼロの担当者が交代で入る前提。**着手前にこの文書を最後まで読むこと。**
 ここに書いてあるのは「何をするか」だけでなく「すでに踏んだ地雷」も含む。
 
 交代の都度の申し送りは [docs/handoff-notes/](handoff-notes/) にある。
-**最新は [2026-08-30（→ Codex）](handoff-notes/2026-08-30-to-codex.md)。**
+過去の申し送りは [2026-08-30（→ Codex）](handoff-notes/2026-08-30-to-codex.md)。
+**現在の検証根拠・Issue 受け入れ条件・配布の時点付き状態は
+[2026-10-01 統合 QA](qa/overnight-status-2026-10-01.md) を優先する。**
+下の歴史欄の「未実装」「次」は各記録当時の意味であり、現状を上書きしない。
 
 ---
 
 ## 1. 現状を 30 秒で
 
-**M2 達成、M3 を実装中。ゲームとして一周し、雲中の計器飛行も練習できる。**
-引数なしで起動すると合成飛行場の滑走路中心線上から始まり、離陸して戻って
-降りると着陸が 5 段階で評価される。地域 OSM PBF をオフライン変換すれば、
-開始地点に最も近い実在滑走路で同じループを飛べ、その 15 km 圏にある誘導路、apron、
-待機位置標示・物理標識、明示または決定論的に補った誘導路灯も地形に沿って表示される。
+**M2 のゲームループを実装済み。M3 の実機・主観評価を残しつつ M4 の最小実装も進めた。**
+引数なしで合成飛行場から離陸し、戻って降りると着陸を 5 段階で評価する。
+地域 OSM PBF を変換すれば最寄り実滑走路と 15 km 圏の地上設備を利用できる。
+
+2026-10-01 の追加・修正は、厳格な datum 検査と geoid 正規化、安全修正版 PBF parser、
+複数 controller 設定と native opt-in、丸形姿勢計、Light Single / Swift Sport profile、
+正確な同一 build replay、合成交通と bounded UDP local/LAN、乱流時計・global seam、
+当該フレームの Transform に追従するカメラ、DEM に沿う滑走路・灯火。
+software 検査と実 scene の画像確認は進んだが、物理 controller、人の操縦感、実 GPU、
+スピーカー聴感を試したという意味ではない。公開済みの
+[alpha.20](https://github.com/Xenoah/flightsim-claude/releases/tag/v0.6.0-alpha.20) は撮影終了の
+hotfix で、source `f3d32d816cc625d10e4309f3506c150280e749a5`、Windows zip・PNG・終了 0・
+checksum を確認済み。追加機能をまとめる alpha.21 は未公開である。
+PBF #40・geoid #41・姿勢計 #43・入力 #44・乱流 #45 は個別の全 7 CI と review を経て
+staging に取り込み済み。staging 名 `agent/alpha20-integration` は履歴上の名前で、配布版を
+示さない。19:55 UTC 時点で機体 #46・net #47・滑走路 #48 は draft / CI 中。
+以後の component PR・main 統合・配布は別ゲートとして追う。
 
 ```bash
 # タイルが無ければ先に焼く（実 DEM は要らない。合成地形で動く）
 cargo run -p flightsim-tilegen --example synthetic_dem -- data/synthetic.tif
 cargo run -p flightsim-tilegen -- --input data/synthetic.tif --output data/tiles     --min-level 8 --max-level 12
 
-# 実滑走路（信頼できる提供元の PBF を利用者が用意。同梱しない）
+# 実滑走路（地域 PBF を利用者が用意。同梱しない。総メモリ消費の sandbox ではない）
 cargo run -p flightsim-tilegen --bin flightsim-airportgen -- \
   --input data/region.osm.pbf --output data/region.fsairports
 
@@ -34,7 +49,14 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 cargo run -p flightsim-app --release -- --approach 1.5 --turbulence moderate  # 着陸練習
 cargo run -p flightsim-app --release -- --difficulty beginner                 # 無風・案内あり
 cargo run -p flightsim-app --release -- --difficulty realistic            # 横風・案内なし
-cargo run -p flightsim-app --release -- --replay flight-001.fsreplay      # 記録の再生
+cargo run -p flightsim-app --release -- --aircraft light-single --replay flight-001.fsreplay
+cargo run -p flightsim-app --release -- --aircraft swift-sport --view chase --traffic synthetic
+cargo run -p flightsim-app -- --write-input-config controls.json
+cargo run -p flightsim-app -- --input-config controls.json --input-diagnostics
+cargo run -p flightsim-app -- --native-controllers --input-config controls.json --input-diagnostics
+cargo run -p flightsim-app -- --host                                  # loopback 127.0.0.1:41520
+cargo run -p flightsim-app -- --join 127.0.0.1:41520 --callsign PILOT2
+cargo run -p flightsim-app -- --headless-screenshot capture.png --screenshot-delay 3
 cargo run -p flightsim-app --release -- --tiles data/tiles \
   --cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300
 ```
@@ -46,8 +68,8 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 風 | `--wind 270/10`（方位/ノット） |
 | 乱流 | `--turbulence light\|moderate\|severe` |
 | 音（エンジン・風切り・失速警報） | 既定で鳴る。毎標本その場で合成（ADR-0009）。ログに `audio: ... is playing` が出れば再生に届いている |
-| 昇降舵トリム | `[` / `]`。既定 0.09（約 75 kt）。**手を離したときの釣り合い速度**を決める |
-| 音の機種を選ぶ | `--engine turbine`（既定・戦闘機）/ `--engine piston`。**飛び方は変わらない**——FDM は 160 hp のピストン単発 |
+| 昇降舵トリム | `[` / `]`。地上開始は Light Single 0.09 / Swift Sport 0.08。進入は専用の釣り合い設定 |
+| 音の機種を選ぶ | `--engine turbine` / `--engine piston` は音のみ。Light Single の既定は turbine、Swift Sport は piston。両 FDM は固定脚プロペラ機 |
 | 音を GUI 無しで聞く | `cargo run -p flightsim-audio --example render_engine -- flight.wav [piston\|turbine]` |
 | 墜落 | 沈下率 5 m/s・バンク 20 度・機首下げ 15 度を超えた接地。`--drop 40` で通せる |
 | 一時停止 / やり直し | `Esc` / `R`。やり直しは記録・評価・案内も戻す。再生中は効かない |
@@ -58,27 +80,38 @@ cargo run -p flightsim-app --release -- --tiles data/tiles \
 | 雲量・雲層・雲中視程 | `--cloud-cover 0.55 --cloud-base 700 --cloud-top 1300 --cloud-visibility 300` |
 | OSM の最寄り滑走路と周辺地上設備 | PBF を `flightsim-airportgen` で焼き、`--airports <FILE>` |
 | チュートリアル導線 | 既定で出る。`H` で消せる |
-| ゲームパッド | 繋げば自動。キーボードと**軸ごとに**共存 |
+| 機体を選ぶ | `--list-aircraft`、`--aircraft light-single\|swift-sport\|PROFILE.json`。FDM・model・入力 rate・視点・音を切り替える |
+| controller 設定 | `--write-input-config` で作成、編集後 `--input-config` で再読込。F10 診断、F11 ページ切替。native code は `--native-controllers` が必要 |
+| 合成交通 / local session | `--traffic synthetic` / `--host` / `--join IP:PORT`。参加者は F12 退出。Internet へ公開しない |
+| 実 scene の撮影 | `--screenshot FILE.png`。一回撮影で終了は `--exit-after-screenshot`。表示サーバー無しは `--headless-screenshot FILE.png` |
 | 検証用: 空中から落として評価表示を通す | `--drop 15` |
 
-- 機体はテクスチャ付き glb を同梱（引数なしで出る）。`--no-model` で箱に戻る
+- Light Single に加え、オリジナルの Swift Sport の GLB / Blender source / 再生成 script を同梱。
+  `--no-model` は汎用メッシュ。custom JSON の不正値・未対応 ID・model 欠落は起動エラー
+- 実 DEM は [データ QA](qa/data-boundaries-2026-10-01.md) の手順で対応 geoid を適用する。
+  旧 `.fsdem` は自動変換しない。provenance の COMPLETE と対象範囲を確認する
+- リプレイは同一 build / 機体 / 地形が前提。frame zero を復元し、後退は bounded replay。
+  旧乱流 recording は seed の global field と時計修正で drift し得る
 - M2 の受け入れテストは `crates/flightsim-sim/tests/airport_circuit.rs`
-- ワークスペースの全テストを Windows / Linux の CI で実行する。
+- 純 Rust 群と描画群の指定テストを Windows / Linux の CI で実行する。
+  対象は workflow の `HEADLESS` / `RENDER` を確認する。
   加えて lint・ドキュメント・依存規約・ソフトウェア Vulkan 起動を検査する
-- `v0.6.0-alpha.6` 以降は、成功した `main` の CI 後に Windows x86_64 の zip を
-  prerelease へ自動添付する。実行ファイル、`assets/`、README、変更履歴、帰属・
-  ライセンス文を同梱する
+- 成功した `main` の CI 後に Windows x86_64 の build / 展開後 smoke / 公開を行う。
+  失敗すれば zip は公開されない。PNG が存在することと process exit 0 は別条件。
+  実行ファイル、`assets/`、README、変更履歴、帰属・ライセンス文を同梱する
 
 ## 2. 破ってはいけない制約
 
 **CI が機械的に検査する。** 破ると `scripts/check-architecture.sh` が落ちる。
 
 1. **`flightsim-core` / `flightsim-fdm` / `flightsim-world` / `flightsim-sim` /
-   `flightsim-tilegen` に `bevy` を依存させない。**
+   `flightsim-tilegen` / `flightsim-net` に `bevy` を依存させない。**
    これらが GUI なしにテストできることが技術選定の根拠そのもの（[ADR-0001](adr/0001-engine-selection.md)）。
-   Bevy を使えるのは `render` / `input` / `ui` / `app` だけ。
+   Bevy を使えるのは `render` / `input` / `ui` / `audio` / `app` だけ。
 2. **依存は一方向。** `core` ← `fdm`/`world` ← 上位。
    **`fdm` から `world` を参照しない。** 地形標高は引数で受け取る。
+   `net` は `core` と `glam` の純データ層。app が接続し、受信状態を自機物理に混ぜない
+   （[ADR-0010](adr/0010-local-traffic-sessions.md)）。
 3. **WGS84 の楕円体定数を `core` の外に書かない。** 座標変換は `flightsim-core` に集約する（[ADR-0002](adr/0002-coordinate-system.md)）。
 
 CI が検査しないが、レビューで落とす規約:
@@ -91,18 +124,39 @@ CI が検査しないが、レビューで落とす規約:
 
 ## 3. 次のタスク
 
-M1（ヘッドレスで妥当に飛ぶ）と M2（1 空港周辺で離陸→旋回→着陸）は達成済み。
-**いま M3 の途中。** 雲と雲中視程（[Issue #11](../../../issues/11)）と、
-OSM 滑走路（[Issue #21](../../../issues/21)）・誘導路（[Issue #25](../../../issues/25)）・
-apron / 待機位置 / 標識 / 誘導路灯（[Issue #27](../../../issues/27)）の取り込みと描画は完了。
-TASK-C（難易度設定）も完了。**M3 で実装できる項目は残っていない**——
-残りはコックピット内装（モデル調達待ち）と、実機・実データ・人の判断が要る検証だけ。
+M1 / M2 の達成記録は維持する。M3 / M4 の現在の判断は
+[ROADMAP](ROADMAP.md) と [統合 QA の Issue 対応表](qa/overnight-status-2026-10-01.md#issue-acceptance-and-remaining-work) を参照。
 
-M4 に入っていて、リプレイ（[Issue #12](../../../issues/12)）は完了。
-残りは機体追加（[#10](../../../issues/10)。モデル調達が要る）、
-METAR、ライブ交通（[#13](../../../issues/13)）、
-オンライン共有ワールド（[#14](../../../issues/14)）。
-継続課題は [ROADMAP](ROADMAP.md) に記録している。
+1. alpha.20 の batch hotfix は公開・実アーカイブ検査済み。alpha.19 の PNG 保存後
+   180 秒で終了しなかった失敗記録は残す。次は alpha.21 の subsystem PR / main 統合・
+   exact-head CI・2 機種の Windows zip smoke・公開 PNG / checksum を確認する。
+   最新の局所 app 95 tests / replay 50 tests と、19:56 UTC の全 local aggregate gate は合格。
+   build SHA は `be80a129cf2fbfe4d488673b7be3561d27c1a8ec5bf7aee2a81bbdec694923b6`。
+   local gate を最終 remote commit CI の代わりにしない
+2. #2 は名前を記録した実 controller の試験、#5 は基準機体を人が操縦した所感が必要。
+   #9 の mapping software が通っても、機種ごとの native channel / HOTAS 検証は残す
+3. #6 の実 DEM 出典・再現 bake・夜間/約 3 km 静止画の根拠を残す。
+   `record_visual_flight` の 360 秒・17.533 km fixture は標高 3017.089〜3017.093 m、
+   4 回の aircraft-anchor rebase、全 keyframe / 最終 state の exact replay を確認済み。
+   [native app の実 scene](qa/high-altitude-2026-10-01.md) でも 6:00 完走・4 回の render-origin
+   rebase・完了時の地形と地平線を最終 build で再確認した。F5 停止・F8 後退・再開も実操作済み。
+   全 LOD 遷移や連続動画の判定へ広げない。
+   路面/灯火の LOD 遮蔽と夜間 1.5 NM 進入の灯火視認性は残件として追う。
+   極端な V/S は短い k 表記へ修正済み。124 UI tests と最新 app の降下画像で収まりを確認した。
+   地上灯火の画像を進入距離での視認性の証拠にしない
+4. #10 / #13 / #14 / #22 / #23 / #33 は実装・局所証拠を用意した。
+   [native app 2 プロセス](qa/high-altitude-lan-alpha21-2026-10-01.md) で接続・8 秒 host 停止後の
+   新 session 再参加・F12 退出を確認。当初疑った文字欠けは針と計器文字の重なりと切り分け、
+   原寸画像・単独実行・native resize で独立した欠落不具合を再現しなかった。
+   main / release へ届いたものだけを対応完了とし、実機・Internet・全 UI の正常性へ意味を広げない
+5. METAR・volumetric clouds・OSM 建物・実交通・公開 online は将来項目。
+   全課題完了や不具合ゼロを宣言しない
+
+### 歴史記録（2026-08〜09）
+
+以下の TASK-A から内装までの「完了」「未実装」「既定」は記載日の履歴。
+設計理由と測定を残している。現在の機体 profile・controller・replay・geoid・parser の
+契約は上の現在状態、各 QA と現行ソースを参照する。
 
 ### TASK-A: 計器盤（`flightsim-ui`）— 完了
 
@@ -185,7 +239,8 @@ apron・待機位置・標識・誘導路灯まで完了。
   この extract に無い multipolygon hole と明示灯火は合成 fixture で検査する
 
 空港名・滑走路 `ref`・建物は未実装。OSM の `surface=*` は表示用の限定した列挙へ写像し、
-未知値は `Unknown` として保持する。PBF parser 自体の hardening は Issue #23 のまま。
+未知値は `Unknown` として保持する。ここは alpha.12 当時の記録。
+PBF parser の後続修正は 2026-10-01 の [データ QA](qa/data-boundaries-2026-10-01.md) を参照。
 
 ### TASK-C: 難易度設定 — 完了
 
@@ -335,31 +390,24 @@ Cessna 172 の実寸から手続き的に組んである（`flightsim-render::co
 3. **計器が 1 列 6 個だった。** 実機のシックスパックは 3 列 2 段の T 字配置。
    3D の盤に 2 段で穴を開けたら、2D 側と噛み合わなかった
 
-### 確認済みの制限と未検証事項
+### 現在の制限と未検証事項（2026-10-01）
 
-ここの本文は申し送りのスナップショット。着手可否と完了状態は
-[GitHub Issues](../../../issues) が正本で、文書同期は [Issue #15](../../../issues/15) で追跡する。
-
-- ゲームパッドの変換ロジックとキーボード共存はテスト済みだが、
-  実機の符号・感度は未確認（[Issue #2](../../../issues/2)）
-- 夜間の滑走路灯とコックピット照明は実装済み（[Issue #3](../../../issues/3)）
-- フライトディレクタは回帰テストの駆動装置。6 km手前から滑走路中心線を連続捕捉し、
-  左右6 m/sの直角横風でも滑走路内へ接地する（[Issue #4](../../../issues/4)）。
-  ILS・航法データ・認証されたautolandではない
-- 乱流は強度上限・連続性・決定論を検証済みだが、操縦感は未調整（[Issue #5](../../../issues/5)）
-- 実 Copernicus DEM を使った夜間・高高度の見え方は未確認（[Issue #6](../../../issues/6)）
-- Copernicus DEM GLO-30 は EGM2008 標高だが、tilegen は WGS84 楕円体高へ
-  変換せず格納している。地形・接地・滑走路は局所的に揃うが、絶対高度に
-  ジオイド高相当の系統誤差が残る（[Issue #22](../../../issues/22)）
-- `osmpbf 0.3.7` は細工・破損 PBF の全経路を panic-free にしない。入力は信頼できる
-  提供元に限り、parser hardening は [Issue #23](../../../issues/23) で追跡する
-- CI の起動スモークは Mesa/lavapipe の CPU Vulkan で同梱 glTF と 1 枚の描画を
-  確認する（[Issue #8](../../../issues/8)）。Windows zip もクリーンな展開先から
-  D3D12 フォールバックで検査するが、実 GPU、ベンダードライバ、性能は保証しない
-- 雲の最小実装（[Issue #11](../../../issues/11)）は完了。高品質なボリューム雲と
-  METAR は後続。HOTAS・軸再割り当て（[Issue #9](../../../issues/9)）、
-  追加機体（[Issue #10](../../../issues/10)）、リプレイ（[Issue #12](../../../issues/12)）、
-  交通（[Issue #13](../../../issues/13)）、オンライン（[Issue #14](../../../issues/14)）は未着手
+- #2: 物理 controller の機種名、入力範囲、符号・感度、切断復帰の実測が無い。
+  診断・校正保存・複数入力・native backend は synthetic / ECS 検査の結果
+- #5: 乱流 24 数値シナリオと severe 長時間走行は成功。人の操縦感評価は別で未実施。
+  preset 名は実気象の分類ではない。field 修正で旧 turbulent replay は変わり得る
+- #6: 正規化した実 Copernicus の夜間・約 3 km 落下試験画像は確認した。
+  screenshot は静止画の証拠で、移動中の全 LOD 遷移・全地域・任意地形の clearance を保証しない
+- #22: EGM2008 / EGM96 の明示的 local PGM 変換経路と独立検算あり。
+  grid の来歴確認・再配布条件は利用者が保持し、旧 tile は別出力先へ再生成する
+- #23: vendored parser の検証済み root から iterator へ渡す。敵対的 fixture と golden output を
+  検査したが、全ファイルの索引・node・apron 集約に total-memory sandbox は無い
+- 同期は最大 16 participants の trusted local/LAN alpha。認証・暗号化・NAT・公開 server・
+  実 ADS-B・remote aircraft profile の転送は無い。packet の単純な検査を認証と呼ばない
+- フライトディレクタは回帰用で、ILS・航法データ・認証された autoland ではない
+- CPU Vulkan / D3D12 fallback は実 GPU・Windows ベンダードライバ・性能を検証しない。
+  Windows の通常 interactive 終了とスピーカー聴感も別の未検証項目
+- 地表画像、OSM 建物、METAR、高品質な volumetric clouds は未実装
 
 ### リリース経路
 
@@ -368,7 +416,13 @@ Cessna 172 の実寸から手続き的に組んである（`flightsim-render::co
 CI が検査した SHA を Windows で `--locked --release` ビルドし、Cargo metadata から
 workspace version を読み、`v<version>` タグが無いときだけ作る。同名タグが別 SHA を
 指していれば失敗する。zip を新規ディレクトリへ展開し、同梱モデルの読み込みと
-完全な PNG を Windows 上で確認してから公開する。release と zip のアップロードは
+完全な PNG と process exit 0 を Windows 上で確認してから公開する。
+新しい workflow の表示 SHA と、`workflow_run` が指定する checkout 対象 SHA を混同しない。
+2026-10-01 の alpha.19 では実 PNG は約 104 秒で保存されたが process が 180 秒で終了せず、
+配布 smoke は失敗した。graphics teardown が原因という説明はログからの推測である。
+明示 batch option の保存/flush/sync/close 後の終了修正は PR #42 で検査する。
+Linux native windowed capture の exit 0 は Windows 成功の代用にならない。
+release と zip のアップロードは
 再実行しても同じ結果になる。
 
 書き込み権限は、ソースを checkout も実行もしない publish job だけが持つ。
@@ -378,7 +432,7 @@ ref が変わっていないことを確認し、PR コードを checkout せず
 
 ---
 
-以下は完了済みのタスク記録。**設計判断の経緯が書いてあるので、
+以下は当時の完了タスクと測定の歴史記録。**設計判断の経緯が書いてあるので、
 似た作業をする前に該当箇所を読むこと。**
 
 ### TASK-1: 接地反力と着陸装置（`flightsim-fdm`）— 完了
@@ -554,7 +608,9 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 「LOD 選択 → 予算内でストリーミング → floating origin 適用」を回している。
 **M2 の描画フレームはこの手順をそのまま実装すればよい。**
 
-### 性能の実測値
+### 性能の実測値（M2 前の歴史記録）
+
+以下は当時の 1 台の Windows 機による測定で、2026-10-01 の再測定ではない。
 
 `cargo bench --workspace`（criterion）。**60 Hz フレームの予算は 16 667 µs。**
 
@@ -701,12 +757,12 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   見つけた。** 夜そのものが暗いのは物理的に正しく、答えは滑走路灯
 - **コックピット視点では機体の外形を隠す。** 目線は胴体の内側にあるので、
   外形を描くと視界が自分の機体で塞がる。プレースホルダの箱では気付きにくいが、
-  実モデルを既定にした瞬間に**起動直後の画がこれになった**。内装モデルは無い
+  実モデルを既定にした瞬間に**起動直後の画がこれになった**。当時は内装が無く、現在は手続き的内装を置く
 - **Bevy の feature を既定オフで列挙するなら `reflect_auto_register` を必ず入れる。**
   0.18 は型登録を自動化していて、`GltfPlugin` は `register_type` を一度も呼ばない。
   切れていると glTF シーンの生成で `scene contains the unregistered type` と
   panic する。**コンパイルも clippy も描画層のテストも CI も全部通る**
-  （CI は GPU が無いので描画を実行しない）。実際に取得した `.glb` を読むまで
+  （当時の CI は描画を実行していなかった。現在は CPU 描画 smoke がある）。実際に取得した `.glb` を読むまで
   出なかった。詳細は [ADR-0007](adr/0007-bevy-version.md)
 - **画像の feature は「書き出す形式」ではなく「読み込む形式」で決める。**
   `png` だけ入れていたが、Meshy はテクスチャを JPEG で返す。`jpeg` が無いと
@@ -810,13 +866,13 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
   cargo fmt --all --check
   cargo clippy --workspace --all-targets -- -D warnings
   cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
-    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --all-targets
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net --all-targets
   cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
-    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --doc
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net --doc
   cargo bench -p flightsim-core -p flightsim-fdm -p flightsim-world \
-    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen --no-run
+    -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net --no-run
   cargo test -j 2 -p flightsim-render -p flightsim-input \
-    -p flightsim-ui -p flightsim-app --all-targets
+    -p flightsim-ui -p flightsim-audio -p flightsim-app --all-targets
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
   bash scripts/check-architecture.sh
   ```
@@ -826,12 +882,5 @@ Bevy を載せる前に、下層の欠陥を潰してから積むための作業
 - 落ちているテストは「落ちている」と報告する。確認したことと推測を区別する
 
 エージェント別の詳細な指示は [.claude/agents/](../.claude/agents/) にある。
-TASK-1 は `simulation`、TASK-2 は `world`、TASK-3 と M2 の Bevy 統合は完了。
-現在は M3。TASK-A（計器盤）、雲・雲中視程、TASK-B（OSM 滑走路・誘導路・apron・
-待機位置・標識・誘導路灯）は完了。
-TASK-C（難易度設定）、リプレイ（[Issue #12](../../../issues/12)）、
-遊びのループ（一時停止・やり直し・墜落・音）も完了。
-次は M4 の残り（機体追加・METAR・ライブ交通）、
-[Issue #22](../../../issues/22)（ジオイド適用。データ源の選定が要る）、
-[Issue #33](../../../issues/33)（姿勢計のはみ出し。Bevy のクリップ挙動の確認が要る）。
-結線を触る場合は `flightsim-sim` の公開 API を先に読むこと。
+旧 TASK の記録は設計理由と測定のために残している。次の作業は §3 の現在の一覧から選ぶ。
+結線を触る場合は `flightsim-sim` の公開 API と [ARCHITECTURE](../ARCHITECTURE.md) を先に読む。

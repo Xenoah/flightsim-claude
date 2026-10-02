@@ -46,6 +46,7 @@ pub mod instruments;
 mod landing;
 pub mod pause;
 pub mod replay;
+pub mod traffic;
 mod tutorial;
 
 pub use crash::{CrashNotice, CrashOverlay, crash_text};
@@ -58,6 +59,7 @@ pub use landing::{
 };
 pub use pause::{PauseOverlay, Paused, pause_text};
 pub use replay::{ReplayBanner, ReplayStatus, format_replay_banner};
+pub use traffic::TrafficPanel;
 pub use tutorial::{
     TutorialProgress, TutorialPrompt, TutorialStage, TutorialState, TutorialVisibility,
     spawn_tutorial_prompt, update_tutorial_prompt,
@@ -273,9 +275,13 @@ impl Plugin for FlightsimUiPlugin {
             .init_resource::<HudSmoothing>()
             .init_resource::<DataAttribution>()
             .init_resource::<InputDiagnosticsPanel>()
+            .init_resource::<TrafficPanel>()
+            .add_systems(Startup, traffic::spawn_traffic_panel)
+            .add_systems(Update, traffic::update_traffic_panel)
             .add_systems(Startup, input_diagnostics::spawn_input_diagnostics)
             .add_systems(Update, input_diagnostics::update_input_diagnostics_panel)
             .add_systems(Startup, spawn_hud)
+            .add_systems(Update, update_help_for_replay)
             .add_systems(
                 Update,
                 (
@@ -440,6 +446,23 @@ LANDINGS {:>6}",
     )
 }
 
+/// Keep live flight controls out of recorded playback guidance.
+pub fn update_help_for_replay(
+    status: Res<ReplayStatus>,
+    mut help: Query<&mut Text, With<HudHelp>>,
+) {
+    let desired = if status.active {
+        "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay.".to_owned()
+    } else {
+        help_text()
+    };
+    for mut text in &mut help {
+        if text.as_str() != desired {
+            **text = desired.clone();
+        }
+    }
+}
+
 /// 操作説明。
 #[must_use]
 pub fn help_text() -> String {
@@ -488,7 +511,7 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
     };
 
     format!(
-        "IAS  {:>5.0} kt\n\
+        "TAS  {:>5.0} kt\n\
          ALT  {:>5.0} ft\n\
          AGL  {:>5.0} ft{ground}\n\
          V/S  {:>5.0} ft/min\n\
@@ -637,10 +660,36 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .insert_resource(attribution)
+            .init_resource::<ReplayStatus>()
             .add_systems(Startup, spawn_hud)
+            .add_systems(Update, update_help_for_replay)
             .add_systems(Update, update_data_attribution_display);
         app.update();
         app
+    }
+
+    #[test]
+    fn replay_help_switches_back_to_live_controls_without_losing_attribution() {
+        let mut app = attribution_harness(DataAttribution::default());
+        let help = |app: &mut App| {
+            let world = app.world_mut();
+            let mut query = world.query_filtered::<&Text, With<HudHelp>>();
+            query
+                .single(world)
+                .expect("one help panel")
+                .as_str()
+                .to_owned()
+        };
+        assert!(help(&mut app).contains("restart this flight"));
+        app.world_mut().resource_mut::<ReplayStatus>().active = true;
+        app.update();
+        let replay = help(&mut app);
+        assert!(replay.is_ascii());
+        assert!(replay.contains("F8 ............. back 10 seconds"));
+        assert!(!replay.contains("restart this flight"));
+        app.world_mut().resource_mut::<ReplayStatus>().active = false;
+        app.update();
+        assert_eq!(help(&mut app), help_text());
     }
 
     #[test]

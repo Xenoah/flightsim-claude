@@ -14,6 +14,7 @@ use bevy::prelude::*;
 pub struct CrashNotice {
     /// 原因の一行。空なら墜落していない。
     headline: String,
+    replay: bool,
 }
 
 impl CrashNotice {
@@ -34,6 +35,11 @@ impl CrashNotice {
             "the crash headline must be a single line"
         );
         self.headline = headline;
+    }
+
+    /// Select a recovery action that is actually enabled by the application.
+    pub fn set_replay(&mut self, replay: bool) {
+        self.replay = replay;
     }
 
     /// 表示を消す。
@@ -97,7 +103,7 @@ pub fn update_crash_overlay(
         if !notice.is_crashed() {
             continue;
         }
-        let body = crash_text(notice.headline());
+        let body = crash_text_with_recovery(notice.headline(), notice.replay);
         if text.as_str() != body {
             **text = body;
         }
@@ -109,12 +115,29 @@ pub fn update_crash_overlay(
 /// **ASCII のみ。**
 #[must_use]
 pub fn crash_text(headline: &str) -> String {
-    format!("{headline}\n\nR ..... try again")
+    crash_text_with_recovery(headline, false)
+}
+
+fn crash_text_with_recovery(headline: &str, replay: bool) -> String {
+    let recovery = if replay {
+        "F8 ..... rewind 10 seconds"
+    } else {
+        "R ..... try again"
+    };
+    format!("{headline}\n\n{recovery}")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replay_crash_offers_rewind_instead_of_disabled_restart() {
+        let text = crash_text_with_recovery("CRASHED: test", true);
+        assert!(text.contains("F8 ..... rewind"));
+        assert!(!text.contains("R ..... try again"));
+        assert!(crash_text("CRASHED: test").contains("R ..... try again"));
+    }
 
     #[test]
     fn the_overlay_shows_the_cause_and_the_way_out() {

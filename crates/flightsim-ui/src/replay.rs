@@ -24,6 +24,12 @@ pub struct ReplayStatus {
     pub elapsed: Seconds,
     /// 記録全体の長さ。
     pub total: Seconds,
+    /// Exact rewind is rebuilding physics history in bounded batches.
+    pub seeking: bool,
+    /// A reproducibility or numerical failure stopped this replay.
+    pub fault: Option<String>,
+    /// The recorded input stream reached its end.
+    pub finished: bool,
 }
 
 /// 再生表示の印。
@@ -87,7 +93,23 @@ pub fn update_replay_banner(
 /// **ASCII のみ。** 既定フォントに字形が無い記号は豆腐になる。
 #[must_use]
 pub fn format_replay_banner(status: &ReplayStatus) -> String {
-    let state = if status.paused { "PAUSED" } else { "REPLAY" };
+    if let Some(fault) = &status.fault {
+        return format!("{fault}   F8 rewind");
+    }
+    if status.finished && !status.seeking {
+        return format!(
+            "REPLAY COMPLETE  {} / {}   F8 back 10s",
+            clock(status.elapsed),
+            clock(status.total)
+        );
+    }
+    let state = if status.seeking {
+        "SEEKING"
+    } else if status.paused {
+        "PAUSED"
+    } else {
+        "REPLAY"
+    };
     let speed = if status.speed.is_finite() {
         status.speed.clamp(0.0, 99.0)
     } else {
@@ -127,6 +149,9 @@ mod tests {
     fn status() -> ReplayStatus {
         ReplayStatus {
             active: true,
+            seeking: false,
+            fault: None,
+            finished: false,
             paused: false,
             speed: 1.0,
             elapsed: Seconds(65.0),

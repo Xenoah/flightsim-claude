@@ -1,0 +1,498 @@
+//! Complete aircraft selection: validated dynamics, model, camera and controls.
+use flightsim_core::{Attitude, Meters, MetersPerSecond, Radians};
+use flightsim_fdm::{AircraftConfig, RigidBodyState, definition::AircraftDefinition};
+use flightsim_input::{AxisState, ElevatorTrim, PilotControls, RampAxis};
+use flightsim_render::{ModelAxis, ModelFit};
+use serde::{Deserialize, Serialize};
+use std::io::Read;
+use std::path::{Component, Path};
+
+const MAX_PROFILE_BYTES: u64 = 128 * 1024;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AircraftProfile {
+    pub version: u16,
+    pub id: String,
+    pub dynamics: AircraftDefinition,
+    pub model: ModelDefinition,
+    pub controls: ControlDefinition,
+    pub camera_eye_m: [f64; 3],
+    pub engine_sound: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ModelDefinition {
+    pub path: String,
+    pub forward: String,
+    pub up: String,
+    pub length_m: f64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ControlDefinition {
+    pub surface_rate: f64,
+    pub centering_rate: f64,
+    pub throttle_rate: f64,
+    pub flap_rate: f64,
+    pub default_trim: f64,
+    pub trim_rate: f64,
+    pub approach_speed_mps: f64,
+    /// Initial attitude and trim are distinct from the flaps-up takeoff trim.
+    pub approach_pitch_rad: f64,
+    pub approach_trim: f64,
+    pub approach_throttle: f64,
+    pub approach_flaps: f64,
+}
+
+impl AircraftProfile {
+    pub fn builtin(id: &str) -> Result<Self, String> {
+        let json = match id {
+            "light-single" => include_str!("../../../assets/aircraft/light_single.json"),
+            "swift-sport" => include_str!("../../../assets/aircraft/swift_sport.json"),
+            _ => {
+                return Err(format!(
+                    "unknown aircraft `{id}`; choose light-single or swift-sport, or a JSON profile path"
+                ));
+            }
+        };
+        Self::parse(json)
+    }
+
+    pub fn load(choice: &str) -> Result<Self, String> {
+        if !choice.ends_with(".json") {
+            return Self::builtin(choice);
+        }
+        let mut bytes = Vec::new();
+        std::fs::File::open(choice)
+            .map_err(|e| e.to_string())?
+            .take(MAX_PROFILE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        if bytes.len() as u64 > MAX_PROFILE_BYTES {
+            return Err("aircraft profile exceeds 128 KiB".into());
+        }
+        let json = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+        Self::parse(json)
+    }
+
+    fn parse(json: &str) -> Result<Self, String> {
+        let profile: Self = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        profile.validate()?;
+        Ok(profile)
+    }
+
+    pub fn configuration(&self) -> AircraftConfig {
+        // All creation paths validate first. No untrusted object can bypass parse.
+        self.dynamics
+            .to_config()
+            .expect("validated aircraft profile")
+    }
+
+    pub fn model_fit(&self) -> ModelFit {
+        ModelFit::new(
+            ModelAxis::parse(&self.model.forward).expect("validated axis"),
+            ModelAxis::parse(&self.model.up).expect("validated axis"),
+            Meters(self.model.length_m),
+        )
+        .expect("validated axes")
+    }
+
+    pub fn pilot_controls(&self, approach: bool) -> PilotControls {
+        let c = self.controls;
+        let mut result = PilotControls::default();
+        result.aileron = AxisState::new(c.surface_rate, c.centering_rate);
+        result.elevator = AxisState::new(c.surface_rate, c.centering_rate);
+        result.rudder = AxisState::new(c.surface_rate, c.centering_rate);
+        result.throttle = RampAxis::new(
+            if approach { c.approach_throttle } else { 0.0 },
+            c.throttle_rate,
+        );
+        result.flaps = RampAxis::new(if approach { c.approach_flaps } else { 0.0 }, c.flap_rate);
+        result.trim = ElevatorTrim::new(
+            if approach {
+                c.approach_trim
+            } else {
+                c.default_trim
+            },
+            c.trim_rate,
+        );
+        result
+    }
+
+    /// Place the aircraft on the requested approach with its configured pitch.
+    ///
+    /// Bundled controls/pitch balance a 3-degree, still-air approach near sea
+    /// level. This sets the initial pose only; no controller runs afterward.
+    /// Other heights, wind, glideslopes and custom profiles need pilot input.
+    pub fn approach_state(
+        &self,
+        runway: &flightsim_world::Runway,
+        distance: Meters,
+        glideslope: Radians,
+    ) -> RigidBodyState {
+        let state = flightsim_sim::approach_state(
+            runway,
+            distance,
+            glideslope,
+            MetersPerSecond(self.controls.approach_speed_mps),
+        );
+        RigidBodyState::from_geodetic(
+            state.geodetic(),
+            Attitude::new(
+                Radians::ZERO,
+                Radians(self.controls.approach_pitch_rad),
+                state.attitude().yaw,
+            ),
+            state.velocity_ned(),
+        )
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.version != 1 {
+            return Err(format!(
+                "unsupported aircraft profile version {}",
+                self.version
+            ));
+        }
+        if self.id.is_empty()
+            || self.id.len() > 48
+            || !self
+                .id
+                .bytes()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        {
+            return Err("aircraft id must be a short lowercase ASCII identifier".into());
+        }
+        self.dynamics.to_config().map_err(|e| e.to_string())?;
+        let path = Path::new(&self.model.path);
+        if self.model.path.is_empty()
+            || self.model.path.len() > 256
+            || path.is_absolute()
+            || self.model.path.contains('\\')
+            || self.model.path.contains(':')
+            || path
+                .components()
+                .any(|c| !matches!(c, Component::Normal(_)))
+            || !self.model.path.ends_with(".glb")
+        {
+            return Err(
+                "model path must be a relative .glb asset path without parent traversal".into(),
+            );
+        }
+        if !self.model.length_m.is_finite() || !(1.0..=100.0).contains(&self.model.length_m) {
+            return Err("model length must be 1..=100 metres".into());
+        }
+        ModelFit::new(
+            ModelAxis::parse(&self.model.forward).map_err(|e| e.to_string())?,
+            ModelAxis::parse(&self.model.up).map_err(|e| e.to_string())?,
+            Meters(self.model.length_m),
+        )
+        .map_err(|e| e.to_string())?;
+        for value in self.camera_eye_m {
+            if !value.is_finite() || value.abs() > 10.0 {
+                return Err(
+                    "camera eye must be finite and within 10 metres of the center of mass".into(),
+                );
+            }
+        }
+        if flightsim_audio::EngineKind::parse(&self.engine_sound).is_none() {
+            return Err("engine_sound must be piston or turbine".into());
+        }
+        let c = self.controls;
+        for value in [c.surface_rate, c.throttle_rate, c.flap_rate, c.trim_rate] {
+            if !value.is_finite() || !(0.01..=10.0).contains(&value) {
+                return Err("control rates must be finite and within 0.01..=10".into());
+            }
+        }
+        if !c.centering_rate.is_finite()
+            || !(0.0..=10.0).contains(&c.centering_rate)
+            || !c.default_trim.is_finite()
+            || !(-1.0..=1.0).contains(&c.default_trim)
+            || !c.approach_speed_mps.is_finite()
+            || !(10.0..=150.0).contains(&c.approach_speed_mps)
+            || !c.approach_pitch_rad.is_finite()
+            || c.approach_pitch_rad.abs() > core::f64::consts::FRAC_PI_4
+            || !c.approach_trim.is_finite()
+            || !(-1.0..=1.0).contains(&c.approach_trim)
+            || !c.approach_throttle.is_finite()
+            || !(0.0..=1.0).contains(&c.approach_throttle)
+            || !c.approach_flaps.is_finite()
+            || !(0.0..=1.0).contains(&c.approach_flaps)
+        {
+            return Err("invalid aircraft control or approach setting".into());
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn bundled_definitions_select_distinct_dynamics_models_and_controls() {
+        let light = AircraftProfile::builtin("light-single").unwrap();
+        let sport = AircraftProfile::builtin("swift-sport").unwrap();
+        assert_ne!(
+            light.dynamics.mass_kg.to_bits(),
+            sport.dynamics.mass_kg.to_bits()
+        );
+        assert_ne!(
+            light.dynamics.max_shaft_power_w.to_bits(),
+            sport.dynamics.max_shaft_power_w.to_bits()
+        );
+        assert_ne!(light.model.path, sport.model.path);
+        assert_ne!(
+            light.controls.surface_rate.to_bits(),
+            sport.controls.surface_rate.to_bits()
+        );
+        assert_eq!(
+            flightsim_sim::replay::aircraft_fingerprint(&light.configuration()),
+            flightsim_sim::replay::aircraft_fingerprint(&AircraftConfig::light_single())
+        );
+    }
+    #[test]
+    fn both_bundled_aircraft_take_off_and_remain_numerically_stable() {
+        use flightsim_core::{Degrees, Geodetic, MetersPerSecond, Radians, Seconds};
+        use flightsim_sim::{
+            DirectorTargets, FlightDirector, GroundSampler, Simulation, VerticalTarget,
+        };
+        use flightsim_world::{MemoryTileSource, Terrain};
+        for id in ["light-single", "swift-sport"] {
+            let profile = AircraftProfile::builtin(id).unwrap();
+            let mut sim = Simulation::parked(
+                profile.configuration(),
+                Geodetic::from_degrees(35.55, 139.78, 0.0),
+                Radians::ZERO,
+                Terrain::new(MemoryTileSource::new(), 1024, 8..=12),
+                GroundSampler::default(),
+            );
+            let director = FlightDirector::default();
+            let mut liftoff = None;
+            for step in 0..14_400 {
+                let target_pitch = if sim.airspeed().get() < 30.0 {
+                    0.0
+                } else {
+                    5.0
+                };
+                let controls = director.control(
+                    sim.state(),
+                    sim.agl(),
+                    DirectorTargets {
+                        vertical: VerticalTarget::Pitch(Degrees(target_pitch).to_radians()),
+                        heading: Radians::ZERO,
+                        airspeed: MetersPerSecond(45.0),
+                        flaps: 0.0,
+                        brakes: 0.0,
+                        throttle_override: Some(1.0),
+                        wings_level: true,
+                    },
+                );
+                let report = sim.advance(Seconds(1.0 / 120.0), controls);
+                assert!(
+                    !report.diverged && !sim.crashed(),
+                    "{id}: takeoff failed at {step}"
+                );
+                if sim.agl().get() > 3.0 && liftoff.is_none() {
+                    liftoff = Some(f64::from(step) / 120.0);
+                }
+            }
+            eprintln!(
+                "{id}: liftoff={liftoff:?}s final AGL={:.1}m TAS={:.1}m/s",
+                sim.agl().get(),
+                sim.airspeed().get()
+            );
+            assert!(liftoff.is_some_and(|seconds| seconds < 60.0));
+            assert!(sim.agl().get() > 100.0);
+        }
+    }
+
+    #[test]
+    fn bundled_approaches_hold_speed_and_three_degree_descent_without_a_controller() {
+        use flightsim_core::{Degrees, NauticalMiles, Seconds};
+        use flightsim_sim::{GroundSampler, Simulation};
+        use flightsim_world::{MemoryTileSource, Runway, Terrain};
+        for id in ["light-single", "swift-sport"] {
+            let profile = AircraftProfile::builtin(id).unwrap();
+            let state = profile.approach_state(
+                &Runway::synthetic(),
+                NauticalMiles(1.5).to_meters(),
+                Degrees(3.0).to_radians(),
+            );
+            let initial_pitch = state.attitude().pitch.to_degrees().get();
+            let mut sim = Simulation::from_state(
+                profile.configuration(),
+                state,
+                Terrain::new(MemoryTileSource::new(), 1024, 8..=12),
+                GroundSampler::default(),
+            );
+            // Exactly the startup controls, held unchanged. No flight director,
+            // autopilot, feedback or stabilisation is involved in this test.
+            let input = profile.pilot_controls(true).to_control_inputs();
+            for step in 1..=3600 {
+                let report = sim.advance(Seconds(1.0 / 120.0), input);
+                let pitch = sim.state().attitude().pitch.to_degrees().get();
+                let descent_angle = (-sim.state().vertical_speed().get())
+                    .atan2(sim.state().ground_speed().get())
+                    .to_degrees();
+                assert!(!report.diverged && !sim.crashed(), "{id}, step {step}");
+                // Scenario requirements, independent of the configured trim:
+                // selected speed +/- 1 m/s and a 3 +/- 0.5 degree descent at
+                // every step, including the transient immediately after spawn.
+                assert!(
+                    (sim.airspeed().get() - profile.controls.approach_speed_mps).abs() < 1.0,
+                    "{id}, step {step}: TAS={}",
+                    sim.airspeed().get()
+                );
+                assert!(
+                    (descent_angle - 3.0).abs() < 0.5,
+                    "{id}, step {step}: descent angle={descent_angle}"
+                );
+                assert!(
+                    (pitch - initial_pitch).abs() < 1.0,
+                    "{id}, step {step}: pitch={pitch}"
+                );
+                if step == 1200 || step == 3600 {
+                    eprintln!(
+                        "{id} approach{:.0}s: alt={:.3} TAS={:.3} pitch={:.3} VS={:.3} descent={:.3}",
+                        f64::from(step) / 120.0,
+                        sim.agl().get(),
+                        sim.airspeed().get(),
+                        pitch,
+                        sim.state().vertical_speed().get(),
+                        descent_angle,
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn approach_defaults_balance_existing_fdm_forces_and_pitch_moment() {
+        use bevy::math::DVec3;
+        use flightsim_core::{Degrees, NauticalMiles};
+        use flightsim_fdm::{Atmosphere, aero, gravity};
+        for id in ["light-single", "swift-sport"] {
+            let profile = AircraftProfile::builtin(id).unwrap();
+            let state = profile.approach_state(
+                &flightsim_world::Runway::synthetic(),
+                NauticalMiles(1.5).to_meters(),
+                Degrees(3.0).to_radians(),
+            );
+            let config = profile.configuration();
+            let controls = profile.pilot_controls(true).to_control_inputs();
+            let air = Atmosphere::standard().sample(state.altitude());
+            let angles = aero::aero_angles(state.body_velocity());
+            let (force, moment) = aero::body_force_and_moment(
+                &config.aero,
+                &config.geometry,
+                angles,
+                state.angular_velocity,
+                controls,
+                air.density,
+            );
+            let thrust = config.engine.thrust(
+                controls.throttle(),
+                angles.true_airspeed.get(),
+                air.density_ratio(),
+            );
+            let acceleration = state.orientation
+                * ((force + DVec3::X * thrust.get()) / config.mass_properties.mass().get())
+                + gravity::acceleration_ecef(state.geodetic(), &state.local_frame());
+            let angular_acceleration = config.mass_properties.inverse_inertia() * moment;
+            assert!(acceleration.length() < 0.01, "{id}: {acceleration:?}");
+            assert!(
+                angular_acceleration.length() < 0.0001,
+                "{id}: {angular_acceleration:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn approach_pose_preserves_runway_position_velocity_and_heading() {
+        use flightsim_core::{Degrees, NauticalMiles};
+        for id in ["light-single", "swift-sport"] {
+            let profile = AircraftProfile::builtin(id).unwrap();
+            for heading in [0.0, 50.0, 180.0, 270.0] {
+                let mut runway = flightsim_world::Runway::synthetic();
+                runway.heading = Degrees(heading).to_radians();
+                let distance = NauticalMiles(1.5).to_meters();
+                let glideslope = Degrees(3.0).to_radians();
+                let base = flightsim_sim::approach_state(
+                    &runway,
+                    distance,
+                    glideslope,
+                    MetersPerSecond(profile.controls.approach_speed_mps),
+                );
+                let state = profile.approach_state(&runway, distance, glideslope);
+                assert!((base.position.0 - state.position.0).length() < 1e-6);
+                assert!((base.velocity - state.velocity).length() < 1e-9);
+                assert!(
+                    (base.attitude().yaw.get() - state.attitude().yaw.get()).cos() > 1.0 - 1e-12
+                );
+                assert!(state.attitude().roll.get().abs() < 1e-9);
+                assert!(
+                    (state.attitude().pitch.get() - profile.controls.approach_pitch_rad).abs()
+                        < 1e-9
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn parked_controls_keep_their_flaps_up_takeoff_trim() {
+        for (id, trim) in [("light-single", 0.09), ("swift-sport", 0.08)] {
+            let profile = AircraftProfile::builtin(id).unwrap();
+            let parked = profile.pilot_controls(false).to_control_inputs();
+            assert!((parked.elevator() - trim).abs() < 1e-12);
+            assert!(parked.throttle().abs() < 1e-12);
+            assert!(parked.flaps().abs() < 1e-12);
+            assert!((profile.pilot_controls(true).trim.value() - trim).abs() > 0.01);
+        }
+    }
+
+    #[test]
+    fn approach_trim_and_pitch_reject_nonfinite_and_out_of_range_values() {
+        let profile = AircraftProfile::builtin("light-single").unwrap();
+        for trim in [-1.0, 1.0] {
+            for pitch in [-core::f64::consts::FRAC_PI_4, core::f64::consts::FRAC_PI_4] {
+                let mut boundary = profile.clone();
+                boundary.controls.approach_trim = trim;
+                boundary.controls.approach_pitch_rad = pitch;
+                assert!(boundary.validate().is_ok());
+            }
+        }
+        for trim in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.01, 1.01] {
+            let mut invalid = profile.clone();
+            invalid.controls.approach_trim = trim;
+            assert!(invalid.validate().is_err());
+        }
+        for pitch in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.79, 0.79] {
+            let mut invalid = profile.clone();
+            invalid.controls.approach_pitch_rad = pitch;
+            assert!(invalid.validate().is_err());
+        }
+        for (field, value) in [("approach_trim", 1.01), ("approach_pitch_rad", 0.79)] {
+            let mut invalid = serde_json::to_value(&profile).unwrap();
+            invalid["controls"][field] = serde_json::json!(value);
+            assert!(AircraftProfile::parse(&invalid.to_string()).is_err());
+            invalid["controls"].as_object_mut().unwrap().remove(field);
+            assert!(AircraftProfile::parse(&invalid.to_string()).is_err());
+        }
+    }
+
+    #[test]
+    fn unknown_missing_and_unsafe_profiles_fail_instead_of_selecting_a_fallback() {
+        assert!(AircraftProfile::load("jet").is_err());
+        assert!(AircraftProfile::load("does-not-exist.json").is_err());
+        let profile = AircraftProfile::builtin("swift-sport").unwrap();
+        let mut json = serde_json::to_value(profile).unwrap();
+        json["model"]["path"] = serde_json::json!("../other.glb");
+        assert!(AircraftProfile::parse(&json.to_string()).is_err());
+        json["model"]["path"] = serde_json::json!("aircraft/swift_sport.glb");
+        json["version"] = serde_json::json!(999);
+        assert!(AircraftProfile::parse(&json.to_string()).is_err());
+    }
+}

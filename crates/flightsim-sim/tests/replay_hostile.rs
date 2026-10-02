@@ -6,7 +6,7 @@
 use flightsim_core::Seconds;
 use flightsim_fdm::ControlInputs;
 use flightsim_sim::replay::{
-    Conditions, FORMAT_VERSION, Frame, MAGIC, MAX_FRAMES, MAX_SPEED, MIN_SPEED, Player, Recorder,
+    Conditions, FORMAT_VERSION, MAGIC, MAX_FRAMES, MAX_SPEED, MIN_SPEED, Player, Recorder,
     Recording, ReplayError,
 };
 
@@ -157,7 +157,7 @@ fn a_valid_keyframe_orientation_survives_the_round_trip_bit_for_bit() {
 }
 
 #[test]
-fn a_corrupt_keyframe_orientation_is_still_normalized() {
+fn a_corrupt_keyframe_orientation_is_rejected_instead_of_repaired() {
     // 単位長を触らないからといって、壊れた回転まで通してはいけない。
     // 長さ 0 や非有限のまま渡すと、そこから先の姿勢が全部壊れる。
     let state = flightsim_fdm::RigidBodyState::from_geodetic(
@@ -183,12 +183,14 @@ fn a_corrupt_keyframe_orientation_is_still_normalized() {
         let at = orientation + index * 8;
         bytes[at..at + 8].copy_from_slice(&value.to_le_bytes());
     }
-    let restored = read(&bytes).expect("an out-of-range rotation is repaired, not rejected");
-    let length = restored.keyframes()[0].state.orientation.length();
-    assert!(
-        (length - 1.0).abs() < 1e-9,
-        "the rotation should have been normalized, its length is {length}"
-    );
+    assert!(matches!(
+        read(&bytes),
+        Err(ReplayError::InvalidValue {
+            field: "keyframe orientation",
+            frame: Some(0),
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -341,13 +343,18 @@ fn the_recorder_stops_at_the_frame_limit() {
 }
 
 #[test]
-fn control_inputs_read_back_from_a_corrupt_file_stay_in_range() {
-    // 範囲外の値がファイルに入っていても、FDM へ渡る前に潰れること。
+fn corrupt_control_inputs_are_rejected_instead_of_changing_the_flight() {
+    // ファイルの破損をクランプすると別の飛行になる。FDM へ渡す前に拒否する。
     let mut bytes = sample_bytes(1);
     // 最後のフレームの aileron（frame_time の次）を 1e30 にする。
     let aileron = bytes.len() - 56 + 8;
     bytes[aileron..aileron + 8].copy_from_slice(&1.0e30_f64.to_le_bytes());
-    let recording = read(&bytes).expect("an out-of-range control is clamped, not rejected");
-    let Frame { controls, .. } = recording.frames()[0];
-    assert!((-1.0..=1.0).contains(&controls.aileron()));
+    assert!(matches!(
+        read(&bytes),
+        Err(ReplayError::InvalidValue {
+            field: "aileron",
+            frame: Some(0),
+            ..
+        })
+    ));
 }

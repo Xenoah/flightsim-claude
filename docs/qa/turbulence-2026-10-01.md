@@ -283,7 +283,7 @@ an existing manually flyable approach setup (different from the high-altitude
 numeric fixture), use the same command with each of `light`, `moderate`, `severe`:
 
 ```sh
-cargo run -p flightsim-app -- --engine piston \
+cargo run -p flightsim-app -- --aircraft light-single --engine piston \
   --approach 1.5 --start 35.55,139.78 --difficulty beginner --wind 0/0 \
   --turbulence light
 ```
