@@ -62,7 +62,7 @@ SOURCE_FILES = (
     "crates/flightsim-world/data/ncep-ncar-1991-2020.json",
 )
 REVIEWED_STATES = {"original_source_recorded", "licensed_with_notices"}
-RAW_SUFFIXES = (".fsreplay", ".fsdem", ".fsairports", ".osm", ".pbf", ".csv", ".log")
+RAW_SUFFIXES = (".fsreplay", ".fsdem", ".fsairports", ".fsscenery", ".osm", ".pbf", ".csv", ".log")
 
 
 def load_script(name):
@@ -153,7 +153,9 @@ def inspect(root):
             raise ValueError("unsafe bundle destination")
         path = regular(source)
         digest = readiness.digest(path)
-        if path.name.lower().endswith(RAW_SUFFIXES):
+        with path.open("rb") as stream:
+            scenery_magic = stream.read(4) == b"FSSC"
+        if path.name.lower().endswith(RAW_SUFFIXES) or scenery_magic:
             block("RAW_DATA_EXCLUDED", f"Raw telemetry/regional data is excluded: {source}")
         if digest in unresolved_hashes:
             block("UNRESOLVED_ASSET_RIGHTS", f"Unresolved asset bytes would be published: {source}")

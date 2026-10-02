@@ -38,7 +38,7 @@ fn advance_script(
     script.surfaces = 0;
     if tiles.is_stitching() {
         let started = std::time::Instant::now();
-        script.progress = advance_stitched_update(
+        script.progress = advance_stitched_update::<StandardMaterial>(
             &mut commands,
             &mut meshes,
             &mut tiles,
@@ -56,7 +56,7 @@ fn advance_script(
     script.surfaces = preparations.len();
     let started = std::time::Instant::now();
     for (id, dem) in preparations {
-        tiles.insert_prepared(prepare_tile(
+        tiles.insert_prepared(prepare_tile::<StandardMaterial>(
             &mut commands,
             &mut meshes,
             Handle::default(),
@@ -68,7 +68,7 @@ fn advance_script(
     }
     script.surface_time = started.elapsed();
     let started = std::time::Instant::now();
-    script.progress = apply_stitched_update(
+    script.progress = apply_stitched_update::<StandardMaterial>(
         &mut commands,
         &mut meshes,
         &mut tiles,
@@ -459,7 +459,7 @@ fn stream_automatic(
     streaming.reads = 0;
     streaming.surfaces = 0;
     if tiles.is_stitching() {
-        streaming.progress = advance_stitched_update(
+        streaming.progress = advance_stitched_update::<StandardMaterial>(
             &mut commands,
             &mut meshes,
             &mut tiles,
@@ -480,7 +480,7 @@ fn stream_automatic(
         Meters::ZERO,
         streaming.budget,
         &mut |id, dem| {
-            preparations.push(prepare_tile(
+            preparations.push(prepare_tile::<StandardMaterial>(
                 &mut commands,
                 &mut meshes,
                 Handle::default(),
@@ -496,7 +496,7 @@ fn stream_automatic(
     for tile in preparations {
         tiles.insert_prepared(tile);
     }
-    streaming.progress = apply_stitched_update(
+    streaming.progress = apply_stitched_update::<StandardMaterial>(
         &mut commands,
         &mut meshes,
         &mut tiles,

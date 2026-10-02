@@ -95,6 +95,17 @@ impl Blob {
         }
     }
 
+    /// Validated uncompressed byte count, without decompressing the blob.
+    ///
+    /// Consumers can charge a cumulative work budget before `decode()`. Raw data
+    /// uses its actual length; zlib uses the required bounded `raw_size`. A
+    /// successful zlib decode still verifies its exact output/input lengths and
+    /// stream end, so this metadata cannot authorize an oversized expansion.
+    /// Unknown blob types can be skipped using `get_type()` before this call.
+    pub fn uncompressed_size(&self) -> Result<usize> {
+        uncompressed_blob_size(&self.blob)
+    }
+
     /// Returns the type of a blob without decoding its content.
     pub fn get_type(&self) -> BlobType<'_> {
         match self.header.type_() {
@@ -469,19 +480,18 @@ impl BlobReader<BufReader<File>> {
     }
 }
 
-pub(crate) fn decode_blob<T: Message>(blob: &fileformat::Blob) -> Result<T> {
+fn uncompressed_blob_size(blob: &fileformat::Blob) -> Result<usize> {
     if blob.has_raw() {
         let size = blob.raw().len() as u64;
-        if size < MAX_BLOB_MESSAGE_SIZE {
-            if blob.has_raw_size() && i64::from(blob.raw_size()) != size as i64 {
-                return Err(crate::validate::invalid(
-                    "blob raw_size does not match raw data",
-                ));
-            }
-            T::parse_from_bytes(blob.raw()).map_err(|e| new_protobuf_error(e, "raw blob data"))
-        } else {
-            Err(new_blob_error(BlobError::MessageTooBig { size }))
+        if size >= MAX_BLOB_MESSAGE_SIZE {
+            return Err(new_blob_error(BlobError::MessageTooBig { size }));
         }
+        if blob.has_raw_size() && i64::from(blob.raw_size()) != size as i64 {
+            return Err(crate::validate::invalid(
+                "blob raw_size does not match raw data",
+            ));
+        }
+        Ok(blob.raw().len())
     } else if blob.has_zlib_data() {
         if !blob.has_raw_size()
             || blob.raw_size() < 0
@@ -491,12 +501,22 @@ pub(crate) fn decode_blob<T: Message>(blob: &fileformat::Blob) -> Result<T> {
                 "invalid or missing compressed blob raw_size",
             ));
         }
+        Ok(blob.raw_size() as usize)
+    } else {
+        Err(new_blob_error(BlobError::Empty))
+    }
+}
+
+pub(crate) fn decode_blob<T: Message>(blob: &fileformat::Blob) -> Result<T> {
+    let length = uncompressed_blob_size(blob)?;
+    if blob.has_raw() {
+        T::parse_from_bytes(blob.raw()).map_err(|e| new_protobuf_error(e, "raw blob data"))
+    } else if blob.has_zlib_data() {
         // A Read decoder can return EOF after producing every payload byte even
         // when the zlib checksum trailer is missing. Require the low-level
         // decoder's StreamEnd, exact output size, and complete input consumption.
         // One spare output byte distinguishes an oversized stream from a valid
         // stream whose decoded length exactly fills its advertised buffer.
-        let length = blob.raw_size() as usize;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(length + 1)
@@ -543,6 +563,29 @@ fn read_exact_bytes(reader: &mut impl Read, length: usize) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uncompressed_size_checks_raw_and_compressed_metadata() {
+        let mut raw = fileformat::Blob::new();
+        raw.set_raw(vec![1, 2, 3]);
+        let make = |value| Blob::new(fileformat::BlobHeader::new(), value, None);
+        assert_eq!(make(raw.clone()).uncompressed_size().unwrap(), 3);
+        raw.set_raw_size(3);
+        assert_eq!(make(raw.clone()).uncompressed_size().unwrap(), 3);
+        raw.set_raw_size(4);
+        assert!(make(raw).uncompressed_size().is_err());
+        let mut compressed = fileformat::Blob::new();
+        compressed.set_zlib_data(vec![0]);
+        assert!(make(compressed.clone()).uncompressed_size().is_err());
+        for invalid in [-1, 33_554_432, i32::MAX] {
+            compressed.set_raw_size(invalid);
+            assert!(make(compressed.clone()).uncompressed_size().is_err());
+        }
+        compressed.set_raw_size(123);
+        assert_eq!(make(compressed.clone()).uncompressed_size().unwrap(), 123);
+        assert!(decode_blob::<crate::proto::osmformat::PrimitiveBlock>(&compressed).is_err());
+        assert!(make(fileformat::Blob::new()).uncompressed_size().is_err());
+    }
 
     #[test]
     fn test_get_type() {

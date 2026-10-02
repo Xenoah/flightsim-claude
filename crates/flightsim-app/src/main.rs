@@ -41,7 +41,7 @@ use flightsim_render::{
     CameraWorldPosition, CloudLayer, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin,
     RenderSet, SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
     extents_in_model_space,
-    terrain::prepare_tile,
+    terrain::prepare_tile_with_options,
     terrain_stitching::{advance_stitched_update, apply_stitched_update},
     update_terrain_selection_with_surface,
 };
@@ -58,8 +58,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 mod aircraft_profile;
+mod airport_drape_runtime;
 mod distribution;
+mod render_metrics;
 mod replay_runtime;
+mod scenery_runtime;
 mod screen_capture;
 use replay_runtime::ReplayPlayback;
 #[cfg(test)]
@@ -260,6 +263,11 @@ struct Startup {
     ///
     /// 生の PBF は実行時に読まない（ADR-0003 / ADR-0008）。
     airports: Option<PathBuf>,
+    /// Optional offline regional OSM scenery. Never loaded into physics.
+    scenery: Option<PathBuf>,
+    scenery_error: Option<String>,
+    surface_detail: bool,
+    render_stats: bool,
     start: Geodetic,
     /// `--start` が明示されたか。
     ///
@@ -368,6 +376,10 @@ impl Default for Startup {
             input_arguments_invalid: false,
             tiles: None,
             airports: None,
+            scenery: None,
+            scenery_error: None,
+            surface_detail: true,
+            render_stats: false,
             start: runway.takeoff_start(),
             start_was_explicit: false,
             heading: runway.heading,
@@ -426,7 +438,7 @@ struct TerrainStreaming {
     source: BoxedSource,
     cache: TileCache,
     live: flightsim_render::TerrainSelectionState,
-    material: Handle<StandardMaterial>,
+    material: Handle<flightsim_render::terrain_detail::TerrainMaterial>,
 }
 
 /// 機体の実体につける印。
@@ -472,6 +484,10 @@ fn main() -> bevy::app::AppExit {
         return bevy::app::AppExit::Success;
     }
     let (mut startup, mut diagnostics) = parse_arguments();
+    if let Some(error) = startup.scenery_error.as_ref() {
+        eprintln!("invalid scenery options: {error}");
+        std::process::exit(2);
+    }
     if let Some(error) = startup.traffic_error.as_ref() {
         eprintln!("invalid traffic/session options: {error}");
         std::process::exit(2);
@@ -575,11 +591,21 @@ fn main() -> bevy::app::AppExit {
             return bevy::app::AppExit::error();
         }
     };
+    let scenery_runtime = match scenery_runtime::SceneryRuntime::new(&startup) {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            eprintln!("cannot load regional scenery: {error}");
+            return bevy::app::AppExit::error();
+        }
+    };
     let clouds = startup.clouds;
     let engine_sound = startup.engine_sound;
     let conditions = recording_conditions(&startup, &clock);
     let playback = recording.map(ReplayPlayback::new);
-    let data_attribution = world_runtime::data_attribution(&startup);
+    let mut data_attribution = world_runtime::data_attribution(&startup);
+    if let Some(credit) = scenery_runtime.attribution() {
+        data_attribution = world_runtime::data_attribution_with_scenery(&startup, credit);
+    }
 
     let headless = startup.headless_screenshot;
     let native_controllers = startup.native_controllers;
@@ -623,6 +649,7 @@ fn main() -> bevy::app::AppExit {
     app.add_plugins(plugins)
         .add_plugins((
             FlightsimRenderPlugin,
+            flightsim_render::terrain_detail::TerrainDetailPlugin,
             FlightsimInputPlugin,
             FlightsimUiPlugin,
             flightsim_audio::FlightAudioPlugin,
@@ -630,9 +657,15 @@ fn main() -> bevy::app::AppExit {
         .insert_resource(tutorial_state)
         .init_resource::<StallWarningStatus>()
         .insert_resource(world_runtime)
+        .insert_resource(scenery_runtime)
+        .init_resource::<scenery_runtime::SceneryReset>()
         .insert_resource(clock)
         .insert_resource(clouds)
         .insert_resource(data_attribution)
+        .insert_resource(flightsim_render::terrain_detail::SurfaceDetailSettings {
+            enabled: startup.surface_detail,
+        })
+        .insert_resource(render_metrics::RenderMetrics::new(startup.render_stats))
         .insert_resource(startup)
         .insert_resource(diagnostics)
         .insert_resource(traffic_runtime)
@@ -670,6 +703,11 @@ fn main() -> bevy::app::AppExit {
                 .before(RenderSet::Rebase),
         )
         .add_systems(Update, stream_terrain.in_set(RenderSet::Terrain))
+        .add_systems(Update, scenery_runtime::stream.after(RenderSet::Terrain))
+        .add_systems(
+            Update,
+            render_metrics::record.after(scenery_runtime::stream),
+        )
         .add_systems(
             Update,
             publish_input_diagnostics
@@ -747,6 +785,9 @@ fn application_help() -> &'static str {
 --global-terrain on|off --climate on|off         Global terrain and normals\n\
 --date YYYY-MM-DD                              Seasonal climate and solar date\n\
 --airports FILE.fsairports                       Offline airport database\n\
+--scenery FILE.fsscenery                        Offline regional surface scenery\n\
+--surface-detail on|off                        Procedural terrain material detail\n\
+--render-stats                                 Bounded CPU/wall-frame diagnostics\n\
 --wind FROM_DEG/KNOTS --turbulence calm|light|moderate|severe\n\
 --time HH:MM --time-rate N                      Local mean solar time\n\
 --cloud-cover 0..1 --cloud-base M --cloud-top M --cloud-visibility M\n\
@@ -1077,6 +1118,16 @@ fn parse_arguments_from(
                 Some(path) => startup.tiles = Some(PathBuf::from(path)),
                 None => notes.push("--tiles needs a directory".to_owned()),
             },
+            "--scenery" => match next_argument_value(&mut arguments) {
+                Some(path) => startup.scenery = Some(PathBuf::from(path)),
+                None => startup.scenery_error = Some("--scenery needs a .fsscenery file".into()),
+            },
+            "--surface-detail" => match next_argument_value(&mut arguments).as_deref() {
+                Some("on") => startup.surface_detail = true,
+                Some("off") => startup.surface_detail = false,
+                _ => startup.scenery_error = Some("--surface-detail expects on or off".into()),
+            },
+            "--render-stats" => startup.render_stats = true,
             "--engine" => match next_argument_value(&mut arguments) {
                 Some(text) => match flightsim_audio::EngineKind::parse(&text) {
                     Some(kind) => {
@@ -2087,6 +2138,7 @@ fn control_flight(
     // `--time-rate 60` で夜明けを待っていた人を、一時停止のたびに
     // 実時間へ引き戻すことになる。
     mut rate_before_pause: Local<Option<flightsim_render::TimeRate>>,
+    scenery_reset: Option<ResMut<scenery_runtime::SceneryReset>>,
 ) {
     if playback.is_some() {
         return;
@@ -2116,6 +2168,9 @@ fn control_flight(
     }
 
     if keyboard.just_pressed(KeyCode::KeyR) {
+        if let Some(mut reset) = scenery_reset {
+            reset.request();
+        }
         rig.reset();
         restart_flight(
             &start,
@@ -2206,6 +2261,10 @@ fn refresh_recording_clock(recorder: &mut FlightRecorder, clock: &flightsim_rend
 /// - `F5` — 一時停止・再開
 /// - `F6` / `F7` — 遅く / 速く
 /// - `F8` — 10 秒戻る
+#[allow(
+    clippy::too_many_arguments,
+    reason = "replay seek resets simulation, camera, UI and derived scenery together"
+)]
 fn control_replay(
     mut commands: Commands,
     mut landing: ResMut<flightsim_ui::LandingReportState>,
@@ -2214,6 +2273,7 @@ fn control_replay(
     mut simulation: ResMut<FlightSimulation>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut rig: ResMut<CameraRig>,
+    scenery_reset: Option<ResMut<scenery_runtime::SceneryReset>>,
 ) {
     let Some(mut playback) = playback else {
         if keyboard.just_pressed(KeyCode::F9) {
@@ -2241,6 +2301,9 @@ fn control_replay(
         info!("replay speed: x{:.2}", playback.player.speed());
     }
     if keyboard.just_pressed(KeyCode::F8) {
+        if let Some(mut reset) = scenery_reset {
+            reset.request();
+        }
         rig.reset();
         *landing = default();
         commands.remove_resource::<flightsim_ui::LandingReport>();
@@ -2622,7 +2685,9 @@ fn setup(
     playback: Option<Res<ReplayPlayback>>,
     config: Res<TerrainRenderConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut terrain_tiles: ResMut<TerrainTiles>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut terrain_materials: ResMut<Assets<flightsim_render::terrain_detail::TerrainMaterial>>,
     mut media: ResMut<Assets<ScatteringMedium>>,
     lighting: Res<flightsim_render::SunLighting>,
     sun: Res<SunDirection>,
@@ -2769,6 +2834,58 @@ fn setup(
     commands.insert_resource(startup.view);
 
     // --- 空港面 ---
+    let rendered_terrain = startup.world.global_terrain || startup.tiles.is_some();
+    // Reserve bounded essential overlay admission for runway and lamps before
+    // less-important apron/taxiway features. Compound signs stay independent.
+    // 見た目も進入・評価と同じ滑走路、同じ DEM 標高へ置く。
+    let visual_threshold = runway.threshold;
+    let (runway_mesh, runway_origin) = flightsim_render::runway::runway_mesh_with_elevation(
+        visual_threshold,
+        runway.heading,
+        runway.length,
+        runway.width,
+        |point| airport_sampler.sample(&mut airport_probe, point).elevation,
+    );
+    airport_drape_runtime::spawn(
+        &mut commands,
+        &mut meshes,
+        &mut terrain_tiles,
+        runway_mesh,
+        materials.add(flightsim_render::default_terrain_material()),
+        runway_origin,
+        "runway".into(),
+        rendered_terrain,
+        airport_drape_runtime::Support::Surface,
+        |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+    );
+    // 滑走路灯。**夜に降りるには滑走路の側が光る必要がある。**
+    // 太陽高度に応じて `update_airport_lights` が明るさを動かす。
+    let (light_groups, light_origin) =
+        flightsim_render::runway_lights::runway_light_meshes_with_elevation(
+            visual_threshold,
+            runway.heading,
+            runway.length,
+            runway.width,
+            |point| airport_sampler.sample(&mut airport_probe, point).elevation,
+        );
+    for group in light_groups {
+        if let Some(entity) = airport_drape_runtime::spawn(
+            &mut commands,
+            &mut meshes,
+            &mut terrain_tiles,
+            group.mesh,
+            materials.add(group.material),
+            light_origin,
+            "runway lights".into(),
+            rendered_terrain,
+            airport_drape_runtime::Support::Fixtures(20),
+            |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+        ) {
+            commands.entity(entity).insert(group.marker);
+        }
+    }
+
+    commands.insert_resource(ActiveRunway(runway));
 
     // エプロンは誘導路より低い lift で先に置く。三角形の各頂点で DEM を引くため、
     // 大きな面も平らな板にはならず地形へ追従する。
@@ -2803,15 +2920,22 @@ fn setup(
                     continue;
                 }
             };
-        commands.spawn((
-            flightsim_render::terrain_mesh_bundle(
-                meshes.add(mesh),
-                airport_surface_material.clone(),
-                origin,
-            ),
-            Name::new(format!("apron OSM feature {}", apron.source_id())),
-        ));
-        rendered_aprons += 1;
+        if airport_drape_runtime::spawn(
+            &mut commands,
+            &mut meshes,
+            &mut terrain_tiles,
+            mesh,
+            airport_surface_material.clone(),
+            origin,
+            format!("apron OSM feature {}", apron.source_id()),
+            rendered_terrain,
+            airport_drape_runtime::Support::Surface,
+            |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+        )
+        .is_some()
+        {
+            rendered_aprons += 1;
+        }
     }
 
     // 明示 OSM 灯火を先に登録する。同種かつ 0.25 m 以内の fallback は後から除かれ、
@@ -2896,15 +3020,22 @@ fn setup(
             );
             continue;
         };
-        commands.spawn((
-            flightsim_render::terrain_mesh_bundle(
-                meshes.add(mesh),
-                airport_surface_material.clone(),
-                origin,
-            ),
-            Name::new(format!("taxiway OSM way {}", taxiway.source_way_id)),
-        ));
-        rendered_taxiways += 1;
+        if airport_drape_runtime::spawn(
+            &mut commands,
+            &mut meshes,
+            &mut terrain_tiles,
+            mesh,
+            airport_surface_material.clone(),
+            origin,
+            format!("taxiway OSM way {}", taxiway.source_way_id),
+            rendered_terrain,
+            airport_drape_runtime::Support::Surface,
+            |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+        )
+        .is_some()
+        {
+            rendered_taxiways += 1;
+        }
 
         if ground_light_allocation_failed || ground_light_accumulator.is_none() {
             continue;
@@ -2963,18 +3094,22 @@ fn setup(
             holding.runway_side(),
         ) {
             Ok(Some((mesh, origin))) => {
-                commands.spawn((
-                    flightsim_render::terrain_mesh_bundle(
-                        meshes.add(mesh),
-                        airport_surface_material.clone(),
-                        origin,
-                    ),
-                    Name::new(format!(
-                        "holding marking OSM feature {}",
-                        holding.source_id()
-                    )),
-                ));
-                rendered_markings += 1;
+                if airport_drape_runtime::spawn(
+                    &mut commands,
+                    &mut meshes,
+                    &mut terrain_tiles,
+                    mesh,
+                    airport_surface_material.clone(),
+                    origin,
+                    format!("holding marking OSM feature {}", holding.source_id()),
+                    rendered_terrain,
+                    airport_drape_runtime::Support::Surface,
+                    |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+                )
+                .is_some()
+                {
+                    rendered_markings += 1;
+                }
             }
             Ok(None) => {}
             Err(error) => warn!(
@@ -3077,16 +3212,21 @@ fn setup(
     match flightsim_render::taxiway_lights::ground_light_meshes(&airport_ground_lights) {
         Ok(Some((groups, origin))) => {
             for group in groups {
-                commands.spawn((
-                    flightsim_render::terrain_mesh_bundle(
-                        meshes.add(group.mesh),
-                        materials.add(group.material),
-                        origin,
-                    ),
-                    group.marker,
-                    Name::new(format!("airport ground lights {rendered_light_groups}")),
-                ));
-                rendered_light_groups += 1;
+                if let Some(entity) = airport_drape_runtime::spawn(
+                    &mut commands,
+                    &mut meshes,
+                    &mut terrain_tiles,
+                    group.mesh,
+                    materials.add(group.material),
+                    origin,
+                    format!("airport ground lights {rendered_light_groups}"),
+                    rendered_terrain,
+                    airport_drape_runtime::Support::Surface,
+                    |p| airport_sampler.sample(&mut airport_probe, p).elevation,
+                ) {
+                    commands.entity(entity).insert(group.marker);
+                    rendered_light_groups += 1;
+                }
             }
         }
         Ok(None) => {}
@@ -3100,47 +3240,6 @@ fn setup(
             airport_ground_lights.len()
         );
     }
-
-    // 見た目も進入・評価と同じ滑走路、同じ DEM 標高へ置く。
-    let visual_threshold = runway.threshold;
-    let (runway_mesh, runway_origin) = flightsim_render::runway::runway_mesh_with_elevation(
-        visual_threshold,
-        runway.heading,
-        runway.length,
-        runway.width,
-        |point| airport_sampler.sample(&mut airport_probe, point).elevation,
-    );
-    commands.spawn((
-        flightsim_render::terrain_mesh_bundle(
-            meshes.add(runway_mesh),
-            materials.add(flightsim_render::default_terrain_material()),
-            runway_origin,
-        ),
-        Name::new("runway"),
-    ));
-    // 滑走路灯。**夜に降りるには滑走路の側が光る必要がある。**
-    // 太陽高度に応じて `update_airport_lights` が明るさを動かす。
-    let (light_groups, light_origin) =
-        flightsim_render::runway_lights::runway_light_meshes_with_elevation(
-            visual_threshold,
-            runway.heading,
-            runway.length,
-            runway.width,
-            |point| airport_sampler.sample(&mut airport_probe, point).elevation,
-        );
-    for group in light_groups {
-        commands.spawn((
-            flightsim_render::terrain_mesh_bundle(
-                meshes.add(group.mesh),
-                materials.add(group.material),
-                light_origin,
-            ),
-            group.marker,
-            Name::new("runway lights"),
-        ));
-    }
-
-    commands.insert_resource(ActiveRunway(runway));
 
     commands.insert_resource(TowerViewAnchor(world_runtime::tower_anchor(
         &mut airport_probe,
@@ -3275,7 +3374,8 @@ fn setup(
         source: make_source(&startup),
         cache: TileCache::new(config.cache_bytes),
         live: flightsim_render::TerrainSelectionState::default(),
-        material: materials.add(flightsim_render::default_terrain_material()),
+        material: terrain_materials
+            .add(flightsim_render::terrain_detail::default_surface_detail_material()),
     });
 
     // --- カメラと空 ---
@@ -3554,6 +3654,7 @@ fn stream_terrain(
     simulation: Res<FlightSimulation>,
     mode: Res<ViewMode>,
     tower: Res<TowerViewAnchor>,
+    scenery: Res<scenery_runtime::SceneryRuntime>,
 ) {
     let camera = camera_position.0.to_ecef();
     let camera_ground = if *mode == ViewMode::Tower {
@@ -3582,8 +3683,9 @@ fn stream_terrain(
         return;
     }
     let mut prepared = Vec::new();
+    let selector = scenery.terrain_selector(streaming.selector, camera_position.0);
     let update = update_terrain_selection_with_surface(
-        &streaming.selector,
+        &selector,
         &streaming.source,
         &mut streaming.cache,
         &mut streaming.live,
@@ -3591,13 +3693,14 @@ fn stream_terrain(
         camera_ground,
         config.load_budget_per_frame,
         &mut |id, dem| {
-            prepared.push(prepare_tile(
+            prepared.push(prepare_tile_with_options(
                 &mut commands,
                 &mut meshes,
                 streaming.material.clone(),
                 &origin.0,
                 id,
                 dem,
+                &scenery.terrain_mesh_options(id, dem),
                 color,
             ));
         },
@@ -3681,6 +3784,22 @@ fn report_terrain(
     }
     *previous_truncated = truncated;
     let usage = tiles.resource_usage();
+    let overlays = tiles.overlay_usage();
+    if overlays.registered > 0 {
+        info!(
+            "terrain overlays: {} registered ({} optional), {} source vertices, revision {}/{}, pending {}, precision hidden {}, omitted optional {}, rejected groups {}, max prepared authored displacement {:.3} m",
+            overlays.registered,
+            overlays.optional_registered,
+            overlays.source_vertices,
+            overlays.committed_revision,
+            overlays.revision,
+            overlays.pending,
+            overlays.precision_hidden,
+            overlays.omitted_optional,
+            overlays.rejected_transactions,
+            overlays.maximum_authored_displacement.get()
+        );
+    }
     let live_matches_desired = streaming.live.matches_desired();
     let displayed_matches_desired = displayed_cut_matches_desired(
         live_matches_desired,

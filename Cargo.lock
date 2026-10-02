@@ -2454,11 +2454,13 @@ name = "flightsim-render"
 version = "0.6.0-alpha.21"
 dependencies = [
  "bevy",
+ "criterion",
  "flightsim-core",
  "flightsim-fdm",
  "flightsim-sim",
  "flightsim-world",
  "glam",
+ "naga",
 ]
 
 [[package]]

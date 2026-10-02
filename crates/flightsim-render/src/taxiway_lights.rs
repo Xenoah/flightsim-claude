@@ -352,12 +352,18 @@ fn light_mesh(
         // 北 x 東は下向きなので反転する。
         indices.extend_from_slice(&[base, base + 2, base + 1, base, base + 3, base + 2]);
     }
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "fixed small authored light layer"
+    )]
+    let lifts = vec![LIGHT_LIFT as f32; vertex_count];
     Ok(Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(crate::terrain_drape::ATTRIBUTE_OVERLAY_LIFT, lifts)
     .with_inserted_indices(Indices::U32(indices)))
 }
 

@@ -127,6 +127,7 @@ struct TaxiwayMeshBuilder {
     positions: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
     colors: Vec<[f32; 4]>,
+    lifts: Vec<f32>,
     indices: Vec<u32>,
 }
 
@@ -137,6 +138,7 @@ impl TaxiwayMeshBuilder {
             positions: Vec::new(),
             normals: Vec::new(),
             colors: Vec::new(),
+            lifts: Vec::new(),
             indices: Vec::new(),
         }
     }
@@ -145,6 +147,7 @@ impl TaxiwayMeshBuilder {
         self.positions.try_reserve_exact(vertex_count).ok()?;
         self.normals.try_reserve_exact(vertex_count).ok()?;
         self.colors.try_reserve_exact(vertex_count).ok()?;
+        self.lifts.try_reserve_exact(vertex_count).ok()?;
         self.indices.try_reserve_exact(index_count).ok()?;
         Some(())
     }
@@ -162,21 +165,21 @@ impl TaxiwayMeshBuilder {
         let near_right = lateral_point(near, heading, half_width, lift);
         let far_left = lateral_point(far, heading, -half_width, lift);
         let far_right = lateral_point(far, heading, half_width, lift);
-        let base = self.push_vertices([near_left, near_right, far_right, far_left], srgb)?;
+        let base = self.push_vertices([near_left, near_right, far_right, far_left], srgb, lift)?;
         self.indices
             .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
         Some(())
     }
 
     fn disc(&mut self, centre: Geodetic, radius: f64, lift: f64, srgb: [f32; 3]) -> Option<()> {
-        let centre_index = self.push_vertex(lifted(centre, lift), srgb)?;
+        let centre_index = self.push_vertex(lifted(centre, lift), srgb, lift)?;
         let first_ring_index = u32::try_from(self.positions.len()).ok()?;
         for side in 0..JOINT_SIDES {
             #[allow(clippy::cast_precision_loss, reason = "JOINT_SIDES は 12")]
             let angle = core::f64::consts::TAU * side as f64 / JOINT_SIDES as f64;
             let point =
                 centre.offset_by(Meters(radius * angle.cos()), Meters(radius * angle.sin()));
-            self.push_vertex(lifted(point, lift), srgb)?;
+            self.push_vertex(lifted(point, lift), srgb, lift)?;
         }
 
         for side in 0..JOINT_SIDES {
@@ -193,15 +196,16 @@ impl TaxiwayMeshBuilder {
         &mut self,
         points: [Geodetic; N],
         srgb: [f32; 3],
+        lift: f64,
     ) -> Option<u32> {
         let base = u32::try_from(self.positions.len()).ok()?;
         for point in points {
-            self.push_vertex(point, srgb)?;
+            self.push_vertex(point, srgb, lift)?;
         }
         Some(base)
     }
 
-    fn push_vertex(&mut self, point: Geodetic, srgb: [f32; 3]) -> Option<u32> {
+    fn push_vertex(&mut self, point: Geodetic, srgb: [f32; 3], lift: f64) -> Option<u32> {
         let index = u32::try_from(self.positions.len()).ok()?;
         let ecef = point.to_ecef();
         let relative = ecef.as_vec() - self.origin.as_vec();
@@ -219,6 +223,11 @@ impl TaxiwayMeshBuilder {
                 .push([relative.x as f32, relative.y as f32, relative.z as f32]);
             self.normals.push([up.x as f32, up.y as f32, up.z as f32]);
         }
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "fixed small authored pavement/paint layer"
+        )]
+        self.lifts.push(lift as f32);
         self.colors.push([
             crate::srgb_to_linear(srgb[0]),
             crate::srgb_to_linear(srgb[1]),
@@ -236,6 +245,7 @@ impl TaxiwayMeshBuilder {
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, self.colors)
+        .with_inserted_attribute(crate::terrain_drape::ATTRIBUTE_OVERLAY_LIFT, self.lifts)
         .with_inserted_indices(Indices::U32(self.indices));
         (mesh, self.origin)
     }

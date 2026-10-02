@@ -206,6 +206,12 @@ impl MarkingMeshBuilder {
     }
 
     fn build(self) -> Mesh {
+        let vertex_count = self.positions.len();
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "fixed small authored marking layer"
+        )]
+        let lifts = vec![MARKING_LIFT as f32; vertex_count];
         Mesh::new(
             PrimitiveTopology::TriangleList,
             RenderAssetUsages::default(),
@@ -213,6 +219,7 @@ impl MarkingMeshBuilder {
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, self.colors)
+        .with_inserted_attribute(crate::terrain_drape::ATTRIBUTE_OVERLAY_LIFT, lifts)
         .with_inserted_indices(Indices::U32(self.indices))
     }
 }

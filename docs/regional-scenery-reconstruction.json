@@ -1,0 +1,146 @@
+{
+  "schema": "flightsim-fssc-reconstruction-method-v1",
+  "verified_utc": "2026-10-02T19:06:37Z",
+  "reviewed_integration_commit": "f693903afa72d72a5afac8c7ee0a259ed729cfd5",
+  "source": {
+    "provider_page": "https://download.geofabrik.de/europe/liechtenstein.html",
+    "verified_dated_download": "https://download.geofabrik.de/europe/liechtenstein-260930.osm.pbf",
+    "snapshot_utc": "2026-09-30T20:22:42Z",
+    "snapshot_sequence": 4924,
+    "bytes": 3458908,
+    "sha256": "c6f495bd86bdc52ba48557733f765508be0098eb95ad32dbb60cfb683b8b4ae7",
+    "fnv1a64_decimal": 5707395193316645619,
+    "fnv1a64_hex": "4f34bdb072691af3",
+    "additional_geographic_clip": null
+  },
+  "arguments": {
+    "source_name": "Geofabrik Liechtenstein OSM, snapshot2026-09-30T20:22:42Z",
+    "source_url": "https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf"
+  },
+  "output": {
+    "format": "FSSC",
+    "version": 1,
+    "bytes": 8381178,
+    "sha256": "ef6c802053df442a1db8a871e4591476bb5f845bb4ec394a1bf6df9cf81a867e",
+    "roads": 13932,
+    "buildings": 17906,
+    "landcover": 4067,
+    "points": 336453,
+    "triangle_index_entries": 506193,
+    "horizontal_datum": "WGS84 radians f64",
+    "altitude": 0
+  },
+  "additional_contents": {
+    "non_public_geography": null,
+    "external_geographic_datasets": [],
+    "source_kind": "OpenStreetMap",
+    "fixed_notice": "Map data \u00a9 OpenStreetMap contributors; https://www.openstreetmap.org/copyright; derived database licensed under ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/",
+    "road_width_defaults_m": {
+      "Motorway": 12.0,
+      "Primary": 9.0,
+      "Secondary": 7.0,
+      "Residential": 5.5,
+      "Service": 4.0,
+      "Track": 3.0,
+      "Path": 1.5
+    },
+    "building_height_default_m": 9.0,
+    "building_level_height_m": 3.0,
+    "foot_to_meter": 0.3048
+  },
+  "code_file_sha256": {
+    "Cargo.toml": "ee8a60dad6b7ae16b13cabfb2f0f96f0156e7110fa943b7226810153aef4c190",
+    "Cargo.lock": "f69047a580170b9a8ed977f55c51a58738bf8274f898bc23b3707c46a7840d01",
+    "crates/flightsim-core/Cargo.toml": "451cfabf1e36f19e299044a77cde6f0752562da92e99928c9202f87bfe1b306b",
+    "crates/flightsim-core/src/lib.rs": "ec244ab00be657d001dec37050a4a9e0fb75c216b4feb6e2e147e5b227f05b8c",
+    "crates/flightsim-core/src/geodetic.rs": "507cbf8b2ff73888f237db3f4d18f481022601bf383bcc2169fcd86c4122dd5d",
+    "crates/flightsim-core/src/frames.rs": "94362e5f5a573f1ccdae47984555f2015aa42a65856c2114d0b5aab80d0f7dde",
+    "crates/flightsim-core/src/units.rs": "2496c492811b42aa8986c899b63f76cf6147c2c894785bba20c6d61767a66c81",
+    "crates/flightsim-tilegen/Cargo.toml": "429e4a36a2fd9273c9d9f6f49b065463e1b0c478c8b5e543eee1fd3a451ebaf7",
+    "crates/flightsim-tilegen/src/lib.rs": "b4d352240b034349f93a5af59eddd36b48bf823a0050a8c618a34beda96b1331",
+    "crates/flightsim-tilegen/src/scenery.rs": "6603d57833a17b29c70166cb130f767bc8fe6d3a519a35b4c1596872222f873a",
+    "crates/flightsim-tilegen/src/bin/flightsim-scenerygen.rs": "b445971a43f2c5b35d5d1ef1c602fb0b712a4345b9653c4ed76728771905f7ea",
+    "crates/flightsim-world/Cargo.toml": "74fe0a40795c55d3bbb6de357001c041184204c71c028cec2439acb1c0d22459",
+    "crates/flightsim-world/src/lib.rs": "3fc9686adffb66b06dccf3560c7d92130b916fdc2f6111955963d7e4b267c40f",
+    "crates/flightsim-world/src/scenery.rs": "ade44baa3aa0b2603ee7d7453e5036d60e0053287a34a019c24842a393bde704",
+    "crates/flightsim-world/src/scenery/io.rs": "e65fb9e24150a353d37553d2521c56b6c3f6c5dd0acf145188b8c3291bb16297",
+    "vendor/osmpbf/Cargo.toml": "9e997a503e803f9fae2a942dd3a0205316017504259b85b96271acf43966f392",
+    "vendor/osmpbf/build.rs": "77a6ac62cb73aff5415ba47de5e6d2b1620a07e7d9adedeb4b6dabd068ee5e5c",
+    "vendor/osmpbf/FLIGHTSIM-PATCHES.md": "f5f539018e58ee612b9ae04d33a5741d8ebf6ed9565f1fa88df5e4f700b021f3",
+    "vendor/osmpbf/src/blob.rs": "ec82aa8eef4bd3cd887db1e5bcfb10c283e8549b483a73800068d4276df52154",
+    "vendor/osmpbf/src/block.rs": "90db552b184abf514c9adcec8f59d081d5a0cdfb6cdf123b5483af652b5db324",
+    "vendor/osmpbf/src/dense.rs": "311fb67883dd932efdbf2f8834c893f7b1b2fd0d0d4a2d61bb0f06ac94748a37",
+    "vendor/osmpbf/src/elements.rs": "15c427b11e6dc6dbbe2edf8cc7ad3ae7cace90184e75bf48030d62128fe65cbb",
+    "vendor/osmpbf/src/error.rs": "04038ff988f7a49ac8bc5f8c527f2007fbaf681fb5837de0e3fff9b77c813668",
+    "vendor/osmpbf/src/indexed.rs": "1c208df933c24073ab68abbbe538369c713dd1461eb575a5532f75a3ab901841",
+    "vendor/osmpbf/src/lib.rs": "5d665e9a7bdd9fc15513996435c033424e20335a972ae551fb29ccef0e616199",
+    "vendor/osmpbf/src/mmap_blob.rs": "325a3527c80a93775560cb0ecc5a944789e8b96dfed8e7f197eb97768291deec",
+    "vendor/osmpbf/src/proto/fileformat.proto": "eff8c3868b7fbf29a1ef9902933bd55a957c4e87ccfc490166fbe573ee173775",
+    "vendor/osmpbf/src/proto/osmformat.proto": "f7e8c405d752f435308495241ab9a65d8935b54c093ae2d1ad4fb73690d703d6",
+    "vendor/osmpbf/src/reader.rs": "ca9785d402d5c50459a06a84b2a2fe0dff7da2669e78b09e0805e1f3b6b0d0e3",
+    "vendor/osmpbf/src/validate.rs": "b4a35b27df21243b6dbd355a74b3ed6e2292a397671514b5204582b222624e71"
+  },
+  "locked_critical_dependencies": {
+    "clap": {
+      "version": "4.6.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf"
+    },
+    "earcutr": {
+      "version": "0.5.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "afc28d89ac6cb489f679fcf51aaa62b4667bb0fb73a30f1d4d23949069707c07"
+    },
+    "flate2": {
+      "version": "1.1.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
+    },
+    "glam": {
+      "version": "0.30.10",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "19fc433e8437a212d1b6f1e68c7824af3aed907da60afa994e7f542d18d12aa9"
+    },
+    "miniz_oxide": {
+      "version": "0.8.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
+    },
+    "osmpbf": {
+      "version": "0.3.7"
+    },
+    "protobuf": {
+      "version": "3.7.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
+    },
+    "protobuf-codegen": {
+      "version": "3.7.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "5d3976825c0014bbd2f3b34f0001876604fe87e0c86cd8fa54251530f1544ace"
+    },
+    "same-file": {
+      "version": "1.0.6",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
+    },
+    "tempfile": {
+      "version": "3.27.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+    }
+  },
+  "independent_reproduction": {
+    "mode": "Existing prebuilt release importer, no Cargo invocation",
+    "host": "x86_64-unknown-linux-gnu",
+    "rustc": "1.93.0 (254b59607 2026-01-19)",
+    "original_comparison": "byte-for-byte identical",
+    "source_dated_url_comparison": "byte-for-byte identical to retained input"
+  },
+  "official_guidance": [
+    "https://opendatacommons.org/licenses/odbl/1-0/",
+    "https://osmfoundation.org/wiki/Licence/Community_Guidelines/Produced_Work_-_Guideline",
+    "https://www.openstreetmap.org/copyright"
+  ],
+  "scope": "Engineering reconstruction/access offer for the OSM-derived FSSC database; no legal opinion, commercial binary approval or release allowlist change"
+}

@@ -42,7 +42,7 @@ fn stream(
         streaming.camera,
         streaming.budget,
         &mut |id, dem| {
-            let (entity, mesh) = spawn_tile(
+            let (entity, mesh) = spawn_tile::<StandardMaterial>(
                 &mut commands,
                 &mut meshes,
                 Handle::default(),

@@ -4,7 +4,7 @@
 //! Bevy に依存しない形でテストされている。ここはその結果を
 //! `Commands` に反映するだけ。
 
-use bevy::prelude::*;
+use bevy::{pbr::Material, prelude::*};
 use flightsim_core::{Geodetic, Meters, Radians, RenderFrame};
 use flightsim_world::{TileId, build_mesh};
 use std::collections::HashMap;
@@ -45,9 +45,60 @@ impl Default for TerrainRenderConfig {
 pub struct TerrainTiles {
     entities: HashMap<TileId, (Entity, Handle<Mesh>)>,
     pub(crate) stitching: crate::terrain_stitching::TerrainStitching,
+    pub(crate) overlays: crate::terrain_overlays::TerrainOverlays,
 }
 
 impl TerrainTiles {
+    /// Register an immutable airport footprint for exact, atomic terrain draping.
+    /// The entity and handle must already belong to this scene and be unique.
+    ///
+    /// # Errors
+    /// Registration exceeds the scene bound or duplicates an existing target.
+    pub fn register_overlay(
+        &mut self,
+        entity: Entity,
+        mesh: Handle<Mesh>,
+        source: crate::terrain_drape::TerrainOverlay,
+    ) -> Result<(), crate::terrain_drape::DrapeError> {
+        self.overlays.register(entity, mesh, source)
+    }
+
+    /// Stop managing one overlay before its owner despawns/removes its assets.
+    /// Any in-flight result is cancelled; the next cut uses the updated registry.
+    pub fn unregister_overlay(&mut self, entity: Entity) -> bool {
+        self.overlays.unregister(entity)
+    }
+
+    /// Atomically admit a complete optional scenery cohort while preserving
+    /// essential airport reservations. New entities must start hidden. Keep
+    /// returned retired assets until the returned revision has committed.
+    ///
+    /// # Errors
+    /// Invalid/duplicate targets, >24 optional meshes, >40,000 optional source
+    /// triangles, or aggregate scene limits. Rejection changes nothing.
+    pub fn replace_optional_overlays(
+        &mut self,
+        additions: Vec<crate::TerrainOverlayRegistration>,
+    ) -> Result<crate::TerrainOverlaySwap, crate::terrain_drape::DrapeError> {
+        self.overlays.replace_optional(additions)
+    }
+
+    /// Cancel optional scenery preparation and return both staged and retained
+    /// old scenery assets for the owner to remove on relocation/reset. Essential
+    /// airport registrations remain intact. No cancelled result can commit.
+    pub fn clear_optional_overlays(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
+        self.overlays.clear_optional()
+    }
+
+    #[must_use]
+    pub fn overlay_usage(&self) -> crate::TerrainOverlayUsage {
+        self.overlays.usage()
+    }
+
+    pub(crate) fn mesh_handle(&self, id: TileId) -> Option<&Handle<Mesh>> {
+        self.entities.get(&id).map(|(_, mesh)| mesh)
+    }
+
     #[must_use]
     pub fn len(&self) -> usize {
         self.entities.len()
@@ -86,8 +137,13 @@ impl TerrainTiles {
         {
             self.stitching.retire(previous);
         }
-        self.stitching
-            .record_surface(prepared.entity, prepared.vertices, prepared.indices);
+        self.stitching.record_surface(
+            prepared.entity,
+            prepared.vertices,
+            prepared.indices,
+            prepared.origin,
+            prepared.surface_vertices,
+        );
         self.stitching
             .insert_boundary(prepared.id, prepared.boundary);
     }
@@ -116,6 +172,7 @@ impl TerrainTiles {
     /// meshes and pending/visible bridges. The caller despawns returned entities
     /// and removes returned mesh handles; useful for an explicit new flight.
     pub fn drain_all(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
+        self.overlays.reset();
         let mut assets: Vec<_> = self.entities.drain().map(|(_, asset)| asset).collect();
         assets.extend(self.stitching.drain_all());
         assets
@@ -139,6 +196,8 @@ pub struct PreparedTerrainTile {
     pub(crate) boundary: flightsim_world::seams::TerrainBoundary,
     vertices: usize,
     indices: usize,
+    origin: flightsim_core::Ecef,
+    surface_vertices: usize,
 }
 
 /// Build a surface and retain its actual rendered edge geometry for stitching.
@@ -147,16 +206,54 @@ pub struct PreparedTerrainTile {
     clippy::too_many_arguments,
     reason = "surface preparation receives its rendering context and optional palette"
 )]
-pub fn prepare_tile(
+pub fn prepare_tile<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     id: TileId,
     dem: &flightsim_world::DemTile,
     color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
 ) -> PreparedTerrainTile {
-    let source = build_mesh(id, dem, &crate::mesh_options_for(id.level));
+    prepare_tile_with_options(
+        commands,
+        meshes,
+        material,
+        frame,
+        id,
+        dem,
+        &crate::mesh_options_for(id.level),
+        color,
+    )
+}
+
+/// Opt-in bounded tessellation for a regional terrain surface. The existing
+/// [`prepare_tile`] wrapper retains its 33-point policy. Source samples, DEM
+/// cache identity and physical terrain remain untouched; boundaries and overlay
+/// copies retain the exact generated grid for the atomic terrain transaction.
+///
+/// # Panics
+/// Resolution outside 2..=65. Callers must keep a tile's chosen options stable
+/// for its source generation, rather than changing them with camera cadence.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "explicit bounded mesh options plus the existing preparation context"
+)]
+pub fn prepare_tile_with_options<M: Material>(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<M>,
+    frame: &RenderFrame,
+    id: TileId,
+    dem: &flightsim_world::DemTile,
+    options: &flightsim_world::MeshOptions,
+    color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
+) -> PreparedTerrainTile {
+    assert!(
+        (2..=65).contains(&options.resolution),
+        "runtime terrain resolution must be in 2..=65"
+    );
+    let source = build_mesh(id, dem, options);
     let boundary = flightsim_world::seams::TerrainBoundary::from_mesh(id, &source);
     let (entity, mesh) = spawn_source(commands, meshes, material, frame, id, &source, color);
     PreparedTerrainTile {
@@ -166,6 +263,8 @@ pub fn prepare_tile(
         boundary,
         vertices: source.positions.len(),
         indices: source.indices.len(),
+        origin: source.origin,
+        surface_vertices: source.surface_vertex_count,
     }
 }
 
@@ -173,10 +272,10 @@ pub fn prepare_tile(
 ///
 /// メッシュ生成は `flightsim-world::build_mesh`（純 Rust、テスト済み）。
 /// ここは GPU 資産への登録と spawn だけ。
-pub fn spawn_tile(
+pub fn spawn_tile<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     id: TileId,
     dem: &flightsim_world::DemTile,
@@ -187,10 +286,10 @@ pub fn spawn_tile(
 /// Prepare a terrain mesh whose surface uses an app-supplied geographic palette.
 /// The callback returns linear RGBA, not sRGB. Its position is the actual DEM
 /// surface vertex; source data and physics stay outside the renderer.
-pub fn spawn_tile_colored(
+pub fn spawn_tile_colored<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     id: TileId,
     dem: &flightsim_world::DemTile,
@@ -199,10 +298,10 @@ pub fn spawn_tile_colored(
     spawn_tile_impl(commands, meshes, material, frame, id, dem, Some(color))
 }
 
-fn spawn_tile_impl(
+fn spawn_tile_impl<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     id: TileId,
     dem: &flightsim_world::DemTile,
@@ -212,10 +311,10 @@ fn spawn_tile_impl(
     spawn_source(commands, meshes, material, frame, id, &source, color)
 }
 
-fn spawn_source(
+fn spawn_source<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     id: TileId,
     source: &flightsim_world::TerrainMesh,
@@ -385,5 +484,103 @@ mod tests {
                 assert_eq!(colors.len(), mesh.positions.len());
             }
         }
+    }
+    #[test]
+    fn opt_in_mesh_options_preserve_the_legacy_wrapper_and_bound_regional_grids() {
+        let mut world = World::new();
+        let mut queue = bevy::ecs::world::CommandQueue::default();
+        let mut meshes = Assets::<Mesh>::default();
+        let id = TileId::containing(13, Geodetic::from_degrees(47.127, 9.529, 0.0));
+        let dem = flightsim_world::DemTile::new(
+            id.bounds(),
+            flightsim_world::HeightGrid::flat(65, 65, Meters(643.0)),
+        );
+        let original = dem.clone();
+        let frame = RenderFrame::new(id.center());
+        let old = prepare_tile(
+            &mut Commands::new(&mut queue, &world),
+            &mut meshes,
+            Handle::<StandardMaterial>::default(),
+            &frame,
+            id,
+            &dem,
+            None,
+        );
+        let explicit = prepare_tile_with_options(
+            &mut Commands::new(&mut queue, &world),
+            &mut meshes,
+            Handle::<StandardMaterial>::default(),
+            &frame,
+            id,
+            &dem,
+            &crate::mesh_options_for(13),
+            None,
+        );
+        assert_eq!(
+            meshes
+                .get(&old.mesh)
+                .unwrap()
+                .attribute(Mesh::ATTRIBUTE_POSITION),
+            meshes
+                .get(&explicit.mesh)
+                .unwrap()
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+        );
+        let regional = prepare_tile_with_options(
+            &mut Commands::new(&mut queue, &world),
+            &mut meshes,
+            Handle::<crate::terrain_detail::TerrainMaterial>::default(),
+            &frame,
+            id,
+            &dem,
+            &flightsim_world::MeshOptions {
+                resolution: 65,
+                skirt_depth: None,
+            },
+            None,
+        );
+        assert_eq!(old.surface_vertices, 33 * 33);
+        assert_eq!(regional.surface_vertices, 65 * 65);
+        assert!(regional.boundary.vertex_count() > old.boundary.vertex_count());
+        assert_eq!(
+            dem, original,
+            "render options cannot modify physical DEM samples"
+        );
+        queue.apply(&mut world);
+        assert_eq!(
+            world.get::<Visibility>(regional.entity),
+            Some(&Visibility::Hidden)
+        );
+        assert!(
+            world
+                .get::<MeshMaterial3d<crate::terrain_detail::TerrainMaterial>>(regional.entity)
+                .is_some()
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "runtime terrain resolution must be in 2..=65")]
+    fn opt_in_terrain_mesh_rejects_an_unbounded_runtime_resolution() {
+        let world = World::new();
+        let mut queue = bevy::ecs::world::CommandQueue::default();
+        let mut meshes = Assets::<Mesh>::default();
+        let id = TileId::new(0, 0, 0);
+        let dem = flightsim_world::DemTile::new(
+            id.bounds(),
+            flightsim_world::HeightGrid::flat(2, 2, Meters::ZERO),
+        );
+        prepare_tile_with_options(
+            &mut Commands::new(&mut queue, &world),
+            &mut meshes,
+            Handle::<StandardMaterial>::default(),
+            &RenderFrame::new(id.center()),
+            id,
+            &dem,
+            &flightsim_world::MeshOptions {
+                resolution: 66,
+                skirt_depth: None,
+            },
+            None,
+        );
     }
 }

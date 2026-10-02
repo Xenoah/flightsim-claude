@@ -49,7 +49,7 @@
     reason = "Bevy の system は Res<T> / Query<T> を値で受け取るのが必須のイディオム。参照に変えると system として登録できない"
 )]
 
-use bevy::prelude::*;
+use bevy::{pbr::Material, prelude::*};
 use flightsim_core::{Ecef, Geodetic, Meters, RenderFrame};
 use flightsim_world::{MeshOptions, TerrainMesh};
 
@@ -62,11 +62,17 @@ pub mod holding_position;
 pub mod model;
 pub mod runway;
 pub mod runway_lights;
+pub mod scenery;
+pub mod scenery_exclusions;
 pub mod sun;
 pub mod taxiway;
 pub mod taxiway_lights;
 pub mod taxiway_sign;
 pub mod terrain;
+pub mod terrain_detail;
+pub mod terrain_drape;
+mod terrain_overlays;
+pub use terrain_overlays::{TerrainOverlayRegistration, TerrainOverlaySwap, TerrainOverlayUsage};
 mod terrain_selection;
 pub mod terrain_stitching;
 pub mod weather;
@@ -332,10 +338,11 @@ pub fn mesh_options_for(_level: u8) -> MeshOptions {
     }
 }
 
-/// 地形マテリアルの既定値。
+/// Opaque vertex-colour baseline shared by terrain and airport surfaces.
 ///
-/// テクスチャはまだ無いので、標高で色を変えることもしていない。
-/// M3 で地表画像を載せるまでの繋ぎ。
+/// Ground-only procedural detail wraps this through
+/// [`terrain_detail::default_surface_detail_material`]. Runway pavement and
+/// markings keep this baseline without the procedural overlay.
 #[must_use]
 pub fn default_terrain_material() -> StandardMaterial {
     StandardMaterial {
@@ -468,9 +475,9 @@ pub fn srgb_to_linear(value: f32) -> f32 {
 
 /// メッシュを spawn するときの標準的な構成要素。
 #[must_use]
-pub fn terrain_mesh_bundle(
+pub fn terrain_mesh_bundle<M: Material>(
     mesh: Handle<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     origin: Ecef,
 ) -> impl Bundle {
     (

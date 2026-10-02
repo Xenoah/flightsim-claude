@@ -257,6 +257,23 @@ pub(super) fn data_attribution(startup: &Startup) -> DataAttribution {
     DataAttribution::new(sources.join(" | "))
 }
 
+pub(super) fn data_attribution_with_scenery(startup: &Startup, scenery: &str) -> DataAttribution {
+    let mut sources = Vec::new();
+    if startup.world.global_terrain {
+        sources.push("Terrain: NOAA/NE/Copernicus");
+    }
+    if startup.world.climate_enabled {
+        sources.push("Climate: NOAA normals");
+    }
+    sources.push(scenery);
+    if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. })
+        && !scenery.contains("OpenStreetMap")
+    {
+        sources.push(OSM_AIRPORT_ATTRIBUTION);
+    }
+    DataAttribution::new(sources.join(" | "))
+}
+
 /// Independent capture gate preserves an already-paused flight and freezes the
 /// closing frame so Esc/C/arrows cannot leak through the modal.
 #[derive(Resource, Debug, Default)]
@@ -595,6 +612,7 @@ fn apply_world_map_start(world: &mut World) {
             orientation.0 = state.orientation;
         }
     }
+    scenery_runtime::clear(world);
     let mut tiles = world.remove_resource::<TerrainTiles>().unwrap_or_default();
     // Cancel an in-flight stitching transaction too: it owns hidden bridges
     // and may retain the old visible mesh for a same-ID source replacement.
@@ -618,7 +636,13 @@ fn apply_world_map_start(world: &mut World) {
         request.position.longitude_degrees(),
         request.month
     );
-    world.insert_resource(data_attribution(&startup));
+    let scenery_credit = world
+        .get_resource::<scenery_runtime::SceneryRuntime>()
+        .and_then(scenery_runtime::SceneryRuntime::attribution);
+    world.insert_resource(scenery_credit.map_or_else(
+        || data_attribution(&startup),
+        |credit| data_attribution_with_scenery(&startup, credit),
+    ));
     world.insert_resource(startup);
 }
 
@@ -1184,7 +1208,7 @@ mod tests {
                 tiles.insert_prepared(prepare_tile(
                     &mut commands,
                     &mut meshes,
-                    Handle::default(),
+                    Handle::<StandardMaterial>::default(),
                     &frame,
                     id,
                     &dem,
@@ -1195,7 +1219,7 @@ mod tests {
                 &mut commands,
                 &mut meshes,
                 &mut tiles,
-                Handle::default(),
+                Handle::<StandardMaterial>::default(),
                 &frame,
                 TerrainUpdate {
                     prepared: vec![a, b],
@@ -1214,7 +1238,7 @@ mod tests {
             tiles.insert_prepared(prepare_tile(
                 &mut commands,
                 &mut meshes,
-                Handle::default(),
+                Handle::<StandardMaterial>::default(),
                 &frame,
                 b,
                 &dem,
@@ -1224,7 +1248,7 @@ mod tests {
                 &mut commands,
                 &mut meshes,
                 &mut tiles,
-                Handle::default(),
+                Handle::<StandardMaterial>::default(),
                 &frame,
                 TerrainUpdate {
                     prepared: vec![b],
@@ -1388,3 +1412,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "scenery_map_tests.rs"]
+mod scenery_map_tests;

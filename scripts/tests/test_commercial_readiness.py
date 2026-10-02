@@ -118,6 +118,14 @@ class StagingChecks(unittest.TestCase):
         (self.bundle / "region.fsairports").write_bytes(b"FSAP")
         self.assertIn("UNAPPROVED_GEODATA", self.codes())
 
+    def test_scenery_database_outside_assets_is_blocked(self):
+        (self.bundle / "region.fsscenery").write_bytes(b"FSSC\x01\x00")
+        self.assertIn("UNAPPROVED_GEODATA", self.codes())
+
+    def test_renamed_scenery_database_cannot_hide_in_a_notice(self):
+        (self.bundle / "README-extra.txt").write_bytes(b"FSSC\x01\x00")
+        self.assertIn("UNAPPROVED_GEODATA", self.codes())
+
     def test_source_hash_change_requires_review(self):
         (self.repo / self.asset).write_bytes(b"replacement")
         self.assertIn("SOURCE_ASSET_CHANGED", self.codes())

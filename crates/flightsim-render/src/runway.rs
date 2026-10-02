@@ -198,6 +198,7 @@ struct QuadBuilder {
     positions: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
     colors: Vec<[f32; 4]>,
+    lifts: Vec<f32>,
     indices: Vec<u32>,
 }
 
@@ -208,6 +209,7 @@ impl QuadBuilder {
             positions: Vec::new(),
             normals: Vec::new(),
             colors: Vec::new(),
+            lifts: Vec::new(),
             indices: Vec::new(),
         }
     }
@@ -233,6 +235,11 @@ impl QuadBuilder {
                 self.normals.push([up.x as f32, up.y as f32, up.z as f32]);
             }
             self.colors.push(color);
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "fixed small authored pavement/paint layer"
+            )]
+            self.lifts.push(lift as f32);
         }
         // 左近・右近・右遠・左遠。前方 × 右方は下向きなので、この順序で上向き。
         self.indices
@@ -247,6 +254,7 @@ impl QuadBuilder {
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, self.colors)
+        .with_inserted_attribute(crate::terrain_drape::ATTRIBUTE_OVERLAY_LIFT, self.lifts)
         .with_inserted_indices(Indices::U32(self.indices));
         (mesh, self.origin)
     }

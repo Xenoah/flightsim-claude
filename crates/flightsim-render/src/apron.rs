@@ -133,6 +133,11 @@ pub fn apron_mesh(
         indices.extend_from_slice(&[base, base + 1, base + 2]);
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "fixed small authored apron layer"
+    )]
+    let lifts = vec![APRON_LIFT as f32; vertex_count];
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
@@ -140,6 +145,7 @@ pub fn apron_mesh(
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
+    .with_inserted_attribute(crate::terrain_drape::ATTRIBUTE_OVERLAY_LIFT, lifts)
     .with_inserted_indices(Indices::U32(indices));
     Ok((mesh, origin))
 }

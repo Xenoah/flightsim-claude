@@ -66,6 +66,7 @@ pub mod dem;
 pub mod global;
 pub mod lod;
 pub mod mesh;
+pub mod scenery;
 pub mod seams;
 pub mod streaming;
 pub mod terrain;
@@ -95,3 +96,9 @@ pub use terrain::{
     DiskTileSource, EmptyTileSource, MemoryTileSource, Terrain, TerrainError, TileSource,
 };
 pub use tile::{Direction, GeoBounds, TileId};
+
+pub use scenery::{
+    BuildingHeightSource, LandCoverClass, RoadClass, SceneryBounds, SceneryBuilding,
+    SceneryDatabase, SceneryError, SceneryFeatureRef, SceneryLandCover, SceneryRoad, ScenerySource,
+    ScenerySourceKind,
+};

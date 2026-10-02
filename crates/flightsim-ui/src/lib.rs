@@ -278,6 +278,13 @@ pub struct HudLog;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct DataAttributionDisplay;
 
+/// Shared bottom layout reserves the measured attribution height automatically.
+#[derive(Component)]
+struct HudBottom;
+
+#[derive(Component)]
+struct HudBottomPanels;
+
 /// HUD のプラグイン。
 #[derive(Debug, Default)]
 pub struct FlightsimUiPlugin;
@@ -359,63 +366,90 @@ pub fn spawn_hud(mut commands: Commands) {
         HudText,
     ));
 
-    // どのキーが何に割り当てられているかを、いつでも見られるようにする。
-    // フライトシムの最大の離脱要因は「初見で離陸できないこと」。
-    commands.spawn((
-        Text::new(help_text()),
-        TextFont {
-            font_size: 14.0,
-            ..default()
-        },
-        TextColor(Color::srgba(0.8, 0.85, 0.9, 0.75)),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(12.0),
-            left: Val::Px(12.0),
-            ..default()
-        },
-        HudHelp,
-    ));
-
-    // 飛行の積み上げ。帰属表記が出る間だけ update system が 1 行ぶん上へ退避させる。
-    // **OSM 未使用の従来起動では位置を変えない。**
-    commands.spawn((
-        Text::new(""),
-        TextFont {
-            font_size: 14.0,
-            ..default()
-        },
-        TextColor(Color::srgba(0.85, 0.9, 0.85, 0.7)),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(12.0),
-            right: Val::Px(12.0),
-            ..default()
-        },
-        HudLog,
-    ));
-
-    // 法的な帰属表記は飛行中も読める必要がある。地形上でも文字が埋もれないよう
-    // 薄い背景を付け、飛行記録は上で 1 行ぶん退避してある。
-    commands.spawn((
-        Text::new(""),
-        TextFont {
-            font_size: 12.0,
-            ..default()
-        },
-        TextColor(Color::srgba(0.95, 0.95, 0.95, 0.9)),
-        TextLayout::new_with_justify(Justify::Right),
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(12.0),
-            right: Val::Px(12.0),
-            padding: UiRect::axes(Val::Px(6.0), Val::Px(3.0)),
-            ..default()
-        },
-        Visibility::Hidden,
-        DataAttributionDisplay,
-    ));
+    // Keep help and the flight log in one row above the footer. Flex layout
+    // reserves its actual wrapped height in the same layout pass, including
+    // narrow windows and attribution/replay changes. With no credit, the row
+    // retains the legacy 12-pixel bottom/side margins.
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(12.0),
+                left: Val::Px(12.0),
+                right: Val::Px(12.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
+                ..default()
+            },
+            HudBottom,
+        ))
+        .with_children(|bottom| {
+            bottom
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        flex_wrap: FlexWrap::Wrap,
+                        align_items: AlignItems::FlexEnd,
+                        column_gap: Val::Px(12.0),
+                        row_gap: Val::Px(8.0),
+                        ..default()
+                    },
+                    HudBottomPanels,
+                ))
+                .with_children(|panels| {
+                    panels.spawn((
+                        Text::new(help_text()),
+                        TextFont {
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.8, 0.85, 0.9, 0.75)),
+                        Node {
+                            max_width: Val::Percent(100.0),
+                            min_width: Val::Px(0.0),
+                            ..default()
+                        },
+                        HudHelp,
+                    ));
+                    panels.spawn((
+                        Text::new(""),
+                        TextFont {
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.85, 0.9, 0.85, 0.7)),
+                        Node {
+                            max_width: Val::Percent(100.0),
+                            min_width: Val::Px(0.0),
+                            margin: UiRect::left(Val::Auto),
+                            ..default()
+                        },
+                        HudLog,
+                    ));
+                });
+            bottom.spawn((
+                Text::new(""),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.95, 0.95, 0.95, 0.9)),
+                TextLayout::new_with_justify(Justify::Right)
+                    .with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+                Node {
+                    display: Display::None,
+                    max_width: Val::Percent(100.0),
+                    min_width: Val::Px(0.0),
+                    align_self: AlignSelf::FlexEnd,
+                    flex_shrink: 0.0,
+                    padding: UiRect::axes(Val::Px(6.0), Val::Px(3.0)),
+                    ..default()
+                },
+                Visibility::Hidden,
+                DataAttributionDisplay,
+            ));
+        });
 }
 
 /// 飛行記録の表示。
@@ -603,23 +637,21 @@ pub fn update_flight_log_display(state: Res<HudState>, mut query: Query<&mut Tex
 /// データ帰属表記を更新する。空文字列なら要素ごと隠す。
 pub fn update_data_attribution_display(
     attribution: Res<DataAttribution>,
-    mut display_query: Query<(&mut Text, &mut Visibility), With<DataAttributionDisplay>>,
-    mut log_query: Query<&mut Node, With<HudLog>>,
+    mut display_query: Query<(&mut Text, &mut Visibility, &mut Node), With<DataAttributionDisplay>>,
 ) {
-    for (mut text, mut visibility) in &mut display_query {
+    for (mut text, mut visibility, mut node) in &mut display_query {
         if text.as_str() != attribution.text() {
             **text = attribution.text().to_owned();
         }
-        *visibility = if attribution.is_empty() {
+        let empty = attribution.is_empty();
+        *visibility = if empty {
             Visibility::Hidden
         } else {
             Visibility::Visible
         };
-    }
-
-    let log_bottom = if attribution.is_empty() { 12.0 } else { 42.0 };
-    for mut node in &mut log_query {
-        node.bottom = Val::Px(log_bottom);
+        // Hidden visibility alone still occupies layout space. Remove the empty
+        // footer from flex layout so the legacy panel position is restored.
+        node.display = if empty { Display::None } else { Display::Flex };
     }
 }
 
@@ -754,27 +786,21 @@ mod tests {
     }
 
     #[test]
-    fn the_flight_log_moves_only_while_attribution_is_visible() {
+    fn empty_attribution_removes_its_layout_reservation() {
         const OSM: &str = "Airport data: (c) OpenStreetMap contributors (ODbL)";
         let mut app = attribution_harness(DataAttribution::default());
-
-        let log_bottom = |app: &mut App| {
+        let footer_display = |app: &mut App| {
             let world = app.world_mut();
-            let mut query = world.query_filtered::<&Node, With<HudLog>>();
-            query
-                .single(world)
-                .expect("spawn_hud should create one flight log")
-                .bottom
+            let mut query = world.query_filtered::<&Node, With<DataAttributionDisplay>>();
+            query.single(world).unwrap().display
         };
-        assert_eq!(log_bottom(&mut app), Val::Px(12.0));
-
+        assert_eq!(footer_display(&mut app), Display::None);
         app.world_mut().resource_mut::<DataAttribution>().set(OSM);
         app.update();
-        assert_eq!(log_bottom(&mut app), Val::Px(42.0));
-
+        assert_eq!(footer_display(&mut app), Display::Flex);
         app.world_mut().resource_mut::<DataAttribution>().clear();
         app.update();
-        assert_eq!(log_bottom(&mut app), Val::Px(12.0));
+        assert_eq!(footer_display(&mut app), Display::None);
     }
 
     #[test]
@@ -1107,3 +1133,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "attribution_layout_tests.rs"]
+mod attribution_layout_tests;

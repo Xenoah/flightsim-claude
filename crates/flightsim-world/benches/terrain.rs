@@ -193,5 +193,49 @@ fn climate_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmarks, climate_benchmarks);
+/// Compare render tessellation without changing the DEM or physical sampler.
+/// An optional local .fsdem path supplies a reproducible regional-data fixture;
+/// no fixture data or path is embedded in the repository or timed loop.
+fn mesh_resolution_benchmarks(criterion: &mut Criterion) {
+    let id = TileId::containing(13, Geodetic::from_degrees(47.139, 9.518, 0.0));
+    let atlas = flightsim_world::global::GlobalTerrain::bundled().unwrap();
+    let mut fixtures = vec![
+        ("synthetic_65", id, DemTile::new(id.bounds(), hilly(65))),
+        ("global_33", id, atlas.tile(id).unwrap()),
+    ];
+    if let Some(path) = std::env::var_os("FLIGHTSIM_BENCH_DEM") {
+        let mut file = std::fs::File::open(path).expect("open explicitly supplied benchmark DEM");
+        let stored = read_tile(&mut file).expect("validate explicitly supplied benchmark DEM");
+        fixtures.push(("regional_fixture", stored.id, stored.tile));
+    }
+    let mut group = criterion.benchmark_group("mesh_resolution");
+    group.sample_size(20);
+    group.warm_up_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(2));
+    for (label, id, dem) in fixtures {
+        for resolution in [33, 65] {
+            let options = flightsim_world::MeshOptions {
+                resolution,
+                skirt_depth: None,
+            };
+            group.bench_function(format!("{label}/{resolution}"), |bencher| {
+                bencher.iter(|| {
+                    black_box(flightsim_world::build_mesh(
+                        black_box(id),
+                        black_box(&dem),
+                        black_box(&options),
+                    ))
+                });
+            });
+        }
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    benchmarks,
+    climate_benchmarks,
+    mesh_resolution_benchmarks
+);
 criterion_main!(benches);

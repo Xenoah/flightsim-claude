@@ -273,6 +273,80 @@ fn arbitrary_lod_and_resolution_differences_cover_the_entire_shared_interval() {
 }
 
 #[test]
+fn regional_33_65_boundaries_cover_both_resolution_and_lod_transitions() {
+    for coarse_level in [11, 12, 13] {
+        for difference in [0, 1] {
+            let coarse = TileId::new(
+                coarse_level,
+                1078 << (coarse_level - 10),
+                244 << (coarse_level - 10),
+            );
+            let scale = 1 << difference;
+            let fine = TileId::new(
+                coarse_level + difference,
+                (coarse.x + 1) * scale,
+                coarse.y * scale,
+            );
+            for (coarse_resolution, fine_resolution) in [(33, 65), (65, 33), (65, 65)] {
+                let make = |id: TileId, resolution: u32, base: f64| {
+                    let heights = (0..65)
+                        .flat_map(|row| {
+                            (0..65).map(move |column| {
+                                (base
+                                    + (f64::from(row) - 32.0).powi(2) * 0.7
+                                    + f64::from(row % 7) * 6.0
+                                    + f64::from(column) * 2.0)
+                                    as f32
+                            })
+                        })
+                        .collect();
+                    build_mesh(
+                        id,
+                        &DemTile::new(id.bounds(), HeightGrid::new(65, 65, heights)),
+                        &MeshOptions {
+                            resolution,
+                            skirt_depth: Some(Meters::ZERO),
+                        },
+                    )
+                };
+                let meshes = [
+                    (coarse, make(coarse, coarse_resolution, 250.0)),
+                    (fine, make(fine, fine_resolution, 1400.0)),
+                ];
+                let (boundaries, seams) = prepare(&meshes);
+                assert_eq!(seams.len(), 1);
+                assert_eq!(boundaries[&coarse].resolution(), coarse_resolution as usize);
+                assert_eq!(boundaries[&fine].resolution(), fine_resolution as usize);
+                let bridge = seams[0].build_mesh(&boundaries);
+                let (vertices, indices) = seams[0].mesh_size_bound(&boundaries);
+                assert!(bridge.positions.len() <= vertices && bridge.indices.len() <= indices);
+                assert!(TerrainSeam::encoding_error_bound(&bridge).get() < 0.003);
+                for step in 1..128 {
+                    let t = f64::from(step) / 128.0;
+                    let a = edge_point(
+                        &meshes[0].1,
+                        coarse_resolution as usize,
+                        true,
+                        t / f64::from(scale),
+                    );
+                    let b = edge_point(&meshes[1].1, fine_resolution as usize, false, t);
+                    let along =
+                        edge_point(&meshes[1].1, fine_resolution as usize, false, t + 0.0001) - b;
+                    let normal = along.cross(b - a).normalize();
+                    for across in [0.1, 0.5, 0.9] {
+                        assert!(
+                            hits(&bridge, a.lerp(b, across), normal, 2.0),
+                            "regional seam levels {coarse_level}/{} resolutions {coarse_resolution}/{fine_resolution} t={t} across={across}",
+                            coarse_level + difference
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn post_f32_boundary_is_retained_and_reencoding_has_an_explicit_bound() {
     for level in [0, 3, 7, 13, 24] {
         let a = TileId::new(level, 0, 0);

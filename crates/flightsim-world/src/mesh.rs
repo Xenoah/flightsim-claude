@@ -160,19 +160,42 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
     // 地心方向の単位ベクトル（スカートを垂らす向き）を頂点ごとに持つ。
     let mut up_vectors = Vec::with_capacity(vertex_count);
     let mut world_positions = Vec::with_capacity(vertex_count);
+    let mut polar_vertices = Vec::with_capacity(vertex_count);
 
     for row in 0..resolution {
         for column in 0..resolution {
             let u = f64::from(column) / steps;
             let v = f64::from(row) / steps;
             // v = 0 が北端。DEM の行順に合わせている。
+            // Closed endpoints matter: south-edge subtraction can be one ulp
+            // below -PI/2, reversing the tiny longitude radius at the pole.
+            let north_pole = row == 0 && id.y == 0;
+            let south_pole = row == resolution - 1 && id.y == TileId::rows(id.level) - 1;
+            let latitude = if north_pole {
+                core::f64::consts::FRAC_PI_2
+            } else if south_pole {
+                -core::f64::consts::FRAC_PI_2
+            } else {
+                (bounds.north.get() - v * bounds.height().get())
+                    .clamp(-core::f64::consts::FRAC_PI_2, core::f64::consts::FRAC_PI_2)
+            };
             let position = Geodetic::new(
-                Radians(bounds.north.get() - v * bounds.height().get()),
+                Radians(latitude),
                 Radians(bounds.west.get() + u * bounds.width().get()),
                 Meters::ZERO,
             );
             let elevation = dem.elevation_at(position);
-            let surface = Geodetic::new(position.latitude, position.longitude, elevation).to_ecef();
+            let polar = north_pole || south_pole;
+            // A pole is one point, not one nearly coincident point per longitude.
+            // Sampling still uses this tile's original longitude and unchanged
+            // DEM. Only render coordinates/shading are canonicalized.
+            let longitude = if polar {
+                Radians::ZERO
+            } else {
+                position.longitude
+            };
+            let surface = Geodetic::new(position.latitude, longitude, elevation).to_ecef();
+            polar_vertices.push(polar);
 
             #[allow(
                 clippy::cast_possible_truncation,
@@ -227,8 +250,12 @@ pub fn build_mesh(id: TileId, dem: &DemTile, options: &MeshOptions) -> TerrainMe
     let mut normals: Vec<[f32; 3]> = normal_accumulator
         .iter()
         .zip(&up_vectors)
-        .map(|(accumulated, up)| {
-            let normal = if accumulated.length_squared() > 0.0 {
+        .zip(&polar_vertices)
+        .map(|((accumulated, up), &polar)| {
+            // Independent longitude wedges cannot estimate a unique normal at
+            // their collapsed endpoint. Degenerate residual faces previously
+            // produced inward normals (slope PI); use stable ellipsoid-up there.
+            let normal = if !polar && accumulated.length_squared() > 0.0 {
                 accumulated.normalize()
             } else {
                 *up
@@ -922,5 +949,57 @@ mod tests {
                 skirt_depth: None,
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod polar_render_regressions {
+    use super::*;
+
+    #[test]
+    fn both_closed_poles_have_one_outward_shading_normal_at_every_level() {
+        let atlas = crate::global::GlobalTerrain::bundled().unwrap();
+        for level in [0, 4, 8, 10, 11, 13] {
+            for south in [false, true] {
+                let columns = TileId::columns(level);
+                for x in [0, 1.min(columns - 1), columns / 3, columns - 1] {
+                    let id = TileId::new(level, x, if south { TileId::rows(level) - 1 } else { 0 });
+                    let dem = atlas.tile(id).unwrap();
+                    let original = dem.clone();
+                    let mesh = build_mesh(
+                        id,
+                        &dem,
+                        &MeshOptions {
+                            resolution: 33,
+                            skirt_depth: Some(Meters::ZERO),
+                        },
+                    );
+                    let row = if south { 32 } else { 0 };
+                    let pole_up = if south { -DVec3::Z } else { DVec3::Z };
+                    let first = mesh.positions[row * 33];
+                    for column in 0..33 {
+                        let index = row * 33 + column;
+                        assert_eq!(
+                            mesh.positions[index].map(f32::to_bits),
+                            first.map(f32::to_bits),
+                            "one pole position: {id:?}"
+                        );
+                        let normal = DVec3::from_array(mesh.normals[index].map(f64::from));
+                        assert!(
+                            (normal - pole_up).length() < 1.0e-7,
+                            "outward pole normal: {id:?}: {normal:?}"
+                        );
+                        assert!(
+                            mesh.slopes[index].abs() < 1.0e-6,
+                            "stable pole shading slope: {id:?}"
+                        );
+                    }
+                    assert_eq!(
+                        dem, original,
+                        "rendering cannot mutate physical DEM samples"
+                    );
+                }
+            }
+        }
     }
 }

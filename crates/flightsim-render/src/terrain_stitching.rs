@@ -7,7 +7,7 @@
 
 use crate::TerrainUpdate;
 use crate::terrain::{TerrainTiles, apply_terrain_update};
-use bevy::prelude::*;
+use bevy::{pbr::Material, prelude::*};
 use flightsim_core::{Ecef, Geodetic, Meters, Radians, RenderFrame};
 use flightsim_world::TileId;
 use flightsim_world::seams::{
@@ -37,6 +37,8 @@ pub struct StitchProgress {
     pub remaining: usize,
     pub visible: usize,
     pub resident: usize,
+    /// Airport overlay copies/jobs pending for this same atomic cut.
+    pub overlays_pending: bool,
 }
 
 /// Logical geometry owned by the stitched path, including pending/retired
@@ -64,6 +66,8 @@ pub struct TerrainResourceUsage {
 struct MeshFootprint {
     vertices: usize,
     indices: usize,
+    origin: Ecef,
+    surface_vertices: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +92,7 @@ struct PendingCut {
     queue: BTreeSet<TerrainSeamKey>,
     planner: Option<TerrainSeamPlanner>,
     prepared: BTreeMap<TerrainSeamKey, RenderedSeam>,
+    overlays_started: bool,
 }
 
 /// Internal ownership of compact boundaries and one pending cut. With at most
@@ -115,9 +120,23 @@ impl TerrainStitching {
         self.displayed.iter().copied()
     }
 
-    pub(crate) fn record_surface(&mut self, entity: Entity, vertices: usize, indices: usize) {
-        self.surfaces
-            .insert(entity, MeshFootprint { vertices, indices });
+    pub(crate) fn record_surface(
+        &mut self,
+        entity: Entity,
+        vertices: usize,
+        indices: usize,
+        origin: Ecef,
+        surface_vertices: usize,
+    ) {
+        self.surfaces.insert(
+            entity,
+            MeshFootprint {
+                vertices,
+                indices,
+                origin,
+                surface_vertices,
+            },
+        );
     }
 
     pub(crate) fn resource_usage(&self) -> TerrainResourceUsage {
@@ -217,6 +236,7 @@ impl TerrainStitching {
     fn progress(&self, prepared: usize, planning_work: usize) -> StitchProgress {
         StitchProgress {
             planning_work,
+            overlays_pending: false,
             planning_pending: self
                 .pending
                 .as_ref()
@@ -254,11 +274,11 @@ impl TerrainStitching {
     clippy::too_many_arguments,
     reason = "transaction uses the existing terrain render context"
 )]
-pub fn apply_stitched_update(
+pub fn apply_stitched_update<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     tiles: &mut TerrainTiles,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     update: TerrainUpdate,
     mesh_budget: usize,
@@ -279,7 +299,9 @@ pub fn apply_stitched_update(
         target.remove(id);
     }
     target.extend(&update.spawned);
-    let changed = target != state.displayed || update.replaced.iter().any(|id| target.contains(id));
+    let changed = target != state.displayed
+        || update.replaced.iter().any(|id| target.contains(id))
+        || tiles.overlays.is_dirty();
     if changed {
         assert!(
             target.iter().all(|id| state.boundaries.contains_key(id)),
@@ -292,6 +314,7 @@ pub fn apply_stitched_update(
             queue: BTreeSet::new(),
             planner: Some(TerrainSeamPlanner::default()),
             prepared: BTreeMap::new(),
+            overlays_started: false,
         });
     } else {
         apply_terrain_update(commands, meshes, tiles, update);
@@ -317,11 +340,11 @@ pub fn apply_stitched_update(
     clippy::too_many_arguments,
     reason = "bounded preparation uses the existing terrain render context"
 )]
-pub fn advance_stitched_update(
+pub fn advance_stitched_update<M: Material>(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     tiles: &mut TerrainTiles,
-    material: Handle<StandardMaterial>,
+    material: Handle<M>,
     frame: &RenderFrame,
     mesh_budget: usize,
     color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
@@ -425,17 +448,67 @@ pub fn advance_stitched_update(
                     footprint: MeshFootprint {
                         vertices: source.positions.len(),
                         indices: source.indices.len(),
+                        origin: source.origin,
+                        surface_vertices: source.surface_vertex_count,
                     },
                 },
             );
             prepared_count += 1;
         }
     }
-    if state
+    let bridges_ready = state
         .pending
         .as_ref()
-        .is_some_and(|pending| pending.planner.is_none() && pending.queue.is_empty())
-    {
+        .is_some_and(|pending| pending.planner.is_none() && pending.queue.is_empty());
+    let mut overlays_ready = true;
+    if bridges_ready && (!tiles.overlays.is_empty() || tiles.overlays.is_dirty()) {
+        let pending = state.pending.as_mut().expect("ready terrain cut");
+        if !pending.overlays_started || tiles.overlays.needs_restart() {
+            let mut sources: Vec<_> = pending
+                .target
+                .iter()
+                .map(|&id| {
+                    let entity = tiles.entity(id).expect("prepared target entity");
+                    let surface = state.surfaces[&entity];
+                    crate::terrain_overlays::OverlayTerrainSource {
+                        key: crate::terrain_overlays::OverlaySourceKey::Tile(
+                            id,
+                            state.generations[&id],
+                        ),
+                        footprint: [id, id],
+                        required: false,
+                        origin: surface.origin,
+                        surface_vertices: surface.surface_vertices,
+                        mesh: tiles.mesh_handle(id).expect("prepared target mesh").clone(),
+                    }
+                })
+                .collect();
+            for (key, plan) in &pending.desired {
+                let seam = pending
+                    .prepared
+                    .get(key)
+                    .or_else(|| state.visible.get(key))
+                    .expect("ready target bridge");
+                sources.push(crate::terrain_overlays::OverlayTerrainSource {
+                    key: crate::terrain_overlays::OverlaySourceKey::Bridge(*key, plan.generations),
+                    footprint: plan.descriptor.tiles(),
+                    required: false,
+                    origin: seam.footprint.origin,
+                    surface_vertices: seam.footprint.surface_vertices,
+                    mesh: seam.mesh.clone(),
+                });
+            }
+            tiles.overlays.begin(sources);
+            pending.overlays_started = true;
+        }
+        let (ready, copied) = tiles
+            .overlays
+            .advance(meshes, mesh_budget.saturating_sub(prepared_count));
+        overlays_ready = ready;
+        prepared_count += copied;
+    }
+    if bridges_ready && overlays_ready {
+        tiles.overlays.commit(commands, meshes);
         let pending = state.pending.take().expect("ready transaction");
         let mut old = std::mem::take(&mut state.visible);
         let mut prepared = pending.prepared;
@@ -458,7 +531,9 @@ pub fn advance_stitched_update(
         state.displayed = pending.target;
         state.prune_boundaries(tiles);
     }
-    let progress = state.progress(prepared_count, planning_work);
+    tiles.overlays.apply_precision(commands, frame);
+    let mut progress = state.progress(prepared_count, planning_work);
+    progress.overlays_pending = tiles.overlays.has_preparation();
     tiles.stitching = state;
     progress
 }

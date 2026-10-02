@@ -37,3 +37,15 @@ build dependencies to the workspace lockfile. Decoding behavior of the existing
 default rust-zlib feature is unchanged.
 
 The fork is stored at repository-root vendor/osmpbf, outside workspace member directories. Cargo issue #6745 makes excludes nested below a member ineffective; cargo metadata confirms this fork is not an application workspace member. The inherited Some(None) rustdoc link was corrected to a code span.
+
+## 2026-10-02: offline cumulative decode accounting
+
+`Blob::uncompressed_size()` exposes the same validated raw byte length or zlib
+`raw_size` used by the decoder, without decompression. Raw/raw_size disagreement,
+negative/missing/oversized compressed lengths and unsupported encodings remain
+errors. The actual zlib decoder still verifies exact output length, full input
+consumption and StreamEnd. Existing valid bytes, airportgen behavior and record
+ordering are unchanged. Regional scenerygen uses this metadata to reject a
+cumulative decoded-byte budget before decoding a block; compressed file size alone
+is not a sufficient CPU-work bound. The importer also bounds total relation-member
+references (not only distinct member IDs).

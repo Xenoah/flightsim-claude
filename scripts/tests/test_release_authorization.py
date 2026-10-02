@@ -266,6 +266,20 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         self.authorize_fixture()
         self.assertIn("RAW_DATA_EXCLUDED", self.codes())
 
+    def test_scenery_data_is_blocked_even_when_requested_by_manifest(self):
+        self.write("region.fsscenery", "FSSC synthetic database")
+        self.manifest["required_bundle_files"].append("region.fsscenery")
+        self.refresh_evidence()
+        self.authorize_fixture()
+        self.assertIn("RAW_DATA_EXCLUDED", self.codes())
+
+    def test_renamed_scenery_is_still_blocked_by_magic(self):
+        self.write("notice-extra.txt", "FSSC synthetic database")
+        self.manifest["required_bundle_files"].append("notice-extra.txt")
+        self.refresh_evidence()
+        self.authorize_fixture()
+        self.assertIn("RAW_DATA_EXCLUDED", self.codes())
+
     def make_bundle(self):
         self.authorize_fixture()
         _, plan = gate.inspect(self.repo)

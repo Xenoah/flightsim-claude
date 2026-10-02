@@ -74,7 +74,9 @@ def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = N
                 continue
             if relative.startswith(("assets/", "data/")) and relative not in allowed_assets:
                 block("UNAPPROVED_ASSET", f"External asset is not in the commercial allowlist: {relative}")
-            if path.name.lower().endswith((".osm", ".pbf", ".fsairports", ".fsdem")):
+            with path.open("rb") as stream:
+                scenery_magic = stream.read(4) == b"FSSC"
+            if path.name.lower().endswith((".osm", ".pbf", ".fsairports", ".fsdem", ".fsscenery")) or scenery_magic:
                 block("UNAPPROVED_GEODATA", f"No reviewed regional/OSM distribution grant exists for: {relative}")
             if path.suffix.lower() in (".glb", ".gltf", ".blend", ".ttf", ".otf", ".wav", ".mp3", ".ogg", ".mp4", ".png", ".jpg", ".jpeg", ".webp", ".dds", ".ktx2", ".fsclim", ".fsgt") and relative not in allowed_assets:
                 block("UNINVENTORIED_BINARY_ASSET", f"Unapproved binary asset path: {relative}")

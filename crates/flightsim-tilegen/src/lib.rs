@@ -58,6 +58,7 @@ pub mod geoid;
 pub mod geotiff;
 pub mod global;
 pub mod region;
+pub mod scenery;
 pub mod testing;
 pub mod vertical_datum;
 
@@ -68,3 +69,8 @@ pub use generate::{
 };
 pub use geotiff::{GeoRaster, RasterCoverage, RasterError};
 pub use region::{Region, RegionError};
+
+pub use scenery::{
+    SceneryBakeOptions, SceneryGenError, SceneryGenerationReport, bake_scenery_bytes,
+    generate_scenery_database,
+};

@@ -17,5 +17,14 @@ bevy.workspace = true
 # fdm / core の公開 API に現れる f64 の型を扱うため。
 glam.workspace = true
 
+[dev-dependencies]
+criterion.workspace = true
+# Already used by Bevy; validate the actual procedural WGSL helper without a GPU.
+naga = { version = "27.0.3", features = ["wgsl-in"] }
+
 [lints]
 workspace = true
+
+[[bench]]
+name = "scenery_mesh"
+harness = false

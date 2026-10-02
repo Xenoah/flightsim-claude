@@ -1,0 +1,1487 @@
+//! Bounded overlay preparation tied to the terrain visibility transaction.
+//! CPU copies have a per-update cap; clipping runs on immutable compute-pool
+//! inputs. Essential airports are admitted/processed before optional scenery.
+
+use crate::terrain_drape::{
+    DrapeError, DrapeTerrain, DrapedOverlay, OverlayPrecision, TerrainOverlay,
+};
+use bevy::mesh::VertexAttributeValues;
+use bevy::prelude::*;
+use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
+use flightsim_core::{Ecef, Meters, RenderFrame};
+use flightsim_world::{TerrainSeamKey, TileId};
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+pub const MAX_TERRAIN_OVERLAYS: usize = 64;
+pub const MAX_OPTIONAL_OVERLAYS: usize = 24;
+pub const MAX_OPTIONAL_SOURCE_TRIANGLES: usize = 40_000;
+pub const MAX_OVERLAY_TERRAIN_TILES: usize = 512;
+pub const MAX_OVERLAY_TERRAIN_VERTICES: usize = 262_144;
+pub const OVERLAY_TILE_COPIES_PER_FRAME: usize = 2;
+const MAX_DISCOVERY_SOURCES: usize = 5 * 8_192;
+
+/// A staged, initially hidden ground mesh. Its owner keeps its material and
+/// world-position components; the terrain transaction replaces only mesh data.
+#[derive(Debug)]
+pub struct TerrainOverlayRegistration {
+    pub entity: Entity,
+    pub mesh: Handle<Mesh>,
+    pub source: TerrainOverlay,
+}
+
+/// After a successful batch replacement, keep these old assets displayed until
+/// `overlay_usage().committed_revision >= revision`, then remove/despawn them.
+/// Keep at most one outstanding swap; discard unpublished staged assets before
+/// requesting another batch. Admission errors leave the old registry untouched.
+#[derive(Debug)]
+pub struct TerrainOverlaySwap {
+    pub revision: u64,
+    pub retired: Vec<(Entity, Handle<Mesh>)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OverlaySourceKey {
+    Tile(TileId, u64),
+    Bridge(TerrainSeamKey, [u64; 2]),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct OverlayTerrainSource {
+    pub key: OverlaySourceKey,
+    pub footprint: [TileId; 2],
+    pub required: bool,
+    pub origin: Ecef,
+    pub surface_vertices: usize,
+    pub mesh: Handle<Mesh>,
+}
+#[derive(Debug, Clone)]
+struct PrecisionSource {
+    footprint: [TileId; 2],
+    origin: Ecef,
+    extent: f64,
+}
+#[derive(Debug)]
+struct RegisteredOverlay {
+    entity: Entity,
+    mesh: Handle<Mesh>,
+    source: Arc<TerrainOverlay>,
+    optional: bool,
+}
+#[derive(Debug)]
+struct PreparedOverlays {
+    reuse: bool,
+    outputs: Vec<Option<DrapedOverlay>>,
+    errors: [Option<DrapeError>; 2],
+}
+type DrapeResult = Result<PreparedOverlays, DrapeError>;
+#[derive(Debug)]
+struct Preparation {
+    revision: u64,
+    signature: Vec<OverlaySourceKey>,
+    sources: Vec<OverlayTerrainSource>,
+    discovery: Option<Task<Result<Vec<OverlayTerrainSource>, DrapeError>>>,
+    required_tiles: usize,
+    next_source: usize,
+    copied_vertices: usize,
+    terrain: Vec<DrapeTerrain>,
+    precision: Vec<PrecisionSource>,
+    optional_disabled: bool,
+    task: Option<Task<DrapeResult>>,
+    result: Option<DrapeResult>,
+    cancelled: Arc<AtomicBool>,
+}
+impl Drop for Preparation {
+    fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+}
+
+/// CPU lifecycle/admission counts, not driver memory or a frame-rate claim.
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub struct TerrainOverlayUsage {
+    pub registered: usize,
+    pub optional_registered: usize,
+    pub source_triangles: usize,
+    pub source_vertices: usize,
+    pub pending: bool,
+    pub copied_tiles: usize,
+    pub copied_vertices: usize,
+    pub rejected_transactions: u64,
+    pub dirty: bool,
+    pub revision: u64,
+    pub committed_revision: u64,
+    pub precision_hidden: usize,
+    pub optional_swap_pending: bool,
+    /// Optional batches omitted for the committed cut due to preparation caps/errors.
+    /// Separate from the rebase-dependent precision visibility gate.
+    pub omitted_optional: usize,
+    /// Largest displacement from the original authored mesh's ground surface,
+    /// not a claim to have resampled physical contact at every fragment.
+    pub maximum_authored_displacement: Meters,
+    /// Candidate occurrences over the 60-degree ground-support limit.
+    pub omitted_support_facets: usize,
+}
+#[derive(Debug, Default)]
+pub(crate) struct TerrainOverlays {
+    registered: Vec<RegisteredOverlay>,
+    committed_signature: Option<Vec<OverlaySourceKey>>,
+    preparation: Option<Preparation>,
+    rejected_transactions: u64,
+    revision: u64,
+    committed_revision: u64,
+    displayed: BTreeSet<Entity>,
+    output_precision: BTreeMap<Entity, OverlayPrecision>,
+    precision_hidden: BTreeSet<Entity>,
+    committed_precision: Vec<PrecisionSource>,
+    retired_optional: Vec<RegisteredOverlay>,
+    optional_swap_pending: bool,
+    omitted_optional: BTreeSet<Entity>,
+}
+
+impl TerrainOverlays {
+    pub(crate) fn register(
+        &mut self,
+        entity: Entity,
+        mesh: Handle<Mesh>,
+        source: TerrainOverlay,
+    ) -> Result<(), DrapeError> {
+        if source.is_empty() {
+            return Ok(());
+        }
+        let candidate = TerrainOverlayRegistration {
+            entity,
+            mesh,
+            source,
+        };
+        self.validate_admission(std::slice::from_ref(&candidate), false)?;
+        self.registered.push(RegisteredOverlay {
+            entity: candidate.entity,
+            mesh: candidate.mesh,
+            source: Arc::new(candidate.source),
+            optional: false,
+        });
+        self.reset();
+        Ok(())
+    }
+
+    fn validate_admission(
+        &self,
+        additions: &[TerrainOverlayRegistration],
+        replace_optional: bool,
+    ) -> Result<(), DrapeError> {
+        let retained: Vec<_> = self
+            .registered
+            .iter()
+            .filter(|overlay| !replace_optional || !overlay.optional)
+            .collect();
+        let triangles = retained
+            .iter()
+            .map(|overlay| overlay.source.triangle_count())
+            .sum::<usize>()
+            + additions
+                .iter()
+                .map(|overlay| overlay.source.triangle_count())
+                .sum::<usize>();
+        let vertices = retained
+            .iter()
+            .map(|overlay| overlay.source.vertex_count())
+            .sum::<usize>()
+            + additions
+                .iter()
+                .map(|overlay| overlay.source.vertex_count())
+                .sum::<usize>();
+        if retained.len() + additions.len() > MAX_TERRAIN_OVERLAYS
+            || triangles > crate::terrain_drape::MAX_OVERLAY_SOURCE_TRIANGLES
+            || vertices > crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES
+        {
+            return Err(DrapeError::SourceLimit);
+        }
+        let mut entities: BTreeSet<_> = self
+            .registered
+            .iter()
+            .map(|overlay| overlay.entity)
+            .collect();
+        let mut meshes: BTreeSet<_> = self
+            .registered
+            .iter()
+            .map(|overlay| overlay.mesh.id())
+            .collect();
+        for addition in additions {
+            if !entities.insert(addition.entity)
+                || !meshes.insert(addition.mesh.id())
+                || addition.source.is_empty()
+            {
+                return Err(DrapeError::InvalidMesh);
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn replace_optional(
+        &mut self,
+        additions: Vec<TerrainOverlayRegistration>,
+    ) -> Result<TerrainOverlaySwap, DrapeError> {
+        if self.optional_swap_pending {
+            return Err(DrapeError::UpdatePending);
+        }
+        if additions.len() > MAX_OPTIONAL_OVERLAYS
+            || additions
+                .iter()
+                .map(|overlay| overlay.source.triangle_count())
+                .sum::<usize>()
+                > MAX_OPTIONAL_SOURCE_TRIANGLES
+        {
+            return Err(DrapeError::SourceLimit);
+        }
+        self.validate_admission(&additions, true)?;
+        let mut retired = Vec::new();
+        for overlay in std::mem::take(&mut self.registered) {
+            if overlay.optional {
+                retired.push((overlay.entity, overlay.mesh.clone()));
+                self.retired_optional.push(overlay);
+            } else {
+                self.registered.push(overlay);
+            }
+        }
+        self.registered
+            .extend(additions.into_iter().map(|overlay| RegisteredOverlay {
+                entity: overlay.entity,
+                mesh: overlay.mesh,
+                source: Arc::new(overlay.source),
+                optional: true,
+            }));
+        self.reset();
+        self.optional_swap_pending = true;
+        Ok(TerrainOverlaySwap {
+            revision: self.revision,
+            retired,
+        })
+    }
+
+    pub(crate) fn unregister(&mut self, entity: Entity) -> bool {
+        if let Some(index) = self
+            .registered
+            .iter()
+            .position(|overlay| overlay.entity == entity)
+        {
+            self.registered.remove(index);
+        } else if let Some(index) = self
+            .retired_optional
+            .iter()
+            .position(|overlay| overlay.entity == entity)
+        {
+            self.retired_optional.remove(index);
+        } else {
+            return false;
+        }
+        self.omitted_optional.remove(&entity);
+        self.displayed.remove(&entity);
+        self.output_precision.remove(&entity);
+        self.precision_hidden.remove(&entity);
+        self.reset();
+        true
+    }
+
+    pub(crate) fn clear_optional(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
+        let mut removed = std::mem::take(&mut self.retired_optional);
+        let mut retained = Vec::new();
+        for overlay in std::mem::take(&mut self.registered) {
+            if overlay.optional {
+                removed.push(overlay);
+            } else {
+                retained.push(overlay);
+            }
+        }
+        self.registered = retained;
+        let result = removed
+            .into_iter()
+            .map(|overlay| {
+                self.displayed.remove(&overlay.entity);
+                self.output_precision.remove(&overlay.entity);
+                self.precision_hidden.remove(&overlay.entity);
+                (overlay.entity, overlay.mesh)
+            })
+            .collect();
+        self.optional_swap_pending = false;
+        self.omitted_optional.clear();
+        self.reset();
+        result
+    }
+    pub(crate) fn is_empty(&self) -> bool {
+        self.registered.is_empty()
+    }
+    pub(crate) fn is_dirty(&self) -> bool {
+        self.revision != self.committed_revision
+    }
+    pub(crate) fn needs_restart(&self) -> bool {
+        self.is_dirty()
+            && self
+                .preparation
+                .as_ref()
+                .is_none_or(|prep| prep.revision != self.revision)
+    }
+    pub(crate) fn has_preparation(&self) -> bool {
+        self.preparation.is_some()
+    }
+    pub(crate) fn usage(&self) -> TerrainOverlayUsage {
+        TerrainOverlayUsage {
+            registered: self.registered.len(),
+            optional_registered: self
+                .registered
+                .iter()
+                .filter(|overlay| overlay.optional)
+                .count(),
+            source_triangles: self
+                .registered
+                .iter()
+                .map(|overlay| overlay.source.triangle_count())
+                .sum(),
+            source_vertices: self
+                .registered
+                .iter()
+                .map(|overlay| overlay.source.vertex_count())
+                .sum(),
+            pending: self.preparation.is_some(),
+            copied_tiles: self.preparation.as_ref().map_or(0, |prep| prep.next_source),
+            copied_vertices: self
+                .preparation
+                .as_ref()
+                .map_or(0, |prep| prep.copied_vertices),
+            rejected_transactions: self.rejected_transactions,
+            dirty: self.is_dirty(),
+            revision: self.revision,
+            committed_revision: self.committed_revision,
+            precision_hidden: self.precision_hidden.len(),
+            optional_swap_pending: self.optional_swap_pending,
+            omitted_optional: self.omitted_optional.len(),
+            omitted_support_facets: self
+                .output_precision
+                .values()
+                .map(|metrics| metrics.omitted_support_facets)
+                .sum(),
+            maximum_authored_displacement: Meters(
+                self.output_precision
+                    .values()
+                    .map(|metrics| metrics.authored_displacement.get())
+                    .fold(0.0, f64::max),
+            ),
+        }
+    }
+
+    pub(crate) fn begin(&mut self, sources: Vec<OverlayTerrainSource>) {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let templates: Vec<_> = self
+            .registered
+            .iter()
+            .map(|overlay| (Arc::clone(&overlay.source), overlay.optional))
+            .collect();
+        let too_many = sources.len() > MAX_DISCOVERY_SOURCES;
+        let discovery_cancelled = Arc::clone(&cancelled);
+        let discovery = if too_many || templates.is_empty() {
+            None
+        } else {
+            Some(AsyncComputeTaskPool::get().spawn(async move {
+                let mut relevant = Vec::new();
+                for mut source in sources {
+                    if discovery_cancelled.load(Ordering::Relaxed) {
+                        return Err(DrapeError::Cancelled);
+                    }
+                    let mut interested = false;
+                    for (template, optional) in &templates {
+                        if source
+                            .footprint
+                            .iter()
+                            .any(|&id| template.intersects_tile(id))
+                        {
+                            interested = true;
+                            source.required |= !optional;
+                        }
+                    }
+                    if interested {
+                        relevant.push(source);
+                    }
+                }
+                Ok(relevant)
+            }))
+        };
+        self.preparation = Some(Preparation {
+            revision: self.revision,
+            signature: Vec::new(),
+            sources: Vec::new(),
+            discovery,
+            required_tiles: 0,
+            next_source: 0,
+            copied_vertices: 0,
+            terrain: Vec::new(),
+            precision: Vec::new(),
+            optional_disabled: false,
+            task: None,
+            result: if too_many {
+                Some(Err(DrapeError::TerrainLimit))
+            } else if self.is_empty() {
+                Some(Ok(PreparedOverlays {
+                    reuse: false,
+                    outputs: Vec::new(),
+                    errors: [None; 2],
+                }))
+            } else {
+                None
+            },
+            cancelled,
+        });
+    }
+
+    /// Returns readiness and copies charged against the existing mesh budget.
+    pub(crate) fn advance(&mut self, meshes: &Assets<Mesh>, budget: usize) -> (bool, usize) {
+        let Some(prep) = &mut self.preparation else {
+            return (true, 0);
+        };
+        if prep.result.is_some() {
+            return (true, 0);
+        }
+        if let Some(discovery) = &mut prep.discovery {
+            let Some(result) = block_on(poll_once(discovery)) else {
+                return (false, 0);
+            };
+            prep.discovery = None;
+            match result {
+                Ok(mut sources) => {
+                    prep.signature = sources.iter().map(|source| source.key.clone()).collect();
+                    if prep.revision == self.committed_revision
+                        && self.committed_signature.as_ref() == Some(&prep.signature)
+                    {
+                        prep.result = Some(Ok(PreparedOverlays {
+                            reuse: true,
+                            outputs: Vec::new(),
+                            errors: [None; 2],
+                        }));
+                        return (true, 0);
+                    }
+                    sources.sort_by_key(|source| !source.required);
+                    if sources.len() > MAX_OVERLAY_TERRAIN_TILES {
+                        prep.optional_disabled = true;
+                        sources.retain(|source| source.required);
+                    }
+                    if sources.len() > MAX_OVERLAY_TERRAIN_TILES {
+                        prep.result = Some(Err(DrapeError::TerrainLimit));
+                        return (true, 0);
+                    }
+                    prep.sources = sources;
+                }
+                Err(error) => {
+                    prep.result = Some(Err(error));
+                    return (true, 0);
+                }
+            }
+            return (false, 0);
+        }
+        if let Some(task) = &mut prep.task {
+            if let Some(result) = block_on(poll_once(task)) {
+                prep.result = Some(result);
+                prep.task = None;
+            }
+            return (prep.result.is_some(), 0);
+        }
+        let mut copied = 0;
+        for _ in 0..budget.min(OVERLAY_TILE_COPIES_PER_FRAME) {
+            let Some(source) = prep.sources.get(prep.next_source) else {
+                break;
+            };
+            match copy_terrain(meshes, source, prep.copied_vertices) {
+                Ok(terrain) => {
+                    prep.precision.push(PrecisionSource {
+                        footprint: source.footprint,
+                        origin: source.origin,
+                        extent: terrain
+                            .positions
+                            .iter()
+                            .map(|point| glam::DVec3::from_array(point.map(f64::from)).length())
+                            .fold(0.0, f64::max),
+                    });
+                    prep.required_tiles += usize::from(source.required);
+                    prep.copied_vertices += terrain.positions.len();
+                    prep.terrain.push(terrain);
+                }
+                Err(error) if source.required => {
+                    prep.result = Some(Err(error));
+                    return (true, copied);
+                }
+                Err(_) => {
+                    prep.optional_disabled = true;
+                    prep.next_source = prep.sources.len();
+                    break;
+                }
+            }
+            prep.next_source += 1;
+            copied += 1;
+        }
+        if prep.next_source == prep.sources.len() {
+            let sources: Vec<_> = self
+                .registered
+                .iter()
+                .map(|overlay| (Arc::clone(&overlay.source), overlay.optional))
+                .collect();
+            let terrain = std::mem::take(&mut prep.terrain);
+            let cancelled = Arc::clone(&prep.cancelled);
+            let optional_disabled = prep.optional_disabled;
+            let required_tiles = prep.required_tiles;
+            prep.task = Some(AsyncComputeTaskPool::get().spawn(async move {
+                Ok(prepare_overlays(
+                    &sources,
+                    &terrain,
+                    required_tiles,
+                    &cancelled,
+                    optional_disabled,
+                ))
+            }));
+        }
+        (false, copied)
+    }
+
+    pub(crate) fn commit(&mut self, commands: &mut Commands, meshes: &mut Assets<Mesh>) {
+        let Some(mut prep) = self.preparation.take() else {
+            return;
+        };
+        let result = prep
+            .result
+            .take()
+            .expect("commit only after preparation is ready");
+        assert_eq!(
+            prep.revision, self.revision,
+            "stale overlay preparation cannot commit"
+        );
+        self.committed_revision = self.revision;
+        self.committed_signature = Some(std::mem::take(&mut prep.signature));
+        if result.as_ref().is_ok_and(|result| result.reuse) {
+            return;
+        }
+        self.retired_optional.clear();
+        self.optional_swap_pending = false;
+        self.committed_precision = std::mem::take(&mut prep.precision);
+        self.displayed.clear();
+        self.output_precision.clear();
+        self.precision_hidden.clear();
+        self.omitted_optional.clear();
+        match result {
+            Ok(result) => {
+                let omitted: usize = result
+                    .outputs
+                    .iter()
+                    .flatten()
+                    .map(|output| output.precision.omitted_support_facets)
+                    .sum();
+                if omitted > 0 {
+                    info!(
+                        "ground overlays omitted {omitted} steep support candidates (>60 deg); supported facets retained"
+                    );
+                }
+                for (group, error) in result.errors.into_iter().enumerate() {
+                    if let Some(error) = error {
+                        self.rejected_transactions = self.rejected_transactions.saturating_add(1);
+                        if group == 0 {
+                            warn!(
+                                "required airport overlay group rejected: {error}; hiding that group for this cut"
+                            );
+                        } else {
+                            let total = self
+                                .registered
+                                .iter()
+                                .filter(|overlay| overlay.optional)
+                                .count();
+                            let omitted = self
+                                .registered
+                                .iter()
+                                .zip(&result.outputs)
+                                .filter(|(overlay, output)| overlay.optional && output.is_none())
+                                .count();
+                            warn!(
+                                "optional terrain overlays retained {}, omitted {omitted} of {total}; first rejection: {error}",
+                                total - omitted
+                            );
+                        }
+                    }
+                }
+                for (overlay, output) in self.registered.iter().zip(result.outputs) {
+                    if let Some(output) = output {
+                        if let Some(mesh) = meshes.get_mut(&overlay.mesh) {
+                            *mesh = output.mesh;
+                            self.output_precision
+                                .insert(overlay.entity, output.precision);
+                            self.displayed.insert(overlay.entity);
+                            commands
+                                .entity(overlay.entity)
+                                .insert(Visibility::Inherited);
+                        }
+                    } else {
+                        if overlay.optional {
+                            self.omitted_optional.insert(overlay.entity);
+                        }
+                        commands.entity(overlay.entity).insert(Visibility::Hidden);
+                    }
+                }
+            }
+            Err(error) => {
+                self.rejected_transactions = self.rejected_transactions.saturating_add(1);
+                warn!(
+                    "airport overlay preparation rejected: {error}; hiding overlays for this terrain cut"
+                );
+                for overlay in &self.registered {
+                    if overlay.optional {
+                        self.omitted_optional.insert(overlay.entity);
+                    }
+                    commands.entity(overlay.entity).insert(Visibility::Hidden);
+                }
+            }
+        }
+    }
+
+    /// Re-evaluate conservative f32 transform headroom when the render frame
+    /// moves/rebases. A coarse distant origin is not equivalent to exact f64
+    /// facets. Never replace a small layer by an arbitrary large vertical lift.
+    pub(crate) fn apply_precision(&mut self, commands: &mut Commands, frame: &RenderFrame) {
+        for overlay in self.registered.iter().chain(&self.retired_optional) {
+            if !self.displayed.contains(&overlay.entity) {
+                continue;
+            }
+            let metrics = self.output_precision.get(&overlay.entity);
+            let output_extent =
+                metrics.map_or(overlay.source.radius.get(), |metrics| metrics.output_extent);
+            let support_cosine = metrics.map_or(1.0, |metrics| metrics.support_cosine);
+            let error = self
+                .committed_precision
+                .iter()
+                .enumerate()
+                .filter(|(index, source)| {
+                    metrics.map_or_else(
+                        || {
+                            source
+                                .footprint
+                                .iter()
+                                .any(|&id| overlay.source.intersects_tile(id))
+                        },
+                        |metrics| metrics.terrain_sources.contains(index),
+                    )
+                })
+                .map(|(_, source)| {
+                    transform_error_bound(
+                        frame,
+                        source.origin,
+                        source.extent,
+                        overlay.source.origin,
+                        output_extent,
+                    )
+                })
+                .fold(0.0, f64::max);
+            let sufficient = error < overlay.source.minimum_lift() * support_cosine * 0.5;
+            if sufficient {
+                if self.precision_hidden.remove(&overlay.entity) {
+                    commands
+                        .entity(overlay.entity)
+                        .insert(Visibility::Inherited);
+                }
+            } else if self.precision_hidden.insert(overlay.entity) {
+                commands.entity(overlay.entity).insert(Visibility::Hidden);
+                warn!(
+                    "terrain overlay hidden: f32 bound {error:.4} m, support cosine {support_cosine:.6}, authored layer {:.4} m",
+                    overlay.source.minimum_lift()
+                );
+            }
+        }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.preparation = None;
+        self.committed_signature = None;
+        self.revision = self
+            .revision
+            .checked_add(1)
+            .expect("overlay generation exhausted");
+    }
+}
+
+/// Bound both actual GPU affine evaluations relative to the canonical f64
+/// facets. The measured matrix discrepancy includes quaternion conversion;
+/// rounded reference basis entries add a 1.5-epsilon Frobenius bound. Four
+/// epsilon covers seven float multiply/add roundings (u=epsilon/2), using the
+/// sqrt(3) bound for the absolute rotation matrix norm, plus translation and
+/// output-vertex encoding. Keeping half the normal-direction lift is additional
+/// headroom for driver arithmetic; coarse million-metre roots remain rejected.
+fn transform_error_bound(
+    frame: &RenderFrame,
+    source_origin: Ecef,
+    source_extent: f64,
+    overlay_origin: Ecef,
+    overlay_extent: f64,
+) -> f64 {
+    let rotation = glam::Mat3::from_quat(frame.rotation_to_render(glam::DQuat::IDENTITY));
+    let reference = glam::Mat3::from_cols(
+        frame.vector_to_render(glam::DVec3::X),
+        frame.vector_to_render(glam::DVec3::Y),
+        frame.vector_to_render(glam::DVec3::Z),
+    );
+    let difference = rotation
+        .to_cols_array()
+        .into_iter()
+        .zip(reference.to_cols_array())
+        .map(|(actual, reference)| (f64::from(actual) - f64::from(reference)).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    let epsilon = f64::from(f32::EPSILON);
+    let extent = source_extent + overlay_extent;
+    let translations = frame.to_render(source_origin).as_dvec3().length()
+        + frame.to_render(overlay_origin).as_dvec3().length();
+    (difference + 1.5 * epsilon) * extent
+        + 0.5 * epsilon * (translations + overlay_extent)
+        + 4.0 * epsilon * (3.0_f64.sqrt() * extent + translations)
+        + 1.0e-7
+}
+
+fn prepare_overlays(
+    sources: &[(Arc<TerrainOverlay>, bool)],
+    terrain: &[DrapeTerrain],
+    required_tiles: usize,
+    cancelled: &AtomicBool,
+    optional_disabled: bool,
+) -> PreparedOverlays {
+    prepare_overlays_with_budget(
+        sources,
+        terrain,
+        required_tiles,
+        cancelled,
+        optional_disabled,
+        crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+        0,
+    )
+}
+
+// A smaller output/remaining-work allowance makes the aggregate failure policy
+// directly testable without allocating production-sized meshes. Production uses
+// the unchanged hard cap and starts all charged work at zero.
+fn prepare_overlays_with_budget(
+    sources: &[(Arc<TerrainOverlay>, bool)],
+    terrain: &[DrapeTerrain],
+    required_tiles: usize,
+    cancelled: &AtomicBool,
+    optional_disabled: bool,
+    output_limit: usize,
+    initial_work: usize,
+) -> PreparedOverlays {
+    let mut result = PreparedOverlays {
+        reuse: false,
+        outputs: (0..sources.len()).map(|_| None).collect(),
+        errors: [None; 2],
+    };
+    let output_limit = output_limit.min(crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES);
+    let mut vertices = 0;
+    let mut work = initial_work;
+    for optional in [false, true] {
+        let group = usize::from(optional);
+        if optional && optional_disabled {
+            result.errors[group] = Some(DrapeError::TerrainLimit);
+            continue;
+        }
+        let terrain = if optional {
+            terrain
+        } else {
+            &terrain[..required_tiles]
+        };
+        for (index, (source, is_optional)) in sources
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, is_optional))| *is_optional == optional)
+        {
+            debug_assert_eq!(*is_optional, optional);
+            if output_limit - vertices < 3 {
+                result.errors[group].get_or_insert(DrapeError::OutputLimit);
+                break; // No later complete triangle can fit either.
+            }
+            match source.drape_cancellable(terrain, cancelled, &mut work, output_limit - vertices) {
+                Ok(output) => {
+                    vertices += output.mesh.count_vertices();
+                    debug_assert!(vertices <= output_limit);
+                    result.outputs[index] = Some(output);
+                }
+                Err(error) => {
+                    result.errors[group].get_or_insert(error);
+                    // Airports are one atomic required group. Optional batches
+                    // follow caller priority order and fail independently. All
+                    // failed conversion/intersection work remains charged; a
+                    // spent shared work budget cannot be reset for later items.
+                    if !optional || matches!(error, DrapeError::WorkLimit | DrapeError::Cancelled) {
+                        break;
+                    }
+                }
+            }
+        }
+        if !optional && result.errors[group].is_some() {
+            for (index, (_, is_optional)) in sources.iter().enumerate() {
+                if !is_optional {
+                    result.outputs[index] = None;
+                }
+            }
+            // Discarded required output consumes no committed geometry budget.
+            // Its CPU work is deliberately not refunded.
+            vertices = 0;
+        }
+    }
+    result
+}
+
+fn copy_terrain(
+    meshes: &Assets<Mesh>,
+    source: &OverlayTerrainSource,
+    already_copied: usize,
+) -> Result<DrapeTerrain, DrapeError> {
+    if source.surface_vertices > MAX_OVERLAY_TERRAIN_VERTICES.saturating_sub(already_copied) {
+        return Err(DrapeError::TerrainLimit);
+    }
+    let mesh = meshes.get(&source.mesh).ok_or(DrapeError::InvalidMesh)?;
+    let Some(VertexAttributeValues::Float32x3(positions)) =
+        mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+    else {
+        return Err(DrapeError::InvalidMesh);
+    };
+    let Some(indices) = mesh.indices() else {
+        return Err(DrapeError::InvalidMesh);
+    };
+    if source.surface_vertices > positions.len() {
+        return Err(DrapeError::InvalidMesh);
+    }
+    let mut surface_indices = Vec::new();
+    let indices: Vec<_> = indices.iter().collect();
+    for triangle in indices.chunks_exact(3) {
+        if triangle
+            .iter()
+            .all(|&index| index < source.surface_vertices)
+        {
+            for &index in triangle {
+                surface_indices.push(u32::try_from(index).map_err(|_| DrapeError::InvalidMesh)?);
+            }
+        }
+    }
+    Ok(DrapeTerrain {
+        origin: source.origin,
+        footprint: Some(source.footprint),
+        positions: positions[..source.surface_vertices].to_vec(),
+        indices: surface_indices,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flightsim_core::{Geodetic, Meters, Radians};
+
+    fn registration(world: &mut World, meshes: &mut Assets<Mesh>) -> TerrainOverlayRegistration {
+        let geo = Geodetic::from_degrees(35.55, 139.78, 40.0);
+        let (mesh, origin) =
+            crate::runway::runway_mesh(geo, Radians::ZERO, Meters(100.0), Meters(20.0));
+        let source = TerrainOverlay::surface(&mesh, origin, |_| Meters(40.0)).unwrap();
+        TerrainOverlayRegistration {
+            entity: world.spawn(Visibility::Hidden).id(),
+            mesh: meshes.add(mesh),
+            source,
+        }
+    }
+
+    #[test]
+    fn optional_admission_failure_does_not_mutate_airport_registry() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut registry = TerrainOverlays::default();
+        let airport = registration(&mut world, &mut meshes);
+        registry
+            .register(airport.entity, airport.mesh, airport.source)
+            .unwrap();
+        let before = registry.usage();
+        let too_many = (0..25)
+            .map(|_| registration(&mut world, &mut meshes))
+            .collect();
+        assert!(matches!(
+            registry.replace_optional(too_many),
+            Err(DrapeError::SourceLimit)
+        ));
+        assert_eq!(registry.usage(), before);
+    }
+
+    #[test]
+    fn first_optional_swap_is_busy_even_without_a_retired_generation_and_clear_cancels_it() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut registry = TerrainOverlays::default();
+        let first = registration(&mut world, &mut meshes);
+        let entity = first.entity;
+        assert!(
+            registry
+                .replace_optional(vec![first])
+                .unwrap()
+                .retired
+                .is_empty()
+        );
+        assert!(matches!(
+            registry.replace_optional(Vec::new()),
+            Err(DrapeError::UpdatePending)
+        ));
+        let removed = registry.clear_optional();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0].0, entity);
+        assert!(!registry.usage().optional_swap_pending);
+        assert!(registry.replace_optional(Vec::new()).is_ok());
+    }
+
+    #[test]
+    fn optional_candidate_failure_cannot_consume_airport_work_or_hide_its_output() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let airport = registration(&mut world, &mut meshes);
+        let optional = registration(&mut world, &mut meshes);
+        let id = TileId::containing(13, airport.source.origin.to_geodetic());
+        let dem = flightsim_world::DemTile::new(
+            id.bounds(),
+            flightsim_world::HeightGrid::flat(2, 2, Meters(40.0)),
+        );
+        let source = flightsim_world::build_mesh(
+            id,
+            &dem,
+            &flightsim_world::MeshOptions {
+                resolution: 2,
+                skirt_depth: Some(Meters::ZERO),
+            },
+        );
+        let terrain = DrapeTerrain {
+            origin: source.origin,
+            footprint: None,
+            positions: source.positions,
+            indices: source.indices,
+        };
+        let mut dense = terrain.clone();
+        dense.indices = dense.indices.repeat(16_385);
+        let sources = [
+            (Arc::new(airport.source), false),
+            (Arc::new(optional.source), true),
+        ];
+        let result = prepare_overlays(
+            &sources,
+            &[terrain, dense],
+            1,
+            &AtomicBool::new(false),
+            false,
+        );
+        assert!(
+            result.outputs[0]
+                .as_ref()
+                .is_some_and(|output| output.mesh.count_vertices() > 0)
+        );
+        assert!(result.outputs[1].is_none());
+        assert_eq!(result.errors[0], None);
+        assert_eq!(result.errors[1], Some(DrapeError::TerrainLimit));
+    }
+
+    fn support_for(source: &TerrainOverlay) -> DrapeTerrain {
+        let id = TileId::containing(13, source.origin.to_geodetic());
+        let mesh = flightsim_world::build_mesh(
+            id,
+            &flightsim_world::DemTile::new(
+                id.bounds(),
+                flightsim_world::HeightGrid::flat(2, 2, Meters(40.0)),
+            ),
+            &flightsim_world::MeshOptions {
+                resolution: 2,
+                skirt_depth: Some(Meters::ZERO),
+            },
+        );
+        DrapeTerrain {
+            origin: mesh.origin,
+            footprint: None,
+            positions: mesh.positions,
+            indices: mesh.indices,
+        }
+    }
+
+    fn queue_result(registry: &mut TerrainOverlays, result: PreparedOverlays) -> Arc<AtomicBool> {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        registry.preparation = Some(Preparation {
+            revision: registry.revision,
+            signature: Vec::new(),
+            sources: Vec::new(),
+            discovery: None,
+            required_tiles: 0,
+            next_source: 0,
+            copied_vertices: 0,
+            terrain: Vec::new(),
+            precision: Vec::new(),
+            optional_disabled: false,
+            task: None,
+            result: Some(Ok(result)),
+            cancelled: Arc::clone(&cancelled),
+        });
+        cancelled
+    }
+
+    #[test]
+    fn optional_output_failure_preserves_prior_and_later_smaller_batches() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let small = registration(&mut world, &mut meshes);
+        let terrain = [support_for(&small.source)];
+        let mut work = 0;
+        let expected = small
+            .source
+            .drape_cancellable(
+                &terrain,
+                &AtomicBool::new(false),
+                &mut work,
+                crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+            )
+            .unwrap()
+            .mesh
+            .count_vertices();
+        assert!(expected > 0);
+        let mut large_mesh = meshes.get(&small.mesh).unwrap().clone();
+        let indices: Vec<_> = large_mesh
+            .indices()
+            .unwrap()
+            .iter()
+            .map(|i| u32::try_from(i).unwrap())
+            .collect();
+        large_mesh.insert_indices(bevy::mesh::Indices::U32(indices.repeat(4)));
+        let large = Arc::new(
+            TerrainOverlay::surface(&large_mesh, small.source.origin, |_| Meters(40.0)).unwrap(),
+        );
+        let small = Arc::new(small.source);
+        let sources = [
+            (Arc::clone(&small), false),
+            (Arc::clone(&small), true),
+            (large, true),
+            (Arc::clone(&small), true),
+        ];
+        let result = prepare_overlays_with_budget(
+            &sources,
+            &terrain,
+            1,
+            &AtomicBool::new(false),
+            false,
+            expected * 3,
+            0,
+        );
+        assert_eq!(result.errors, [None, Some(DrapeError::OutputLimit)]);
+        assert_eq!(
+            result
+                .outputs
+                .iter()
+                .map(Option::is_some)
+                .collect::<Vec<_>>(),
+            [true, true, false, true]
+        );
+        assert_eq!(
+            result
+                .outputs
+                .iter()
+                .flatten()
+                .map(|o| o.mesh.count_vertices())
+                .sum::<usize>(),
+            expected * 3
+        );
+    }
+
+    #[test]
+    fn exhausted_optional_work_keeps_completed_outputs_and_never_refunds_failed_work() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let small = Arc::new(registration(&mut world, &mut meshes).source);
+        let terrain = [support_for(&small)];
+        let mut used = 0;
+        small
+            .drape_cancellable(
+                &terrain,
+                &AtomicBool::new(false),
+                &mut used,
+                crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+            )
+            .unwrap();
+        assert!(used > 1);
+        let sources = [
+            (Arc::clone(&small), false),
+            (Arc::clone(&small), true),
+            (Arc::clone(&small), true),
+            (Arc::clone(&small), true),
+        ];
+        let result = prepare_overlays_with_budget(
+            &sources,
+            &terrain,
+            1,
+            &AtomicBool::new(false),
+            false,
+            crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+            crate::terrain_drape::MAX_OVERLAY_INTERSECTIONS - 2 * used,
+        );
+        assert_eq!(result.errors, [None, Some(DrapeError::WorkLimit)]);
+        assert_eq!(
+            result
+                .outputs
+                .iter()
+                .map(Option::is_some)
+                .collect::<Vec<_>>(),
+            [true, true, false, false]
+        );
+    }
+
+    #[test]
+    fn required_output_failure_remains_atomic_but_releases_discarded_vertex_capacity() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let small = Arc::new(registration(&mut world, &mut meshes).source);
+        let terrain = [support_for(&small)];
+        let expected = small
+            .drape_cancellable(
+                &terrain,
+                &AtomicBool::new(false),
+                &mut 0,
+                crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+            )
+            .unwrap()
+            .mesh
+            .count_vertices();
+        let sources = [
+            (Arc::clone(&small), false),
+            (Arc::clone(&small), false),
+            (small, true),
+        ];
+        let result = prepare_overlays_with_budget(
+            &sources,
+            &terrain,
+            1,
+            &AtomicBool::new(false),
+            false,
+            expected,
+            0,
+        );
+        assert_eq!(result.errors, [Some(DrapeError::OutputLimit), None]);
+        assert_eq!(
+            result
+                .outputs
+                .iter()
+                .map(Option::is_some)
+                .collect::<Vec<_>>(),
+            [false, false, true]
+        );
+    }
+
+    #[test]
+    fn partial_optional_commit_recovery_and_cancel_clear_omission_state() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut registry = TerrainOverlays::default();
+        let required = registration(&mut world, &mut meshes);
+        let terrain = [support_for(&required.source)];
+        let required_entity = required.entity;
+        registry
+            .register(required.entity, required.mesh, required.source)
+            .unwrap();
+        let optional = (0..2)
+            .map(|_| registration(&mut world, &mut meshes))
+            .collect::<Vec<_>>();
+        let optional_entities: Vec<_> = optional.iter().map(|r| r.entity).collect();
+        registry.replace_optional(optional).unwrap();
+        let sources: Vec<_> = registry
+            .registered
+            .iter()
+            .map(|r| (Arc::clone(&r.source), r.optional))
+            .collect();
+        let size = sources[0]
+            .0
+            .drape_cancellable(
+                &terrain,
+                &AtomicBool::new(false),
+                &mut 0,
+                crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+            )
+            .unwrap()
+            .mesh
+            .count_vertices();
+        let partial = prepare_overlays_with_budget(
+            &sources,
+            &terrain,
+            1,
+            &AtomicBool::new(false),
+            false,
+            2 * size,
+            0,
+        );
+        queue_result(&mut registry, partial);
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(registry.usage().omitted_optional, 1);
+        assert_eq!(
+            world.get::<Visibility>(optional_entities[0]),
+            Some(&Visibility::Inherited)
+        );
+        assert_eq!(
+            world.get::<Visibility>(optional_entities[1]),
+            Some(&Visibility::Hidden)
+        );
+        assert_eq!(
+            world.get::<Visibility>(required_entity),
+            Some(&Visibility::Inherited)
+        );
+        queue_result(
+            &mut registry,
+            PreparedOverlays {
+                reuse: true,
+                outputs: Vec::new(),
+                errors: [None; 2],
+            },
+        );
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(
+            registry.usage().omitted_optional,
+            1,
+            "unchanged-cut reuse preserves omission state"
+        );
+        assert_eq!(
+            world.get::<Visibility>(optional_entities[0]),
+            Some(&Visibility::Inherited)
+        );
+        assert_eq!(
+            world.get::<Visibility>(optional_entities[1]),
+            Some(&Visibility::Hidden)
+        );
+        let complete = prepare_overlays(&sources, &terrain, 1, &AtomicBool::new(false), false);
+        queue_result(&mut registry, complete);
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(registry.usage().omitted_optional, 0);
+        assert!(
+            optional_entities
+                .iter()
+                .all(|entity| world.get::<Visibility>(*entity) == Some(&Visibility::Inherited))
+        );
+        let next = prepare_overlays_with_budget(
+            &sources,
+            &terrain,
+            1,
+            &AtomicBool::new(false),
+            false,
+            size,
+            0,
+        );
+        queue_result(&mut registry, next);
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(registry.usage().omitted_optional, 2);
+        let recovery = prepare_overlays(&sources, &terrain, 1, &AtomicBool::new(false), false);
+        let cancelled = queue_result(&mut registry, recovery);
+        let removed = registry.clear_optional();
+        assert_eq!(removed.len(), 2);
+        assert!(cancelled.load(Ordering::Relaxed));
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(registry.usage().omitted_optional, 0);
+        assert_eq!(registry.usage().registered, 1);
+        assert_eq!(
+            world.get::<Visibility>(required_entity),
+            Some(&Visibility::Inherited)
+        );
+    }
+
+    #[test]
+    fn coarse_transform_precision_is_rechecked_after_frame_changes() {
+        let mut world = World::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut registry = TerrainOverlays::default();
+        let item = registration(&mut world, &mut meshes);
+        let entity = item.entity;
+        let origin = item.source.origin;
+        let id = TileId::containing(13, origin.to_geodetic());
+        registry.register(entity, item.mesh, item.source).unwrap();
+        registry.displayed.insert(entity);
+        registry.committed_precision.push(PrecisionSource {
+            footprint: [id, id],
+            origin,
+            extent: 2_000_000.0,
+        });
+        let nearby = RenderFrame::new(origin.to_geodetic());
+        registry.apply_precision(&mut world.commands(), &nearby);
+        world.flush();
+        assert_eq!(world.get::<Visibility>(entity), Some(&Visibility::Hidden));
+        registry.committed_precision[0].extent = 1.0;
+        registry.apply_precision(&mut world.commands(), &nearby);
+        world.flush();
+        assert_eq!(
+            world.get::<Visibility>(entity),
+            Some(&Visibility::Inherited)
+        );
+        let far = RenderFrame::new(
+            origin
+                .to_geodetic()
+                .offset_by(Meters(50_000.0), Meters::ZERO),
+        );
+        registry.apply_precision(&mut world.commands(), &far);
+        world.flush();
+        assert_eq!(world.get::<Visibility>(entity), Some(&Visibility::Hidden));
+        registry.apply_precision(&mut world.commands(), &nearby);
+        world.flush();
+        assert_eq!(
+            world.get::<Visibility>(entity),
+            Some(&Visibility::Inherited)
+        );
+    }
+    #[test]
+    fn affine_rounding_bound_covers_real_global_facets_and_rebases() {
+        use flightsim_core::{LocalFrame, Ned};
+        use glam::{Affine3A, DQuat, DVec3, Vec3};
+        let atlas = flightsim_world::global::GlobalTerrain::bundled().unwrap();
+        let transform = |frame: &RenderFrame, origin| {
+            Affine3A::from_scale_rotation_translation(
+                Vec3::ONE,
+                frame.rotation_to_render(DQuat::IDENTITY),
+                frame.to_render(origin),
+            )
+        };
+        let local = |frame: &LocalFrame, world| {
+            let point = frame.ecef_to_ned_position(world);
+            DVec3::new(point.north(), point.east(), point.up())
+        };
+        let cross = |a: DVec3, b: DVec3| a.x * b.y - a.y * b.x;
+        let mut checked = 0;
+        let mut accepted = 0;
+        let mut coarse_rejected = 0;
+        for (lat, lon) in [
+            (35.55, 139.78),
+            (47.139, 9.518),
+            (-0.13, -78.36),
+            (65.0, 179.99),
+            (89.999, 65.0),
+            (-89.999, -95.0),
+        ] {
+            let point = Geodetic::from_degrees(lat, lon, 0.0);
+            let height = atlas.sample(point).unwrap().surface_height;
+            let anchor = Geodetic::new(point.latitude, point.longitude, height);
+            let local_frame = LocalFrame::new(anchor);
+            let up = local_frame.up_ecef();
+            let frames = [
+                RenderFrame::new(anchor),
+                RenderFrame::new(
+                    local_frame
+                        .ned_to_ecef_position(Ned::new(6000.0, -3000.0, 0.0))
+                        .to_geodetic(),
+                ),
+            ];
+            for level in [0, 4, 8, 11, 13] {
+                for north in [-1500.0, 0.0, 1500.0] {
+                    for east in [-1500.0, 0.0, 1500.0] {
+                        let probe = local_frame.ned_to_ecef_position(Ned::new(north, east, 0.0));
+                        let id = TileId::containing(level, probe.to_geodetic());
+                        let dem = atlas.tile(id).unwrap();
+                        let mesh = flightsim_world::build_mesh(
+                            id,
+                            &dem,
+                            &flightsim_world::MeshOptions {
+                                resolution: 33,
+                                skirt_depth: Some(Meters::ZERO),
+                            },
+                        );
+                        let projected = local(&local_frame, probe);
+                        let mut hit = None;
+                        for tri in mesh.indices.chunks_exact(3) {
+                            let vertices = [tri[0], tri[1], tri[2]].map(|index| {
+                                local(
+                                    &local_frame,
+                                    Ecef(
+                                        mesh.origin.as_vec()
+                                            + Vec3::from_array(mesh.positions[index as usize])
+                                                .as_dvec3(),
+                                    ),
+                                )
+                            });
+                            let area = cross(vertices[1] - vertices[0], vertices[2] - vertices[0]);
+                            if area >= -1e-10 {
+                                continue;
+                            }
+                            let b =
+                                cross(projected - vertices[0], vertices[2] - vertices[0]) / area;
+                            let c =
+                                cross(vertices[1] - vertices[0], projected - vertices[0]) / area;
+                            if b < -1e-9 || c < -1e-9 || b + c > 1.0 + 1e-9 {
+                                continue;
+                            }
+                            let on_facet =
+                                vertices[0] * (1.0 - b - c) + vertices[1] * b + vertices[2] * c;
+                            let face = (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]);
+                            hit =
+                                Some(([tri[0], tri[1], tri[2]], on_facet, -face.z / face.length()));
+                            break;
+                        }
+                        let Some((tri, on_facet, cosine)) = hit else {
+                            continue;
+                        };
+                        let world = local_frame.ned_to_ecef_position(Ned::new(
+                            on_facet.x,
+                            on_facet.y,
+                            -on_facet.z,
+                        ));
+                        let source_extent = mesh
+                            .positions
+                            .iter()
+                            .map(|p| Vec3::from_array(*p).as_dvec3().length())
+                            .fold(0.0, f64::max);
+                        for frame in &frames {
+                            let terrain_transform = transform(frame, mesh.origin);
+                            let overlay_transform = transform(frame, anchor.to_ecef());
+                            let triangle = tri.map(|index| {
+                                terrain_transform
+                                    .transform_point3(Vec3::from_array(
+                                        mesh.positions[index as usize],
+                                    ))
+                                    .as_dvec3()
+                            });
+                            let normal = (triangle[1] - triangle[0])
+                                .cross(triangle[2] - triangle[0])
+                                .normalize();
+                            for lift in [0.0, 0.03, 0.055, 0.08] {
+                                let relative =
+                                    world.as_vec() + up * lift - anchor.to_ecef().as_vec();
+                                let rendered = overlay_transform
+                                    .transform_point3(relative.as_vec3())
+                                    .as_dvec3();
+                                let separation = (rendered - triangle[0]).dot(normal);
+                                let bound = transform_error_bound(
+                                    frame,
+                                    mesh.origin,
+                                    source_extent,
+                                    anchor.to_ecef(),
+                                    relative.length(),
+                                );
+                                if lift.abs() < f64::EPSILON {
+                                    assert!(
+                                        separation.abs() <= bound,
+                                        "{lat},{lon} L{level}: error={} bound={bound}",
+                                        separation.abs()
+                                    );
+                                } else if bound < lift * cosine * 0.5 {
+                                    assert!(
+                                        separation > 0.0,
+                                        "accepted buried layer at {lat},{lon} L{level}"
+                                    );
+                                    accepted += 1;
+                                } else if level == 0 {
+                                    coarse_rejected += 1;
+                                }
+                                checked += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            checked > 1500 && accepted > 500 && coarse_rejected > 100,
+            "checked={checked} accepted={accepted} coarse={coarse_rejected}"
+        );
+    }
+}

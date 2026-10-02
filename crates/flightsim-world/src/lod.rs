@@ -47,6 +47,7 @@ pub struct LodSelector {
     max_level: u8,
     root_geometric_error: Meters,
     max_tiles: usize,
+    near_detail: Option<(Meters, u8)>,
 }
 
 impl LodSelector {
@@ -90,6 +91,7 @@ impl LodSelector {
             max_level,
             root_geometric_error,
             max_tiles: DEFAULT_MAX_TILES,
+            near_detail: None,
         }
     }
 
@@ -104,6 +106,37 @@ impl LodSelector {
             "tile budget must cover both geographic roots"
         );
         self.max_tiles = max_tiles;
+        self
+    }
+
+    /// Request a minimum render level for geographic footprints near the
+    /// camera, independent of AGL. Intended for explicitly scoped regional
+    /// scenery coverage; it is off by default and never changes physical data.
+    /// The requested level is capped by this selector's existing maximum. The
+    /// existing leaf budget still applies and reports incomplete refinement via
+    /// [`LodSelection::truncated`]. It does not guarantee source availability.
+    ///
+    /// # Panics
+    /// A nonfinite/nonpositive radius or a level outside the tile scheme.
+    #[must_use]
+    pub fn with_near_detail(mut self, radius: Meters, minimum_level: u8) -> Self {
+        assert!(
+            radius.is_finite() && radius.get() > 0.0,
+            "near detail radius must be positive and finite"
+        );
+        assert!(
+            minimum_level <= crate::tile::MAX_LEVEL,
+            "near detail level exceeds the tile scheme"
+        );
+        self.near_detail = Some((radius, minimum_level.min(self.max_level)));
+        self
+    }
+
+    /// Restore the original SSE-only policy, for example after leaving an
+    /// explicitly enabled regional scenery area.
+    #[must_use]
+    pub const fn without_near_detail(mut self) -> Self {
+        self.near_detail = None;
         self
     }
 
@@ -159,9 +192,17 @@ impl LodSelector {
             Meters::ZERO
         };
         let camera_position = camera.to_geodetic();
+        let near_reference = self.near_detail.map(|(radius, level)| {
+            let surface = Geodetic::new(
+                camera_position.latitude,
+                camera_position.longitude,
+                Meters::ZERO,
+            );
+            (surface.to_ecef(), surface, radius, level)
+        });
         let mut leaves: BTreeSet<_> = TileId::roots().into_iter().collect();
         let mut pending = BinaryHeap::new();
-        let enqueue = |id: TileId, pending: &mut BinaryHeap<(u64, Reverse<TileId>)>| {
+        let enqueue = |id: TileId, pending: &mut BinaryHeap<(bool, u64, Reverse<TileId>)>| {
             if id.level >= self.max_level {
                 return;
             }
@@ -172,17 +213,21 @@ impl LodSelector {
                 ground_elevation,
             );
             let error = self.screen_space_error(self.estimated_geometric_error(id.level), distance);
-            if error > self.max_screen_space_error {
+            let near = near_reference.is_some_and(|(surface, position, radius, level)| {
+                id.level < level
+                    && distance_to_bounds(surface, position, id.bounds()).get() <= radius.get()
+            });
+            if near || error > self.max_screen_space_error {
                 // SSE is nonnegative. IEEE bit ordering is numeric ordering;
                 // the tile ID provides stable ordering for equal priorities.
-                pending.push((error.to_bits(), Reverse(id)));
+                pending.push((near, error.to_bits(), Reverse(id)));
             }
         };
         for id in TileId::roots() {
             enqueue(id, &mut pending);
         }
         let mut truncated = false;
-        while let Some((_, Reverse(id))) = pending.pop() {
+        while let Some((_, _, Reverse(id))) = pending.pop() {
             // Replacing one complete leaf by four adds exactly three. Preserve
             // the old leaf when the budget is exhausted, rather than dropping
             // unvisited siblings/hemispheres (especially common at the poles).
@@ -583,5 +628,90 @@ mod tests {
     #[should_panic(expected = "tile budget must cover both geographic roots")]
     fn a_one_tile_budget_cannot_silently_drop_a_hemisphere() {
         let _ = selector().with_max_tiles(1);
+    }
+    #[test]
+    fn scoped_near_detail_is_default_off_and_removable() {
+        for (lat, lon) in [(35.55, 139.78), (0.0, 179.999), (90.0, 0.0), (-90.0, 0.0)] {
+            let camera = camera_over(lat, lon, 1200.0);
+            let base = selector().select(camera);
+            assert_eq!(
+                base,
+                selector()
+                    .with_near_detail(Meters(5500.0), 0)
+                    .select(camera)
+            );
+            assert_eq!(
+                base,
+                selector()
+                    .with_near_detail(Meters(5500.0), 13)
+                    .without_near_detail()
+                    .select(camera)
+            );
+        }
+    }
+
+    #[test]
+    fn near_detail_preserves_a_fine_horizontal_region_independent_of_agl() {
+        for height in [700.0, 1700.0, 5700.0] {
+            let camera = Geodetic::from_degrees(47.127, 9.529, height).to_ecef();
+            let configured = LodSelector::new(
+                16.0,
+                1080.0,
+                Degrees(60.0).to_radians(),
+                13,
+                Meters(20000.0),
+            )
+            .with_near_detail(Meters(5500.0), 13);
+            let selection = configured.select_with_surface(camera, Meters(643.0));
+            assert!(!selection.truncated);
+            let ground = Geodetic::from_degrees(47.127, 9.529, 0.0);
+            for id in &selection.tiles {
+                if distance_to_bounds(ground.to_ecef(), ground, id.bounds()).get() < 5000.0 {
+                    assert_eq!(id.level, 13);
+                }
+            }
+            assert!(
+                selection.tiles.iter().any(|id| id.level < 10),
+                "distant world should retain normal LOD"
+            );
+        }
+    }
+
+    #[test]
+    fn near_detail_caps_level_and_leaf_count_at_dateline_and_poles() {
+        for (lat, lon) in [(0.0, 179.9999), (90.0, 0.0), (-90.0, 180.0)] {
+            let configured = LodSelector::new(
+                16.0,
+                1080.0,
+                Degrees(60.0).to_radians(),
+                12,
+                Meters(20000.0),
+            )
+            .with_max_tiles(128)
+            .with_near_detail(Meters(500000.0), 13);
+            let selection = configured.select(camera_over(lat, lon, 10000.0));
+            assert!(selection.truncated && selection.tiles.len() <= 128);
+            assert!(selection.tiles.iter().all(|id| id.level <= 12));
+            let area: f64 = selection
+                .tiles
+                .iter()
+                .map(|id| id.bounds().width().get() * id.bounds().height().get())
+                .sum();
+            assert!((area - core::f64::consts::TAU * core::f64::consts::PI).abs() < 1e-9);
+            let ids: BTreeSet<_> = selection.tiles.iter().copied().collect();
+            for id in &selection.tiles {
+                let mut ancestor = id.parent();
+                while let Some(parent) = ancestor {
+                    assert!(!ids.contains(&parent));
+                    ancestor = parent.parent();
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "near detail radius must be positive and finite")]
+    fn invalid_near_detail_radius_is_rejected() {
+        let _ = selector().with_near_detail(Meters(f64::NAN), 13);
     }
 }
