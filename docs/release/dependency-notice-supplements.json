@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "description": "Version-pinned upstream notice texts omitted by the corresponding crates.io source archives. This record collects evidence, not legal approval or automatic license choice.",
+  "entries": [
+    {
+      "repository": "AccessKit/accesskit",
+      "revision": "0b6901a8c8e6fb1cb5a2dc7c19dc7bee1cc5ad09",
+      "upstream_path": "LICENSE-MIT",
+      "path": "docs/release/licenses/upstream/AccessKit_accesskit/0b6901a8c8e6/LICENSE-MIT",
+      "git_blob_sha": "31aa79387f27e730e33d871925e152e35e428031",
+      "source": "https://github.com/AccessKit/accesskit/blob/0b6901a8c8e6fb1cb5a2dc7c19dc7bee1cc5ad09/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "repository": "AccessKit/accesskit",
+      "revision": "5801c4a49ff9b2c9ec3f77b3c31272d0da4c5cd3",
+      "upstream_path": "LICENSE-APACHE",
+      "path": "docs/release/licenses/upstream/AccessKit_accesskit/5801c4a49ff9/LICENSE-APACHE",
+      "git_blob_sha": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d",
+      "source": "https://github.com/AccessKit/accesskit/blob/5801c4a49ff9b2c9ec3f77b3c31272d0da4c5cd3/LICENSE-APACHE",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+    },
+    {
+      "repository": "teoxoy/encase",
+      "revision": "ffba833409487e8958f327215e2c0a09f0c470df",
+      "upstream_path": "LICENSE",
+      "path": "docs/release/licenses/upstream/teoxoy_encase/ffba83340948/LICENSE",
+      "git_blob_sha": "30c629513b36dd916fdb64fadf182f407aa3caec",
+      "source": "https://github.com/teoxoy/encase/blob/ffba833409487e8958f327215e2c0a09f0c470df/LICENSE",
+      "sha256": "8876cdca96eb380d16d5ea32bf4529d85e87dedc7765ae2861a9bec7f34acbed"
+    },
+    {
+      "repository": "aclysma/profiling",
+      "revision": "8271551172eb6fa4cba47369aedd93790c623df9",
+      "upstream_path": "LICENSE-MIT",
+      "path": "docs/release/licenses/upstream/aclysma_profiling/8271551172eb/LICENSE-MIT",
+      "git_blob_sha": "6a84e059ad8b43e03c2b06bc2af4dc1d8442808d",
+      "source": "https://github.com/aclysma/profiling/blob/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT",
+      "sha256": "c8167fdeeed46d3f244d3f85c5bf998ce889343691c32be2c61a8bc4b5c08333"
+    },
+    {
+      "repository": "KillingSpark/zstd-rs",
+      "revision": "fcc40ba1bc766ba38eca852cb64550c827d7068d",
+      "upstream_path": "LICENSE",
+      "path": "docs/release/licenses/upstream/KillingSpark_zstd-rs/fcc40ba1bc76/LICENSE",
+      "git_blob_sha": "486a3351baf6325158c9ce6d84d782fda5d4520b",
+      "source": "https://github.com/KillingSpark/zstd-rs/blob/fcc40ba1bc766ba38eca852cb64550c827d7068d/LICENSE",
+      "sha256": "d715eb0d9cfe1cc0cc22577e387436aa568b31ca272a7c837004dc0cdde925b5"
+    },
+    {
+      "repository": "gfx-rs/rspirv",
+      "revision": "e91a5debc10c395b36db7721dfff6326d697a1e2",
+      "upstream_path": "LICENSE",
+      "path": "docs/release/licenses/upstream/gfx-rs_rspirv/e91a5debc10c/LICENSE",
+      "git_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "source": "https://github.com/gfx-rs/rspirv/blob/e91a5debc10c395b36db7721dfff6326d697a1e2/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "61020bdcb4eb04fca6bbf748aeb9570e859236e0",
+      "upstream_path": "COPYING",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/61020bdcb4eb/COPYING",
+      "git_blob_sha": "1787983c037783b8855a688f5d9c0b6a2ec30b40",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/61020bdcb4eb04fca6bbf748aeb9570e859236e0/COPYING",
+      "sha256": "12121dfa588677007848ab922a45a1e3248868f6ff063598fceb3141d7897314"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "61020bdcb4eb04fca6bbf748aeb9570e859236e0",
+      "upstream_path": "license/APACHE",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/61020bdcb4eb/license/APACHE",
+      "git_blob_sha": "690245e2787c89e4332ff4c674112bea22dc41e3",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/61020bdcb4eb04fca6bbf748aeb9570e859236e0/license/APACHE",
+      "sha256": "58317934bf818c379e4215fad7e8dfb6812edff32c9557b8b039343f69711e08"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "61020bdcb4eb04fca6bbf748aeb9570e859236e0",
+      "upstream_path": "license/MIT",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/61020bdcb4eb/license/MIT",
+      "git_blob_sha": "3746e3bb20fc30b6f07688c561b87ee1eb7a439d",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/61020bdcb4eb04fca6bbf748aeb9570e859236e0/license/MIT",
+      "sha256": "f774bf68151714985324d90adbd59e8f271b7ba518608d871b6ba16464692879"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "7ddd1fe576fcfc503347eb97e476a47581479f22",
+      "upstream_path": "COPYING",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/7ddd1fe576fc/COPYING",
+      "git_blob_sha": "1787983c037783b8855a688f5d9c0b6a2ec30b40",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/7ddd1fe576fcfc503347eb97e476a47581479f22/COPYING",
+      "sha256": "12121dfa588677007848ab922a45a1e3248868f6ff063598fceb3141d7897314"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "7ddd1fe576fcfc503347eb97e476a47581479f22",
+      "upstream_path": "license/APACHE",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/7ddd1fe576fc/license/APACHE",
+      "git_blob_sha": "690245e2787c89e4332ff4c674112bea22dc41e3",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/7ddd1fe576fcfc503347eb97e476a47581479f22/license/APACHE",
+      "sha256": "58317934bf818c379e4215fad7e8dfb6812edff32c9557b8b039343f69711e08"
+    },
+    {
+      "repository": "zakarumych/gpu-alloc",
+      "revision": "7ddd1fe576fcfc503347eb97e476a47581479f22",
+      "upstream_path": "license/MIT",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-alloc/7ddd1fe576fc/license/MIT",
+      "git_blob_sha": "3746e3bb20fc30b6f07688c561b87ee1eb7a439d",
+      "source": "https://github.com/zakarumych/gpu-alloc/blob/7ddd1fe576fcfc503347eb97e476a47581479f22/license/MIT",
+      "sha256": "f774bf68151714985324d90adbd59e8f271b7ba518608d871b6ba16464692879"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a",
+      "upstream_path": "COPYING",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/bb28b4e55b74/COPYING",
+      "git_blob_sha": "9eca5fed017db6917cc476f67dcff36b0364bd48",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/COPYING",
+      "sha256": "f72143f7e9d9fb8bd336b139fa22f825a299591c29f2f7338c5566347b137613"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a",
+      "upstream_path": "license/APACHE",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/bb28b4e55b74/license/APACHE",
+      "git_blob_sha": "cfaf4615fc4eafe17df4df25b135ae82a73f142d",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/APACHE",
+      "sha256": "6bec8c944a6d4251be50ac86bb4ca360bcce5aea472505dee2800e160bf1cdbf"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a",
+      "upstream_path": "license/MIT",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/bb28b4e55b74/license/MIT",
+      "git_blob_sha": "6fb305333b5577c09ea210cdf2e1fcf6793e9b01",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/license/MIT",
+      "sha256": "5226e27d5fbc683db56c52853cdb9d15b69abadb525a60f95c862c2dbd77cdc8"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "9f2fb9546591322e7b77ee1e79385e01effd85e4",
+      "upstream_path": "COPYING",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/9f2fb9546591/COPYING",
+      "git_blob_sha": "9eca5fed017db6917cc476f67dcff36b0364bd48",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/COPYING",
+      "sha256": "f72143f7e9d9fb8bd336b139fa22f825a299591c29f2f7338c5566347b137613"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "9f2fb9546591322e7b77ee1e79385e01effd85e4",
+      "upstream_path": "license/APACHE",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/9f2fb9546591/license/APACHE",
+      "git_blob_sha": "cfaf4615fc4eafe17df4df25b135ae82a73f142d",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/APACHE",
+      "sha256": "6bec8c944a6d4251be50ac86bb4ca360bcce5aea472505dee2800e160bf1cdbf"
+    },
+    {
+      "repository": "zakarumych/gpu-descriptor",
+      "revision": "9f2fb9546591322e7b77ee1e79385e01effd85e4",
+      "upstream_path": "license/MIT",
+      "path": "docs/release/licenses/upstream/zakarumych_gpu-descriptor/9f2fb9546591/license/MIT",
+      "git_blob_sha": "6fb305333b5577c09ea210cdf2e1fcf6793e9b01",
+      "source": "https://github.com/zakarumych/gpu-descriptor/blob/9f2fb9546591322e7b77ee1e79385e01effd85e4/license/MIT",
+      "sha256": "5226e27d5fbc683db56c52853cdb9d15b69abadb525a60f95c862c2dbd77cdc8"
+    },
+    {
+      "repository": "nical/rust_debug",
+      "revision": "93f414cd572b5c2781df93dbdc068ed13443d05a",
+      "upstream_path": "LICENSE",
+      "path": "docs/release/licenses/upstream/nical_rust_debug/93f414cd572b/LICENSE",
+      "git_blob_sha": "9ad7b40bcf7bb89a9866e5e2e8fdb370fb528e36",
+      "source": "https://github.com/nical/rust_debug/blob/93f414cd572b5c2781df93dbdc068ed13443d05a/LICENSE",
+      "sha256": "7e98bed7f100747aaae7d82ab94fbe6b76fd6b84b09a3aaa413bff8196d0fbb1"
+    },
+    {
+      "repository": "DioxusLabs/taffy",
+      "revision": "8f30e394106af09dbf131d184e3cff25d20cc207",
+      "upstream_path": "LICENSE.md",
+      "path": "docs/release/licenses/upstream/DioxusLabs_taffy/8f30e394106a/LICENSE.md",
+      "git_blob_sha": "d45edd34912e6f6339bdce580c0c6c0300c4f6f6",
+      "source": "https://github.com/DioxusLabs/taffy/blob/8f30e394106af09dbf131d184e3cff25d20cc207/LICENSE.md",
+      "sha256": "a7083ef3dd41a65eeb2162c2c091b0082e2724fb4c6ed029b363c7840d244ecd"
+    },
+    {
+      "repository": "AccessKit/accesskit",
+      "revision": "5801c4a49ff9b2c9ec3f77b3c31272d0da4c5cd3",
+      "upstream_path": "LICENSE-MIT",
+      "path": "docs/release/licenses/upstream/AccessKit_accesskit/5801c4a49ff9/LICENSE-MIT",
+      "git_blob_sha": "31aa79387f27e730e33d871925e152e35e428031",
+      "source": "https://github.com/AccessKit/accesskit/blob/5801c4a49ff9b2c9ec3f77b3c31272d0da4c5cd3/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "repository": "AccessKit/accesskit",
+      "revision": "0b6901a8c8e6fb1cb5a2dc7c19dc7bee1cc5ad09",
+      "upstream_path": "LICENSE-APACHE",
+      "path": "docs/release/licenses/upstream/AccessKit_accesskit/0b6901a8c8e6/LICENSE-APACHE",
+      "git_blob_sha": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d",
+      "source": "https://github.com/AccessKit/accesskit/blob/0b6901a8c8e6fb1cb5a2dc7c19dc7bee1cc5ad09/LICENSE-APACHE",
+      "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+    },
+    {
+      "repository": "RustAudio/dasp",
+      "revision": "97c3bb9b2363c0b46ac1633858bf1054fd02a980",
+      "upstream_path": "LICENSE-MIT",
+      "path": "docs/release/licenses/upstream/RustAudio_dasp/97c3bb9b2363/LICENSE-MIT",
+      "git_blob_sha": "b35b54912ac435a64227b09c9347475caefa1cbd",
+      "source": "https://github.com/RustAudio/dasp/blob/97c3bb9b2363c0b46ac1633858bf1054fd02a980/LICENSE-MIT",
+      "sha256": "b1d6df41ed3aa96806e74c729444d7c121d90e6660a6aed01d298e03fde475a0"
+    },
+    {
+      "repository": "RustAudio/dasp",
+      "revision": "97c3bb9b2363c0b46ac1633858bf1054fd02a980",
+      "upstream_path": "LICENSE-APACHE",
+      "path": "docs/release/licenses/upstream/RustAudio_dasp/97c3bb9b2363/LICENSE-APACHE",
+      "git_blob_sha": "74c4f492b303bec6da5ec6af182865f664a4c4c0",
+      "source": "https://github.com/RustAudio/dasp/blob/97c3bb9b2363c0b46ac1633858bf1054fd02a980/LICENSE-APACHE",
+      "sha256": "756c8d2ab2dc24f256e1455b5f03937f4933d83d7bc9f2d55009fc962377d512"
+    },
+    {
+      "repository": "gilrs-project/gilrs",
+      "revision": "07e286e24b046cf39e5c367daa2770b805a64692",
+      "upstream_path": "LICENSE-MIT",
+      "path": "docs/release/licenses/upstream/gilrs-project_gilrs/07e286e24b04/LICENSE-MIT",
+      "source": "https://gitlab.com/gilrs-project/gilrs/-/raw/07e286e24b046cf39e5c367daa2770b805a64692/LICENSE-MIT",
+      "sha256": "74497fa3c93ebb5ec32d85de117469cb3fab3276f7c02426f14c0f19f31f4424"
+    }
+  ]
+}

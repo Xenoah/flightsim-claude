@@ -468,7 +468,7 @@ pub struct AeroCoefficients {
 ///
 /// # 単純化していること
 ///
-/// 定出力モデル（`推力 = 出力 / 速度`）に静止推力の上限を掛けたもの。
+/// 定出力モデル（`推力 = 出力 / 速度`）に出力に応じた静止推力の上限を掛けたもの。
 /// 実際のプロペラ効率は前進率とピッチによって変化し、混合比・過給・回転数の
 /// 動特性も無視している。M1 で飛ばすには十分だが、**エンジン計器を実装する段階で
 /// 作り直しが必要**。
@@ -488,15 +488,20 @@ impl EngineConfig {
     /// 密度比に比例させているのは、高高度・高温で推力が落ちる効果を入れるため。
     #[must_use]
     pub fn thrust(&self, throttle: f64, true_airspeed: f64, density_ratio: f64) -> Newtons {
-        let available_power =
-            throttle.clamp(0.0, 1.0) * self.max_shaft_power * self.propeller_efficiency;
+        let throttle = throttle.clamp(0.0, 1.0);
+        let available_power = throttle * self.max_shaft_power * self.propeller_efficiency;
 
-        // 速度ゼロで推力が発散するため、静止推力で頭打ちにする。
-        // 分母の下限は「この速度以下では静止推力と等しい」という意味を持つ。
-        let reference_speed = available_power / self.static_thrust.get().max(f64::EPSILON);
-        let effective_speed = true_airspeed.max(reference_speed).max(f64::EPSILON);
-
-        Newtons(available_power / effective_speed * density_ratio.max(0.0))
+        // Static actuator-disk scaling: P ~ T^(3/2) / sqrt(rho), so
+        // T_static ~ throttle^(2/3) * density_ratio when engine power is
+        // approximated as proportional to throttle * density_ratio.
+        // NASA: https://www.grc.nasa.gov/www/k-12/airplane/propanl.html
+        // This is still a static cap / constant-efficiency approximation,
+        // not a blade-element or variable-pitch propeller model.
+        // The previous cap cancelled throttle at V=0: even 0.01% power
+        // produced full static thrust. The cap must vanish with power.
+        let static_limit = self.static_thrust.get() * throttle.powf(2.0 / 3.0);
+        let power_limit = available_power / true_airspeed.max(f64::EPSILON);
+        Newtons(power_limit.min(static_limit) * density_ratio.max(0.0))
     }
 }
 

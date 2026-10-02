@@ -261,9 +261,20 @@ impl GeoBounds {
     /// 範囲内の位置を `[0, 1]` の正規化座標へ写す。
     ///
     /// `u = 0` が西端、`v = 0` が**北端**（DEM の行順に合わせている）。
+    /// Both longitude endpoints are inclusive for sampling. Outside this
+    /// interval, choose the equivalent longitude nearest its centre, keeping
+    /// nearby out-of-bounds points on the correct side for DEM clamping.
+    /// Full-width bounds retain their distinct explicit west/east endpoints;
+    /// wrapped equivalents use the centre's `[-PI, PI)` branch.
     #[must_use]
     pub fn normalise(self, position: Geodetic) -> (f64, f64) {
-        let longitude = position.longitude.wrap_signed().get();
+        let longitude = position.longitude.get();
+        let longitude = if longitude >= self.west.get() && longitude <= self.east.get() {
+            longitude
+        } else {
+            let centre = (self.west.get() + self.east.get()) * 0.5;
+            centre + Radians(longitude - centre).wrap_signed().get()
+        };
         let u = (longitude - self.west.get()) / self.width().get();
         let v = (self.north.get() - position.latitude.get()) / self.height().get();
         (u, v)
@@ -515,6 +526,64 @@ mod tests {
             (u - 1.0).abs() < 1e-12 && (v - 1.0).abs() < 1e-12,
             "south-east corner mapped to ({u}, {v})"
         );
+    }
+
+    #[test]
+    fn normalise_keeps_both_dateline_sides_and_wrapped_equivalents() {
+        for level in [0, 1, 6, 13, MAX_LEVEL] {
+            for (x, expected) in [(0, 0.0), (TileId::columns(level) - 1, 1.0)] {
+                let bounds = TileId::new(level, x, 0).bounds();
+                for turns in -3..=3 {
+                    let point = Geodetic::new(
+                        bounds.center().latitude,
+                        Radians(PI + f64::from(turns) * TAU),
+                        Meters::ZERO,
+                    );
+                    let (u, v) = bounds.normalise(point);
+                    assert!(
+                        (u - expected).abs() < 1e-6,
+                        "level {level}, x {x}, turns {turns}: u={u}, expected {expected}"
+                    );
+                    assert!((v - 0.5).abs() < 1e-9);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn normalise_preserves_out_of_bounds_direction_and_full_width_endpoints() {
+        let bounds = GeoBounds {
+            west: Radians(degrees(10.0)),
+            east: Radians(degrees(20.0)),
+            south: Radians(degrees(-10.0)),
+            north: Radians(degrees(10.0)),
+        };
+        for turns in -3..=3 {
+            for (longitude, expected) in [(9.0, -0.1), (15.0, 0.5), (21.0, 1.1)] {
+                let point = Geodetic::from_degrees(0.0, longitude + f64::from(turns) * 360.0, 0.0);
+                assert!((bounds.normalise(point).0 - expected).abs() < 1e-12);
+            }
+        }
+        let full_width = GeoBounds {
+            west: Radians(-PI),
+            east: Radians(PI),
+            ..bounds
+        };
+        for (longitude, expected) in [(-180.0, 0.0), (0.0, 0.5), (180.0, 1.0)] {
+            assert!(
+                (full_width
+                    .normalise(Geodetic::from_degrees(0.0, longitude, 0.0))
+                    .0
+                    - expected)
+                    .abs()
+                    < 1e-12
+            );
+        }
+        // Away from the duplicated endpoint, any number of wraps is unambiguous.
+        for turns in -3..=3 {
+            let point = Geodetic::from_degrees(0.0, 90.0 + f64::from(turns) * 360.0, 0.0);
+            assert!((full_width.normalise(point).0 - 0.75).abs() < 1e-12);
+        }
     }
 
     #[test]

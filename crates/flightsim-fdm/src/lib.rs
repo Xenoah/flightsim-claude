@@ -60,6 +60,13 @@ pub use turbulence::Turbulence;
 use flightsim_core::{Geodetic, LocalFrame, Meters, Seconds};
 use glam::DVec3;
 
+/// Revision of deterministic flight-model equations, independent of aircraft JSON.
+///
+/// Replay owners must bind this value into their compatibility fingerprint.
+/// Revision 2 corrects the partial-power static thrust cap; identical profile
+/// bytes do not imply compatibility with revision 1 trajectories.
+pub const FDM_MODEL_REVISION: u32 = 2;
+
 /// 推奨する物理ステップ幅。60Hz 描画で 2 ステップ、144Hz で 1〜2 ステップ。
 pub const RECOMMENDED_FIXED_DT: Seconds = Seconds(1.0 / 120.0);
 

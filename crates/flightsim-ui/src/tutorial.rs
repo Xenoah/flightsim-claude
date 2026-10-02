@@ -17,7 +17,7 @@
 //! - **ヒステリシスを入れる。** 閾値ちょうどで数値が揺れても段階がバタつかない
 //!   よう、進む方向と戻る方向で別の閾値を使う（Schmitt トリガ）。
 //! - **戻る遷移がある。** 場周高度に達する前に沈み始めたら（＝離陸直後の
-//!   トラブル）、「上昇を続けろ」ではなく降下段階の案内へ直接切り替える。
+//!   トラブル）、速度と出力を確認する回復案内へ切り替える。
 //! - **完了したら二度と出ない。** 一度でも接地（`log.landings > 0`）したら
 //!   [`TutorialStage::Complete`] に固定する。以後どんな `HudState` が来ても
 //!   後戻りしない。**上級者の邪魔をしないのが最優先。**
@@ -47,6 +47,8 @@ pub enum TutorialStage {
     Rotate,
     /// 上昇中。まだ場周高度に達していない。
     Climb,
+    /// 場周高度に届く前に沈下。着陸と誤認せず速度と出力を確認する。
+    RecoverClimb,
     /// 場周高度に達した。旋回して戻るよう促す。
     Circuit,
     /// 滑走路へ戻る降下中。
@@ -65,19 +67,16 @@ impl TutorialStage {
     #[must_use]
     pub const fn prompt(self) -> &'static str {
         match self {
-            Self::Parked => "TAKE OFF\nPress PageUp to open the throttle.",
-            Self::Accelerate => "ACCELERATING\nHold the runway heading straight ahead.",
-            Self::Rotate => "ROTATE\nHold S to raise the nose and lift off.",
-            // **「S を握り続けろ」とは言わない。** 握り続けると機首が
-            // 上がりすぎて速度を失い、離した瞬間に落ちる。トリムを使えば
-            // 手を離していられることを、ここで教える。
-            Self::Climb => {
-                "CLIMBING
-Ease off S. Press ] to trim for hands-off flight."
+            Self::Parked => "TAKE OFF\nPageUp: full power. Throttle and trim stay set.",
+            Self::Accelerate => "ACCELERATING\nStay straight; near 75 kt EAS, start gentle S/Down.",
+            Self::Rotate => "ROTATE GENTLY\nS/Down gently; ease off at FIRST nose rise.",
+            Self::Climb => "CLIMBING\n70-80 kt EAS. Small S/W inputs; trim once steady.",
+            Self::RecoverClimb => {
+                "CHECK CLIMB\nPageUp: full power. Small S/W inputs for 70-80 kt EAS."
             }
             Self::Circuit => "PATTERN ALTITUDE\nTurn back toward the runway with A/D.",
-            Self::Descend => "HEADING BACK\nEase off S and reduce throttle with PageDown.",
-            Self::Approach => "FINAL APPROACH\nLine up on the runway and ease the throttle back.",
+            Self::Descend => "HEADING BACK\nLower the nose gently; reduce power with PageDown.",
+            Self::Approach => "FINAL APPROACH\nLine up; S/W for airspeed, PageUp/Down for descent.",
             Self::Complete => "",
         }
     }
@@ -87,13 +86,13 @@ Ease off S. Press ] to trim for hands-off flight."
 // 閾値（ヒステリシス: 進む方向と戻る方向で別の値を使う）
 // ---------------------------------------------------------------------------
 
-/// 離陸速度の目安。既存の操作説明（[`crate::help_text`] の
-/// "hold S at about 60 kt"）と一致させてある。二重に指定して片方だけ
-/// 直される事故を防げないのが弱点だが、値そのものは合わせておく。
-const ROTATE_SPEED_ENTER: Knots = Knots(60.0);
+/// Generic clean-configuration training cue for the bundled aircraft, in EAS.
+/// Supported by ground-rotation tests with feedback-based elevator release.
+/// Not a certified aircraft V-speed or a guaranteed liftoff speed.
+const ROTATE_SPEED_ENTER: Knots = Knots(75.0);
 
-/// 離陸速度を割り込んだと判定する下限。ヒステリシス用に少し低く取る。
-const ROTATE_SPEED_EXIT: Knots = Knots(50.0);
+/// A small hysteresis band avoids flicker without keeping a stale rotation cue.
+const ROTATE_SPEED_EXIT: Knots = Knots(72.0);
 
 /// スロットルのヒステリシス閾値（`HudState::throttle` は 0..1 の正規化値）。
 const THROTTLE_ENTER: f64 = 0.5;
@@ -180,9 +179,8 @@ fn circuit_bound(current: TutorialStage) -> Meters {
 ///
 /// **場周高度に達する前は、高度だけで `Approach` を判定しない。** 離陸直後は
 /// 高度が低くて当然で、それは最終進入ではない。上昇中はそのまま `Climb`。
-/// 沈み始めたら（`vertical_speed` が十分に負）`Circuit` を経由せず直接
-/// `Descend`／`Approach` へ案内する。**「上昇を続けろ」と言い続けるより、
-/// 実際に起きていること（降りている）に合わせた案内のほうが正しい。**
+/// 沈み始めたら回復案内へ移る。離陸直後の沈下で減速や出力低下を促さない。
+/// 場周高度に達した後の通常の降下・進入とは区別する。
 fn classify_airborne(
     current: TutorialStage,
     agl: Meters,
@@ -190,19 +188,13 @@ fn classify_airborne(
     reached_pattern_altitude: bool,
 ) -> TutorialStage {
     if !reached_pattern_altitude {
-        let was_descending = matches!(current, TutorialStage::Descend | TutorialStage::Approach);
-        if was_descending {
-            if vertical_speed >= EARLY_SINK_EXIT {
-                return TutorialStage::Climb;
-            }
-            return if agl <= approach_bound(current) {
-                TutorialStage::Approach
-            } else {
-                TutorialStage::Descend
-            };
-        }
-        return if vertical_speed <= EARLY_SINK_ENTER {
-            TutorialStage::Descend
+        let sinking = if current == TutorialStage::RecoverClimb {
+            vertical_speed < EARLY_SINK_EXIT
+        } else {
+            vertical_speed <= EARLY_SINK_ENTER
+        };
+        return if sinking {
+            TutorialStage::RecoverClimb
         } else {
             TutorialStage::Climb
         };
@@ -254,6 +246,17 @@ impl TutorialProgress {
         }
     }
 
+    /// Seed an explicit approach scenario, without guessing intent from a sink.
+    /// The app must also restore this seed when restarting an approach flight.
+    #[must_use]
+    pub const fn for_approach() -> Self {
+        Self {
+            stage: TutorialStage::Approach,
+            reached_pattern_altitude: true,
+            completed: false,
+        }
+    }
+
     /// 現在の段階。
     #[must_use]
     pub const fn stage(&self) -> TutorialStage {
@@ -276,8 +279,8 @@ impl TutorialProgress {
             return self.stage;
         }
 
-        if hud.on_ground && hud.throttle.is_finite() && hud.airspeed.is_finite() {
-            self.stage = classify_on_ground(self.stage, hud.throttle, hud.airspeed);
+        if hud.on_ground && hud.throttle.is_finite() && hud.equivalent_airspeed.is_finite() {
+            self.stage = classify_on_ground(self.stage, hud.throttle, hud.equivalent_airspeed);
         } else if !hud.on_ground && hud.agl.is_finite() && hud.vertical_speed.is_finite() {
             if hud.agl >= PATTERN_ALTITUDE_ENTER.to_meters() {
                 self.reached_pattern_altitude = true;
@@ -292,6 +295,26 @@ impl TutorialProgress {
 
         self.stage
     }
+}
+
+/// Select the immediate cue without mutating the aircraft or the lesson state.
+/// Warning recovery takes precedence over every unfinished lesson, including
+/// intentional approach; an airspeed alone cannot determine a stall.
+#[must_use]
+fn tutorial_prompt(stage: TutorialStage, hud: &HudState) -> &'static str {
+    if stage == TutorialStage::Complete {
+        return "";
+    }
+    if !hud.stall_warning_unavailable && hud.stall_warning && !hud.on_ground {
+        return "STALL WARNING\nW/Up: lower nose; level wings; power as needed.";
+    }
+    if matches!(stage, TutorialStage::Climb | TutorialStage::RecoverClimb)
+        && hud.equivalent_airspeed.is_finite()
+        && hud.equivalent_airspeed < Knots(70.0).to_meters_per_second()
+    {
+        return "BUILD AIRSPEED\nEase S; W/Up as needed. PageUp; aim 70-80 kt EAS.";
+    }
+    stage.prompt()
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +351,12 @@ impl TutorialVisibility {
 pub struct TutorialState(TutorialProgress);
 
 impl TutorialState {
+    /// Seed the guide for an explicitly requested approach start or restart.
+    #[must_use]
+    pub const fn for_approach() -> Self {
+        Self(TutorialProgress::for_approach())
+    }
+
     /// 現在の段階。
     #[must_use]
     pub const fn stage(&self) -> TutorialStage {
@@ -394,7 +423,7 @@ pub fn update_tutorial_prompt(
 
     for (mut text, mut node_visibility) in &mut query {
         if show {
-            **text = stage.prompt().to_owned();
+            **text = tutorial_prompt(stage, &hud).to_owned();
             *node_visibility = Visibility::Visible;
         } else {
             *node_visibility = Visibility::Hidden;
@@ -410,6 +439,9 @@ mod tests {
     fn hud(on_ground: bool, throttle: f64, airspeed_kt: f64, agl_ft: f64, vs_fpm: f64) -> HudState {
         HudState {
             airspeed: flightsim_core::Knots(airspeed_kt).to_meters_per_second(),
+            equivalent_airspeed: flightsim_core::Knots(airspeed_kt).to_meters_per_second(),
+            stall_warning: false,
+            stall_warning_unavailable: false,
             altitude: Meters(0.0),
             agl: flightsim_core::Feet(agl_ft).to_meters(),
             vertical_speed: flightsim_core::FeetPerMinute(vs_fpm).to_meters_per_second(),
@@ -510,12 +542,12 @@ mod tests {
 
     #[test]
     fn rotate_speed_does_not_flicker_near_the_threshold() {
-        // 55〜65 kt を往復しても、一度 Rotate に入ったら 50 kt を
+        // 73〜77 kt を往復しても、一度 Rotate に入ったら 72 kt を
         // 割り込むまでは Accelerate に戻らない。
         let mut progress = TutorialProgress::new();
-        progress.update(&hud(true, 1.0, 62.0, 0.0, 0.0));
+        progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0));
         assert_eq!(progress.stage(), TutorialStage::Rotate);
-        for speed in [58.0, 65.0, 55.0, 61.0] {
+        for speed in [74.0, 77.0, 73.0, 76.0] {
             assert_eq!(
                 progress.update(&hud(true, 1.0, speed, 0.0, 0.0)),
                 TutorialStage::Rotate,
@@ -531,7 +563,7 @@ mod tests {
     #[test]
     fn lifting_off_moves_to_climb() {
         let mut progress = TutorialProgress::new();
-        progress.update(&hud(true, 1.0, 65.0, 0.0, 0.0));
+        progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0));
         let stage = progress.update(&hud(false, 1.0, 65.0, 20.0, 300.0));
         assert_eq!(stage, TutorialStage::Climb);
     }
@@ -565,21 +597,22 @@ mod tests {
     // --- 戻る遷移: 場周高度に達する前に沈み始める ---
 
     #[test]
-    fn sinking_before_reaching_pattern_altitude_goes_straight_to_descend() {
+    fn sinking_before_pattern_altitude_prompts_recovery_without_reducing_power() {
         // 離陸直後のトラブルを想定: 300 ft までしか上がらずに沈み始めた。
-        // 「上昇を続けろ」ではなく降下段階の案内へ切り替わること。
+        // 着陸と誤認して出力低下を促すことなく、回復案内に切り替わる。
         let mut progress = TutorialProgress::new();
         progress.update(&hud(false, 1.0, 65.0, 300.0, 200.0));
         assert_eq!(progress.stage(), TutorialStage::Climb);
         let stage = progress.update(&hud(false, 0.5, 60.0, 280.0, -250.0));
-        assert_eq!(stage, TutorialStage::Descend);
+        assert_eq!(stage, TutorialStage::RecoverClimb);
+        assert!(!stage.prompt().contains("PageDown"));
     }
 
     #[test]
     fn recovering_climb_before_landing_returns_to_climb() {
         let mut progress = TutorialProgress::new();
         progress.update(&hud(false, 1.0, 65.0, 300.0, -250.0));
-        assert_eq!(progress.stage(), TutorialStage::Descend);
+        assert_eq!(progress.stage(), TutorialStage::RecoverClimb);
         // 電源を入れ直して上昇に戻せば Climb に戻る。
         let stage = progress.update(&hud(false, 1.0, 65.0, 320.0, 150.0));
         assert_eq!(stage, TutorialStage::Climb);
@@ -646,7 +679,7 @@ mod tests {
         assert_eq!(progress.stage(), TutorialStage::Accelerate);
 
         let mut broken = hud(true, f64::NAN, 0.0, 0.0, 0.0);
-        broken.airspeed = MetersPerSecond(f64::NAN);
+        broken.equivalent_airspeed = MetersPerSecond(f64::NAN);
         let stage = progress.update(&broken);
         assert_eq!(
             stage,
@@ -670,7 +703,7 @@ mod tests {
             progress.update(&hud(true, -1.0, -50.0, -10.0, -10.0));
         }
         assert_eq!(progress.stage(), TutorialStage::Parked);
-        let stage = progress.update(&hud(true, 1.0, 65.0, 0.0, 0.0));
+        let stage = progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0));
         assert_eq!(stage, TutorialStage::Rotate);
     }
 
@@ -688,7 +721,7 @@ mod tests {
 
         push(progress.update(&hud(true, 0.0, 0.0, 0.0, 0.0)), &mut seen);
         push(progress.update(&hud(true, 0.8, 10.0, 0.0, 0.0)), &mut seen);
-        push(progress.update(&hud(true, 1.0, 65.0, 0.0, 0.0)), &mut seen);
+        push(progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0)), &mut seen);
         push(
             progress.update(&hud(false, 1.0, 65.0, 50.0, 500.0)),
             &mut seen,
@@ -741,6 +774,224 @@ mod tests {
         assert_eq!(visibility, TutorialVisibility(true));
     }
 
+    #[test]
+    fn high_altitude_true_speed_does_not_trigger_an_early_rotation() {
+        for (profile, trim) in [("Light Single", 0.09), ("Swift Sport", 0.08)] {
+            let mut progress = TutorialProgress::new();
+            let mut high = hud(true, 1.0, 55.0, 0.0, 0.0);
+            high.altitude = Meters(4000.0);
+            high.airspeed = Knots(80.0).to_meters_per_second();
+            high.trim = trim;
+            assert_eq!(
+                progress.update(&high),
+                TutorialStage::Accelerate,
+                "{profile}"
+            );
+            high.equivalent_airspeed = Knots(75.0).to_meters_per_second();
+            assert_eq!(progress.update(&high), TutorialStage::Rotate, "{profile}");
+            for speed in [71.0, 75.0, 71.0, 75.0] {
+                high.equivalent_airspeed = Knots(speed).to_meters_per_second();
+                let expected = if speed < 72.0 {
+                    TutorialStage::Accelerate
+                } else {
+                    TutorialStage::Rotate
+                };
+                assert_eq!(progress.update(&high), expected, "{profile}");
+            }
+        }
+    }
+
+    #[test]
+    fn ground_rotation_uses_nose_rise_feedback_and_clear_liftoff_transition() {
+        for trim in [0.09, 0.08] {
+            let mut progress = TutorialProgress::new();
+            let mut state = hud(true, 1.0, 65.0, 0.0, 0.0);
+            state.trim = trim;
+            assert_eq!(progress.update(&state), TutorialStage::Accelerate);
+            state.equivalent_airspeed = Knots(75.0).to_meters_per_second();
+            assert_eq!(progress.update(&state), TutorialStage::Rotate);
+            assert!(tutorial_prompt(progress.stage(), &state).contains("FIRST nose rise"));
+            // A sloped runway can already have positive pitch; do not turn an
+            // absolute pitch value into an automatic rotation/release decision.
+            for pitch in [-3.0, 0.0, 3.0, 5.0, 10.0] {
+                state.pitch = flightsim_core::Degrees(pitch).to_radians();
+                let prompt = tutorial_prompt(progress.stage(), &state);
+                assert!(prompt.starts_with("ROTATE GENTLY"));
+                assert!(prompt.contains("FIRST nose rise"));
+                assert!(prompt.lines().count() <= 2);
+                assert!(prompt.is_ascii());
+                assert!(prompt.lines().all(|line| line.len() <= 60));
+            }
+            state.on_ground = false;
+            state.agl = Feet(20.0).to_meters();
+            state.vertical_speed = MetersPerSecond(1.0);
+            assert_eq!(progress.update(&state), TutorialStage::Climb);
+            let prompt = tutorial_prompt(progress.stage(), &state);
+            assert!(prompt.starts_with("CLIMBING"));
+            assert!(prompt.contains("70-80 kt EAS"));
+            assert!(!prompt.contains("W/Up") && !prompt.contains("BUILD AIRSPEED"));
+        }
+    }
+
+    #[test]
+    fn early_sink_recovers_repeatedly_without_becoming_a_landing() {
+        let mut progress = TutorialProgress::new();
+        progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0));
+        for _ in 0..3 {
+            assert_eq!(
+                progress.update(&hud(false, 1.0, 70.0, 100.0, 200.0)),
+                TutorialStage::Climb
+            );
+            assert_eq!(
+                progress.update(&hud(false, 1.0, 65.0, 90.0, -250.0)),
+                TutorialStage::RecoverClimb
+            );
+            for vs in [-100.0, 0.0, 50.0] {
+                assert_eq!(
+                    progress.update(&hud(false, 1.0, 70.0, 90.0, vs)),
+                    TutorialStage::RecoverClimb
+                );
+            }
+        }
+        assert_eq!(
+            progress.update(&hud(false, 0.7, 80.0, 1000.0, 0.0)),
+            TutorialStage::Circuit
+        );
+        assert_eq!(
+            progress.update(&hud(false, 0.5, 75.0, 500.0, -250.0)),
+            TutorialStage::Descend
+        );
+    }
+
+    #[test]
+    fn explicit_approach_and_fresh_takeoff_have_distinct_reset_seeds() {
+        for _ in 0..3 {
+            let mut approach = TutorialProgress::for_approach();
+            let low_descent = hud(false, 0.4, 65.0, 150.0, -300.0);
+            assert_eq!(approach.update(&low_descent), TutorialStage::Approach);
+            assert!(!tutorial_prompt(approach.stage(), &low_descent).contains("BUILD AIRSPEED"));
+            let mut takeoff = TutorialProgress::default();
+            assert_eq!(
+                takeoff.update(&hud(true, 0.0, 0.0, 0.0, 0.0)),
+                TutorialStage::Parked
+            );
+            assert_eq!(takeoff.update(&low_descent), TutorialStage::RecoverClimb);
+        }
+        assert_eq!(
+            TutorialState::for_approach().stage(),
+            TutorialStage::Approach
+        );
+        assert_eq!(TutorialState::default().stage(), TutorialStage::Parked);
+    }
+
+    #[test]
+    fn warning_overrides_climb_cruise_and_approach_without_changing_the_lesson() {
+        let mut state = hud(false, 1.0, 80.0, 500.0, 100.0);
+        for stage in [
+            TutorialStage::Climb,
+            TutorialStage::Circuit,
+            TutorialStage::Approach,
+        ] {
+            for _ in 0..3 {
+                state.stall_warning = true;
+                let prompt = tutorial_prompt(stage, &state);
+                assert!(prompt.starts_with("STALL WARNING"));
+                assert!(prompt.contains("lower nose"));
+                assert!(!prompt.contains("trim") && !prompt.contains("PageDown"));
+                state.stall_warning = false;
+                assert_eq!(tutorial_prompt(stage, &state), stage.prompt());
+            }
+        }
+        state.stall_warning = true;
+        assert_eq!(tutorial_prompt(TutorialStage::Complete, &state), "");
+        state.stall_warning_unavailable = true;
+        assert_eq!(
+            tutorial_prompt(TutorialStage::Climb, &state),
+            TutorialStage::Climb.prompt()
+        );
+    }
+
+    #[test]
+    fn slow_climb_gets_airspeed_advice_without_adding_trim() {
+        for trim in [0.09, 0.08] {
+            let mut state = hud(false, 1.0, 65.0, 100.0, 200.0);
+            state.trim = trim;
+            assert!(tutorial_prompt(TutorialStage::Climb, &state).starts_with("BUILD AIRSPEED"));
+            assert!(
+                tutorial_prompt(TutorialStage::RecoverClimb, &state).starts_with("BUILD AIRSPEED")
+            );
+            state.equivalent_airspeed = Knots(75.0).to_meters_per_second();
+            assert_eq!(
+                tutorial_prompt(TutorialStage::Climb, &state),
+                TutorialStage::Climb.prompt()
+            );
+            assert!(!tutorial_prompt(TutorialStage::Climb, &state).contains("Press ]"));
+        }
+    }
+
+    #[test]
+    fn a_fast_early_sink_does_not_demand_more_nose_down() {
+        let mut progress = TutorialProgress::new();
+        progress.update(&hud(true, 1.0, 75.0, 0.0, 0.0));
+        for speed in [80.0, 100.0, 120.0] {
+            let state = hud(false, 1.0, speed, 200.0, -300.0);
+            assert_eq!(progress.update(&state), TutorialStage::RecoverClimb);
+            let prompt = tutorial_prompt(progress.stage(), &state);
+            assert!(prompt.starts_with("CHECK CLIMB"));
+            assert!(prompt.contains("Small S/W inputs"));
+            assert!(!prompt.contains("W/Up") && !prompt.contains("Ease S"));
+        }
+    }
+
+    #[test]
+    fn guide_refreshes_after_hide_pause_crash_and_restart() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(hud(true, 0.0, 0.0, 0.0, 0.0))
+            .init_resource::<TutorialVisibility>()
+            .init_resource::<TutorialState>()
+            .init_resource::<crate::Paused>()
+            .init_resource::<crate::CrashNotice>()
+            .add_systems(Startup, spawn_tutorial_prompt)
+            .add_systems(Update, update_tutorial_prompt);
+        let shown = |app: &mut App| {
+            let world = app.world_mut();
+            let mut query = world.query_filtered::<(&Text, &Visibility), With<TutorialPrompt>>();
+            let (text, visibility) = query.single(world).expect("one tutorial prompt");
+            (text.as_str().to_owned(), *visibility)
+        };
+        app.update();
+        for _ in 0..3 {
+            app.world_mut().resource_mut::<TutorialVisibility>().0 = false;
+            app.world_mut()
+                .insert_resource(hud(false, 1.0, 65.0, 100.0, -250.0));
+            app.update();
+            assert_eq!(shown(&mut app).1, Visibility::Hidden);
+            app.world_mut().resource_mut::<TutorialVisibility>().0 = true;
+            app.world_mut().resource_mut::<crate::Paused>().0 = true;
+            app.update();
+            assert_eq!(shown(&mut app).1, Visibility::Hidden);
+            app.world_mut().resource_mut::<crate::Paused>().0 = false;
+            app.world_mut()
+                .resource_mut::<crate::CrashNotice>()
+                .set("Crash");
+            app.update();
+            assert_eq!(shown(&mut app).1, Visibility::Hidden);
+            app.world_mut().resource_mut::<crate::CrashNotice>().clear();
+            app.world_mut().insert_resource(TutorialState::default());
+            app.world_mut()
+                .insert_resource(hud(true, 0.0, 0.0, 0.0, 0.0));
+            app.update();
+            assert_eq!(
+                shown(&mut app),
+                (
+                    TutorialStage::Parked.prompt().to_owned(),
+                    Visibility::Visible
+                )
+            );
+        }
+    }
+
     // --- 字形・文言 ---
 
     #[test]
@@ -751,6 +1002,7 @@ mod tests {
             TutorialStage::Accelerate,
             TutorialStage::Rotate,
             TutorialStage::Climb,
+            TutorialStage::RecoverClimb,
             TutorialStage::Circuit,
             TutorialStage::Descend,
             TutorialStage::Approach,
@@ -770,6 +1022,7 @@ mod tests {
             (TutorialStage::Parked, "PageUp"),
             (TutorialStage::Rotate, "S"),
             (TutorialStage::Climb, "S"),
+            (TutorialStage::RecoverClimb, "PageUp"),
             (TutorialStage::Circuit, "A/D"),
             (TutorialStage::Descend, "PageDown"),
         ];
@@ -789,12 +1042,14 @@ mod tests {
             TutorialStage::Accelerate,
             TutorialStage::Rotate,
             TutorialStage::Climb,
+            TutorialStage::RecoverClimb,
             TutorialStage::Circuit,
             TutorialStage::Descend,
             TutorialStage::Approach,
         ] {
             let lines = stage.prompt().lines().count();
             assert!(lines <= 2, "{stage:?} prompt has {lines} lines");
+            assert!(stage.prompt().lines().all(|line| line.len() <= 60));
         }
     }
 

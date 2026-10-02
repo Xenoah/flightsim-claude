@@ -11,20 +11,50 @@ on:
 permissions:
   contents: read
 
+# Release input hashes must have identical bytes on Linux and Windows checkouts.
+# Process-local Git configuration; no runner/account settings are persisted.
+env:
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+
 concurrency:
   # 異なる main commit が近接して完了しても、同じ version/tag を並行操作しない。
   group: release-main
   cancel-in-progress: false
 
 jobs:
-  build_windows:
-    name: build Windows bundle
+  authorize:
+    name: authorize exact binary publication
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_sha == github.sha &&
       github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      authorized: ${{ steps.gate.outputs.authorized }}
+      source_inventory_sha256: ${{ steps.gate.outputs.source_inventory_sha256 }}
+      release_inventory_sha256: ${{ steps.gate.outputs.release_inventory_sha256 }}
+      authorization_sha256: ${{ steps.gate.outputs.authorization_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Check version, exact payload, rights evidence and publication authorization
+        id: gate
+        run: |
+          python3 scripts/check-release-authorization.py --allow-blocked \
+            --github-output "$GITHUB_OUTPUT" --github-summary "$GITHUB_STEP_SUMMARY"
+
+  build_windows:
+    name: build authorized Windows bundle
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
     outputs:
@@ -40,6 +70,29 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Recheck the exact authorization before any build or packaging
+        shell: pwsh
+        env:
+          EXPECTED_INVENTORY: ${{ needs.authorize.outputs.release_inventory_sha256 }}
+          EXPECTED_SOURCE: ${{ needs.authorize.outputs.source_inventory_sha256 }}
+          EXPECTED_AUTHORIZATION: ${{ needs.authorize.outputs.authorization_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $report = python scripts/check-release-authorization.py `
+            --inventory-file (Join-Path $env:RUNNER_TEMP 'release-inventory.json')
+          if ($LASTEXITCODE -ne 0) { throw 'binary publication authorization failed' }
+          $gate = ($report -join "`n") | ConvertFrom-Json
+          if (-not $gate.authorized -or
+              $gate.release_inventory_sha256 -ne $env:EXPECTED_INVENTORY -or
+              $gate.source_inventory_sha256 -ne $env:EXPECTED_SOURCE -or
+              $gate.authorization_sha256 -ne $env:EXPECTED_AUTHORIZATION) {
+            throw 'authorization or actual release input bytes changed between jobs'
+          }
 
       - name: Install the tested Rust toolchain
         shell: pwsh
@@ -91,6 +144,8 @@ jobs:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          INVENTORY_SHA256: ${{ needs.authorize.outputs.release_inventory_sha256 }}
+          AUTHORIZATION_SHA256: ${{ needs.authorize.outputs.authorization_sha256 }}
         run: |
           $ErrorActionPreference = 'Stop'
           $staging = Join-Path $env:RUNNER_TEMP "flightsim-claude-$env:TAG-windows-x86_64"
@@ -98,60 +153,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path $staging, $artifact | Out-Null
 
           $executable = Join-Path $env:GITHUB_WORKSPACE 'target/x86_64-pc-windows-msvc/release/flightsim-app.exe'
-          $required = @(
-            $executable,
-            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/light_single.glb'),
-            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/light_single.json'),
-            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.glb'),
-            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.json'),
-            (Join-Path $env:GITHUB_WORKSPACE 'assets/aircraft/swift_sport.blend'),
-            (Join-Path $env:GITHUB_WORKSPACE 'README.md'),
-            (Join-Path $env:GITHUB_WORKSPACE 'CHANGELOG.md'),
-            (Join-Path $env:GITHUB_WORKSPACE 'ATTRIBUTION.md'),
-            (Join-Path $env:GITHUB_WORKSPACE 'LICENSE-MIT'),
-            (Join-Path $env:GITHUB_WORKSPACE 'LICENSE-APACHE')
-          )
-          foreach ($path in $required) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "required release file is missing: $path"
-            }
-          }
-
+          $inventory = Get-Content -Raw -LiteralPath (Join-Path $env:RUNNER_TEMP 'release-inventory.json') | ConvertFrom-Json
+          # The gate and copy operation consume one exact inventory. Never copy
+          # assets/, a workspace, logs or QA recordings recursively.
           Copy-Item -LiteralPath $executable -Destination $staging
-          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'assets') `
-            -Destination (Join-Path $staging 'assets') -Recurse
-          foreach ($name in @('README.md', 'CHANGELOG.md', 'ATTRIBUTION.md', 'LICENSE-MIT', 'LICENSE-APACHE')) {
-            Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $name) -Destination $staging
+          foreach ($file in $inventory.files) {
+            $destination = Join-Path $staging $file.path
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+            Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $file.source) -Destination $destination
           }
+          python scripts/check-release-authorization.py --bundle $staging --executable $executable
+          if ($LASTEXITCODE -ne 0) { throw 'staged bundle differs from the authorized inventory' }
 
           $zip = Join-Path $artifact $env:BUNDLE
           Compress-Archive -LiteralPath $staging -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or (Get-Item $zip).Length -eq 0) {
             throw "release archive was not created"
-          }
-
-          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
-          try {
-            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
-            foreach ($suffix in @(
-              '/flightsim-app.exe',
-              '/assets/aircraft/light_single.glb',
-              '/assets/aircraft/light_single.json',
-              '/assets/aircraft/swift_sport.glb',
-              '/assets/aircraft/swift_sport.json',
-              '/assets/aircraft/swift_sport.blend',
-              '/README.md',
-              '/CHANGELOG.md',
-              '/ATTRIBUTION.md',
-              '/LICENSE-MIT',
-              '/LICENSE-APACHE'
-            )) {
-              if (-not ($names | Where-Object { $_.EndsWith($suffix) })) {
-                throw "release archive is missing $suffix"
-              }
-            }
-          } finally {
-            $archive.Dispose()
           }
 
           $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
@@ -164,6 +181,8 @@ jobs:
             source_sha = $env:SOURCE_SHA
             tag = $env:TAG
             version = $env:VERSION
+            release_inventory_sha256 = $env:INVENTORY_SHA256
+            authorization_sha256 = $env:AUTHORIZATION_SHA256
           } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifact 'release-metadata.json')
 
       # Run the archive users will download, from a fresh extraction directory.
@@ -187,13 +206,9 @@ jobs:
 
           $packageRoot = $packageDirectories[0].FullName
           $executable = Join-Path $packageRoot 'flightsim-app.exe'
-          foreach ($path in @($executable,
-            (Join-Path $packageRoot 'assets/aircraft/light_single.glb'),
-            (Join-Path $packageRoot 'assets/aircraft/swift_sport.glb'))) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-              throw "extracted release file is missing: $path"
-            }
-          }
+          $builtExecutable = Join-Path $env:GITHUB_WORKSPACE 'target/x86_64-pc-windows-msvc/release/flightsim-app.exe'
+          python scripts/check-release-authorization.py --bundle $packageRoot --executable $builtExecutable
+          if ($LASTEXITCODE -ne 0) { throw 'extracted bundle differs from the authorized inventory' }
 
           function Test-CompletePng([string] $Path) {
             try {
@@ -323,8 +338,14 @@ jobs:
         with:
           name: windows-smoke-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/flightsim-windows-smoke*.png
-            ${{ runner.temp }}/flightsim-windows-smoke*.log
+            ${{ runner.temp }}/flightsim-windows-smoke.png
+            ${{ runner.temp }}/flightsim-windows-smoke.log
+            ${{ runner.temp }}/flightsim-windows-smoke.stdout.log
+            ${{ runner.temp }}/flightsim-windows-smoke.stderr.log
+            ${{ runner.temp }}/flightsim-windows-smoke-swift.png
+            ${{ runner.temp }}/flightsim-windows-smoke-swift.log
+            ${{ runner.temp }}/flightsim-windows-smoke-swift.stdout.log
+            ${{ runner.temp }}/flightsim-windows-smoke-swift.stderr.log
           if-no-files-found: warn
           retention-days: 7
 
@@ -342,14 +363,20 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: release-artifact/
+          path: |
+            release-artifact/${{ steps.version.outputs.bundle }}
+            release-artifact/${{ steps.version.outputs.bundle }}.sha256
+            release-artifact/release-metadata.json
+            release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke.png
+            release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke-swift.png
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
 
   publish:
     name: tag and publish prerelease
-    needs: build_windows
+    needs: [authorize, build_windows]
+    if: needs.authorize.outputs.authorized == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -370,6 +397,8 @@ jobs:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           EXPECTED_TAG: ${{ needs.build_windows.outputs.tag }}
           EXPECTED_VERSION: ${{ needs.build_windows.outputs.version }}
+          EXPECTED_INVENTORY: ${{ needs.authorize.outputs.release_inventory_sha256 }}
+          EXPECTED_AUTHORIZATION: ${{ needs.authorize.outputs.authorization_sha256 }}
         run: |
           set -euo pipefail
           metadata=release-artifact/release-metadata.json
@@ -387,6 +416,10 @@ jobs:
           [[ "$tag" == "$EXPECTED_TAG" ]]
           [[ "$version" == "$EXPECTED_VERSION" ]]
           [[ "$tag" == "v$version" ]]
+          [[ "$(jq -er '.release_inventory_sha256' "$metadata")" == "$EXPECTED_INVENTORY" ]]
+          [[ "$(jq -er '.authorization_sha256' "$metadata")" == "$EXPECTED_AUTHORIZATION" ]]
+          [[ "$EXPECTED_INVENTORY" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$EXPECTED_AUTHORIZATION" =~ ^[0-9a-f]{64}$ ]]
           [[ "$bundle" =~ ^flightsim-claude-v[0-9A-Za-z.+-]+-windows-x86_64\.zip$ ]]
           [[ "$expected_digest" =~ ^[0-9a-f]{64}$ ]]
           test -f "release-artifact/$bundle"

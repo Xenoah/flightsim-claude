@@ -1,0 +1,4 @@
+# Asset-profile digests must survive Windows core.autocrlf checkouts.
+*.json text eol=lf
+*.glb -text
+*.blend -text

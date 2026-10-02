@@ -128,6 +128,15 @@ pub struct Radians(pub f64);
 
 **不変条件**
 - FDM は壁時計時間を一切参照しない。`step(dt)` の `dt` は常に定数。
+- Hardware input is sampled per render frame; rate-dependent pilot state updates
+  and effective-control recording run only in `Simulation::advance_with_controls`
+  immediately before each executed fixed step, with its pre-step state. No-step
+  frames and frozen states create no input/recording steps. Crash/divergence ends
+  the current frame at once; reports and physical time count only executed steps,
+  and the remaining terminal frame budget is discarded (ADR-0004).
+- Replay aircraft identity includes the FDM model revision as well as configuration.
+  v1/v2 byte compatibility does not promise old-physics reproduction; old identities
+  are rejected without changing their format, durations or stored fingerprint.
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を
@@ -148,6 +157,51 @@ pub struct Radians(pub f64);
 ---
 
 ## 6. ワールドデータ
+
+### Offline global baseline and regional climate (2026-10-02 branch)
+
+[ADR-0011](docs/adr/0011-offline-global-terrain-climate.md) adds a compact, complete
+world atlas beneath all local DEM levels and an offline monthly climate atlas.
+`world` owns validated immutable source data; `sim` alone connects regional
+temperature to the FDM; `render` applies procedural climate-derived surface cues;
+`ui` presents a data-only modal world map; `app` coordinates explicit new flights.
+Neither the map preview nor render LOD mutates physical terrain or climate.
+Replay v2 records enabled data fingerprints and a fixed climate phase, while v1
+preserves legacy terrain/ISA behavior and byte compatibility.
+
+Global relief is roughly 20 km, not globally detailed 30 m terrain. NOAA
+1991-2020 monthly reanalysis is climatology, not live weather. Full sources and
+limits are in [global terrain](docs/global-terrain.md) and
+[global climate](docs/data/global-climate.md). Local `.fsdem` data retain priority;
+missing primary reads and generated fallback tiles share the existing frame
+budgets and bounded caches. When no regional tile path is configured, an immutable
+`EmptyTileSource` explicitly guarantees that primary reads can never succeed.
+The renderer and physical sampler can skip those reads while retaining cached
+primary precedence; configured directories and mutable sources remain discoverable.
+LOD can use a local terrain-height reference so
+elevated airports are not incorrectly treated as kilometres above ground.
+
+The new branch implementation and its eventual test/runtime evidence are distinct
+from the still-unmerged alpha21 release/publication state described below.
+
+Mixed-LOD/source boundaries use render-only bridges between the actual post-f32
+edge polylines, including shared T/cross-junction caps and polar fans. DEM height
+error alone is not a bound for curved-Earth chord gaps. Topology planning advances in at most 1,024 deterministic work units per update,
+without source snapshots or background tasks. Its ordered indexing, sweeps,
+corner/polar processing, descriptor queueing and normal scratch cleanup are
+incremental. Existing cut assembly, atomic commit and explicit reset cleanup
+remain synchronous; this is not a frame-time guarantee. Bridge and surface
+preparation share the existing mesh budget; a pending bridge transaction pauses
+selection and preserves the old displayed cut until surfaces and bridges can
+commit together. Same-ID source replacement preserves the old entity until that
+commit. New-flight reset drains pending, visible and retired terrain assets.
+The selector retains its 8,192-ID bound; one transition may additionally retain
+one frame's outgoing surface batch (at most 8,192), and at most two bridge sets
+of 4×8,192 meshes each. Compact boundaries and logical geometry bytes are
+observable separately from DEM cache usage. Details and verification limits are
+in [mixed-LOD stitching QA](docs/qa/terrain-mixed-lod-stitching-2026-10-02.md) and
+[incremental planning QA](docs/qa/terrain-seam-planning-2026-10-02.md).
+
 
 ソースは全てオープンデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
@@ -252,7 +306,10 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 サンプルするため、同じ設定なら同じ結果になる。雲底・雲頂は alpha mask 付きの
 PBR 平面で表し、カメラが層内に入ったときだけ distance fog で視程を制限する。
 `ClearColor` は変更しない。`--cloud-cover`、`--cloud-base`、`--cloud-top`、
-`--cloud-visibility` で設定し、既定は雲量 0 の快晴である。
+`--cloud-visibility` で設定する。通常の新規飛行では月別気候の地域雲量と
+近似 AGL 層を使用し、これらの明示設定があれば手動雲層を優先する。
+`--cloud-cover 0` は快晴を指定する。旧 v1 replay と気候無効時の既定は
+従来の雲量 0 を保つ。月別平均は現在の観測天気を表さない。
 
 CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
 `.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに

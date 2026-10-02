@@ -42,6 +42,7 @@
 //! |---|---|
 //! | [`airport`] | OSM PBF の滑走路中心線を `.fsairports` へ変換 |
 //! | [`geotiff`] | GeoTIFF の読み込みと地理参照。EPSG:4326 の単バンド浮動小数点のみ |
+//! | [`global`] | Offline compact world-atlas validation and encoding |
 //! | [`geoid`] | Local EGM2008/EGM96 PGM grid and offline ellipsoidal normalization |
 //! | [`region`] | 焼き込み範囲とタイル列挙。日付変更線・極を扱う |
 //! | [`generate`] | ラスタからタイルを焼き、`.fsdem` として書き出す |
@@ -55,6 +56,7 @@ pub mod airport;
 pub mod generate;
 pub mod geoid;
 pub mod geotiff;
+pub mod global;
 pub mod region;
 pub mod testing;
 pub mod vertical_datum;

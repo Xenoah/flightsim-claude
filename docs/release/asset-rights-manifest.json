@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-10-02",
+  "source_snapshot": "08717b09075e75bda48b61eea87cc7e2e046eea0",
+  "scope": "Engineering rights inventory; not a legal opinion, certificate, or Steam approval",
+  "commercial_external_assets": [
+    "assets/aircraft/swift_sport.glb",
+    "assets/aircraft/swift_sport.json"
+  ],
+  "assets": [
+    {
+      "id": "assets-aircraft-light_single-glb",
+      "path": "assets/aircraft/light_single.glb",
+      "delivery": "external",
+      "sha256": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+      "bytes": 4752424,
+      "review_state": "unresolved",
+      "license": "Meshy generation-specific terms; not established by project MIT/Apache",
+      "sources": [
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Legacy record says paid plan, generated 2026-08-21. Missing generation task, applicable plan/terms and source-input evidence. Exclude from commercial staging; adding CC-BY credit alone cannot establish a grant."
+    },
+    {
+      "id": "assets-aircraft-light_single-json",
+      "path": "assets/aircraft/light_single.json",
+      "delivery": "external",
+      "sha256": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+      "bytes": 2734,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Project-authored configuration. Commercial staging excludes this external legacy profile to keep its model unavailable."
+    },
+    {
+      "id": "assets-aircraft-swift_sport-glb",
+      "path": "assets/aircraft/swift_sport.glb",
+      "delivery": "external",
+      "sha256": "9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1",
+      "bytes": 229192,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "tools/blender/build_swift_sport.py",
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Original procedural generic aircraft. No embedded textures in glTF JSON; source script uses local primitives/materials."
+    },
+    {
+      "id": "assets-aircraft-swift_sport-json",
+      "path": "assets/aircraft/swift_sport.json",
+      "delivery": "external",
+      "sha256": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+      "bytes": 2717,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Project-authored representative dynamics and model profile; not certified real-aircraft data."
+    },
+    {
+      "id": "assets-aircraft-swift_sport-blend",
+      "path": "assets/aircraft/swift_sport.blend",
+      "delivery": "source_only",
+      "sha256": "29a25578733be83d25ccff12c117b29124b57b5e69e8356bd8189d128e514e77",
+      "bytes": 160584,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "tools/blender/build_swift_sport.py",
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Editable original scene. Optional source artifact; not required for runtime staging. Blender program license does not automatically license its artistic output."
+    },
+    {
+      "id": "crates-flightsim-world-data-global-terrain-fsgt",
+      "path": "crates/flightsim-world/data/global-terrain.fsgt",
+      "delivery": "embedded",
+      "sha256": "57bc03c12caa772ecbd52f1d24cd12704ccc4ace5123e9d8c26b6e454907f13e",
+      "bytes": 8912960,
+      "review_state": "licensed_with_notices",
+      "license": "CC0-1.0 + public-domain components + Copernicus GLO-90 terms",
+      "sources": [
+        "docs/data/global-sources.md",
+        "crates/flightsim-world/data/global-terrain.provenance.json",
+        "docs/data/copernicus-glo90-license.pdf"
+      ],
+      "notes": "Mixed-license derivative; preserve specific GLO-90 attribution/disclaimer/terms. Not an entirely public-domain atlas."
+    },
+    {
+      "id": "crates-flightsim-world-data-ncep-ncar-1991-2020-fsclim",
+      "path": "crates/flightsim-world/data/ncep-ncar-1991-2020.fsclim",
+      "delivery": "embedded",
+      "sha256": "b1841fe206dd0b1154868335f7ff09ea9a0e5f17c87baa70029240871fd3bf1a",
+      "bytes": 1180456,
+      "review_state": "licensed_with_notices",
+      "license": "NOAA public-domain federal data",
+      "sources": [
+        "docs/data/global-climate.md",
+        "crates/flightsim-world/data/ncep-ncar-1991-2020.json"
+      ],
+      "notes": "NOAA PSL NCEP/NCAR 1991-2020 monthly climatology; derived simulator data, no official-product/endorsement or live-weather claim."
+    },
+    {
+      "id": "crates-flightsim-tilegen-tests-fixtures-airport-valid-fsairports",
+      "path": "crates/flightsim-tilegen/tests/fixtures/airport-valid.fsairports",
+      "delivery": "test_only",
+      "sha256": "199260d950dcab5d0cd24e845806e4c9dee6e65f4c222ead02d1b35d231ee135",
+      "bytes": 400,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "crates/flightsim-tilegen/tests/pbf_hostile_probe.rs"
+      ],
+      "notes": "400-byte synthetic test fixture; do not mistake it for a real OSM-derived airport pack or ship it as world data."
+    }
+  ],
+  "dependency_assets": [
+    {
+      "id": "bevy-fira-mono",
+      "package": "bevy_text",
+      "version": "0.18.1",
+      "source_path": "src/FiraMono-subset.ttf",
+      "feature": "default_font",
+      "sha256": "45131c5e913a5c7b4311101303e3c320a97b93a27a64b7262b533ee0d31ae03c",
+      "bytes": 18848,
+      "review_state": "licensed_with_notices",
+      "license": "OFL-1.1",
+      "sources": [
+        "https://github.com/bevyengine/bevy/blob/v0.18.1/CREDITS.md",
+        "https://github.com/bevyengine/bevy/blob/v0.18.1/assets/fonts/FiraMono-LICENSE"
+      ],
+      "notice_files": [
+        "docs/release/licenses/FiraMono-LICENSE"
+      ],
+      "reason": ""
+    },
+    {
+      "id": "bevy-tony-mc-mapface",
+      "package": "bevy_core_pipeline",
+      "version": "0.18.1",
+      "source_path": "src/tonemapping/luts/tony_mc_mapface.ktx2",
+      "feature": "tonemapping_luts",
+      "sha256": "053e5adc519b1d733c819a625199e61cf138549db1358e533811d45df3227f84",
+      "bytes": 354208,
+      "review_state": "licensed_with_notices",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "https://github.com/h3r2tic/tony-mc-mapface/blob/909e51c8a74251fd828770248476cb084081e08c/LICENSE-MIT"
+      ],
+      "notice_files": [
+        "docs/release/licenses/TonyMcMapface-LICENSE-MIT"
+      ],
+      "reason": ""
+    },
+    {
+      "id": "bevy-agx-lut",
+      "package": "bevy_core_pipeline",
+      "version": "0.18.1",
+      "source_path": "src/tonemapping/luts/AgX-default_contrast.ktx2",
+      "feature": "tonemapping_luts",
+      "sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
+      "bytes": 17842,
+      "review_state": "unresolved",
+      "license": "License record not yet resolved",
+      "sources": [
+        "https://github.com/MrLixm/AgXc/tree/898198e0490b0551ed81412a0c22e0b72fffb7cd"
+      ],
+      "notice_files": [],
+      "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
+    },
+    {
+      "id": "bevy-blender-filmic-lut",
+      "package": "bevy_core_pipeline",
+      "version": "0.18.1",
+      "source_path": "src/tonemapping/luts/Blender_-11_12.ktx2",
+      "feature": "tonemapping_luts",
+      "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
+      "bytes": 308905,
+      "review_state": "unresolved",
+      "license": "License record not yet resolved",
+      "sources": [
+        "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt"
+      ],
+      "notice_files": [],
+      "reason": "Bevy recipe renders through Blender Filmic, but does not pin the Blender/Filmic version or its asset license; resolve source terms before clearance."
+    }
+  ],
+  "required_bundle_files": [
+    "ATTRIBUTION.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "docs/data/NOTICE-GLOBAL-TERRAIN.txt",
+    "docs/data/copernicus-glo90-license.pdf",
+    "docs/data/global-sources.md",
+    "docs/data/global-climate.md",
+    "docs/data/global-surface-corrections.json",
+    "crates/flightsim-world/data/global-terrain.provenance.json",
+    "crates/flightsim-world/data/ncep-ncar-1991-2020.json",
+    "docs/release/asset-rights-manifest.json",
+    "docs/release/licenses/FiraMono-LICENSE",
+    "docs/release/licenses/TonyMcMapface-LICENSE-MIT"
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "bytes": 8912960,
+  "dataset_id": "ETOPO2022-COP90-NE-2048x1024-surface-v2",
+  "feature_preserving_pooling": {
+    "changed_inland_water_cells": 264,
+    "changed_negative_land_cells": 1468,
+    "largest_node_height_change_from_unpooled_resample_m": 837.5815225616784,
+    "limitation": "the half-cell bound applies only to source-point-to-assigned-node coordinates; interpolated shoreline/negative-height footprints can extend farther and can shift or widen; neighbouring terrain still mixes; not surveyed geometry",
+    "maximum_source_point_to_assigned_node_degrees_per_axis": 0.087890625,
+    "policy": "inland-water source points and negative dry-land minima retained in their nearest canonical cell; inland water wins conflicts; closest lake source point wins, equal-distance ties use source row-major order"
+  },
+  "fingerprint_fnv1a64": "500e8db32bde7019",
+  "format": "FSGT v2",
+  "height_contract": "surface ellipsoid h = H + N; ocean H=0, inland-water H=corrected lake level; below-sea-level dry land retained; coast bilinear blend",
+  "license": "NOAA ETOPO2022 CC0-1.0; NGA-derived geoid public domain; Natural Earth public domain; modified Copernicus DEM GLO-90 under its free-use license with required attribution/redistributed license text (see ATTRIBUTION.md and docs/data/copernicus-glo90-license.pdf)",
+  "native_detail": "stride-10 from NOAA 60 arcsecond source (10 arcminutes), then resampled to 10.546875 arcminutes (~19.5 km at equator); not high-resolution terrain",
+  "polar_policy": "continuous interpolation from nearest row to longitude-independent row mean at each pole",
+  "prepared_sha256": {
+    "etopo_geoid_north_to_south_10min.npy": "85a413d02f13f92c8571797331e65574038e70530ac7846e9c577178c50fa318",
+    "etopo_orthometric_north_to_south_10min.npy": "b5d966b71b01b19914da8fe14ccb1dc408bb0d6790f32bf57cff438c53923879",
+    "inland_water.npy": "1dace45d1a6c986a4e28ee708f1400e73106a9d9c64833ef2625e2181b766be9",
+    "ne_land_north_to_south_10min.npy": "40b4d864d8cab7784172f43f841140c6a362d004f26dda43d45c50d831f28001"
+  },
+  "quantization": {
+    "EGM2008_height_m": 1,
+    "geoid_m": 0.01,
+    "rounding": "halfway away from zero"
+  },
+  "reproduce": "scripts/prepare-global-terrain.py then scripts/pack-global-terrain.py, or flightsim-globalgen on equivalent raw arrays",
+  "resampling": "physical surface H (source ocean H=0) and N bilinear; independent dry-land/inland-water masks nearest-neighbour; target lake H nearest corrected source level, ocean H=0; canonical 2048x1024 cell-centred power-of-two lattice",
+  "sample_origin": {
+    "latitude_deg": 89.912109375,
+    "longitude_deg": -179.912109375
+  },
+  "sha256": "57bc03c12caa772ecbd52f1d24cd12704ccc4ace5123e9d8c26b6e454907f13e",
+  "shape": [
+    1024,
+    2048
+  ],
+  "source_geometry": {
+    "latitude_origin_deg": 89.84166666666667,
+    "longitude_origin_deg": 0.008333333333325754,
+    "shape": [
+      1080,
+      2160
+    ]
+  },
+  "source_preparation": {
+    "column_order": "eastward, periodic",
+    "elevation": "float32 little-endian EGM2008 orthometric height H in metres",
+    "geoid": "float32 little-endian EGM2008 undulation N in metres; h = H + N",
+    "inland_water": "uint8: 1 inland lake/reservoir/Caspian water, 0 otherwise; never overlaps dry land",
+    "land": "uint8: 1 dry land, 0 otherwise; independent Natural Earth geometry minus inland water",
+    "latitude_origin_deg": 89.84166666666667,
+    "latitude_step_deg": -0.16666666666666666,
+    "limitations": [
+      "Coarse 10 arc-minute samples (~18.5 km at the equator), not high-resolution terrain",
+      "Peaks and small islands may be missed; coastline and DEM use different source geometry",
+      "Inland water levels are static modeled levels derived from Copernicus averaged surfaces, not current lake observations",
+      "Natural Earth shorelines are generalized; low-resolution Copernicus overview pixels may mix shore and water",
+      "Strided grid is not symmetrically cell-centered; retain the explicit origins",
+      "Neither source samples the exact poles; runtime must define a continuous pole cap",
+      "NOAA data are not for navigation; this is a derived simulator asset, not an official product"
+    ],
+    "longitude_origin_deg": 0.008333333333325754,
+    "longitude_step_deg": 0.16666666666666666,
+    "method": "ETOPO2022 v1 60s ice-surface source, point decimation stride10; Natural Earth5.1.1 land and5.0.0 lake polygons tested at exact sample nodes; reviewed Copernicus surface corrections remove lake/coastal bathymetry, preserving genuine negative ground; geoid unchanged; no ellipsoidal conversion, ocean flattening or height quantization performed here",
+    "outputs": {
+      "elevation.f32le": {
+        "bytes": 9331200,
+        "sha256": "56edec09212c2f73b9674dfb689226f1ab8e9436283fd6b0e139e87773bfee82"
+      },
+      "etopo_geoid_north_to_south_10min.npy": {
+        "bytes": 9331328,
+        "sha256": "85a413d02f13f92c8571797331e65574038e70530ac7846e9c577178c50fa318"
+      },
+      "etopo_orthometric_north_to_south_10min.npy": {
+        "bytes": 9331328,
+        "sha256": "b5d966b71b01b19914da8fe14ccb1dc408bb0d6790f32bf57cff438c53923879"
+      },
+      "geoid.f32le": {
+        "bytes": 9331200,
+        "sha256": "d7dc76e9a96a42e0de9668665f4b7c9ce66196131c594139d32266b8c64ef193"
+      },
+      "inland_water.npy": {
+        "bytes": 2332928,
+        "sha256": "1dace45d1a6c986a4e28ee708f1400e73106a9d9c64833ef2625e2181b766be9"
+      },
+      "inland_water.u8": {
+        "bytes": 2332800,
+        "sha256": "7c39c16f20649234c0bfd0e53a0162a59da078555067bdbc4f472e7c4e94d71d"
+      },
+      "land.u8": {
+        "bytes": 2332800,
+        "sha256": "fbf3c2a64c7207d920c7ac2bb42437f4c1bbe5dd7f4b1825eb2c8aca3a301f94"
+      },
+      "ne_land_north_to_south_10min.npy": {
+        "bytes": 2332928,
+        "sha256": "40b4d864d8cab7784172f43f841140c6a362d004f26dda43d45c50d831f28001"
+      },
+      "terrain_latitude_north_to_south_10min.npy": {
+        "bytes": 8768,
+        "sha256": "4fb2533bdc95ef38da6206584639438e1137852e92dfec12f49cb4dbffa94e47"
+      },
+      "terrain_longitude_10min.npy": {
+        "bytes": 17408,
+        "sha256": "5513a8c9bd1467d0eaef7a94f1441cbce60e539d6239276dd14c3cdb9aba9463"
+      }
+    },
+    "preparation_packages": {
+      "numpy": "2.3.5",
+      "pyshp": "3.1.6",
+      "shapely": "2.1.2"
+    },
+    "reviewed_access_date_utc": "2026-10-02",
+    "row_order": "north-to-south",
+    "schema": "flightsim-global-terrain-inputs-v2",
+    "shape": [
+      1080,
+      2160
+    ],
+    "sources": {
+      "copernicus_90m_tilelist.txt": {
+        "bytes": 1111950,
+        "sha256": "e5a5efe088e70506bc1007d22006bdcb09b0ec03177b62f9652363c13f49ed97",
+        "url": "https://copernicus-dem-90m.s3.amazonaws.com/tileList.txt"
+      },
+      "etopo_geoid_10min.dods": {
+        "bytes": 9357389,
+        "sha256": "0bdb4e88ed0d65c08052d2ae62bd981353333859c24a80dfd57c088efe45a600",
+        "url": "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_geoid_netcdf/ETOPO_2022_v1_60s_N90W180_geoid.nc.dods?z[0:10:10799][0:10:21599]"
+      },
+      "etopo_surface_10min.dods": {
+        "bytes": 9357398,
+        "sha256": "575c7a0c84f18b41430a723f26475fa41b1d787c94fa641f0d0705291e3991fd",
+        "url": "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_surface_elev_netcdf/ETOPO_2022_v1_60s_N90W180_surface.nc.dods?z[0:10:10799][0:10:21599]"
+      },
+      "natural_earth_lakes_10m.zip": {
+        "bytes": 2349685,
+        "sha256": "0803a06f9c3cb4671d89b68c48b142aad9366ba40f665245e12a913fbc61722a",
+        "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_lakes.zip"
+      },
+      "natural_earth_land_10m.zip": {
+        "bytes": 3269070,
+        "sha256": "e547d749445eaa0964aba76738090ec88f5e63c4585122170f98c67a7ea922dc",
+        "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_land.zip"
+      }
+    },
+    "surface_corrections": {
+      "license": "Copernicus WorldDEM-90 free and open license; required derivative notices apply",
+      "manifest": "docs/data/global-surface-corrections.json",
+      "sha256": "0c6a217df2f0987cbdbbfe0e8c0347eea77ea5fc259516a0f7246d955c294cab",
+      "source": "Copernicus GLO-90 EGM2008 hydro-edited surface, provider averaged overviews",
+      "status": "COMPLETE"
+    },
+    "validation": {
+      "below_sea_level_land_nodes": 1617,
+      "elevation_range_m": [
+        -10511.001953125,
+        6734.1728515625
+      ],
+      "geoid_range_m": [
+        -106.87641143798828,
+        85.65536499023438
+      ],
+      "inland_water_nodes": 7269,
+      "land_nodes": 766682
+    }
+  },
+  "spacing_degrees": 0.17578125,
+  "status": "COMPLETE"
+}

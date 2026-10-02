@@ -4,7 +4,7 @@
 //! activate a non-overlapping cut once every mesh in a replacement is prepared.
 //! None of this changes the ground sampler or writes to simulation state.
 
-use flightsim_core::Ecef;
+use flightsim_core::{Ecef, Meters};
 use flightsim_world::lod::distance_to_bounds;
 use flightsim_world::{DemTile, LodSelector, TileCache, TileId, TileSource};
 use std::collections::{BTreeSet, HashMap};
@@ -40,8 +40,18 @@ pub struct TerrainSelectionState {
     live: BTreeSet<TileId>,
     resident: BTreeSet<TileId>,
     attempts: HashMap<TileId, LoadAttempt>,
+    // Fallback DEMs must never stop the search for a real ancestor. Keep cache
+    // and resident provenance separately because their lifetimes differ.
+    fallback_cache: BTreeSet<TileId>,
+    fallback_resident: BTreeSet<TileId>,
+    fallback_attempts: HashMap<TileId, u64>,
     frame: u64,
+    // Retain arbitration across updates, including a one-read frame budget.
+    last_load_was_fallback: bool,
     resident_limit: usize,
+    lod_truncated: bool,
+    desired_len: usize,
+    matches_desired: bool,
 }
 
 impl Default for TerrainSelectionState {
@@ -50,8 +60,15 @@ impl Default for TerrainSelectionState {
             live: BTreeSet::new(),
             resident: BTreeSet::new(),
             attempts: HashMap::new(),
+            fallback_cache: BTreeSet::new(),
+            fallback_resident: BTreeSet::new(),
+            fallback_attempts: HashMap::new(),
             frame: 0,
+            last_load_was_fallback: false,
             resident_limit: RESIDENT_TILE_LIMIT,
+            lod_truncated: false,
+            desired_len: 0,
+            matches_desired: true,
         }
     }
 }
@@ -82,8 +99,90 @@ impl TerrainSelectionState {
         self.live.iter().copied()
     }
 
+    /// The selector retained coarser complete leaves because its detail budget
+    /// was exhausted. Coverage is retained, but requested SSE is not satisfied.
+    #[must_use]
+    pub const fn selection_truncated(&self) -> bool {
+        self.lod_truncated
+    }
+
+    /// Number of raw leaves requested by the latest selector update, before
+    /// availability fallback or retaining already visible finer coverage.
+    #[must_use]
+    pub const fn desired_len(&self) -> usize {
+        self.desired_len
+    }
+
+    /// Whether visible IDs exactly equal the latest requested leaf IDs. Equal
+    /// counts alone do not imply convergence. This describes the render selector
+    /// cut, not a renderer's possibly still-pending atomic bridge transaction.
+    #[must_use]
+    pub const fn matches_desired(&self) -> bool {
+        self.matches_desired
+    }
+
     fn available(&self, id: TileId, cache: &TileCache) -> bool {
-        self.resident.contains(&id) || cache.contains(id)
+        self.resident.contains(&id) && !self.fallback_resident.contains(&id)
+            || cache.contains(id) && !self.fallback_cache.contains(&id)
+    }
+
+    /// Count of visible tiles drawn from the explicitly identified global fallback.
+    #[must_use]
+    pub fn fallback_len(&self) -> usize {
+        self.live.intersection(&self.fallback_resident).count()
+    }
+
+    fn next_fallback(
+        &self,
+        primary_reads_possible: bool,
+        wanted: &BTreeSet<TileId>,
+        cache: &TileCache,
+        camera: Ecef,
+    ) -> Option<TileId> {
+        let mut candidates = BTreeSet::new();
+        for &leaf in wanted {
+            // A fine generated tile never outranks any available primary
+            // ancestor. Unless primary data are explicitly impossible, unknown
+            // ancestors must first be searched under budget.
+            let mut ancestor = Some(leaf);
+            let mut all_missing = true;
+            while let Some(id) = ancestor {
+                if self.available(id, cache)
+                    || primary_reads_possible
+                        && !self.attempts.get(&id).is_some_and(|attempt| {
+                            matches!(attempt.outcome, LoadOutcome::Missing | LoadOutcome::Failed)
+                        })
+                {
+                    all_missing = false;
+                    break;
+                }
+                ancestor = id.parent();
+            }
+            if !all_missing {
+                continue;
+            }
+            // The fallback may have a lower maximum level than the requested
+            // primary DEM. Try its ancestors too, rather than leaving holes at
+            // an otherwise valid --max-level above the atlas tessellation cap.
+            let mut ancestor = Some(leaf);
+            while let Some(id) = ancestor {
+                if self.resident.contains(&id) || cache.contains(id) {
+                    break;
+                }
+                if self
+                    .fallback_attempts
+                    .get(&id)
+                    .is_none_or(|frame| self.frame.wrapping_sub(*frame) >= RETRY_FRAMES)
+                {
+                    candidates.insert(id);
+                    break;
+                }
+                ancestor = id.parent();
+            }
+        }
+        candidates
+            .into_iter()
+            .min_by_key(|id| tile_priority(*id, camera))
     }
 
     /// Fresh dependencies precede retries, then oldest attempt, distance and ID.
@@ -140,15 +239,29 @@ impl TerrainSelectionState {
         let mut candidates = BTreeSet::new();
         for &leaf in wanted {
             let mut ancestor = Some(leaf);
+            let mut fallback = None;
+            let mut real_available = false;
             while let Some(id) = ancestor {
-                if self.resident.contains(&id) {
+                if self.resident.contains(&id) && !self.fallback_resident.contains(&id) {
+                    real_available = true;
                     break;
                 }
-                if cache.contains(id) {
+                if cache.contains(id) && !self.fallback_cache.contains(&id) {
                     candidates.insert(id);
+                    real_available = true;
                     break;
+                }
+                if fallback.is_none() && (self.resident.contains(&id) || cache.contains(id)) {
+                    fallback = Some(id);
                 }
                 ancestor = id.parent();
+            }
+            if !real_available
+                && let Some(id) = fallback
+                && !self.resident.contains(&id)
+                && cache.contains(id)
+            {
+                candidates.insert(id);
             }
         }
         candidates
@@ -159,6 +272,7 @@ impl TerrainSelectionState {
     fn remove(&mut self, id: TileId, update: &mut TerrainUpdate) {
         self.live.remove(&id);
         self.resident.remove(&id);
+        self.fallback_resident.remove(&id);
         update.despawned.push(id);
     }
 
@@ -213,6 +327,27 @@ fn has_ancestor(id: TileId, set: &BTreeSet<TileId>) -> bool {
     false
 }
 
+/// Exact powers-of-four coverage in the geographic quadtree. Complete root
+/// seeds are useful during cold global startup, but a partial regional request
+/// must never unexpectedly draw an entire hemisphere.
+fn covers_region(region: TileId, leaves: &BTreeSet<TileId>) -> bool {
+    let mut fraction = 0.0;
+    for &id in leaves {
+        if id.level < region.level {
+            let delta = region.level - id.level;
+            if region.x >> delta == id.x && region.y >> delta == id.y {
+                return true;
+            }
+        } else {
+            let delta = id.level - region.level;
+            if id.x >> delta == region.x && id.y >> delta == region.y {
+                fraction += 0.25_f64.powi(i32::from(delta));
+            }
+        }
+    }
+    fraction >= 1.0
+}
+
 fn insert_ancestors(id: TileId, set: &mut BTreeSet<TileId>) {
     let mut ancestor = Some(id);
     while let Some(id) = ancestor {
@@ -235,6 +370,10 @@ pub struct TerrainUpdate {
     /// Resident tiles to destroy, whether previously visible or hidden.
     pub despawned: Vec<TileId>,
     pub loaded: usize,
+    /// Successful, bounded global-fallback tile generations (included in loaded).
+    pub fallback_loaded: usize,
+    /// Source changes at an existing ID. The sink replaces its mesh atomically.
+    pub replaced: Vec<TileId>,
     /// Includes missing and failed reads; at most the frame budget.
     pub load_attempts: usize,
     pub missing: usize,
@@ -268,8 +407,40 @@ pub fn update_terrain_selection<S: TileSource>(
     frame_budget: usize,
     mesh_sink: &mut dyn FnMut(TileId, &DemTile),
 ) -> TerrainUpdate {
+    let selection = selector.select(camera);
+    state.lod_truncated = selection.truncated;
     update_selected_tiles(
-        selector.select(camera).tiles.into_iter().collect(),
+        selection.tiles.into_iter().collect(),
+        source,
+        cache,
+        state,
+        camera,
+        frame_budget,
+        mesh_sink,
+    )
+}
+
+/// Availability-aware selection using the camera's local ground height. Read
+/// and mesh-generation budgets have exactly the same contract as the legacy
+/// zero-height wrapper. This prevents coarse terrain at elevated airports.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the existing streaming context plus a unit-typed ground reference"
+)]
+pub fn update_terrain_selection_with_surface<S: TileSource>(
+    selector: &LodSelector,
+    source: &S,
+    cache: &mut TileCache,
+    state: &mut TerrainSelectionState,
+    camera: Ecef,
+    ground_elevation: Meters,
+    frame_budget: usize,
+    mesh_sink: &mut dyn FnMut(TileId, &DemTile),
+) -> TerrainUpdate {
+    let selection = selector.select_with_surface(camera, ground_elevation);
+    state.lod_truncated = selection.truncated;
+    update_selected_tiles(
+        selection.tiles.into_iter().collect(),
         source,
         cache,
         state,
@@ -297,11 +468,24 @@ fn update_selected_tiles<S: TileSource>(
         "the desired terrain tree exceeds the resident mesh limit"
     );
     state.attempts.retain(|id, _| active.contains(id));
+    state.fallback_attempts.retain(|id, _| active.contains(id));
+    state.fallback_cache.retain(|id| cache.contains(*id));
     state.frame = state.frame.wrapping_add(1);
     if state.frame == 0 {
         state.attempts.clear();
+        state.fallback_attempts.clear();
     }
     let previous_live = state.live.clone();
+    // At most two coarse seeds close the whole globe quickly while finer
+    // primary discovery continues. Seeds are provisional, never primary data.
+    let seed_roots: Vec<_> = if source.has_fallback() {
+        TileId::roots()
+            .into_iter()
+            .filter(|id| covers_region(*id, &wanted) && !covers_region(*id, &state.live))
+            .collect()
+    } else {
+        Vec::new()
+    };
     let mut update = TerrainUpdate::default();
 
     // Retain finer geometry only if it was actually visible. Never accumulate
@@ -328,14 +512,72 @@ fn update_selected_tiles<S: TileSource>(
         mesh_sink,
         &mut update,
     );
+    let primary_reads_possible = source.primary_reads_possible();
     while update.load_attempts < frame_budget {
-        let Some(id) = state.next_request(&wanted, cache, camera) else {
+        let primary = primary_reads_possible
+            .then(|| {
+                seed_roots
+                    .iter()
+                    .copied()
+                    .filter(|id| !state.available(*id, cache) && !state.attempts.contains_key(id))
+                    .min_by_key(|id| tile_priority(*id, camera))
+                    .or_else(|| state.next_request(&wanted, cache, camera))
+            })
+            .flatten();
+        let fallback = if source.has_fallback() {
+            seed_roots
+                .iter()
+                .copied()
+                .filter(|id| {
+                    !state.resident.contains(id)
+                        && !cache.contains(*id)
+                        && (!primary_reads_possible
+                            || state.attempts.get(id).is_some_and(|attempt| {
+                                matches!(
+                                    attempt.outcome,
+                                    LoadOutcome::Missing | LoadOutcome::Failed
+                                )
+                            }))
+                        && state
+                            .fallback_attempts
+                            .get(id)
+                            .is_none_or(|frame| state.frame.wrapping_sub(*frame) >= RETRY_FRAMES)
+                })
+                .min_by_key(|id| tile_priority(*id, camera))
+                .or_else(|| state.next_fallback(primary_reads_possible, &wanted, cache, camera))
+        } else {
+            None
+        };
+        // Both lanes have already established eligibility and their own priority
+        // order. Comparing distances here lets near primary retries repeatedly
+        // delay a farther ready fallback, or vice versa. Alternate read attempts
+        // across frames so ready terrain and newly arriving real DEMs both make
+        // progress, even with a one-read budget. Cold globe seeds still go first.
+        let use_fallback = fallback.is_some_and(|id| seed_roots.contains(&id))
+            || match (primary, fallback) {
+                (_, None) => false,
+                (None, Some(_)) => true,
+                (Some(_), Some(_)) => !state.last_load_was_fallback,
+            };
+        let Some(id) = (if use_fallback { fallback } else { primary }) else {
             break;
         };
         update.load_attempts += 1;
-        let outcome = match source.load(id) {
+        state.last_load_was_fallback = use_fallback;
+        let loaded = if use_fallback {
+            source.load_fallback(id)
+        } else {
+            source.load(id)
+        };
+        let outcome = match loaded {
             Ok(Some(tile)) => {
                 cache.insert(id, tile);
+                if use_fallback {
+                    state.fallback_cache.insert(id);
+                    update.fallback_loaded += 1;
+                } else {
+                    state.fallback_cache.remove(&id);
+                }
                 update.loaded += 1;
                 LoadOutcome::Loaded
             }
@@ -348,13 +590,17 @@ fn update_selected_tiles<S: TileSource>(
                 LoadOutcome::Failed
             }
         };
-        state.attempts.insert(
-            id,
-            LoadAttempt {
-                frame: state.frame,
-                outcome,
-            },
-        );
+        if use_fallback {
+            state.fallback_attempts.insert(id, state.frame);
+        } else {
+            state.attempts.insert(
+                id,
+                LoadAttempt {
+                    frame: state.frame,
+                    outcome,
+                },
+            );
+        }
         // Prepare before a later load can evict this DEM from a small cache.
         prepare_cached(
             &wanted,
@@ -374,10 +620,17 @@ fn update_selected_tiles<S: TileSource>(
     }
     let mut cut = Vec::new();
     for root in TileId::roots() {
-        resolve_cut(root, false, &wanted, &tree, state, &mut cut);
+        resolve_cut(root, false, false, &wanted, &tree, state, &mut cut);
     }
     let keep: BTreeSet<_> = cut.into_iter().collect();
     update.spawned.extend(keep.difference(&previous_live));
+    // A replacement keeps its ID, but the newly prepared entity is hidden until
+    // this cut commits. Explicitly reveal it even when its predecessor was live.
+    update
+        .spawned
+        .extend(update.replaced.iter().filter(|id| keep.contains(id)));
+    update.spawned.sort_unstable();
+    update.spawned.dedup();
 
     let unused: Vec<_> = state.resident.difference(&keep).copied().collect();
     for id in unused {
@@ -389,6 +642,8 @@ fn update_selected_tiles<S: TileSource>(
             state.remove(id, &mut update);
         }
     }
+    state.desired_len = wanted.len();
+    state.matches_desired = keep == wanted;
     state.live = keep;
     update.despawned.sort_unstable();
     update.despawned.dedup();
@@ -413,12 +668,21 @@ fn prepare_cached(
         let Some(id) = state.next_preparation(wanted, cache, camera) else {
             break;
         };
-        if !state.reserve(id, active, camera, update) {
+        let replacing = state.resident.contains(&id);
+        if !replacing && !state.reserve(id, active, camera, update) {
             break;
         }
         let tile = cache.get(id).expect("prepared tile has a cached DEM");
         mesh_sink(id, tile);
         state.resident.insert(id);
+        if state.fallback_cache.contains(&id) {
+            state.fallback_resident.insert(id);
+        } else {
+            state.fallback_resident.remove(&id);
+        }
+        if replacing {
+            update.replaced.push(id);
+        }
         update.prepared.push(id);
     }
 }
@@ -429,6 +693,7 @@ fn prepare_cached(
 fn resolve_cut(
     id: TileId,
     below_wanted: bool,
+    real_ancestor: bool,
     wanted: &BTreeSet<TileId>,
     tree: &BTreeSet<TileId>,
     state: &TerrainSelectionState,
@@ -438,7 +703,10 @@ fn resolve_cut(
         return false;
     }
     let below_wanted = below_wanted || wanted.contains(&id);
-    if below_wanted && state.resident.contains(&id) {
+    let resident =
+        state.resident.contains(&id) && (!real_ancestor || !state.fallback_resident.contains(&id));
+    let real_here = resident && !state.fallback_resident.contains(&id);
+    if below_wanted && resident {
         cut.push(id);
         return true;
     }
@@ -446,7 +714,15 @@ fn resolve_cut(
     let mut covered = true;
     if let Some(children) = id.children() {
         for child in children {
-            covered &= resolve_cut(child, below_wanted, wanted, tree, state, cut);
+            covered &= resolve_cut(
+                child,
+                below_wanted,
+                real_ancestor || real_here,
+                wanted,
+                tree,
+                state,
+                cut,
+            );
         }
     } else {
         covered = false;
@@ -454,7 +730,7 @@ fn resolve_cut(
     if covered {
         return true;
     }
-    if state.resident.contains(&id) {
+    if resident {
         cut.truncate(start);
         cut.push(id);
         return true;
@@ -474,6 +750,11 @@ mod tests {
         errors: BTreeSet<TileId>,
         malformed: BTreeSet<TileId>,
         calls: RefCell<Vec<TileId>>,
+        fallback_calls: RefCell<Vec<TileId>>,
+        fallback: bool,
+        no_primary: bool,
+        fallback_max_level: Option<u8>,
+        fallback_errors: BTreeSet<TileId>,
     }
 
     impl Source {
@@ -484,6 +765,10 @@ mod tests {
 
     impl TileSource for Source {
         fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+            assert!(
+                !self.no_primary,
+                "explicitly absent primary must not be probed"
+            );
             self.calls.borrow_mut().push(id);
             if self.malformed.contains(&id) {
                 Err(TerrainError::Malformed {
@@ -498,6 +783,29 @@ mod tests {
             } else {
                 self.tiles.load(id)
             }
+        }
+
+        fn primary_reads_possible(&self) -> bool {
+            !self.no_primary
+        }
+
+        fn has_fallback(&self) -> bool {
+            self.fallback
+        }
+
+        fn load_fallback(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+            self.fallback_calls.borrow_mut().push(id);
+            if self.fallback_errors.contains(&id) {
+                return Err(TerrainError::Io {
+                    path: "synthetic-fallback".into(),
+                    source: std::io::Error::other("synthetic fallback failure"),
+                });
+            }
+            Ok((self.fallback
+                && self
+                    .fallback_max_level
+                    .is_none_or(|level| id.level <= level))
+            .then(|| DemTile::new(id.bounds(), HeightGrid::flat(9, 9, Meters(5.0)))))
         }
     }
 
@@ -526,10 +834,14 @@ mod tests {
     }
 
     fn check_no_overlap(state: &TerrainSelectionState) {
-        let ids: Vec<_> = state.ids().collect();
-        for (index, &a) in ids.iter().enumerate() {
-            for &b in &ids[index + 1..] {
-                assert!(!contains(a, b) && !contains(b, a), "overlap: {a:?}, {b:?}");
+        // The geographic quadtree can overlap only along ancestor paths.
+        // Check those exact paths rather than every pair so global regressions
+        // can verify every intermediate cut without quadratic test overhead.
+        for id in state.ids() {
+            let mut ancestor = id.parent();
+            while let Some(parent) = ancestor {
+                assert!(!state.contains(parent), "overlap: {id:?}, {parent:?}");
+                ancestor = parent.parent();
             }
         }
     }
@@ -577,7 +889,7 @@ mod tests {
         budget: usize,
         camera: Ecef,
     ) -> TerrainUpdate {
-        let before = source.calls.borrow().len();
+        let before = source.calls.borrow().len() + source.fallback_calls.borrow().len();
         let mut meshes = Vec::new();
         let update = update_selected_tiles(
             wanted.iter().copied().collect(),
@@ -591,7 +903,10 @@ mod tests {
                 meshes.push(id);
             },
         );
-        assert_eq!(update.load_attempts, source.calls.borrow().len() - before);
+        assert_eq!(
+            update.load_attempts,
+            source.calls.borrow().len() + source.fallback_calls.borrow().len() - before
+        );
         assert!(update.load_attempts <= budget);
         assert_eq!(
             update.loaded + update.missing + update.failed,
@@ -602,6 +917,11 @@ mod tests {
         assert!(state.resident_len() <= state.resident_limit);
         assert!(state.live.is_subset(&state.resident));
         check_no_overlap(state);
+        assert_eq!(state.desired_len(), wanted.len());
+        assert_eq!(
+            state.matches_desired(),
+            state.live == wanted.iter().copied().collect()
+        );
         update
     }
 
@@ -1223,5 +1543,650 @@ mod tests {
                 assert!(active.len() <= RESIDENT_TILE_LIMIT);
             }
         }
+    }
+
+    #[test]
+    fn explicit_global_only_seeds_and_refines_without_primary_reads_or_history() {
+        let wanted: Vec<_> = TileId::roots()
+            .into_iter()
+            .flat_map(|id| id.children().unwrap())
+            .flat_map(|id| id.children().unwrap())
+            .collect();
+        for budget in [1, 8] {
+            let source = Source {
+                fallback: true,
+                no_primary: true,
+                ..Default::default()
+            };
+            let mut state = TerrainSelectionState::default();
+            let mut cache = TileCache::new(dem(parent()).memory_footprint());
+            let zero = step(&wanted, &source, &mut cache, &mut state, 0);
+            assert_eq!(zero.load_attempts, 0);
+            assert!(state.is_empty());
+            let mut calls = 0;
+            let mut reads = 0;
+            while !state.matches_desired() && calls < 34 {
+                let update = step(&wanted, &source, &mut cache, &mut state, budget);
+                calls += 1;
+                reads += update.load_attempts;
+                assert_eq!(update.load_attempts, update.fallback_loaded);
+                assert_eq!(update.missing, 0);
+                if calls * budget >= 2 {
+                    for root in TileId::roots() {
+                        assert!(covers_region(root, &state.live));
+                    }
+                }
+                assert!(state.attempts.is_empty());
+                assert!(cache.used_bytes() <= cache.capacity_bytes());
+            }
+            assert!(state.matches_desired());
+            assert_eq!(reads, 34); // Two root seeds plus the 32 exact leaves.
+            assert_eq!(calls, 34_usize.div_ceil(budget));
+            assert_eq!(state.fallback_len(), wanted.len());
+            assert!(source.calls.borrow().is_empty());
+        }
+    }
+
+    #[test]
+    fn explicit_no_primary_keeps_cached_and_resident_real_ancestors() {
+        let parent = parent();
+        let children = parent.children().unwrap();
+        for resident in [false, true] {
+            let mut state = TerrainSelectionState::default();
+            let mut cache = TileCache::new(1_000_000);
+            cache.insert(parent, dem(parent));
+            if resident {
+                let mut original = Source::default();
+                original.add(parent);
+                step(&children, &original, &mut cache, &mut state, 8);
+                cache.clear();
+                assert!(state.contains(parent));
+            }
+            let source = Source {
+                fallback: true,
+                no_primary: true,
+                ..Default::default()
+            };
+            for _ in 0..RETRY_FRAMES + 1 {
+                step(&children, &source, &mut cache, &mut state, 8);
+                assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
+                assert_eq!(state.fallback_len(), 0);
+                check_covered(&state, parent);
+            }
+            assert!(source.calls.borrow().is_empty());
+            assert!(source.fallback_calls.borrow().is_empty());
+        }
+    }
+
+    #[test]
+    fn a_configured_absent_directory_still_discovers_late_real_primary() {
+        use flightsim_world::{
+            DiskTileSource,
+            global::{GlobalTerrain, GlobalTileSource},
+        };
+        let directory = std::env::temp_dir().join(format!(
+            "flightsim-late-primary-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let parent = parent();
+        let children = parent.children().unwrap();
+        let source = GlobalTileSource::new(
+            DiskTileSource::new(&directory),
+            GlobalTerrain::bundled().unwrap(),
+        );
+        assert!(source.primary_reads_possible());
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        let advance = |state: &mut TerrainSelectionState, cache: &mut TileCache| {
+            update_selected_tiles(
+                children.into_iter().collect(),
+                &source,
+                cache,
+                state,
+                camera(),
+                8,
+                &mut |_, _| {},
+            )
+        };
+        for _ in 0..32 {
+            advance(&mut state, &mut cache);
+        }
+        assert_eq!(state.fallback_len(), 4);
+        let path = directory.join(flightsim_world::dem::io::tile_relative_path(parent));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut bytes = Vec::new();
+        flightsim_world::dem::io::write_tile(&mut bytes, parent, dem(parent).grid()).unwrap();
+        std::fs::write(&path, bytes).unwrap();
+        for _ in 0..RETRY_FRAMES + 16 {
+            advance(&mut state, &mut cache);
+            check_covered(&state, parent);
+            if state.fallback_len() == 0 {
+                break;
+            }
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
+        assert_eq!(state.fallback_len(), 0);
+        assert!(source.primary_reads_possible());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn global_fallback_never_masks_a_real_ancestor() {
+        let parent = parent();
+        let children = parent.children().unwrap();
+        let mut source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        source.add(parent);
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..32 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
+        assert_eq!(state.fallback_len(), 0);
+        assert!(source.fallback_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn global_generation_and_meshes_share_the_existing_frame_budgets() {
+        let children = parent().children().unwrap();
+        let source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..80 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), sorted(children));
+        assert_eq!(state.fallback_len(), 4);
+        assert_eq!(source.fallback_calls.borrow().len(), 4);
+        check_covered(&state, parent());
+    }
+
+    #[test]
+    fn real_tile_arriving_after_global_fallback_replaces_same_id_atomically() {
+        let id = parent();
+        let mut source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..32 {
+            step(&[id], &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.fallback_len(), 1);
+        source.add(id);
+        let mut replaced = false;
+        for _ in 0..160 {
+            let update = step(&[id], &source, &mut cache, &mut state, 1);
+            assert!(state.contains(id), "replacement must not leave a hole");
+            if update.replaced.contains(&id) {
+                replaced = true;
+                assert!(update.prepared.contains(&id));
+                assert!(update.spawned.contains(&id));
+                assert!(!update.despawned.contains(&id));
+                assert_eq!(state.fallback_len(), 0);
+                break;
+            }
+        }
+        assert!(replaced, "real DEM retry never replaced global fallback");
+    }
+
+    #[test]
+    fn late_real_parent_overrides_already_visible_global_children() {
+        let parent = parent();
+        let children = parent.children().unwrap();
+        let mut source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..32 {
+            step(&children, &source, &mut cache, &mut state, 2);
+        }
+        assert_eq!(state.fallback_len(), 4);
+        source.add(parent);
+        for _ in 0..160 {
+            step(&children, &source, &mut cache, &mut state, 2);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
+        assert_eq!(state.fallback_len(), 0);
+        check_covered(&state, parent);
+    }
+
+    #[test]
+    fn global_fallback_remains_complete_with_a_one_tile_cache() {
+        let children = parent().children().unwrap();
+        let source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(dem(parent()).memory_footprint());
+        for _ in 0..80 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), sorted(children));
+        assert_eq!(state.fallback_len(), 4);
+        check_covered(&state, parent());
+        for _ in 0..160 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.fallback_len(), 4);
+        assert_eq!(
+            source.fallback_calls.borrow().len(),
+            4,
+            "resident meshes avoid regeneration after DEM eviction"
+        );
+    }
+
+    #[test]
+    fn global_fallback_uses_supported_ancestor_above_its_tessellation_cap() {
+        let parent = parent();
+        let children = parent.children().unwrap();
+        let source = Source {
+            fallback: true,
+            fallback_max_level: Some(parent.level),
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..80 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
+        assert_eq!(state.fallback_len(), 1);
+        check_covered(&state, parent);
+    }
+
+    #[test]
+    fn global_cold_start_seeds_complete_globe_before_fine_discovery() {
+        let wanted: Vec<_> = TileId::roots()
+            .into_iter()
+            .flat_map(|id| id.children().unwrap())
+            .flat_map(|id| id.children().unwrap())
+            .collect();
+        let source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..4 {
+            step(&wanted, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.ids().collect::<Vec<_>>(), TileId::roots());
+        assert_eq!(state.fallback_len(), 2);
+        for root in TileId::roots() {
+            assert!(covers_region(root, &state.live));
+        }
+        for _ in 0..100 {
+            step(&wanted, &source, &mut cache, &mut state, 2);
+        }
+        assert_eq!(
+            state.ids().collect::<BTreeSet<_>>(),
+            wanted.into_iter().collect()
+        );
+        for root in TileId::roots() {
+            assert!(covers_region(root, &state.live));
+        }
+    }
+
+    #[test]
+    fn eligible_fallback_and_primary_work_both_progress_under_continuous_demand() {
+        let near = TileId::new(4, 2, 3);
+        let far = TileId::new(4, 24, 11);
+        let mut near_leaves = vec![near];
+        for _ in 0..4 {
+            near_leaves = near_leaves
+                .into_iter()
+                .flat_map(|id| id.children().unwrap())
+                .collect();
+        }
+        let wanted: Vec<_> = near_leaves
+            .iter()
+            .copied()
+            .chain(far.children().unwrap())
+            .collect();
+        let mut active = BTreeSet::new();
+        for &id in &wanted {
+            insert_ancestors(id, &mut active);
+        }
+        for camera_region in [near, far] {
+            let center = camera_region.center();
+            let camera = Geodetic::new(center.latitude, center.longitude, Meters(100.0)).to_ecef();
+            for (fail_fallback, fresh_primary) in
+                [(false, false), (false, true), (true, false), (true, true)]
+            {
+                for budget in [1, 8] {
+                    let mut source = Source {
+                        fallback: true,
+                        ..Default::default()
+                    };
+                    // Exercise both distance orders, and unsuccessful fallback reads.
+                    // A real coarse tile is newly discovered or has arrived after
+                    // a failed read. Its first read/retry and the fallback lane
+                    // must each get a turn.
+                    source.add(far);
+                    if fail_fallback {
+                        source.fallback_errors.extend(active.iter().copied());
+                    }
+                    let mut state = TerrainSelectionState {
+                        frame: RETRY_FRAMES + 1,
+                        ..Default::default()
+                    };
+                    state.attempts.extend(active.iter().map(|&id| {
+                        (
+                            id,
+                            LoadAttempt {
+                                frame: 1,
+                                outcome: LoadOutcome::Missing,
+                            },
+                        )
+                    }));
+                    state.attempts.insert(
+                        far,
+                        LoadAttempt {
+                            frame: 0,
+                            outcome: LoadOutcome::Failed,
+                        },
+                    );
+                    if fresh_primary {
+                        state.attempts.remove(&far);
+                    }
+                    state.live.extend([near]);
+                    state.live.extend(far.children().unwrap());
+                    state.resident.clone_from(&state.live);
+                    state.fallback_resident.clone_from(&state.live);
+                    let mut cache = TileCache::new(dem(near).memory_footprint());
+                    let frames = 32 / budget;
+                    let mut primary_reads = 0;
+                    let mut fallback_reads = 0;
+                    for frame in 0..frames {
+                        assert!(
+                            state
+                                .next_request(&wanted.iter().copied().collect(), &cache, camera)
+                                .is_some()
+                        );
+                        assert!(
+                            state
+                                .next_fallback(
+                                    true,
+                                    &wanted.iter().copied().collect(),
+                                    &cache,
+                                    camera
+                                )
+                                .is_some()
+                        );
+                        let before_primary = source.calls.borrow().len();
+                        let before_fallback = source.fallback_calls.borrow().len();
+                        step_at(&wanted, &source, &mut cache, &mut state, budget, camera);
+                        primary_reads += source.calls.borrow().len() - before_primary;
+                        fallback_reads += source.fallback_calls.borrow().len() - before_fallback;
+                        assert!(primary_reads.abs_diff(fallback_reads) <= 1);
+                        if (frame + 1) * budget >= 2 {
+                            assert!(
+                                state.contains(far),
+                                "new real ancestor must get a fair read"
+                            );
+                            assert!(!state.fallback_resident.contains(&far));
+                        }
+                        check_covered(&state, near);
+                        check_covered(&state, far);
+                        assert!(cache.used_bytes() <= cache.capacity_bytes());
+                    }
+                    assert_eq!(primary_reads, 16);
+                    assert_eq!(fallback_reads, 16);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn missing_and_failed_fallback_reads_take_a_turn_and_retry_after_data_arrives() {
+        for no_primary in [false, true] {
+            for budget in [1, 8] {
+                for fail in [false, true] {
+                    // A complete sibling cut can replace its covering fallback
+                    // parent; one child alone correctly leaves that parent visible.
+                    let wanted = parent().children().unwrap();
+                    let id = *wanted
+                        .iter()
+                        .min_by_key(|&&id| tile_priority(id, camera()))
+                        .unwrap();
+                    let mut source = Source {
+                        fallback: true,
+                        no_primary,
+                        fallback_max_level: (!fail).then_some(id.level - 1),
+                        ..Default::default()
+                    };
+                    if fail {
+                        source.fallback_errors.extend(wanted);
+                    }
+                    let mut state = TerrainSelectionState::default();
+                    let mut cache = TileCache::new(dem(id).memory_footprint());
+                    let mut last_attempt = None;
+                    for _ in 0..32 {
+                        let update = step(&wanted, &source, &mut cache, &mut state, budget);
+                        if state.fallback_attempts.contains_key(&id) {
+                            assert!(if fail {
+                                update.failed > 0
+                            } else {
+                                update.missing > 0
+                            });
+                            last_attempt = state.fallback_attempts.get(&id).copied();
+                            break;
+                        }
+                    }
+                    let failed_at =
+                        last_attempt.expect("fixture must try its unavailable fallback");
+                    source.fallback_errors.clear();
+                    source.fallback_max_level = None;
+                    let calls_before = source
+                        .fallback_calls
+                        .borrow()
+                        .iter()
+                        .filter(|&&tile| tile == id)
+                        .count();
+                    let mut recovered = false;
+                    for _ in 0..RETRY_FRAMES + 16 {
+                        step(&wanted, &source, &mut cache, &mut state, budget);
+                        let calls_now = source
+                            .fallback_calls
+                            .borrow()
+                            .iter()
+                            .filter(|&&tile| tile == id)
+                            .count();
+                        if state.frame - failed_at < RETRY_FRAMES {
+                            assert_eq!(
+                                calls_now, calls_before,
+                                "fallback retry ignored its cooldown"
+                            );
+                        }
+                        if state.matches_desired() {
+                            assert!(state.frame - failed_at >= RETRY_FRAMES);
+                            assert_eq!(calls_now, calls_before + 1);
+                            recovered = true;
+                            break;
+                        }
+                    }
+                    assert!(
+                        recovered,
+                        "available fallback did not recover after its cooldown: budget={budget}, fail={fail}"
+                    );
+                    assert_eq!(state.ids().collect::<Vec<_>>(), sorted(wanted));
+                    check_covered(&state, parent());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn large_global_cold_start_and_moved_camera_converge_to_exact_desired_ids() {
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        );
+        let source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(512 * 1024 * 1024);
+        // This default-size exact-pole cut exposed a 684-call tail: all but one
+        // fallback mesh were ready, but nearby primary retries won every read.
+        // The moved cut also has 4,094 leaves, so counts cannot prove convergence.
+        for (lat, lon, alt, max_calls) in [(90.0, 0.0, 1215.0, 1_200), (89.9914, 90.0, 1282.0, 450)]
+        {
+            let camera = Geodetic::from_degrees(lat, lon, alt).to_ecef();
+            let wanted = selector.select_with_surface(camera, Meters(14.90934)).tiles;
+            let wanted_set: BTreeSet<_> = wanted.iter().copied().collect();
+            assert_eq!(wanted_set.len(), 4_094);
+            assert_ne!(state.live, wanted_set);
+            let mut converged = false;
+            for _ in 0..max_calls {
+                step_at(&wanted, &source, &mut cache, &mut state, 8, camera);
+                for root in TileId::roots() {
+                    assert!(covers_region(root, &state.live), "global coverage was lost");
+                }
+                assert!(cache.used_bytes() <= cache.capacity_bytes());
+                if state.matches_desired() {
+                    assert_eq!(state.live, wanted_set);
+                    converged = true;
+                    break;
+                }
+            }
+            assert!(
+                converged,
+                "bounded streaming failed to reach the exact desired cut"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_global_only_large_cold_and_moved_cuts_need_no_primary_probes() {
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        );
+        let source = Source {
+            fallback: true,
+            no_primary: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(512 * 1024 * 1024);
+        for (lat, lon, alt, expected_calls, expected_reads, expected_prepared) in [
+            (90.0, 0.0, 1215.0, 512, 4096, 4096),
+            (89.9914, 90.0, 1282.0, 221, 1710, 1761),
+        ] {
+            let camera = Geodetic::from_degrees(lat, lon, alt).to_ecef();
+            let wanted = selector.select_with_surface(camera, Meters(14.90934)).tiles;
+            assert_eq!(wanted.len(), 4094);
+            let mut reads = 0;
+            let mut prepared = 0;
+            for call in 1..=expected_calls {
+                let update = step_at(&wanted, &source, &mut cache, &mut state, 8, camera);
+                reads += update.load_attempts;
+                prepared += update.prepared.len();
+                assert_eq!(update.load_attempts, update.fallback_loaded);
+                assert!(state.attempts.is_empty());
+                assert!(cache.used_bytes() <= cache.capacity_bytes());
+                for root in TileId::roots() {
+                    assert!(covers_region(root, &state.live));
+                }
+                assert_eq!(state.matches_desired(), call == expected_calls);
+            }
+            assert_eq!(reads, expected_reads);
+            assert_eq!(prepared, expected_prepared);
+            assert_eq!(state.live, wanted.into_iter().collect());
+        }
+        assert!(source.calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn desired_diagnostics_compare_ids_instead_of_only_counts() {
+        let old = parent();
+        let new = old.parent().unwrap();
+        let mut source = Source::default();
+        source.add(old);
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        step(&[old], &source, &mut cache, &mut state, 1);
+        assert!(state.matches_desired());
+        step(&[new], &source, &mut cache, &mut state, 1);
+        assert_eq!(state.desired_len(), state.len());
+        assert!(
+            !state.matches_desired(),
+            "retained finer coverage is not the desired ID"
+        );
+        source.add(new);
+        for _ in 0..RETRY_FRAMES + 1 {
+            step(&[new], &source, &mut cache, &mut state, 1);
+            if state.matches_desired() {
+                break;
+            }
+        }
+        assert!(state.matches_desired());
+        assert_eq!(state.ids().collect::<Vec<_>>(), vec![new]);
+        step(&[], &source, &mut cache, &mut state, 1);
+        assert_eq!(state.desired_len(), 0);
+        assert!(state.matches_desired());
+    }
+
+    #[test]
+    fn streaming_exposes_when_lod_detail_was_limited() {
+        let source = Source::default();
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        )
+        .with_max_tiles(2);
+        update_terrain_selection_with_surface(
+            &selector,
+            &source,
+            &mut cache,
+            &mut state,
+            camera(),
+            Meters::ZERO,
+            0,
+            &mut |_, _| {},
+        );
+        assert!(state.selection_truncated());
+        let root_only = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            0,
+            Meters(20_000.0),
+        );
+        update_terrain_selection(
+            &root_only,
+            &source,
+            &mut cache,
+            &mut state,
+            camera(),
+            0,
+            &mut |_, _| {},
+        );
+        assert!(!state.selection_truncated());
     }
 }

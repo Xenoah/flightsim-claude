@@ -5,7 +5,7 @@
 //! `Commands` に反映するだけ。
 
 use bevy::prelude::*;
-use flightsim_core::{Meters, RenderFrame};
+use flightsim_core::{Geodetic, Meters, Radians, RenderFrame};
 use flightsim_world::{TileId, build_mesh};
 use std::collections::HashMap;
 
@@ -44,6 +44,7 @@ impl Default for TerrainRenderConfig {
 #[derive(Resource, Debug, Default)]
 pub struct TerrainTiles {
     entities: HashMap<TileId, (Entity, Handle<Mesh>)>,
+    pub(crate) stitching: crate::terrain_stitching::TerrainStitching,
 }
 
 impl TerrainTiles {
@@ -72,7 +73,52 @@ impl TerrainTiles {
     }
 
     pub fn remove(&mut self, id: TileId) -> Option<(Entity, Handle<Mesh>)> {
+        self.stitching.remove_boundary(id);
         self.entities.remove(&id)
+    }
+
+    /// Register a bounded hidden preparation. A replaced visible mesh stays
+    /// alive until its replacement's bridges and visibility cut commit.
+    pub fn insert_prepared(&mut self, prepared: PreparedTerrainTile) {
+        if let Some(previous) = self
+            .entities
+            .insert(prepared.id, (prepared.entity, prepared.mesh))
+        {
+            self.stitching.retire(previous);
+        }
+        self.stitching
+            .record_surface(prepared.entity, prepared.vertices, prepared.indices);
+        self.stitching
+            .insert_boundary(prepared.id, prepared.boundary);
+    }
+
+    /// Selection must pause while bridges for a new cut are prepared. Advancing
+    /// that transaction uses the same per-frame mesh budget as surface tiles.
+    #[must_use]
+    pub fn is_stitching(&self) -> bool {
+        self.stitching.is_pending()
+    }
+
+    /// IDs actually displayed by the stitched path. During preparation these
+    /// intentionally lag the selector's ready cut.
+    pub fn displayed_ids(&self) -> impl Iterator<Item = TileId> + '_ {
+        self.stitching.displayed_ids()
+    }
+
+    /// Logical mesh and compact-boundary storage owned by the stitched path.
+    /// Includes both old and staged assets during an atomic transition.
+    #[must_use]
+    pub fn resource_usage(&self) -> crate::terrain_stitching::TerrainResourceUsage {
+        self.stitching.resource_usage()
+    }
+
+    /// Remove every asset owned by this terrain scene, including old same-ID
+    /// meshes and pending/visible bridges. The caller despawns returned entities
+    /// and removes returned mesh handles; useful for an explicit new flight.
+    pub fn drain_all(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
+        let mut assets: Vec<_> = self.entities.drain().map(|(_, asset)| asset).collect();
+        assets.extend(self.stitching.drain_all());
+        assets
     }
 
     pub fn ids(&self) -> impl Iterator<Item = TileId> + '_ {
@@ -83,6 +129,45 @@ impl TerrainTiles {
 /// 地形タイルであることを示す印。デバッグ表示と一括削除に使う。
 #[derive(Component, Debug, Clone, Copy)]
 pub struct TerrainTile(pub TileId);
+
+/// Hidden surface preparation plus its compact post-f32 boundary data.
+#[derive(Debug)]
+pub struct PreparedTerrainTile {
+    pub id: TileId,
+    pub entity: Entity,
+    pub mesh: Handle<Mesh>,
+    pub(crate) boundary: flightsim_world::seams::TerrainBoundary,
+    vertices: usize,
+    indices: usize,
+}
+
+/// Build a surface and retain its actual rendered edge geometry for stitching.
+/// The optional palette has the same contract as [`spawn_tile_colored`].
+#[allow(
+    clippy::too_many_arguments,
+    reason = "surface preparation receives its rendering context and optional palette"
+)]
+pub fn prepare_tile(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    frame: &RenderFrame,
+    id: TileId,
+    dem: &flightsim_world::DemTile,
+    color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
+) -> PreparedTerrainTile {
+    let source = build_mesh(id, dem, &crate::mesh_options_for(id.level));
+    let boundary = flightsim_world::seams::TerrainBoundary::from_mesh(id, &source);
+    let (entity, mesh) = spawn_source(commands, meshes, material, frame, id, &source, color);
+    PreparedTerrainTile {
+        id,
+        entity,
+        mesh,
+        boundary,
+        vertices: source.positions.len(),
+        indices: source.indices.len(),
+    }
+}
 
 /// タイル 1 枚ぶんの実体を非表示で準備する。
 ///
@@ -96,8 +181,54 @@ pub fn spawn_tile(
     id: TileId,
     dem: &flightsim_world::DemTile,
 ) -> (Entity, Handle<Mesh>) {
+    spawn_tile_impl(commands, meshes, material, frame, id, dem, None)
+}
+
+/// Prepare a terrain mesh whose surface uses an app-supplied geographic palette.
+/// The callback returns linear RGBA, not sRGB. Its position is the actual DEM
+/// surface vertex; source data and physics stay outside the renderer.
+pub fn spawn_tile_colored(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    frame: &RenderFrame,
+    id: TileId,
+    dem: &flightsim_world::DemTile,
+    color: &dyn Fn(Geodetic, Radians) -> [f32; 4],
+) -> (Entity, Handle<Mesh>) {
+    spawn_tile_impl(commands, meshes, material, frame, id, dem, Some(color))
+}
+
+fn spawn_tile_impl(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    frame: &RenderFrame,
+    id: TileId,
+    dem: &flightsim_world::DemTile,
+    color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
+) -> (Entity, Handle<Mesh>) {
     let source = build_mesh(id, dem, &crate::mesh_options_for(id.level));
-    let handle = meshes.add(crate::to_bevy_mesh(&source));
+    spawn_source(commands, meshes, material, frame, id, &source, color)
+}
+
+fn spawn_source(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    frame: &RenderFrame,
+    id: TileId,
+    source: &flightsim_world::TerrainMesh,
+    color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
+) -> (Entity, Handle<Mesh>) {
+    let mut mesh = crate::to_bevy_mesh(source);
+    if let Some(color) = color {
+        mesh.insert_attribute(
+            Mesh::ATTRIBUTE_COLOR,
+            terrain_vertex_colors(id, source, color),
+        );
+    }
+    let handle = meshes.add(mesh);
 
     // Terrain runs after the regular Transforms set. Give a tile its correct
     // initial frame immediately, even if it becomes visible in this update.
@@ -115,6 +246,35 @@ pub fn spawn_tile(
         .insert((transform, Visibility::Hidden))
         .id();
     (entity, handle)
+}
+
+/// Reconstruct geographic colour positions with closed polar endpoints. Binary
+/// arithmetic can put a south-edge vertex one ulp below -PI/2 even though the
+/// tile and UV are valid; that must not become an invalid global data query.
+fn terrain_vertex_colors(
+    id: TileId,
+    source: &flightsim_world::TerrainMesh,
+    color: &dyn Fn(Geodetic, Radians) -> [f32; 4],
+) -> Vec<[f32; 4]> {
+    let bounds = id.bounds();
+    source
+        .uvs
+        .iter()
+        .zip(&source.elevations)
+        .zip(&source.slopes)
+        .map(|((&[u, v], &height), &slope)| {
+            let latitude = (bounds.north.get() - f64::from(v) * bounds.height().get())
+                .clamp(-core::f64::consts::FRAC_PI_2, core::f64::consts::FRAC_PI_2);
+            color(
+                Geodetic::new(
+                    Radians(latitude),
+                    Radians(bounds.west.get() + f64::from(u) * bounds.width().get()),
+                    Meters(f64::from(height)),
+                ),
+                Radians(f64::from(slope)),
+            )
+        })
+        .collect()
 }
 
 /// 描画対象から外れたタイルを片付ける。
@@ -202,5 +362,28 @@ mod tests {
             tiles.remove(id).is_none(),
             "removing twice should be a no-op"
         );
+    }
+
+    #[test]
+    fn colored_mesh_queries_never_cross_a_closed_polar_endpoint() {
+        for level in [0, 6, 10, 13] {
+            for row in [0, (1_u32 << level) - 1] {
+                let id = TileId::new(level, 0, row);
+                let dem = flightsim_world::DemTile::new(
+                    id.bounds(),
+                    flightsim_world::HeightGrid::flat(33, 33, Meters(-30.0)),
+                );
+                let mesh = build_mesh(id, &dem, &crate::mesh_options_for(level));
+                let colors = terrain_vertex_colors(id, &mesh, &|position, _| {
+                    assert!(
+                        (-core::f64::consts::FRAC_PI_2..=core::f64::consts::FRAC_PI_2)
+                            .contains(&position.latitude.get())
+                    );
+                    assert!(position.longitude.is_finite() && position.altitude.is_finite());
+                    [0.1, 0.2, 0.3, 1.0]
+                });
+                assert_eq!(colors.len(), mesh.positions.len());
+            }
+        }
     }
 }

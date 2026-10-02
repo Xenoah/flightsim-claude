@@ -76,3 +76,10 @@ if sse > threshold: 子タイルへ細分化
 
 以下が起きた場合、この決定を再評価する。
 - 都市部の見た目が要件を満たさないとユーザーが判断した場合 → Cesium ion / Google 3D Tiles の併用を検討（タイル索引が互換なので差し替え可能）
+
+## 2026-10-02 extension: compact global baseline
+
+[ADR-0011](0011-offline-global-terrain-climate.md) adds an offline, roughly20km NOAA
+ETOPO/NaturalEarth base atlas plus monthly NOAA reanalysis climatology. This is
+a compact baseline below regional DEMs, not a full-resolution global bake. The
+regional high-resolution pipeline and no-runtime-raw-data rule remain unchanged.

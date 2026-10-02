@@ -29,8 +29,32 @@ use flightsim_fdm::{
     AircraftConfig, Atmosphere, ControlInputs, Environment, FlightDynamics, RECOMMENDED_FIXED_DT,
     RigidBodyState, Turbulence,
 };
-use flightsim_world::{Terrain, TileSource};
+use flightsim_world::{
+    ClimateDataError, ClimateDate, ClimateSample, GlobalClimate, Terrain, TileSource,
+};
 use glam::DQuat;
+
+/// Physical air for a prospective start point, using the same world/FDM bridge
+/// as [`Simulation`]. Intended for density-aware initialization before a
+/// simulation exists; it only reads the validated immutable climate snapshot.
+///
+/// # Errors
+/// Returns an error if enabled bundled climate data fail validation.
+pub fn climate_atmosphere_sample(
+    position: Geodetic,
+    date: Option<ClimateDate>,
+) -> Result<flightsim_fdm::AtmosphereSample, ClimateDataError> {
+    let atmosphere = if let Some(date) = date {
+        atmosphere_from_climate(GlobalClimate::bundled()?.sample(position, date))
+    } else {
+        Atmosphere::standard()
+    };
+    Ok(atmosphere.sample(position.altitude))
+}
+
+fn atmosphere_from_climate(sample: ClimateSample) -> Atmosphere {
+    Atmosphere::with_temperature_offset(sample.isa_temperature_offset.get())
+}
 
 /// 描画に使う補間済みの姿勢と位置。
 ///
@@ -165,6 +189,9 @@ pub struct Simulation<S: TileSource> {
     wind: Wind,
     /// 乱流。既定は無乱流で、既存の呼び出しの挙動は変わらない。
     turbulence: Turbulence,
+    /// Validated, immutable monthly climatology and a fixed session date.
+    /// None preserves the original ISA-only physics and version-1 replays.
+    climate: Option<(GlobalClimate, ClimateDate)>,
     /// 飛行の記録。
     log: FlightLog,
     /// 距離の累積に使う直前の位置。
@@ -208,6 +235,7 @@ impl<S: TileSource> Simulation<S> {
             diverged: false,
             wind: Wind::CALM,
             turbulence: Turbulence::CALM,
+            climate: None,
             log: FlightLog::default(),
             previous_position: state.geodetic(),
             gear_height,
@@ -242,6 +270,7 @@ impl<S: TileSource> Simulation<S> {
             diverged: false,
             wind: Wind::CALM,
             turbulence: Turbulence::CALM,
+            climate: None,
             log: FlightLog::default(),
             previous_position: state.geodetic(),
             gear_height,
@@ -323,32 +352,47 @@ impl<S: TileSource> Simulation<S> {
         self.restart_at(state);
     }
 
-    /// 描画フレーム時間ぶん進める。
+    /// Advance a render frame using the same controls for every fixed step.
     ///
-    /// 内部で固定 dt に分割する。**フレーム時間をそのまま物理へ渡さない**
-    /// のがこのメソッドの役目（ADR-0004）。
+    /// This is the constant-input wrapper around [`Self::advance_with_controls`].
+    /// The frame duration is never passed directly to the FDM (ADR-0004).
     pub fn advance(&mut self, frame_time: Seconds, controls: ControlInputs) -> StepReport {
-        if self.crash.is_some() {
-            // **壊れた機体を飛ばし続けない。** 転がり続けると「まだ飛べる」
-            // ように見えて、失敗が失敗として伝わらない。
+        self.advance_with_controls(frame_time, |_, _| controls)
+    }
+
+    /// Advance a render frame, obtaining controls immediately before each FDM step.
+    ///
+    /// The callback receives the fixed physics duration (120 Hz) and the **pre-step**
+    /// state. Update rate-dependent pilot controls there, and pass that same duration,
+    /// control value and state to [`crate::replay::Recorder::record`] when recording.
+    /// The existing [`FixedStep`] accumulator alone decides how many steps are due;
+    /// sub-step render frames do not call the callback. Paused callers should omit
+    /// this call or pass zero time, so no paused time is accumulated.
+    ///
+    /// A crash or divergence stops the frame immediately. The report counts only
+    /// executed FDM steps, including a step that diverges. The unused frame budget
+    /// and fractional remainder are discarded on that terminal outcome, while
+    /// [`Self::elapsed`] retains only the time of executed steps. A frozen simulation
+    /// never calls the callback, records another input, or catches up discarded time.
+    pub fn advance_with_controls(
+        &mut self,
+        frame_time: Seconds,
+        mut controls_for_step: impl FnMut(Seconds, &RigidBodyState) -> ControlInputs,
+    ) -> StepReport {
+        if self.crash.is_some() || self.diverged {
             return StepReport {
                 steps: 0,
-                diverged: false,
-                terrain_missing: !self.ground.from_terrain,
-            };
-        }
-        if self.diverged {
-            return StepReport {
-                steps: 0,
-                diverged: true,
+                diverged: self.diverged,
                 terrain_missing: !self.ground.from_terrain,
             };
         }
 
-        let steps = self.fixed.advance(frame_time);
+        let due = self.fixed.advance(frame_time);
+        let dt = self.fixed.fixed_dt();
+        let mut steps = 0;
         let mut terrain_missing = false;
 
-        for _ in 0..steps {
+        for _ in 0..due {
             let state = *self.dynamics.state();
             if !state.is_finite() {
                 self.diverged = true;
@@ -359,24 +403,36 @@ impl<S: TileSource> Simulation<S> {
             self.ground = self.sampler.sample(&mut self.terrain, state.geodetic());
             terrain_missing |= !self.ground.from_terrain;
 
-            // 既存の 120 Hz 呼び出しと同じくステップ終端の時刻で場をサンプルする。
-            // フレーム内に複数ステップあっても、それぞれ別の時刻を使う。
-            self.physics_elapsed += self.fixed.fixed_dt();
-
-            // 接地平面は 1 ステップの間固定される（ADR-0004）。風も同じく
-            // ステップ間で固定（決定論。乱流や突風を入れるなら決定論的な
-            // 擬似乱数列で、ここではなく Wind の生成側で行う）。
-            // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
-            // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
+            // Sample the environment at the step endpoint, exactly as in repeated
+            // 120 Hz calls. Time and addition order are independent of render cadence.
+            self.physics_elapsed += dt;
             let environment = self.environment_for(&state);
-            self.dynamics
-                .step(self.fixed.fixed_dt(), controls, &environment);
+            let controls = controls_for_step(dt, &state);
+            self.dynamics.step(dt, controls, &environment);
+            steps += 1;
+
+            if !self.dynamics.state().is_finite() {
+                self.diverged = true;
+                break;
+            }
             self.update_contact();
             self.update_log();
+            if self.crash.is_some() {
+                // Freeze at the actual impact pose, not a render-frame-dependent
+                // blend of the last two states. This never changes physical state.
+                self.previous = *self.dynamics.state();
+                break;
+            }
         }
 
         if !self.dynamics.state().is_finite() {
             self.diverged = true;
+        }
+        if self.crash.is_some() || self.diverged {
+            // FixedStep reserves the whole frame up front. No reserved step or
+            // fractional remainder may survive a terminal stop; physical elapsed
+            // above, rather than FixedStep's reserved elapsed, is authoritative.
+            self.fixed.reset();
         }
 
         StepReport {
@@ -505,6 +561,63 @@ impl<S: TileSource> Simulation<S> {
         self.wind
     }
 
+    /// Enable a fixed seasonal climate date, or return to ISA with `None`.
+    ///
+    /// The bundled atlas is validated on first enable and shared thereafter.
+    /// Changing the date changes physics; callers recording a flight must
+    /// start a new session and save it in replay conditions before advancing.
+    /// No wall time or visual-clock time acceleration is used here.
+    ///
+    /// # Errors
+    /// Returns an error if the bundled atlas cannot be validated. Existing
+    /// climate settings remain unchanged when loading fails.
+    pub fn set_climate(&mut self, date: Option<ClimateDate>) -> Result<(), ClimateDataError> {
+        match date {
+            None => self.climate = None,
+            Some(date) => {
+                if let Some((_, existing)) = &mut self.climate {
+                    *existing = date;
+                } else {
+                    self.climate = Some((GlobalClimate::bundled()?, date));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Fixed climatological date used for this flight; `None` means ISA.
+    #[must_use]
+    pub fn climate(&self) -> Option<ClimateDate> {
+        self.climate.as_ref().map(|(_, date)| *date)
+    }
+
+    /// Climate at the aircraft position, with explicit reanalysis provenance.
+    /// `temperature` is the climatology's approximate tropospheric lapse;
+    /// [`Self::atmosphere_sample`] reports the exact ISA-offset physical air.
+    #[must_use]
+    pub fn climate_sample(&self) -> Option<ClimateSample> {
+        self.climate
+            .as_ref()
+            .map(|(climate, date)| climate.sample(self.dynamics.state().geodetic(), *date))
+    }
+
+    /// Actual local temperature, pressure and density used by flight dynamics.
+    /// With climate enabled, pressure stays ISA while regional temperature
+    /// changes density and speed of sound. This does not simulate live QNH.
+    #[must_use]
+    pub fn atmosphere_sample(&self) -> flightsim_fdm::AtmosphereSample {
+        let position = self.dynamics.state().geodetic();
+        self.atmosphere_for(position).sample(position.altitude)
+    }
+
+    fn atmosphere_for(&self, position: Geodetic) -> Atmosphere {
+        self.climate
+            .as_ref()
+            .map_or_else(Atmosphere::standard, |(climate, date)| {
+                atmosphere_from_climate(climate.sample(position, *date))
+            })
+    }
+
     /// このステップの環境（大気・風・乱流・接地平面）。
     ///
     /// **積分と、外から状態を読むときで同じものを使う。** 2 箇所に書くと
@@ -515,13 +628,17 @@ impl<S: TileSource> Simulation<S> {
         // 擬似乱数列で、ここではなく Wind の生成側で行う）。
         // 乱流はシミュレーション時刻の関数。**壁時計ではない。**
         // 1 ステップの間は固定され、RK4 の中間評価で値が変わらない。
-        Environment::with_wind_ned(Atmosphere::standard(), state.geodetic(), self.wind.to_ned())
-            .with_turbulence(self.turbulence, self.physics_elapsed, state.geodetic())
-            .with_ground_plane(
-                self.ground.reference,
-                self.ground.elevation,
-                self.ground.slope,
-            )
+        Environment::with_wind_ned(
+            self.atmosphere_for(state.geodetic()),
+            state.geodetic(),
+            self.wind.to_ned(),
+        )
+        .with_turbulence(self.turbulence, self.physics_elapsed, state.geodetic())
+        .with_ground_plane(
+            self.ground.reference,
+            self.ground.elevation,
+            self.ground.slope,
+        )
     }
 
     /// 今の空力角（迎角・横滑り角・真対気速度）。

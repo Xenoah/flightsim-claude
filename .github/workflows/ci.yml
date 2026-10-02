@@ -16,6 +16,20 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  world_source_tools:
+    name: world source-tool boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test offline world-data output safety
+        run: |
+          python3 -m venv "$RUNNER_TEMP/flightsim-source-tools"
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m pip install numpy==2.3.5
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts/tests -v
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts -p 'test_pack_global_terrain.py' -v
+          # These boundary tests fetch no geospatial source data and require no HDF5.
+
   # 純 Rust 側（core / fdm / world / sim / tilegen）。
   #
   # Bevy に依存しないので数秒で終わる。**この速さは ADR-0001 の技術選定で
@@ -173,7 +187,8 @@ jobs:
       - name: Build the application
         run: cargo build --locked --release -p flightsim-app
 
-      - name: Start, load the bundled model, and render one screenshot
+      - name: Start, load original Swift Sport, and render one screenshot
+        id: smoke
         shell: bash
         run: |
           set -euo pipefail
@@ -187,13 +202,15 @@ jobs:
 
           screenshot="$RUNNER_TEMP/flightsim-smoke.png"
           log="$RUNNER_TEMP/flightsim-smoke.log"
+          # This proof must come from the current launch, never a stale capture.
+          rm -f -- "$screenshot"
 
           xvfb-run -a env \
             WGPU_BACKEND=vulkan \
             LIBGL_ALWAYS_SOFTWARE=1 \
             VK_ICD_FILENAMES="$software_icd" \
             target/release/flightsim-app \
-              --screenshot "$screenshot" --screenshot-delay 5 \
+              --aircraft swift-sport --screenshot "$screenshot" --screenshot-delay 5 \
               >"$log" 2>&1 &
           app_pid=$!
 
@@ -225,7 +242,9 @@ jobs:
 
           ready=false
           for _ in $(seq 1 60); do
-            if complete_png && grep -q "aircraft model fitted:" "$log"; then
+            if complete_png && grep -Fq "(swift-sport)" "$log" &&
+                grep -Fq "aircraft/swift_sport.glb" "$log" &&
+                grep -Fq "aircraft model fitted:" "$log"; then
               ready=true
               break
             fi
@@ -268,6 +287,10 @@ jobs:
             exit 1
           fi
 
+          # Only a fully passed smoke may publish its original-aircraft imagery.
+          # Keep diagnostic logs on failure, but leave the PNG path unavailable.
+          echo "verified_screenshot=$screenshot" >> "$GITHUB_OUTPUT"
+
           echo "software-rendered application smoke passed"
           tail -n 40 "$log"
 
@@ -277,7 +300,7 @@ jobs:
         with:
           name: app-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/flightsim-smoke.png
+            ${{ steps.smoke.outputs.verified_screenshot }}
             ${{ runner.temp }}/flightsim-smoke.log
           if-no-files-found: warn
           retention-days: 7

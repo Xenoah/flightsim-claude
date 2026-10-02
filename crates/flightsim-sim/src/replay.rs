@@ -14,7 +14,8 @@
 //!
 //! 決定論が保証するのは**同じビルド・同じ環境**での一致だけ。
 //!
-//! - 機体諸元が変われば別の軌跡になる → 諸元の指紋を記録し、違えば拒否する
+//! - Aircraft parameters or the FDM model revision can change the trajectory;
+//!   their combined fingerprint must match before replay.
 //! - **地形が違えば接地が変わる** → 地形は指紋を取れない（タイルは実行時に
 //!   ストリーミングされ、どれが読まれたかは軌跡に依存する）。代わりに
 //!   [`Keyframe`] を一定間隔で埋め込み、再生側が実際にずれたことを**検出**する
@@ -29,10 +30,11 @@
 //! | 一時停止・再開 | [`Player::set_paused`] |
 //! | 速度変更 | [`Player::set_speed`]（0.1〜8 倍） |
 //! | 前進シーク | 目標まで [`Player::next_due`] を空回しする |
-//! | 後退シーク | [`Player::seek`] が直前のキーフレームを返す。そこから再計算する |
+//! | Exact backward seek | [`Player::seek`] to frame zero, restart the simulation, then replay to the target |
 //!
-//! **後退シークに近道はない。** 物理は積分なので、戻るには積分し直すしかない。
-//! キーフレームはその再計算の開始点を近くに置くためのもの。
+//! State-only keyframes are drift checkpoints, not complete simulation snapshots.
+//! Exact seeking restarts at frame zero: the accumulator, turbulence clock, contact
+//! history and flight log cannot be restored by assigning only a rigid-body state.
 //!
 //! # 使い方
 //!
@@ -63,7 +65,11 @@
 use std::io::{Read, Write};
 
 use flightsim_core::{Geodetic, Meters, MetersPerSecond, Radians, Seconds};
-use flightsim_fdm::{AircraftConfig, ControlInputs, RigidBodyState, Turbulence};
+use flightsim_fdm::{
+    AircraftConfig, ControlInputs, FDM_MODEL_REVISION, RigidBodyState, Turbulence,
+};
+use flightsim_world::global::GLOBAL_TERRAIN_FINGERPRINT;
+use flightsim_world::{ClimateDate, GLOBAL_CLIMATE_FINGERPRINT};
 use glam::{DQuat, DVec3};
 
 use crate::simulation::Wind;
@@ -72,18 +78,25 @@ use crate::simulation::Wind;
 pub const MAGIC: [u8; 8] = *b"FSREPLAY";
 
 /// 形式版。**互換性を壊す変更のたびに上げること。**
-pub const FORMAT_VERSION: u16 = 1;
+pub const FORMAT_VERSION: u16 = 2;
+
+/// Original format. The writer retains its exact layout when world/climate
+/// settings are disabled; old recordings always restore ISA/legacy terrain.
+pub const LEGACY_FORMAT_VERSION: u16 = 1;
 
 /// キーフレームを置く間隔（記録フレーム数）。
 ///
-/// 60 fps なら約 2 秒。後退シークの再計算がこの範囲に収まる。
-/// 短くすると容量が増え、長くするとシークが遅くなる。
+/// One second for new 120 Hz fixed-step recordings (two seconds for old 60 fps
+/// render-frame recordings). These state-only checkpoints detect drift; exact
+/// seeking must replay from frame zero to restore clocks, contacts and flight logs.
 pub const KEYFRAME_INTERVAL: u32 = 120;
 
 /// 読み込みを受け付けるフレーム数の上限。
 ///
-/// 60 fps で約 4.6 時間。1 フレーム 56 バイトなので、上限まで読んでも約 56 MB。
-/// **壊れた長さフィールドで確保しに行かないための線。**
+/// About 2 h 18 m 53 s at 120 Hz (4.6 h for old 60 fps recordings). The frame
+/// payload is at most 56 MB, plus bounded keyframes and metadata. This resource
+/// limit is unchanged by fixed-step recording; it is not a duration guarantee.
+/// **Never trust a corrupt count field to determine an unbounded allocation.**
 pub const MAX_FRAMES: u32 = 1_000_000;
 
 /// 機体名として受け付けるバイト数の上限。
@@ -116,9 +129,11 @@ const KEYFRAME_BYTES: usize = 4 + 8 * 13;
 
 /// 記録した 1 フレーム。
 ///
-/// `frame_time` は**描画フレーム時間**であって物理の固定 dt ではない。
-/// [`crate::Simulation::advance`] が内部で固定 dt に割るので、同じ
-/// `frame_time` を渡せば同じ割り方になる。
+/// New interactive recordings store one fixed physics step and its controls per
+/// record, using [`crate::Simulation::advance_with_controls`]. Existing files may
+/// contain render-frame durations (including zero); their bytes and durations are
+/// retained exactly. In both cases, replay passes the stored duration and controls
+/// to [`crate::Simulation::advance`] without relabeling or resampling the records.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Frame {
     /// このフレームで進めた時間。ファイル境界では有限・非負（0 も有効）。
@@ -129,7 +144,8 @@ pub struct Frame {
 
 /// 一定間隔で埋め込む状態の写し。
 ///
-/// 後退シークの開始点であり、**再生がずれていないことの検査点**でもある。
+/// A checkpoint for detecting replay drift. Frame zero is the exact restart point;
+/// later states alone do not restore the simulation clock, contacts or flight log.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Keyframe {
     /// このキーフレームが対応するフレーム番号（このフレームを進める**前**の状態）。
@@ -145,7 +161,7 @@ pub struct Keyframe {
 pub struct Conditions {
     /// 機体名。人が読むためのもの。一致判定には使わない。
     pub aircraft_name: String,
-    /// 機体諸元の指紋。**これが違えば再生を拒否する。**
+    /// Aircraft parameters and FDM model revision identity. A mismatch rejects playback.
     pub aircraft_fingerprint: u64,
     /// 開始位置。
     pub start: Geodetic,
@@ -164,6 +180,15 @@ pub struct Conditions {
     pub start_epoch: f64,
     /// 記録時の時間加速率。ファイルでは有限・非負に限る。
     pub time_rate: f64,
+    /// Use the bundled global terrain baseline. False preserves legacy terrain
+    /// behavior; explicitly supplied regional tiles remain caller-owned.
+    pub world_terrain: bool,
+    /// Identity of the enabled global terrain payload, otherwise zero.
+    pub terrain_fingerprint: u64,
+    /// Fixed seasonal climatology for this flight. None preserves ISA physics.
+    pub climate_date: Option<ClimateDate>,
+    /// Identity of the enabled climate payload, otherwise zero.
+    pub climate_fingerprint: u64,
 }
 
 impl Default for Conditions {
@@ -177,6 +202,10 @@ impl Default for Conditions {
             turbulence: Turbulence::CALM,
             start_epoch: 0.0,
             time_rate: 1.0,
+            world_terrain: false,
+            terrain_fingerprint: 0,
+            climate_date: None,
+            climate_fingerprint: 0,
         }
     }
 }
@@ -189,12 +218,37 @@ impl Conditions {
         self.aircraft_fingerprint = aircraft_fingerprint(config);
         self
     }
+
+    /// Populate replay-safe identities for this build's bundled world data.
+    /// This must be called before recording the first physics frame.
+    #[must_use]
+    pub fn with_world_climate(
+        mut self,
+        world_terrain: bool,
+        climate_date: Option<ClimateDate>,
+    ) -> Self {
+        self.world_terrain = world_terrain;
+        self.terrain_fingerprint = if world_terrain {
+            GLOBAL_TERRAIN_FINGERPRINT
+        } else {
+            0
+        };
+        self.climate_date = climate_date;
+        self.climate_fingerprint = if climate_date.is_some() {
+            GLOBAL_CLIMATE_FINGERPRINT
+        } else {
+            0
+        };
+        self
+    }
 }
 
 /// 機体諸元の指紋。
 ///
-/// **飛び方を決める数値だけ**を混ぜる。名前は入れない（名前を変えただけで
-/// 再生できなくなるのは筋が悪い）。
+/// Mix flight-affecting parameters and [`FDM_MODEL_REVISION`], never the display
+/// name. An unchanged aircraft configuration does not imply compatible physics.
+/// Pre-revision alpha.21 identities are rejected without changing v1/v2 file
+/// layouts, or rewriting old recordings as if they used the current model.
 ///
 /// 完全なハッシュではなく、値が 1 つでも変われば高い確率で変わる程度のもの。
 /// 目的は「気付かず違う機体で再生する」を防ぐことで、改竄検出ではない。
@@ -267,6 +321,16 @@ pub fn aircraft_fingerprint(config: &AircraftConfig) -> u64 {
         mix(leg.max_stroke().get());
         mix(leg.bottom_stop_travel().get());
         mix(leg.max_recoil_speed().get());
+    }
+    // Domain-separated suffix: retain every config value above, then bind the
+    // physics implementation even when its JSON parameters are unchanged.
+    for byte in b"flightsim-fdm-model"
+        .iter()
+        .copied()
+        .chain(FDM_MODEL_REVISION.to_le_bytes())
+    {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
     hash
 }
@@ -656,7 +720,7 @@ impl std::fmt::Display for ReplayError {
             ),
             Self::UnsupportedVersion { found, expected } => write!(
                 formatter,
-                "the replay is format version {found}; this build reads version {expected}"
+                "the replay is format version {found}; this build reads versions 1 through {expected}"
             ),
             Self::TooLarge {
                 what,
@@ -761,9 +825,23 @@ impl Recording {
     ///
     /// # Errors
     ///
-    /// 記録の数値が不正なとき、または諸元の指紋が一致しないとき。
+    /// 記録の数値が不正なとき、または機体・全球地形・気候データの指紋が一致しないとき。
     pub fn check_reproducible_with(&self, config: &AircraftConfig) -> Result<(), ReplayError> {
         self.validate()?;
+        if self.conditions.world_terrain
+            && self.conditions.terrain_fingerprint != GLOBAL_TERRAIN_FINGERPRINT
+        {
+            return Err(ReplayError::ConditionsMismatch {
+                detail: "the bundled global terrain dataset differs from the recording".to_owned(),
+            });
+        }
+        if self.conditions.climate_date.is_some()
+            && self.conditions.climate_fingerprint != GLOBAL_CLIMATE_FINGERPRINT
+        {
+            return Err(ReplayError::ConditionsMismatch {
+                detail: "the bundled climate dataset differs from the recording".to_owned(),
+            });
+        }
         let actual = aircraft_fingerprint(config);
         if actual == self.conditions.aircraft_fingerprint {
             return Ok(());
@@ -771,7 +849,7 @@ impl Recording {
         let recorded_name = &self.conditions.aircraft_name;
         Err(ReplayError::ConditionsMismatch {
             detail: format!(
-                "it was recorded with `{recorded_name}` (fingerprint {:016x}) but `{}` here has fingerprint {actual:016x}",
+                "aircraft/FDM model mismatch: it was recorded with `{recorded_name}` (fingerprint {:016x}) but `{}` with FDM model revision {FDM_MODEL_REVISION} here has fingerprint {actual:016x}",
                 self.conditions.aircraft_fingerprint, config.name
             ),
         })
@@ -786,7 +864,13 @@ impl Recording {
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ReplayError> {
         self.validate()?;
         writer.write_all(&MAGIC)?;
-        writer.write_all(&FORMAT_VERSION.to_le_bytes())?;
+        let extended = self.conditions.world_terrain || self.conditions.climate_date.is_some();
+        let version = if extended {
+            FORMAT_VERSION
+        } else {
+            LEGACY_FORMAT_VERSION
+        };
+        writer.write_all(&version.to_le_bytes())?;
 
         let name = self.conditions.aircraft_name.as_bytes();
         writer.write_all(&u32::try_from(name.len()).unwrap_or(0).to_le_bytes())?;
@@ -803,6 +887,22 @@ impl Recording {
         writer.write_all(&self.conditions.turbulence.seed.to_le_bytes())?;
         write_f64(writer, self.conditions.start_epoch)?;
         write_f64(writer, self.conditions.time_rate)?;
+
+        if extended {
+            // Fixed 32-byte version-2 extension. Bit 0: global terrain,
+            // bit 1: climate. All reserved bits and absent fields are zero.
+            let flags = u64::from(self.conditions.world_terrain)
+                | (u64::from(self.conditions.climate_date.is_some()) << 1);
+            writer.write_all(&flags.to_le_bytes())?;
+            writer.write_all(&self.conditions.terrain_fingerprint.to_le_bytes())?;
+            write_f64(
+                writer,
+                self.conditions
+                    .climate_date
+                    .map_or(0.0, ClimateDate::annual_phase),
+            )?;
+            writer.write_all(&self.conditions.climate_fingerprint.to_le_bytes())?;
+        }
 
         let frame_count = u32::try_from(self.frames.len()).unwrap_or(u32::MAX);
         let keyframe_count = u32::try_from(self.keyframes.len()).unwrap_or(u32::MAX);
@@ -858,7 +958,7 @@ impl Recording {
             return Err(ReplayError::NotAReplay { found: magic });
         }
         let version = read_u16(reader)?;
-        if version != FORMAT_VERSION {
+        if !(LEGACY_FORMAT_VERSION..=FORMAT_VERSION).contains(&version) {
             return Err(ReplayError::UnsupportedVersion {
                 found: version,
                 expected: FORMAT_VERSION,
@@ -889,6 +989,45 @@ impl Recording {
         let start_epoch = read_f64(reader)?;
         let time_rate = read_f64(reader)?;
 
+        let (world_terrain, terrain_fingerprint, climate_date, climate_fingerprint) =
+            if version == FORMAT_VERSION {
+                let flags = read_u64(reader)?;
+                let terrain_fingerprint = read_u64(reader)?;
+                let phase = read_f64(reader)?;
+                let climate_fingerprint = read_u64(reader)?;
+                require_valid(
+                    flags & !3 == 0,
+                    "world/climate flags",
+                    None,
+                    "only global terrain and climate flag bits are defined",
+                )?;
+                let climate_date = if flags & 2 != 0 {
+                    Some(ClimateDate::from_annual_phase(phase).ok_or(
+                        ReplayError::InvalidValue {
+                            field: "climate annual phase",
+                            frame: None,
+                            requirement: "must be finite and in [0, 1)",
+                        },
+                    )?)
+                } else {
+                    require_valid(
+                        phase.to_bits() == 0,
+                        "disabled climate annual phase",
+                        None,
+                        "must be positive zero when climate is disabled",
+                    )?;
+                    None
+                };
+                (
+                    flags & 1 != 0,
+                    terrain_fingerprint,
+                    climate_date,
+                    climate_fingerprint,
+                )
+            } else {
+                (false, 0, None, 0)
+            };
+
         let conditions = Conditions {
             aircraft_name,
             aircraft_fingerprint,
@@ -908,6 +1047,10 @@ impl Recording {
             },
             start_epoch,
             time_rate,
+            world_terrain,
+            terrain_fingerprint,
+            climate_date,
+            climate_fingerprint,
         };
         validate_conditions(&conditions)?;
 
@@ -1023,6 +1166,18 @@ fn require_valid(
 }
 
 fn validate_conditions(conditions: &Conditions) -> Result<(), ReplayError> {
+    require_valid(
+        conditions.world_terrain == (conditions.terrain_fingerprint != 0),
+        "terrain fingerprint",
+        None,
+        "must be nonzero exactly when bundled global terrain is enabled",
+    )?;
+    require_valid(
+        conditions.climate_date.is_some() == (conditions.climate_fingerprint != 0),
+        "climate fingerprint",
+        None,
+        "must be nonzero exactly when climate is enabled",
+    )?;
     for (field, value) in [
         ("start latitude", conditions.start.latitude.get()),
         ("start longitude", conditions.start.longitude.get()),

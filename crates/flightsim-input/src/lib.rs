@@ -85,15 +85,32 @@ impl AxisState {
         self.value = sanitise(value);
     }
 
-    /// 1 フレーム進める。
+    /// Advance one simulation step.
     ///
-    /// `positive` / `negative` はキーが押されているか。両方押されていれば
-    /// 打ち消し合って中立へ戻る。
+    /// `positive` / `negative` indicate held keys; both together act like release.
+    /// An opposing command returns existing displacement toward neutral at the
+    /// faster of the command and release rates. Any time left after reaching
+    /// neutral moves into the commanded direction at the ordinary command rate.
     pub fn update(&mut self, dt: Seconds, positive: bool, negative: bool) {
+        let dt = valid_elapsed(dt);
         let step = self.rate * dt.get();
         let direction = f64::from(i8::from(positive) - i8::from(negative));
 
         if direction.abs() > 0.0 {
+            // Reversing a slow keyboard axis must not unwind it more slowly
+            // than releasing the key. Split exactly at zero so dt partitioning
+            // cannot turn the faster return rate into extra opposite authority.
+            // Keep the original arithmetic when command rate is already faster.
+            if direction * self.value < 0.0 && self.centering_rate > self.rate {
+                let centering = self.centering_rate * dt.get();
+                if centering < self.value.abs() {
+                    self.value += direction * centering;
+                } else {
+                    let remaining = (dt.get() - self.value.abs() / self.centering_rate).max(0.0);
+                    self.value = sanitise(direction * self.rate * remaining);
+                }
+                return;
+            }
             self.value = sanitise(self.value + direction * step);
             return;
         }
@@ -126,7 +143,11 @@ impl RampAxis {
             "ramp rate must be positive and finite, got {rate}"
         );
         Self {
-            value: initial.clamp(0.0, 1.0),
+            value: if initial.is_nan() {
+                0.0
+            } else {
+                initial.clamp(0.0, 1.0)
+            },
             rate,
         }
     }
@@ -145,6 +166,7 @@ impl RampAxis {
     }
 
     pub fn update(&mut self, dt: Seconds, increase: bool, decrease: bool) {
+        let dt = valid_elapsed(dt);
         let step = self.rate * dt.get();
         let direction = f64::from(i8::from(increase) - i8::from(decrease));
         let next = self.value + direction * step;
@@ -162,6 +184,7 @@ impl RampAxis {
     /// [`Self::set_absolute`] のように瞬時値を書き込むわけではない —
     /// トリガーの押し込み量を「動かす速さ」として扱う。
     pub fn update_analog(&mut self, dt: Seconds, rate_fraction: f64) {
+        let dt = valid_elapsed(dt);
         let rate_fraction = if rate_fraction.is_nan() {
             0.0
         } else {
@@ -174,6 +197,15 @@ impl RampAxis {
             next.clamp(0.0, 1.0)
         };
     }
+}
+
+/// Invalid elapsed time cannot reverse a ramp or poison its persistent value.
+fn valid_elapsed(dt: Seconds) -> Seconds {
+    Seconds(if dt.get().is_finite() {
+        dt.get().max(0.0)
+    } else {
+        0.0
+    })
 }
 
 /// `[-1, 1]` に収め、NaN を 0 に潰す。
@@ -205,6 +237,77 @@ pub struct PilotKeys {
     pub trim_up: bool,
     /// トリムを機首下げ側へ（速い速度で釣り合う）。
     pub trim_down: bool,
+}
+
+impl PilotKeys {
+    /// Sample physical keyboard state once. Native events shorter than a
+    /// rendered frame can be missed; this is a state sample, not a timestamped
+    /// event history. The app decides when the sampled state may drive flight.
+    #[must_use]
+    pub fn from_keyboard(keyboard: &ButtonInput<KeyCode>) -> Self {
+        Self {
+            roll_right: keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD),
+            roll_left: keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA),
+            // 実機の操縦桿と同じで、引く（下キー）と機首が上がる。
+            pitch_up: keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS),
+            pitch_down: keyboard.pressed(KeyCode::ArrowUp) || keyboard.pressed(KeyCode::KeyW),
+            yaw_right: keyboard.pressed(KeyCode::KeyE),
+            yaw_left: keyboard.pressed(KeyCode::KeyQ),
+            throttle_up: keyboard.pressed(KeyCode::PageUp) || keyboard.pressed(KeyCode::Equal),
+            throttle_down: keyboard.pressed(KeyCode::PageDown) || keyboard.pressed(KeyCode::Minus),
+            // トリム。**手を離しても釣り合う速度を決める。**
+            trim_up: keyboard.pressed(KeyCode::BracketRight),
+            trim_down: keyboard.pressed(KeyCode::BracketLeft),
+            flaps_extend: keyboard.pressed(KeyCode::KeyF),
+            flaps_retract: keyboard.pressed(KeyCode::KeyG),
+            brakes: keyboard.pressed(KeyCode::Space),
+        }
+    }
+}
+
+/// One immutable, resolved observation of pilot commands. Sampling never moves
+/// a control surface: the application applies this snapshot to [`PilotControls`]
+/// once per simulation fixed step via [`PilotControls::update_from_sample`].
+///
+/// Controller calibration and per-axis arbitration keep their existing meaning.
+/// Holding a snapshot across a render frame does not alter its device values.
+/// A default snapshot has no held keys or active controllers; applying it centers
+/// transient controls over time and preserves throttle, flaps and trim.
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct SampledPilotInput {
+    pub keys: PilotKeys,
+    roll: Option<controllers::MappedControl>,
+    pitch: Option<controllers::MappedControl>,
+    yaw: Option<controllers::MappedControl>,
+    throttle: Option<controllers::MappedControl>,
+    flaps: Option<controllers::MappedControl>,
+    brake: f64,
+}
+
+impl SampledPilotInput {
+    /// Resolve current controller values without advancing controls or time.
+    #[must_use]
+    pub fn from_bindings(
+        keys: PilotKeys,
+        configuration: &InputConfiguration,
+        devices: &InputDevices,
+    ) -> Self {
+        let sample = |binding: &Option<configuration::ControlBinding>, unipolar| {
+            binding
+                .as_ref()
+                .and_then(|binding| controllers::evaluate_binding(binding, devices, unipolar))
+        };
+        Self {
+            keys,
+            roll: sample(&configuration.roll, false),
+            pitch: sample(&configuration.pitch, false),
+            yaw: sample(&configuration.yaw, false),
+            throttle: sample(&configuration.throttle, true),
+            flaps: sample(&configuration.flaps, true),
+            brake: sample(&configuration.brake, true)
+                .map_or(0.0, |sample| sample.value.clamp(0.0, 1.0)),
+        }
+    }
 }
 
 /// 昇降舵トリム。
@@ -240,8 +343,8 @@ pub struct ElevatorTrim {
 
 impl Default for ElevatorTrim {
     fn default() -> Self {
-        // 0.09 で約 75 kt。**離陸直後に手を離しても落ちない**ところに置く。
-        // 0 のままだと 107 kt へ向かって機首を下げる。
+        // A takeoff/climb trim bias, not an attitude or altitude hold. A badly
+        // over-rotated or stalled aircraft still needs recovery and height.
         Self::new(0.09, 0.12)
     }
 }
@@ -270,13 +373,14 @@ impl ElevatorTrim {
         self.value
     }
 
-    /// 直接置く。**やり直しと自動トリムが使う。**
+    /// Set an explicit trim value for initialization or restart.
     pub fn set(&mut self, value: f64) {
         self.value = sanitise(value);
     }
 
     /// キー入力で 1 フレームぶん動かす。
     pub fn update(&mut self, dt: Seconds, nose_up: bool, nose_down: bool) {
+        let dt = valid_elapsed(dt);
         let direction = f64::from(i8::from(nose_up) - i8::from(nose_down));
         if direction.abs() > 0.0 {
             self.value = sanitise(self.value + direction * self.rate * dt.get());
@@ -314,6 +418,20 @@ impl Default for PilotControls {
 }
 
 impl PilotControls {
+    /// Release momentary control displacement when the application suspends
+    /// flight input (for example a modal or focus loss). Power, flap position
+    /// and elevator trim are persistent pilot settings and remain unchanged.
+    ///
+    /// This does not pause flight, trim the aircraft, alter its state, or clear
+    /// device samples. The application owns suspension and resume policy; an
+    /// active analog control is sampled normally on the next enabled update.
+    pub fn release_transient_controls(&mut self) {
+        self.aileron.set_absolute(0.0);
+        self.elevator.set_absolute(0.0);
+        self.rudder.set_absolute(0.0);
+        self.brakes = 0.0;
+    }
+
     /// キー状態から 1 フレームぶん進める。
     pub fn update(&mut self, dt: Seconds, keys: PilotKeys) {
         self.aileron.update(dt, keys.roll_right, keys.roll_left);
@@ -416,55 +534,55 @@ impl PilotControls {
         configuration: &InputConfiguration,
         devices: &InputDevices,
     ) {
-        let dt = Seconds(if dt.get().is_finite() {
-            dt.get().max(0.0)
-        } else {
-            0.0
-        });
-        let sample = |binding: &Option<configuration::ControlBinding>, unipolar| {
-            binding
-                .as_ref()
-                .and_then(|binding| controllers::evaluate_binding(binding, devices, unipolar))
-        };
+        self.update_from_sample(
+            dt,
+            &SampledPilotInput::from_bindings(keys, configuration, devices),
+        );
+    }
+
+    /// Advance the existing keyboard/controller mapping by one simulation
+    /// step. Call with the simulation's fixed dt, never once with render dt and
+    /// then hold the ramp endpoint across several physics steps.
+    pub fn update_from_sample(&mut self, dt: Seconds, sample: &SampledPilotInput) {
+        let dt = valid_elapsed(dt);
+        let keys = sample.keys;
         apply_mapped_surface(
             &mut self.aileron,
             dt,
             keys.roll_right,
             keys.roll_left,
-            sample(&configuration.roll, false),
+            sample.roll,
         );
         apply_mapped_surface(
             &mut self.elevator,
             dt,
             keys.pitch_up,
             keys.pitch_down,
-            sample(&configuration.pitch, false),
+            sample.pitch,
         );
         apply_mapped_surface(
             &mut self.rudder,
             dt,
             keys.yaw_right,
             keys.yaw_left,
-            sample(&configuration.yaw, false),
+            sample.yaw,
         );
         apply_mapped_ramp(
             &mut self.throttle,
             dt,
             keys.throttle_up,
             keys.throttle_down,
-            sample(&configuration.throttle, true),
+            sample.throttle,
         );
         apply_mapped_ramp(
             &mut self.flaps,
             dt,
             keys.flaps_extend,
             keys.flaps_retract,
-            sample(&configuration.flaps, true),
+            sample.flaps,
         );
         self.trim.update(dt, keys.trim_up, keys.trim_down);
-        let brake =
-            sample(&configuration.brake, true).map_or(0.0, |sample| sample.value.clamp(0.0, 1.0));
-        self.brakes = brake.max(f64::from(u8::from(keys.brakes)));
+        self.brakes = sample.brake.max(f64::from(u8::from(keys.brakes)));
     }
 
     /// FDM へ渡す形にする。
@@ -483,7 +601,7 @@ impl PilotControls {
     /// 実際に舵面へ行く昇降舵。**操縦桿 + トリム。**
     ///
     /// 範囲外は `ControlInputs` 側で丸められるが、ここでも丸めておく。
-    /// **足した結果を見たいのは操縦する側**（HUD と自動トリム）なので、
+    /// **足した結果を見たいのは操縦する側**（HUD）なので、
     /// 丸めた値を返す。
     #[must_use]
     pub fn effective_elevator(self) -> f64 {
@@ -544,6 +662,7 @@ pub struct FlightsimInputPlugin;
 impl Plugin for FlightsimInputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PilotControls>()
+            .init_resource::<SampledPilotInput>()
             .init_resource::<LookAround>()
             .init_resource::<ViewMode>()
             .init_resource::<InputSettings>()
@@ -565,7 +684,8 @@ impl Plugin for FlightsimInputPlugin {
             )
             .add_systems(
                 Update,
-                (read_pilot_keys, controllers::cycle_mapped_view_mode).in_set(InputSystems::Sample),
+                (sample_pilot_input, controllers::cycle_mapped_view_mode)
+                    .in_set(InputSystems::Sample),
             )
             .add_systems(
                 Update,
@@ -584,10 +704,24 @@ impl Plugin for FlightsimInputPlugin {
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct GamepadSettings(pub GamepadAxisMappings);
 
-/// キーボードとゲームパッドを読んで [`PilotControls`] を更新する。
-///
-/// 軸ごとに「ゲームパッドに触れているか」で使い分ける
-/// （[`PilotControls::update_with_gamepad`]）。
+/// Sample keys and calibrated controller channels once per render frame.
+/// This system deliberately has no time or mutable flight-control parameter.
+/// The app must apply the result inside its simulation fixed-step callback.
+pub fn sample_pilot_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    devices: Res<InputDevices>,
+    settings: Res<InputSettings>,
+    mut sample: ResMut<SampledPilotInput>,
+) {
+    *sample = SampledPilotInput::from_bindings(
+        PilotKeys::from_keyboard(&keyboard),
+        &settings.configuration,
+        &devices,
+    );
+}
+
+/// Legacy frame-driven helper for external callers. The runtime plugin uses
+/// [`sample_pilot_input`] instead, so sampling cannot advance a keyboard ramp.
 pub fn read_pilot_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
     devices: Res<InputDevices>,
@@ -595,23 +729,7 @@ pub fn read_pilot_keys(
     time: Res<Time>,
     mut controls: ResMut<PilotControls>,
 ) {
-    let keys = PilotKeys {
-        roll_right: keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD),
-        roll_left: keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA),
-        // 実機の操縦桿と同じで、引く（下キー）と機首が上がる。
-        pitch_up: keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS),
-        pitch_down: keyboard.pressed(KeyCode::ArrowUp) || keyboard.pressed(KeyCode::KeyW),
-        yaw_right: keyboard.pressed(KeyCode::KeyE),
-        yaw_left: keyboard.pressed(KeyCode::KeyQ),
-        throttle_up: keyboard.pressed(KeyCode::PageUp) || keyboard.pressed(KeyCode::Equal),
-        throttle_down: keyboard.pressed(KeyCode::PageDown) || keyboard.pressed(KeyCode::Minus),
-        // トリム。**手を離しても釣り合う速度を決める。**
-        trim_up: keyboard.pressed(KeyCode::BracketRight),
-        trim_down: keyboard.pressed(KeyCode::BracketLeft),
-        flaps_extend: keyboard.pressed(KeyCode::KeyF),
-        flaps_retract: keyboard.pressed(KeyCode::KeyG),
-        brakes: keyboard.pressed(KeyCode::Space),
-    };
+    let keys = PilotKeys::from_keyboard(&keyboard);
     controls.update_with_bindings(
         Seconds(f64::from(time.delta_secs())),
         keys,
@@ -633,6 +751,9 @@ pub fn cycle_view_mode(
         *mode = mode.next();
     }
 }
+
+#[cfg(test)]
+mod keyboard_regression;
 
 #[cfg(test)]
 mod tests {
@@ -928,7 +1049,7 @@ mod tests {
     }
 
     #[test]
-    fn the_default_trim_is_nose_up_so_it_flies_hands_off() {
+    fn the_default_trim_is_a_moderate_nose_up_bias() {
         // **0 のままだと、手を離した機体は 107 kt へ向けて機首を下げる。**
         // 離陸直後の高度ではそれが接地になる（`flightsim-sim` の
         // `tests/hands_off.rs` で測ってある）。

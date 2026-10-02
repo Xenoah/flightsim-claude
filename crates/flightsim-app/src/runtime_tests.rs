@@ -231,6 +231,8 @@ fn faulted_replay_keeps_last_good_world_transform_on_every_update() {
     let mut app = App::new();
     app.insert_resource(Time::<()>::default())
         .insert_resource(PilotControls::default())
+        .init_resource::<SampledPilotInput>()
+        .init_resource::<StallWarningStatus>()
         .insert_resource(flightsim_ui::Paused::default())
         .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(
             flightsim_sim::replay::Conditions::default(),
@@ -307,6 +309,8 @@ fn replay_sound_and_completion_status_use_recorded_inputs() {
     let mut app = App::new();
     app.insert_resource(sim)
         .insert_resource(controls)
+        .init_resource::<SampledPilotInput>()
+        .init_resource::<StallWarningStatus>()
         .insert_resource(ReplayPlayback::new(recording))
         .insert_resource(flightsim_ui::Paused::default())
         .insert_resource(flightsim_ui::ReplayStatus::default())
@@ -361,6 +365,8 @@ fn restart_while_paused_restores_rate_and_records_current_epoch() {
     .insert_resource(simulation())
     .insert_resource(rig)
     .insert_resource(PilotControls::default())
+    .init_resource::<SampledPilotInput>()
+    .init_resource::<StallWarningStatus>()
     .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(
         flightsim_sim::replay::Conditions::default(),
     )))

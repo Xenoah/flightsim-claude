@@ -26,5 +26,9 @@ criterion.workspace = true
 name = "terrain"
 harness = false
 
+[[bench]]
+name = "terrain_seam_planning"
+harness = false
+
 [lints]
 workspace = true

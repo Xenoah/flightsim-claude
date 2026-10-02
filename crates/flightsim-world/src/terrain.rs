@@ -12,7 +12,8 @@
 //! # 深いレベルから順に探す
 //!
 //! 同じ場所を複数のレベルで焼いてある場合、**細かいものを優先する**。
-//! 見つからなければ 1 段粗いレベルへ落ちる。全レベルで見つからなければ `None` を返し、
+//! 見つからなければ 1 段粗いレベルへ落ちる。全 primary レベルを探した後だけ、
+//! 供給元が持つ全球 fallback を使う。どちらにも無ければ `None` を返し、
 //! 「海上」の判断は呼び出し側に委ねる（[ADR-0006](../../../../docs/adr/0006-simulation-integration-layer.md)）。
 //!
 //! [`dem::io`]: crate::dem::io
@@ -38,6 +39,39 @@ pub trait TileSource {
     /// **「存在しない」はエラーではない。** 地形は疎に焼かれるのが普通で、
     /// 海上のタイルは最初から作られない。
     fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError>;
+
+    /// Whether this source may provide primary tiles, now or in the future.
+    ///
+    /// `false` promises that `load` always returns `Ok(None)` for this source's
+    /// entire lifetime. Callers may skip primary reads and missing-tile history,
+    /// but must still respect primary data already in their cache or meshes.
+    /// Never infer this capability from a currently empty directory or cache:
+    /// dynamic and third-party sources keep the conservative `true` default.
+    fn primary_reads_possible(&self) -> bool {
+        true
+    }
+
+    /// Whether a separate, complete-planet fallback pass is available.
+    fn has_fallback(&self) -> bool {
+        false
+    }
+
+    /// Generate one fallback tile only after the primary ancestor search has
+    /// failed. Callers must count this against their normal per-frame budget.
+    /// The default has no fallback; no runtime network access is implied.
+    ///
+    /// # Errors
+    /// A source may report failure rather than silently fabricate terrain.
+    fn load_fallback(&self, _id: TileId) -> Result<Option<DemTile>, TerrainError> {
+        Ok(None)
+    }
+
+    /// Constant-work surface height after *all* primary levels have failed.
+    /// Separate from tile generation so a generated fine tile cannot hide an
+    /// existing real ancestor in the terrain cache.
+    fn fallback_elevation_at(&self, _position: Geodetic) -> Option<Meters> {
+        None
+    }
 }
 
 /// タイル読み込みのエラー。
@@ -157,6 +191,18 @@ impl<T: TileSource + ?Sized> TileSource for Box<T> {
     fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
         (**self).load(id)
     }
+    fn primary_reads_possible(&self) -> bool {
+        (**self).primary_reads_possible()
+    }
+    fn has_fallback(&self) -> bool {
+        (**self).has_fallback()
+    }
+    fn load_fallback(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+        (**self).load_fallback(id)
+    }
+    fn fallback_elevation_at(&self, position: Geodetic) -> Option<Meters> {
+        (**self).fallback_elevation_at(position)
+    }
 }
 
 /// 参照も供給元として扱えるようにする。
@@ -166,6 +212,35 @@ impl<T: TileSource + ?Sized> TileSource for Box<T> {
 impl<T: TileSource + ?Sized> TileSource for &T {
     fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
         (**self).load(id)
+    }
+    fn primary_reads_possible(&self) -> bool {
+        (**self).primary_reads_possible()
+    }
+    fn has_fallback(&self) -> bool {
+        (**self).has_fallback()
+    }
+    fn load_fallback(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+        (**self).load_fallback(id)
+    }
+    fn fallback_elevation_at(&self, position: Geodetic) -> Option<Meters> {
+        (**self).fallback_elevation_at(position)
+    }
+}
+
+/// An explicitly absent, immutable primary source.
+///
+/// Use only when no primary dataset is configured. An empty `MemoryTileSource`
+/// or `DiskTileSource` may receive tiles later and must remain primary-capable.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EmptyTileSource;
+
+impl TileSource for EmptyTileSource {
+    fn load(&self, _id: TileId) -> Result<Option<DemTile>, TerrainError> {
+        Ok(None)
+    }
+
+    fn primary_reads_possible(&self) -> bool {
+        false
     }
 }
 
@@ -208,6 +283,11 @@ impl TileSource for MemoryTileSource {
 /// 逆に無制限に覚えると、長距離飛行で集合が際限なく膨らむ。
 const MISS_MEMORY_LIMIT: usize = 4_096;
 
+/// Maximum retained primary-load diagnostics. A long global flight must not
+/// accumulate an unbounded list of broken regional tiles. The first failures
+/// remain inspectable; further failures are counted by `dropped_load_failures`.
+pub const MAX_RECORDED_LOAD_FAILURES: usize = 4_096;
+
 /// タイルをキャッシュしつつ測地座標の標高を返す。
 ///
 /// # 決定論
@@ -223,6 +303,7 @@ pub struct Terrain<S: TileSource> {
     /// 存在しないと分かったタイル。ファイルアクセスの繰り返しを避ける。
     misses: HashSet<TileId>,
     load_failures: Vec<TerrainError>,
+    dropped_load_failures: u64,
 }
 
 impl<S: TileSource> Terrain<S> {
@@ -248,22 +329,28 @@ impl<S: TileSource> Terrain<S> {
             levels,
             misses: HashSet::new(),
             load_failures: Vec::new(),
+            dropped_load_failures: 0,
         }
     }
 
     /// 測地座標における地形標高（楕円体高）。
     ///
-    /// どのレベルにもタイルが無ければ `None`。**呼び出し側が海面などの既定値を決める。**
+    /// 全 primary レベルを探し、無ければ source の global fallback を使う。
+    /// どちらにもデータが無ければ `None`。呼び出し側が既定値を決める。
     /// ここで 0 m を返してしまうと、「本当に標高 0 m」と「データが無い」が
     /// 区別できなくなる。
     pub fn elevation_at(&mut self, position: Geodetic) -> Option<Meters> {
+        let primary_reads_possible = self.source.primary_reads_possible();
+        if !primary_reads_possible && self.cache.is_empty() {
+            return self.source.fallback_elevation_at(position);
+        }
         for level in self.levels.clone().rev() {
             let id = TileId::containing(level, position);
 
             if self.cache.contains(id) {
                 return self.cache.get(id).map(|tile| tile.elevation_at(position));
             }
-            if self.misses.contains(&id) {
+            if !primary_reads_possible || self.misses.contains(&id) {
                 continue;
             }
 
@@ -276,12 +363,16 @@ impl<S: TileSource> Terrain<S> {
                 Err(error) => {
                     // 壊れたタイル 1 枚で飛行全体を止めない。記録して次のレベルへ。
                     // 黙って無視すると「なぜ地形が平らなのか」が分からなくなる。
-                    self.load_failures.push(error);
+                    if self.load_failures.len() < MAX_RECORDED_LOAD_FAILURES {
+                        self.load_failures.push(error);
+                    } else {
+                        self.dropped_load_failures = self.dropped_load_failures.saturating_add(1);
+                    }
                     self.remember_miss(id);
                 }
             }
         }
-        None
+        self.source.fallback_elevation_at(position)
     }
 
     fn remember_miss(&mut self, id: TileId) {
@@ -291,10 +382,19 @@ impl<S: TileSource> Terrain<S> {
         self.misses.insert(id);
     }
 
-    /// 読み込みに失敗したタイル。**空でないなら地形に穴がある。**
+    /// First primary tile load failures, bounded by `MAX_RECORDED_LOAD_FAILURES`.
+    /// A global fallback may still cover these positions. Later failures are
+    /// counted separately rather than growing memory during long flights.
     #[must_use]
     pub fn load_failures(&self) -> &[TerrainError] {
         &self.load_failures
+    }
+
+    /// Number of additional failures omitted after the diagnostic limit was
+    /// reached. Saturates at u64::MAX; retained diagnostics are never cleared.
+    #[must_use]
+    pub const fn dropped_load_failures(&self) -> u64 {
+        self.dropped_load_failures
     }
 
     #[must_use]
@@ -334,6 +434,63 @@ mod tests {
             source.insert(id, tile);
         }
         Terrain::new(source, 16 * 1024 * 1024, 0..=12)
+    }
+
+    #[test]
+    fn only_explicit_empty_sources_opt_out_of_primary_discovery() {
+        let id = TileId::roots()[0];
+        assert!(!EmptyTileSource.primary_reads_possible());
+        assert!(EmptyTileSource.load(id).unwrap().is_none());
+        let mut memory = MemoryTileSource::new();
+        assert!(memory.primary_reads_possible());
+        memory.insert(id, ramp_tile(id, 3, 10.0));
+        assert!(memory.primary_reads_possible());
+        assert!(memory.load(id).unwrap().is_some());
+        assert!(
+            DiskTileSource::new("unconfigured-but-possibly-future-directory")
+                .primary_reads_possible()
+        );
+        let boxed: Box<dyn TileSource> = Box::new(EmptyTileSource);
+        assert!(!boxed.primary_reads_possible());
+        fn reference_primary_reads_possible<S: TileSource>(source: S) -> bool {
+            source.primary_reads_possible()
+        }
+        assert!(!reference_primary_reads_possible(&boxed));
+        assert!(reference_primary_reads_possible(&memory));
+    }
+
+    #[test]
+    fn an_explicit_absent_primary_skips_reads_and_history_but_preserves_cached_primary() {
+        #[derive(Debug)]
+        struct NoPrimary;
+        impl TileSource for NoPrimary {
+            fn load(&self, _id: TileId) -> Result<Option<DemTile>, TerrainError> {
+                panic!("an explicitly absent primary must not be probed");
+            }
+            fn primary_reads_possible(&self) -> bool {
+                false
+            }
+            fn fallback_elevation_at(&self, _position: Geodetic) -> Option<Meters> {
+                Some(Meters(5.0))
+            }
+        }
+        let coarse = TileId::new(3, 5, 2);
+        let fine = coarse.children().unwrap()[0];
+        let position = fine.center();
+        let mut terrain = Terrain::new(NoPrimary, 1_000_000, 0..=13);
+        assert_eq!(terrain.elevation_at(position), Some(Meters(5.0)));
+        terrain.cache.insert(
+            coarse,
+            DemTile::new(coarse.bounds(), HeightGrid::flat(3, 3, Meters(42.0))),
+        );
+        assert_eq!(terrain.elevation_at(position), Some(Meters(42.0)));
+        terrain.cache.insert(
+            fine,
+            DemTile::new(fine.bounds(), HeightGrid::flat(3, 3, Meters(78.0))),
+        );
+        assert_eq!(terrain.elevation_at(position), Some(Meters(78.0)));
+        assert!(terrain.misses.is_empty());
+        assert!(terrain.load_failures().is_empty());
     }
 
     // --- 基本 ---
@@ -507,6 +664,34 @@ mod tests {
             1,
             "a missing tile was looked up more than once"
         );
+    }
+
+    #[test]
+    fn long_global_travel_keeps_failure_diagnostics_bounded() {
+        #[derive(Debug)]
+        struct BrokenSource;
+        impl TileSource for BrokenSource {
+            fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
+                Err(TerrainError::Io {
+                    path: PathBuf::from(format!("broken-{}-{}", id.x, id.y)),
+                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, "fixture failure"),
+                })
+            }
+            fn fallback_elevation_at(&self, _position: Geodetic) -> Option<Meters> {
+                Some(Meters(25.0))
+            }
+        }
+        let mut terrain = Terrain::new(BrokenSource, 1_024, 9..=9);
+        for index in 0..MAX_RECORDED_LOAD_FAILURES + 17 {
+            let index = u32::try_from(index).unwrap();
+            let id = TileId::new(9, index % 1_024, index / 1_024);
+            assert_eq!(terrain.elevation_at(id.center()), Some(Meters(25.0)));
+            assert!(terrain.load_failures().len() <= MAX_RECORDED_LOAD_FAILURES);
+            assert!(terrain.misses.len() <= MISS_MEMORY_LIMIT);
+        }
+        assert_eq!(terrain.load_failures().len(), MAX_RECORDED_LOAD_FAILURES);
+        assert_eq!(terrain.dropped_load_failures(), 17);
+        assert!(terrain.cache().is_empty());
     }
 
     // --- ディスク ---

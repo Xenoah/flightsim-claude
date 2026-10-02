@@ -76,4 +76,7 @@ pub use flight::{
 };
 pub use ground::{GroundPlane, GroundSampler};
 pub use replay::{Player, Recorder, Recording, ReplayError};
-pub use simulation::{FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind};
+pub use simulation::{
+    FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind,
+    climate_atmosphere_sample,
+};

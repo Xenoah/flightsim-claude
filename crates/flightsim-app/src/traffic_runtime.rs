@@ -81,6 +81,14 @@ impl TrafficRuntime {
             last_error: None,
         })
     }
+
+    /// Move only deterministic practice traffic after an explicit new-flight
+    /// jump. Existing LAN sessions and their remote participants are unchanged.
+    pub fn restart_synthetic_at(&mut self, anchor: Geodetic) {
+        if self.synthetic.is_some() {
+            self.synthetic = Some(SyntheticTraffic::new(anchor));
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -311,4 +319,36 @@ fn traffic_text(
         text.push_str(&format!("\nERROR: {error}"));
     }
     text
+}
+
+#[cfg(test)]
+mod world_jump_tests {
+    use super::*;
+
+    #[test]
+    fn a_world_jump_reanchors_practice_traffic_without_creating_a_session() {
+        let options = Options {
+            synthetic: true,
+            ..Options::default()
+        };
+        let departure = Geodetic::from_degrees(35.55, 139.78, 1000.0);
+        let destination = Geodetic::from_degrees(46.58, 8.0, 3500.0);
+        let mut runtime = TrafficRuntime::new(&options, departure).unwrap();
+        runtime.restart_synthetic_at(destination);
+        assert!(matches!(runtime.session, Session::None));
+        let observations = runtime.synthetic.as_ref().unwrap().sample(Seconds::ZERO);
+        assert!(!observations.is_empty());
+        assert!(
+            observations
+                .iter()
+                .all(|observation| flightsim_net::traffic::within_range(
+                    destination.to_ecef(),
+                    observation.state.position,
+                    Meters(10_000.0)
+                ))
+        );
+        let mut disabled = TrafficRuntime::new(&Options::default(), departure).unwrap();
+        disabled.restart_synthetic_at(destination);
+        assert!(disabled.synthetic.is_none());
+    }
 }

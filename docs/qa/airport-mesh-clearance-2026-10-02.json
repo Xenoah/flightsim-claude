@@ -1,0 +1,511 @@
+{
+  "kind": "independent CPU data diagnostic; not simulator/rendered screenshot",
+  "atlas_sha256": "57bc03c12caa772ecbd52f1d24cd12704ccc4ace5123e9d8c26b6e454907f13e",
+  "atlas_shape": [
+    1024,
+    2048
+  ],
+  "convention": "positive error means terrain plane lies ABOVE sampled physical ground",
+  "limits": "Samples test possible uniform LODs, not selected live cuts, rendered frames, light visibility, or regional DEM. No regional fsdem fixture is available in this checkout.",
+  "regions": {
+    "Haneda vicinity": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -4.917185173490466,
+        "max_terrain_minus_sampler_m": -3.396218451041065,
+        "p99_absolute_error_m": 4.908743526384692,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.1383124168708747,
+        "max_terrain_minus_sampler_m": -0.029703783631269687,
+        "p99_absolute_error_m": 0.13685686779718267,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0179275842967499,
+        "max_terrain_minus_sampler_m": -0.005775926477184612,
+        "p99_absolute_error_m": 0.017485723545595848,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.004759762277586788,
+        "max_terrain_minus_sampler_m": -0.0014236514070304906,
+        "p99_absolute_error_m": 0.004649666708882805,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0012362870117215152,
+        "max_terrain_minus_sampler_m": -0.00012673278735775284,
+        "p99_absolute_error_m": 0.001161989576607283,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.00031939555051252455,
+        "max_terrain_minus_sampler_m": -1.7959561724012474e-05,
+        "p99_absolute_error_m": 0.00029866002523299074,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    },
+    "Kathmandu vicinity": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": 1.0332627774453158,
+        "max_terrain_minus_sampler_m": 9.26078421908096,
+        "p99_absolute_error_m": 9.114894603606654,
+        "fraction_above_pavement_lift_0_08m": 1.0,
+        "fraction_above_light_top_0_47m": 1.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.10468802089667406,
+        "max_terrain_minus_sampler_m": 0.9499113017623131,
+        "p99_absolute_error_m": 0.9197551271138241,
+        "fraction_above_pavement_lift_0_08m": 0.858153078202995,
+        "fraction_above_light_top_0_47m": 0.3997504159733777
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.007115680162314675,
+        "max_terrain_minus_sampler_m": 0.06286886202656206,
+        "p99_absolute_error_m": 0.06051919148555954,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0016397418078213377,
+        "max_terrain_minus_sampler_m": 0.014897600385438636,
+        "p99_absolute_error_m": 0.013769948685985588,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.00046381933566408406,
+        "max_terrain_minus_sampler_m": 0.004086065547198814,
+        "p99_absolute_error_m": 0.0039099153321126325,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.00014050643471819058,
+        "max_terrain_minus_sampler_m": 0.0010057626668640296,
+        "p99_absolute_error_m": 0.0008831651507261997,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    },
+    "Lukla vicinity": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -2.435354787822689,
+        "max_terrain_minus_sampler_m": -0.5821421070618271,
+        "p99_absolute_error_m": 2.390780042062652,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.4700389293234366,
+        "max_terrain_minus_sampler_m": -0.07370025001364411,
+        "p99_absolute_error_m": 0.4574870633138107,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.03134322907317255,
+        "max_terrain_minus_sampler_m": -0.0036748021552739374,
+        "p99_absolute_error_m": 0.029985264999068024,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.010932428715477727,
+        "max_terrain_minus_sampler_m": -0.001449389752906427,
+        "p99_absolute_error_m": 0.01054139931068221,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.002720939505707065,
+        "max_terrain_minus_sampler_m": -6.86908151692478e-07,
+        "p99_absolute_error_m": 0.002522995046697361,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0007891825162005262,
+        "max_terrain_minus_sampler_m": 4.495781968216761e-05,
+        "p99_absolute_error_m": 0.0006880900036549067,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    },
+    "Quito vicinity": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -40.52986469663574,
+        "max_terrain_minus_sampler_m": -23.322632172360954,
+        "p99_absolute_error_m": 40.399705795311476,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.870560188786385,
+        "max_terrain_minus_sampler_m": -0.032624286896407284,
+        "p99_absolute_error_m": 0.8351982089952754,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.14924037595392292,
+        "max_terrain_minus_sampler_m": -0.0059186012708778435,
+        "p99_absolute_error_m": 0.14346615732162266,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.03859698759242747,
+        "max_terrain_minus_sampler_m": -0.0013837628880537522,
+        "p99_absolute_error_m": 0.03687654318312981,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.009873438831618842,
+        "max_terrain_minus_sampler_m": -0.00015196558388197445,
+        "p99_absolute_error_m": 0.009552622056889958,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.00257444043745636,
+        "max_terrain_minus_sampler_m": 8.270432681456441e-05,
+        "p99_absolute_error_m": 0.002366046304923657,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    },
+    "Alps stress": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -9.297648264853251,
+        "max_terrain_minus_sampler_m": -0.4500479575526697,
+        "p99_absolute_error_m": 9.12760010869556,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -1.8032330684504814,
+        "max_terrain_minus_sampler_m": -0.09007881087654823,
+        "p99_absolute_error_m": 1.732834440611855,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.055675662857538555,
+        "max_terrain_minus_sampler_m": -0.0005396812139224494,
+        "p99_absolute_error_m": 0.05122972919938093,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.024489701129823516,
+        "max_terrain_minus_sampler_m": -0.0001923822810567799,
+        "p99_absolute_error_m": 0.02240551308654177,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.008764438701746258,
+        "max_terrain_minus_sampler_m": -9.83834515864146e-05,
+        "p99_absolute_error_m": 0.008158020196929102,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0022341060457620188,
+        "max_terrain_minus_sampler_m": 6.96220968166017e-05,
+        "p99_absolute_error_m": 0.00208949201789892,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    },
+    "Dateline stress": {
+      "6": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -1.8584051279341232,
+        "max_terrain_minus_sampler_m": -0.5187977806645616,
+        "p99_absolute_error_m": 1.8493257002584946,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "8": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.08399845294131403,
+        "max_terrain_minus_sampler_m": -0.021835341192504742,
+        "p99_absolute_error_m": 0.08278137165768173,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "10": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.004065388150067406,
+        "max_terrain_minus_sampler_m": -0.0004270770884495789,
+        "p99_absolute_error_m": 0.003923282849618257,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "11": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0015818404786962503,
+        "max_terrain_minus_sampler_m": -0.00022361039179408237,
+        "p99_absolute_error_m": 0.0015146235361178028,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "12": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0004888910570226557,
+        "max_terrain_minus_sampler_m": -7.22413661016219e-05,
+        "p99_absolute_error_m": 0.00045643578306025394,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      },
+      "13": {
+        "samples": 7212,
+        "ray_misses": 0,
+        "min_terrain_minus_sampler_m": -0.0001286651379288628,
+        "max_terrain_minus_sampler_m": 1.5597479871232167e-05,
+        "p99_absolute_error_m": 0.00011154512448232625,
+        "fraction_above_pavement_lift_0_08m": 0.0,
+        "fraction_above_light_top_0_47m": 0.0
+      }
+    }
+  },
+  "synthetic_haneda_runway": {
+    "source": "Runway::synthetic: 35.548N,139.775E; heading 050; length 2500m; width 45m",
+    "light_count": 106,
+    "airport_geometry_source": "runway.rs and runway_lights.rs",
+    "samples": {
+      "pavement_triangle_centroids": {
+        "6": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 4.315665209513021,
+          "maximum_airport_minus_terrain_m": 4.706862747735087,
+          "centroids_below_terrain": 0
+        },
+        "8": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 0.15565485435759285,
+          "maximum_airport_minus_terrain_m": 0.3261612061554544,
+          "centroids_below_terrain": 0
+        },
+        "10": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 0.08206713808122856,
+          "maximum_airport_minus_terrain_m": 0.09922428058912658,
+          "centroids_below_terrain": 0
+        },
+        "11": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 0.08000310816861855,
+          "maximum_airport_minus_terrain_m": 0.08480802107699503,
+          "centroids_below_terrain": 0
+        },
+        "12": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 0.0799667340837118,
+          "maximum_airport_minus_terrain_m": 0.08122855213176905,
+          "centroids_below_terrain": 0
+        },
+        "13": {
+          "triangle_centroid_count": 16100,
+          "minimum_airport_minus_terrain_m": 0.07998066705273743,
+          "maximum_airport_minus_terrain_m": 0.08031900976928341,
+          "centroids_below_terrain": 0
+        }
+      },
+      "light_top_triangle_centroids": {
+        "6": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 4.703032465669182,
+          "maximum_airport_minus_terrain_m": 5.098400696826815,
+          "centroids_below_terrain": 0
+        },
+        "8": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 0.5499496047927508,
+          "maximum_airport_minus_terrain_m": 0.7168316462000917,
+          "centroids_below_terrain": 0
+        },
+        "10": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 0.47190765820005964,
+          "maximum_airport_minus_terrain_m": 0.4890221289224286,
+          "centroids_below_terrain": 0
+        },
+        "11": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 0.47031946430240623,
+          "maximum_airport_minus_terrain_m": 0.474660307890133,
+          "centroids_below_terrain": 0
+        },
+        "12": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 0.47014036958313454,
+          "maximum_airport_minus_terrain_m": 0.4711475886164038,
+          "centroids_below_terrain": 0
+        },
+        "13": {
+          "triangle_centroid_count": 212,
+          "minimum_airport_minus_terrain_m": 0.4700705435903174,
+          "maximum_airport_minus_terrain_m": 0.4702952275351464,
+          "centroids_below_terrain": 0
+        }
+      }
+    }
+  },
+  "global_random_probes": {
+    "6": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -47.55630082551352,
+      "max_terrain_minus_sampler_m": 47.09739536088682,
+      "p99_absolute_error_m": 10.258311349270683,
+      "fraction_above_pavement_lift_0_08m": 0.0242,
+      "fraction_above_light_top_0_47m": 0.0208,
+      "highest_positive_error_probe_lat_lon": [
+        0.11320524966642047,
+        -77.93696368653819
+      ]
+    },
+    "8": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -4.692794119369523,
+      "max_terrain_minus_sampler_m": 4.3749816342992744,
+      "p99_absolute_error_m": 0.6233751906180585,
+      "fraction_above_pavement_lift_0_08m": 0.01616,
+      "fraction_above_light_top_0_47m": 0.00456,
+      "highest_positive_error_probe_lat_lon": [
+        -14.247983339402955,
+        -69.29296277822897
+      ]
+    },
+    "10": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -0.17759976084425944,
+      "max_terrain_minus_sampler_m": 0.2047243572529851,
+      "p99_absolute_error_m": 0.038958949221590274,
+      "fraction_above_pavement_lift_0_08m": 0.0006,
+      "fraction_above_light_top_0_47m": 0.0,
+      "highest_positive_error_probe_lat_lon": [
+        56.16421537244102,
+        111.32698851888722
+      ]
+    },
+    "11": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -0.08689385586694698,
+      "max_terrain_minus_sampler_m": 0.06288847386649365,
+      "p99_absolute_error_m": 0.009084344969605238,
+      "fraction_above_pavement_lift_0_08m": 0.0,
+      "fraction_above_light_top_0_47m": 0.0,
+      "highest_positive_error_probe_lat_lon": [
+        30.339737076283377,
+        130.68634006612643
+      ]
+    },
+    "12": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -0.014301849661933375,
+      "max_terrain_minus_sampler_m": 0.014168612032563033,
+      "p99_absolute_error_m": 0.0022506415117248602,
+      "fraction_above_pavement_lift_0_08m": 0.0,
+      "fraction_above_light_top_0_47m": 0.0,
+      "highest_positive_error_probe_lat_lon": [
+        28.250748658058374,
+        83.60115075245955
+      ]
+    },
+    "13": {
+      "samples": 25000,
+      "ray_misses": 0,
+      "min_terrain_minus_sampler_m": -0.003945529397469727,
+      "max_terrain_minus_sampler_m": 0.0035590136388918836,
+      "p99_absolute_error_m": 0.0006062952112210948,
+      "fraction_above_pavement_lift_0_08m": 0.0,
+      "fraction_above_light_top_0_47m": 0.0,
+      "highest_positive_error_probe_lat_lon": [
+        36.69806460383153,
+        33.227741299271884
+      ]
+    }
+  }
+}

@@ -48,6 +48,7 @@ pub mod pause;
 pub mod replay;
 pub mod traffic;
 mod tutorial;
+pub mod world_map;
 
 pub use crash::{CrashNotice, CrashOverlay, crash_text};
 pub use input_diagnostics::InputDiagnosticsPanel;
@@ -64,11 +65,23 @@ pub use tutorial::{
     TutorialProgress, TutorialPrompt, TutorialStage, TutorialState, TutorialVisibility,
     spawn_tutorial_prompt, update_tutorial_prompt,
 };
+pub use world_map::{
+    WorldMapActions, WorldMapLayer, WorldMapRaster, WorldMapStart, WorldMapState, WorldMapSystems,
+};
 
 /// HUD に出す値。アプリ側が毎フレーム詰める。
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct HudState {
+    /// True airspeed through the air mass. Takeoff cues use `equivalent_airspeed`.
     pub airspeed: MetersPerSecond,
+    /// Density-corrected equivalent airspeed, supplied by the simulation boundary.
+    /// This is not a calibrated pitot/static IAS instrument.
+    pub equivalent_airspeed: MetersPerSecond,
+    /// AoA-based warning supplied by the app; never inferred from a fixed speed.
+    pub stall_warning: bool,
+    /// True when the aircraft lift curve cannot supply a valid warning threshold.
+    /// The display must not present missing warning data as evidence of safety.
+    pub stall_warning_unavailable: bool,
     pub altitude: Meters,
     pub agl: Meters,
     pub vertical_speed: MetersPerSecond,
@@ -79,8 +92,8 @@ pub struct HudState {
     pub flaps: f64,
     /// 昇降舵トリム `[-1, 1]`。正で機首上げ＝遅い速度で釣り合う。
     ///
-    /// **手を離したときの挙動を決めるのはこれ。** 見えないと、
-    /// なぜ勝手に機首が上がる（下がる）のかが分からない。
+    /// キーを離しても保持する。姿勢・高度を固定する自動操縦ではなく、
+    /// 過渡応答や出力・速度・姿勢にも手放し時の動きは左右される。
     pub trim: f64,
     pub on_ground: bool,
     pub terrain_available: bool,
@@ -145,6 +158,7 @@ impl Default for HudSmoothing {
 /// 実際に画面へ出す値。
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct DisplayedValues {
+    /// Equivalent airspeed for the primary speed display.
     pub airspeed: Knots,
     pub altitude: Feet,
     pub agl: Feet,
@@ -171,7 +185,7 @@ impl HudSmoothing {
         if self.elapsed >= self.refresh_interval.get() {
             self.elapsed = 0.0;
             self.displayed = DisplayedValues {
-                airspeed: state.airspeed.to_knots(),
+                airspeed: state.equivalent_airspeed.to_knots(),
                 altitude: state.altitude.to_feet(),
                 agl: state.agl.to_feet(),
                 vertical_speed: MetersPerSecond(self.smoothed_vertical_speed).to_feet_per_minute(),
@@ -452,7 +466,7 @@ pub fn update_help_for_replay(
     mut help: Query<&mut Text, With<HudHelp>>,
 ) {
     let desired = if status.active {
-        "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay.".to_owned()
+        "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nM .............. world map (preview only)\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay.".to_owned()
     } else {
         help_text()
     };
@@ -467,23 +481,26 @@ pub fn update_help_for_replay(
 #[must_use]
 pub fn help_text() -> String {
     [
-        "W/S or Up/Down .... pitch (S = nose up)",
+        "S/Down: pull up; W/Up: push down (pitch)",
         "A/D or Left/Right . roll",
         "Q/E ............... rudder",
-        "PageUp/PageDown ... throttle",
+        "PageUp/PageDown ... throttle (stays set)",
         "F/G ............... flaps out / in",
-        "[ / ] ............. trim (hands-off speed)",
+        "[ / ] ............. trim nose down/up (stays set)",
         "Space ............. wheel brakes",
         "C ................. change view",
         "H ................. hide / show the guide",
+        "M ................. world map / new flight",
         ", / . ............. time faster / slower",
         "Esc ............... pause",
         "R ................. restart this flight",
         "F9 ................ save this flight as a replay",
         "F10 / F11 ......... input diagnostics / next page",
         "",
-        "Takeoff: throttle to full, hold S at about 60 kt,",
-        "then ease off. Trim with ] so it flies hands-off.",
+        "Takeoff: full power; near 75 kt EAS, gentle S/Down.",
+        "Ease off at FIRST nose rise; then observe.",
+        "Trim only once steady: ] if pulling, [ if pushing.",
+        "Stall warning: W/Up, wings level, power as needed.",
     ]
     .join("\n")
 }
@@ -510,15 +527,23 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         ""
     };
 
+    let warning = if state.stall_warning_unavailable {
+        "  STALL WARN N/A"
+    } else if state.stall_warning {
+        "  STALL WARN"
+    } else {
+        ""
+    };
+
     format!(
-        "TAS  {:>5.0} kt\n\
+        "EAS  {:>5.0} kt{warning}\n\
          ALT  {:>5.0} ft\n\
          AGL  {:>5.0} ft{ground}\n\
          V/S  {:>5.0} ft/min\n\
          HDG  {:>5.0} deg\n\
          PIT  {:>5.1} deg\n\
          BNK  {:>5.1} deg\n\
-         THR  {:>5.0} %\n\
+         THR  {:>5.0} % set\n\
          FLP  {:>5.0} %\n\
          TRM  {:>5.2}{trim_hint}
 \
@@ -606,6 +631,9 @@ mod tests {
     fn cruising() -> HudState {
         HudState {
             airspeed: MetersPerSecond(51.444),
+            equivalent_airspeed: MetersPerSecond(51.444),
+            stall_warning: false,
+            stall_warning_unavailable: false,
             altitude: Meters(304.8),
             agl: Meters(304.8),
             vertical_speed: MetersPerSecond(2.54),
@@ -686,6 +714,7 @@ mod tests {
         let replay = help(&mut app);
         assert!(replay.is_ascii());
         assert!(replay.contains("F8 ............. back 10 seconds"));
+        assert!(replay.contains("M .............. world map (preview only)"));
         assert!(!replay.contains("restart this flight"));
         app.world_mut().resource_mut::<ReplayStatus>().active = false;
         app.update();
@@ -906,7 +935,7 @@ mod tests {
         let first = smoothing.displayed();
 
         // 1 フレームぶんだけ進めて速度を変える。
-        state.airspeed = MetersPerSecond(80.0);
+        state.equivalent_airspeed = MetersPerSecond(80.0);
         let after_one_frame = smoothing.update(Seconds(1.0 / 60.0), &state);
         assert_eq!(
             after_one_frame, first,
@@ -995,11 +1024,77 @@ mod tests {
     }
 
     #[test]
+    fn eas_and_persistent_controls_are_unambiguous_for_both_profiles() {
+        for (profile, trim) in [("Light Single", 0.09), ("Swift Sport", 0.08)] {
+            let mut state = cruising();
+            state.airspeed = Knots(100.0).to_meters_per_second();
+            state.equivalent_airspeed = Knots(75.0).to_meters_per_second();
+            state.throttle = 1.0;
+            state.trim = trim;
+            let mut smoothing = HudSmoothing::default();
+            for warning in [false, true, false, true] {
+                state.stall_warning = warning;
+                let text = format_hud(smoothing.update(Seconds(0.2), &state), &state);
+                assert!(text.starts_with("EAS     75 kt"), "{profile}: {text}");
+                assert!(!text.contains("TAS") && !text.contains("IAS"));
+                assert!(text.contains("THR    100 % set"), "{profile}: {text}");
+                assert!(
+                    text.contains(&format!("TRM   {trim:.2}  nose up")),
+                    "{profile}: {text}"
+                );
+                assert_eq!(text.contains("STALL WARN"), warning);
+            }
+        }
+    }
+
+    #[test]
+    fn unavailable_warning_is_visible_even_with_a_stale_warning_value() {
+        let mut state = cruising();
+        let mut smoothing = HudSmoothing::default();
+        for available in [false, true, false] {
+            state.stall_warning_unavailable = !available;
+            state.stall_warning = true;
+            let text = format_hud(smoothing.update(Seconds(0.2), &state), &state);
+            assert_eq!(text.contains("STALL WARN N/A"), !available);
+            assert!(text.ends_with("COCKPIT"));
+        }
+    }
+
+    #[test]
+    fn help_teaches_small_inputs_and_conditional_trim_with_bounded_lines() {
+        let help = help_text();
+        for phrase in [
+            "S/Down: pull up",
+            "W/Up: push down",
+            "stays set",
+            "75 kt EAS",
+            "FIRST nose rise",
+            "then observe",
+            "] if pulling",
+            "[ if pushing",
+            "Stall warning",
+        ] {
+            assert!(help.contains(phrase), "missing {phrase}: {help}");
+        }
+        assert!(!help.contains("hold S") && !help.contains("flies hands-off"));
+        assert!(!help.contains("brief S") && !help.contains("65 kt EAS"));
+        assert!(help.lines().count() <= 20);
+        assert!(help.lines().all(|line| line.len() <= 52));
+    }
+
+    #[test]
     fn the_help_lists_every_control() {
         // 初見で離陸できないのがこのジャンル最大の離脱要因。
         let help = help_text();
         for expected in [
-            "pitch", "roll", "rudder", "throttle", "flaps", "brakes", "view",
+            "pitch",
+            "roll",
+            "rudder",
+            "throttle",
+            "flaps",
+            "brakes",
+            "view",
+            "world map",
         ] {
             assert!(
                 help.contains(expected),

@@ -210,6 +210,103 @@ pub fn coefficients(
     }
 }
 
+/// First positive lift maximum before the configured stall-blend midpoint.
+///
+/// `stall_angle` is the blend's 50% point, **not** the maximum-lift angle.
+/// Warning owners can use a conservative fraction of this peak. This helper
+/// only reads [`coefficients`]; it does not change forces, trim, or controls.
+///
+/// Searches `(0, stall_angle)` with 64 fixed intervals, then refines the first
+/// positive local maximum for 40 fixed iterations. It intentionally excludes
+/// the unrelated deep-stall flat-plate maximum near 55 degrees. The supported
+/// smooth sigmoid curve has a single attached-flow peak in the bracket; an
+/// unusual custom curve without a resolved interior peak returns `None`.
+///
+/// Assumes a physically valid configuration (normally checked by
+/// `AircraftDefinition::to_config`). Nonfinite lift parameters, nonpositive
+/// lift slope/blend rate, a blend angle outside `(0, pi/2)`, and flap settings
+/// outside finite `[0,1]` return `None`. Disabled-stall fixtures therefore have
+/// no reported peak. No fallback angle is invented. Callers may cache the
+/// result while the aircraft configuration and flap setting are unchanged.
+#[must_use]
+pub fn positive_stall_peak_angle(
+    aero: &AeroCoefficients,
+    geometry: &Geometry,
+    flaps: f64,
+) -> Option<Radians> {
+    let bound = aero.stall_angle.get();
+    if ![
+        aero.lift_zero,
+        aero.lift_alpha,
+        aero.lift_flaps,
+        aero.stall_blend_rate,
+        bound,
+        flaps,
+    ]
+    .into_iter()
+    .all(f64::is_finite)
+        || aero.lift_alpha <= 0.0
+        || aero.stall_blend_rate <= 0.0
+        || bound <= 0.0
+        || bound >= core::f64::consts::FRAC_PI_2
+        || !(0.0..=1.0).contains(&flaps)
+    {
+        return None;
+    }
+
+    let controls = ControlInputs::neutral().with_flaps(flaps);
+    let lift_at = |alpha| {
+        coefficients(
+            aero,
+            geometry,
+            AeroAngles {
+                angle_of_attack: Radians(alpha),
+                sideslip: Radians::ZERO,
+                true_airspeed: MetersPerSecond(1.0),
+            },
+            DVec3::ZERO,
+            controls,
+        )
+        .lift
+    };
+    let interval = bound / 64.0;
+    let mut left = lift_at(0.0);
+    let mut middle = lift_at(interval);
+    if !left.is_finite() || !middle.is_finite() {
+        return None;
+    }
+    for index in 2..=64 {
+        let right = lift_at(f64::from(index) * interval);
+        if !right.is_finite() {
+            return None;
+        }
+        if middle > 0.0 && middle > left && middle >= right {
+            let mut low = f64::from(index - 2) * interval;
+            let mut high = f64::from(index) * interval;
+            for _ in 0..40 {
+                let a = low + (high - low) / 3.0;
+                let b = high - (high - low) / 3.0;
+                let lift_a = lift_at(a);
+                let lift_b = lift_at(b);
+                if !lift_a.is_finite() || !lift_b.is_finite() {
+                    return None;
+                }
+                if lift_a < lift_b {
+                    low = a;
+                } else {
+                    high = b;
+                }
+            }
+            let result = (low + high) * 0.5;
+            return (result.is_finite() && result > 0.0 && result < bound)
+                .then_some(Radians(result));
+        }
+        left = middle;
+        middle = right;
+    }
+    None
+}
+
 /// 機体軸での空気力 `N` とモーメント `N·m` を返す。
 ///
 /// 揚力・抗力は風軸で定義されるため、迎角による回転で機体軸へ移している。

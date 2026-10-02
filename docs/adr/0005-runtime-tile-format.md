@@ -197,3 +197,11 @@ EGM2008 5分格子を50万点の公開基準値と比較し、最大誤差0.275m
 - 全球規模で焼く段階になったら、ファイル数の問題からパック形式へ移行する
 - 圧縮が必要になった場合（ネットワーク配信を始める等）、ペイロードに圧縮を
   導入する。ヘッダにフラグ用の予約バイトを 1 つ空けてあるのはそのため
+
+## 2026-10-02 extension: complete-world fallback atlas
+
+[ADR-0011](0011-offline-global-terrain-climate.md) avoids a global millions-file
+`.fsdem` tree by bundling a compact checked atlas and generating bounded demand
+DEMs. Regional `.fsdem` bytes and their ellipsoidal-height contract are unchanged.
+The global atlas carries independent orthometric, geoid and geographic-mask
+channels plus version, registration and checksum; see the global-terrain guide.

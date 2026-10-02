@@ -102,7 +102,7 @@ impl Instrument {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Airspeed => "TAS",
+            Self::Airspeed => "EAS",
             Self::Attitude => "ATT",
             Self::Altitude => "ALT",
             Self::VerticalSpeed => "V/S fpm",
@@ -116,7 +116,7 @@ impl Instrument {
     /// 実機のシックスパックの並び。**上段の 3 つ、下段の 3 つ**の順。
     ///
     /// ```text
-    ///   IAS  ATT  ALT     上段
+    ///   EAS  ATT  ALT     上段
     ///   PWR  HDG  V/S     下段
     /// ```
     ///
@@ -317,6 +317,7 @@ pub fn instrument_readout(instrument: Instrument, state: &HudReadout) -> String 
 /// 単位変換は**ここへ詰めるときに一度だけ**行う（`flightsim_core::units`）。
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct HudReadout {
+    /// Equivalent airspeed, matching the takeoff/climb guidance.
     pub airspeed: Knots,
     pub altitude: Feet,
     pub vertical_speed: FeetPerMinute,
@@ -334,7 +335,7 @@ impl HudReadout {
     #[must_use]
     pub fn from_state(state: &crate::HudState) -> Self {
         Self {
-            airspeed: state.airspeed.to_knots(),
+            airspeed: state.equivalent_airspeed.to_knots(),
             altitude: state.altitude.to_feet(),
             vertical_speed: state.vertical_speed.to_feet_per_minute(),
             heading_degrees: finite_or_zero(state.heading.wrap_positive().to_degrees().get()),
@@ -631,7 +632,7 @@ pub fn update_panel_lighting(
 /// 針 1 本の向きを決める。
 fn needle_angle_for(needle: &InstrumentNeedle, state: &HudState) -> NeedleAngle {
     match (needle.instrument, needle.index) {
-        (Instrument::Airspeed, _) => airspeed_needle(state.airspeed),
+        (Instrument::Airspeed, _) => airspeed_needle(state.equivalent_airspeed),
         (Instrument::Altitude, 0) => altitude_hundreds_needle(state.altitude),
         (Instrument::Altitude, _) => altitude_thousands_needle(state.altitude),
         (Instrument::VerticalSpeed, _) => vertical_speed_needle(state.vertical_speed),
@@ -1056,10 +1057,37 @@ mod tests {
     }
 
     #[test]
+    fn speed_label_readout_and_needle_all_use_eas_at_altitude() {
+        let state = HudState {
+            airspeed: Knots(100.0).to_meters_per_second(),
+            equivalent_airspeed: Knots(75.0).to_meters_per_second(),
+            altitude: Meters(4000.0),
+            ..HudState::default()
+        };
+        assert_eq!(Instrument::Airspeed.label(), "EAS");
+        assert_eq!(
+            instrument_readout(Instrument::Airspeed, &HudReadout::from_state(&state)),
+            "75 kt"
+        );
+        let needle = InstrumentNeedle {
+            instrument: Instrument::Airspeed,
+            index: 0,
+        };
+        let expected = airspeed_needle(state.equivalent_airspeed).degrees();
+        assert!((needle_angle_for(&needle, &state).degrees() - expected).abs() < 1e-5);
+        assert!(
+            (needle_angle_for(&needle, &state).degrees()
+                - airspeed_needle(state.airspeed).degrees())
+            .abs()
+                > 1.0
+        );
+    }
+
+    #[test]
     fn the_readout_converts_units_once() {
         // 100 kt = 51.444 m/s、1000 ft = 304.8 m。既知の換算値と突き合わせる。
         let state = crate::HudState {
-            airspeed: MetersPerSecond(51.444),
+            equivalent_airspeed: MetersPerSecond(51.444),
             altitude: Meters(304.8),
             vertical_speed: MetersPerSecond(2.54),
             heading: Degrees(-10.0).to_radians(),
@@ -1079,7 +1107,7 @@ mod tests {
     #[test]
     fn a_broken_state_does_not_reach_the_readout() {
         let state = crate::HudState {
-            airspeed: MetersPerSecond(f64::NAN),
+            equivalent_airspeed: MetersPerSecond(f64::NAN),
             altitude: Meters(f64::INFINITY),
             heading: Radians(f64::NAN),
             throttle: f64::NAN,

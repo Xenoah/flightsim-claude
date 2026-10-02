@@ -55,6 +55,7 @@ use flightsim_world::{MeshOptions, TerrainMesh};
 
 pub mod aircraft;
 pub mod apron;
+pub mod biome;
 pub mod cockpit;
 pub mod daylight;
 pub mod holding_position;
@@ -67,6 +68,7 @@ pub mod taxiway_lights;
 pub mod taxiway_sign;
 pub mod terrain;
 mod terrain_selection;
+pub mod terrain_stitching;
 pub mod weather;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
@@ -76,7 +78,10 @@ pub use daylight::{
 pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
 pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
-pub use terrain_selection::{TerrainSelectionState, TerrainUpdate, update_terrain_selection};
+pub use terrain_selection::{
+    TerrainSelectionState, TerrainUpdate, update_terrain_selection,
+    update_terrain_selection_with_surface,
+};
 pub use weather::{CloudDeckSurface, CloudDistanceFog, CloudLayer, CloudLayerError};
 
 /// 世界座標での位置。**これが正であり、`Transform` は派生値。**

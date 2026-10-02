@@ -1,0 +1,5 @@
+# Keep machine-readable evidence stable across release-builder platforms.
+* text eol=lf
+# Verbatim upstream notices retain original bytes, including line endings and
+# one upstream trailing space. Keep text diffs readable, scope the exception.
+licenses/** -text -eol diff whitespace=-blank-at-eol

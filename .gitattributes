@@ -11,3 +11,12 @@
 # CRLF が混ざると読みづらい差分になる。
 *.yml text eol=lf
 *.yaml text eol=lf
+
+# Compact baked world atlases are binary; never normalize their bytes.
+*.fsgt binary
+*.fsclim binary
+
+# Source ledgers are checksum-pinned; Windows checkouts must preserve LF bytes.
+docs/data/global-surface-corrections.json text eol=lf linguist-generated=true
+crates/flightsim-world/data/*.json text eol=lf linguist-generated=true
+docs/data/copernicus-glo90-license.pdf binary

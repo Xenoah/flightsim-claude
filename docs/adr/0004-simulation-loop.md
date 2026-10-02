@@ -107,3 +107,47 @@ fn step(&mut self, dt: f64) {
 - FDM が壁時計から独立するため、**リプレイ機能とネットワーク同期の前提条件が最初から満たされる。** これらは要件にあるので、後付けにするより最初から分離しておく方が安い。
 - ヘッドレスで N 倍速のシミュレーションが可能になる（10分の飛行を数秒でテストできる）。QA の回帰テストはこれを使う。
 - 描画補間の実装を `render` 担当が忘れると、120Hz 物理を 60Hz で表示した際にわずかなジッタが出る。これは実装漏れとして検出しにくいので、**補間の有無を切り替えられるデバッグフラグを用意すること。**
+
+
+### Fixed-step pilot controls and terminal recording (2026-10-02)
+
+`Simulation::advance_with_controls(frame_time, callback)` uses the existing
+`FixedStep` accumulator. Immediately before each actual FDM step it calls
+`FnMut(Seconds, &RigidBodyState) -> ControlInputs` with the fixed duration and the
+pre-step state. The application samples hardware once per render frame, then
+updates rate-dependent pilot controls inside that callback. Recording receives
+the same duration, returned effective controls and pre-step state. The constant
+`advance(frame_time, controls)` API remains a wrapper.
+
+No second accumulator or Bevy dependency is introduced in `sim`. A render frame
+that executes no physics steps must not update pilot-rate state or append a
+record. Paused callers omit the call or pass zero duration. The existing 0.25 s
+frame clamp still bounds the number of updates.
+
+A crash or numerical divergence terminates the loop immediately, even when the
+frame originally budgeted more steps. `StepReport.steps` counts actual FDM calls,
+including the call that first diverged. `Simulation::elapsed` and impact time
+advance only for those calls. Remaining reserved steps and fractional frame time
+are discarded; they cannot reappear after a state-only recovery. Finite crashes
+freeze rendering at the impact state. Divergence does not copy an invalid state
+into the last valid interpolation endpoint. This removes the former difference
+between impact inside one long frame and impact encountered by sequential replay.
+
+The replay aircraft fingerprint now includes `FDM_MODEL_REVISION` in addition to
+configuration values. Pre-revision alpha.21 files with identical parameters are
+readable and writable as v1/v2 bytes but are rejected for reproduction, because
+this build does not emulate their old physics. File format versions remain file
+schema versions, not implicit physics selectors. Old durations, zero-duration
+records, identities and bytes are never relabeled as current fixed-step records.
+
+Accepted costs: new interactive recordings contain 120 records per simulated
+second. The unchanged 1,000,000-record cap covers about 2 h 18 m 53 s; its frame
+payload is 56 MB maximum and keyframes add at most 900,072 serialized bytes.
+The unchanged 120-record checkpoint interval is one second at this cadence.
+Exact seek still restarts from frame zero, so the application limit of 240 records
+per update advances at most two recorded seconds per update for these files.
+These are bounded record/work counts, not memory-layout or wall-clock performance
+guarantees. No limits are increased to compensate for the new cadence.
+
+Regression evidence is summarized in
+[fixed-step controls/replay QA](../qa/fixed-step-controls-replay-2026-10-02.md).

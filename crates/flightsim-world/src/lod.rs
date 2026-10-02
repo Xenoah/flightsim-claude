@@ -17,6 +17,8 @@
 
 use crate::tile::{GeoBounds, TileId};
 use flightsim_core::{Ecef, Geodetic, Meters, Radians};
+use std::cmp::Reverse;
+use std::collections::{BTreeSet, BinaryHeap};
 
 /// 1 回の選択で返すタイル数の上限。
 ///
@@ -91,8 +93,16 @@ impl LodSelector {
         }
     }
 
+    /// Set the leaf budget. Even a truncated selection keeps both root domains.
+    ///
+    /// # Panics
+    /// A budget below two cannot cover both geographic roots.
     #[must_use]
     pub const fn with_max_tiles(mut self, max_tiles: usize) -> Self {
+        assert!(
+            max_tiles >= 2,
+            "tile budget must cover both geographic roots"
+        );
         self.max_tiles = max_tiles;
         self
     }
@@ -133,45 +143,65 @@ impl LodSelector {
     /// カメラ位置から描画すべきタイル集合を選ぶ。
     #[must_use]
     pub fn select(&self, camera: Ecef) -> LodSelection {
-        let camera_position = camera.to_geodetic();
-        let mut selection = LodSelection {
-            tiles: Vec::new(),
-            truncated: false,
-        };
-
-        for root in TileId::roots() {
-            self.refine(root, camera, camera_position, &mut selection);
-        }
-
-        selection
+        self.select_with_surface(camera, Meters::ZERO)
     }
 
-    fn refine(
-        &self,
-        tile: TileId,
-        camera: Ecef,
-        camera_position: Geodetic,
-        selection: &mut LodSelection,
-    ) {
-        if selection.tiles.len() >= self.max_tiles {
-            selection.truncated = true;
-            return;
-        }
-
-        let distance = distance_to_bounds(camera, camera_position, tile.bounds());
-
-        if tile.level >= self.max_level || !self.should_refine(tile.level, distance) {
-            selection.tiles.push(tile);
-            return;
-        }
-
-        match tile.children() {
-            Some(children) => {
-                for child in children {
-                    self.refine(child, camera, camera_position, selection);
-                }
+    /// Select relative to a known local ground elevation, instead of assuming
+    /// the ellipsoid is the visible surface. At a high-altitude airport the
+    /// camera can be metres above ground but kilometres above the ellipsoid.
+    /// This local reference preserves near-contact tessellation; it is not a
+    /// per-tile terrain bound, and remote relief still uses the error estimate.
+    #[must_use]
+    pub fn select_with_surface(&self, camera: Ecef, ground_elevation: Meters) -> LodSelection {
+        let ground_elevation = if ground_elevation.is_finite() {
+            ground_elevation
+        } else {
+            Meters::ZERO
+        };
+        let camera_position = camera.to_geodetic();
+        let mut leaves: BTreeSet<_> = TileId::roots().into_iter().collect();
+        let mut pending = BinaryHeap::new();
+        let enqueue = |id: TileId, pending: &mut BinaryHeap<(u64, Reverse<TileId>)>| {
+            if id.level >= self.max_level {
+                return;
             }
-            None => selection.tiles.push(tile),
+            let distance = distance_to_bounds_at_elevation(
+                camera,
+                camera_position,
+                id.bounds(),
+                ground_elevation,
+            );
+            let error = self.screen_space_error(self.estimated_geometric_error(id.level), distance);
+            if error > self.max_screen_space_error {
+                // SSE is nonnegative. IEEE bit ordering is numeric ordering;
+                // the tile ID provides stable ordering for equal priorities.
+                pending.push((error.to_bits(), Reverse(id)));
+            }
+        };
+        for id in TileId::roots() {
+            enqueue(id, &mut pending);
+        }
+        let mut truncated = false;
+        while let Some((_, Reverse(id))) = pending.pop() {
+            // Replacing one complete leaf by four adds exactly three. Preserve
+            // the old leaf when the budget is exhausted, rather than dropping
+            // unvisited siblings/hemispheres (especially common at the poles).
+            if leaves.len().saturating_add(3) > self.max_tiles {
+                truncated = true;
+                break;
+            }
+            let Some(children) = id.children() else {
+                continue;
+            };
+            leaves.remove(&id);
+            for child in children {
+                leaves.insert(child);
+                enqueue(child, &mut pending);
+            }
+        }
+        LodSelection {
+            tiles: leaves.into_iter().collect(),
+            truncated,
         }
     }
 }
@@ -182,6 +212,18 @@ impl LodSelector {
 /// 範囲の中心からの符号付き角差を `[-π, π]` に正規化してから判定している。
 #[must_use]
 pub fn distance_to_bounds(camera: Ecef, camera_position: Geodetic, bounds: GeoBounds) -> Meters {
+    distance_to_bounds_at_elevation(camera, camera_position, bounds, Meters::ZERO)
+}
+
+/// Distance to the clamped geographic footprint on a local reference-height
+/// shell. All ECEF conversion remains in flightsim-core.
+#[must_use]
+pub fn distance_to_bounds_at_elevation(
+    camera: Ecef,
+    camera_position: Geodetic,
+    bounds: GeoBounds,
+    elevation: Meters,
+) -> Meters {
     let latitude = camera_position
         .latitude
         .get()
@@ -197,7 +239,7 @@ pub fn distance_to_bounds(camera: Ecef, camera_position: Geodetic, bounds: GeoBo
     let clamped_offset = offset.clamp(-half_width, half_width);
     let longitude = center_longitude + clamped_offset;
 
-    let nearest = Geodetic::new(Radians(latitude), Radians(longitude), Meters::ZERO).to_ecef();
+    let nearest = Geodetic::new(Radians(latitude), Radians(longitude), elevation).to_ecef();
     camera.distance_to(nearest)
 }
 
@@ -467,5 +509,79 @@ mod tests {
             12,
             Meters(20_000.0),
         );
+    }
+
+    #[test]
+    fn high_airports_keep_near_ground_detail_instead_of_using_msl_distance() {
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        );
+        for (lat, lon, height) in [(46.5, 8.0, 3000.0), (-13.5, -71.97, 4500.0)] {
+            let position = Geodetic::from_degrees(lat, lon, height + 2.0);
+            let desired = selector.select_with_surface(position.to_ecef(), Meters(height));
+            assert!(!desired.truncated);
+            assert!(
+                desired.tiles.contains(&TileId::containing(13, position)),
+                "{position:?}"
+            );
+            let old = selector.select(position.to_ecef());
+            assert!(!old.tiles.contains(&TileId::containing(13, position)));
+        }
+    }
+
+    #[test]
+    fn sea_level_selection_remains_exactly_compatible() {
+        let selector = selector();
+        for longitude in [-180.0, 0.0, 180.0] {
+            let camera = camera_over(35.0, longitude, 100.0);
+            assert_eq!(
+                selector.select(camera),
+                selector.select_with_surface(camera, Meters::ZERO)
+            );
+        }
+    }
+
+    #[test]
+    fn exhausted_lod_budget_keeps_complete_nonoverlapping_globe_at_poles() {
+        for budget in [2, 5, 16, 128, 4096] {
+            let selector = LodSelector::new(
+                0.000001,
+                1080.0,
+                Degrees(60.0).to_radians(),
+                24,
+                Meters(20_000.0),
+            )
+            .with_max_tiles(budget);
+            for latitude in [-90.0, 0.0, 90.0] {
+                let selection = selector
+                    .select_with_surface(camera_over(latitude, 180.0, 2802.0), Meters(2800.0));
+                assert!(selection.truncated);
+                assert!(selection.tiles.len() <= budget);
+                let area: f64 = selection
+                    .tiles
+                    .iter()
+                    .map(|id| id.bounds().width().get() * id.bounds().height().get())
+                    .sum();
+                assert!((area - core::f64::consts::TAU * core::f64::consts::PI).abs() < 1e-9);
+                let ids: BTreeSet<_> = selection.tiles.iter().copied().collect();
+                for id in &selection.tiles {
+                    let mut ancestor = id.parent();
+                    while let Some(parent) = ancestor {
+                        assert!(!ids.contains(&parent), "overlapping LOD leaves");
+                        ancestor = parent.parent();
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "tile budget must cover both geographic roots")]
+    fn a_one_tile_budget_cannot_silently_drop_a_hemisphere() {
+        let _ = selector().with_max_tiles(1);
     }
 }

@@ -10,6 +10,34 @@
 
 ## 現在利用しているデータ
 
+### 同梱の全球ベース地形 — NOAA ETOPO 2022 / Copernicus GLO-90 / Natural Earth
+
+> Global terrain: NOAA NCEI ETOPO 2022 (CC0), NGA-derived EGM2008 geoid (public domain), Natural Earth (public domain), modified Copernicus WorldDEM-90.
+
+同梱の `global-terrain.fsgt` は ETOPO 2022 の ice-surface 標高と対応する EGM2008
+geoid に、独立した湖・海岸の surface correction を加えた粗い全球ベースです。
+60 秒角格子を stride 10 で取得し、2048×1024 の整列格子へ再標本化しています。
+最終間隔は **10.546875 分角（赤道で約 19.5 km）** で、30 m DEM や衛星写真ではありません。
+Natural Earth の陸地・湖 polygon で dry land / inland water / ocean を区別します。
+海では H=0、内水は補正した静的な水面標高、陸地は負の標高も保持し、
+WGS84 楕円体高を `h = H + N` として求めます。海岸・小島・現在の湖面水位を精密に
+表すものではありません。ソース・ハッシュ・補正・再標本化は provenance に記録します。
+
+Copernicus 由来の変更データを含むため、全球ベースは全体として単に public domain
+ではありません。配布時は以下の required notices と license text を保持してください。
+
+> produced using Copernicus WorldDEM™-90 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved
+
+> The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM™-90
+
+- 再配布する notices: [NOTICE-GLOBAL-TERRAIN.txt](docs/data/NOTICE-GLOBAL-TERRAIN.txt)
+- 同梱の Copernicus GLO-90 license: [copernicus-glo90-license.pdf](docs/data/copernicus-glo90-license.pdf)
+- 正確なデータ出典・処理: [global-sources.md](docs/data/global-sources.md)
+- NOAA NCEI ETOPO 2022: https://www.ncei.noaa.gov/products/etopo-global-relief-model
+- ETOPO 2022 metadata / CC0-1.0: https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ngdc.mgg.dem:etopo_2022
+- EGM2008 geoid metadata: https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_geoid_netcdf/ETOPO_2022_v1_60s_N90W180_geoid.nc.das
+- Natural Earth public-domain terms: https://www.naturalearthdata.com/about/terms-of-use/
+
 ### 標高 — Copernicus DEM GLO-30
 
 `flightsim-tilegen` が読み込む対象です。**焼いたタイルを配布する場合、
@@ -79,7 +107,15 @@ CC BY 4.0。https://esa-worldcover.org/
 
 | ファイル | 生成 | プラン |
 |---|---|---|
-| `assets/aircraft/light_single.glb` | 2026-08-21、Meshy text-to-3D（preview → refine） | **有料プラン。再配布可** |
+| `assets/aircraft/light_single.glb` | 2026-08-21、Meshy text-to-3D（preview → refine） | 過去の記録: **有料プラン・再配布可**。生成時の根拠資料は未検証 |
+
+**2026-10-02 商用配布監査での留保:** 上のプラン記録は履歴として残していますが、
+生成 task、当日のプラン・適用規約、入力素材の権利を確認する資料は、今回の
+リポジトリ監査では検証できていません。このモデルを商用配布可と改めて認定する
+ものではありません。根拠が揃うまで、商用候補の staging からは除外し、
+オリジナルの Swift Sport を使います。後日の一般規約や Meshy のクレジット追記だけで
+この既存モデルを CC BY と再分類しないでください。
+必要な証拠と残る配布条件は [商用配布監査](docs/release/commercial-distribution-audit.md) を参照。
 
 軽単発機。4.75 MB、頂点 29,327、ベースカラー JPEG 1 枚（法線マップは無い）。
 モデル座標系は **前 = −X、上 = +Y**（glTF の慣習である −Z 前方とは違う）。
@@ -111,9 +147,39 @@ CC BY 4.0。https://esa-worldcover.org/
 `flightsim-app` の実行時依存には載らない（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 
 本プロジェクト自体は [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) です。
+この記述で第三者のデータ・モデル・フォント・依存ソフトウェアの個別条件を
+MIT / Apache-2.0 に置き換えることはありません。配布対象と一致する依存関係の
+ライセンス本文・著作権表示は `scripts/collect-dependency-notices.py` で収集し、
+未解決項目と最終ターゲットの条件を別途確認してください。
+
+### Bevy に埋め込まれるフォント・描画 LUT
+
+- **Fira Mono:** Bevy 0.18.1 の `default_font` が subset フォントを実行ファイルへ
+  埋め込みます。The Mozilla Foundation and Telefonica S.A. による
+  SIL Open Font License 1.1 の [原文](docs/release/licenses/FiraMono-LICENSE) を
+  同梱してください。これは Bevy のソースコード向け MIT / Apache 条件とは別です
+- **Tony McMapface:** `tonemapping_luts` が埋め込む LUT の、Tomasz Stachowiak による
+  [MIT の原文](docs/release/licenses/TonyMcMapface-LICENSE-MIT) を保存しています
+- **AgX / Blender Filmic LUT:** 同じ feature で埋め込まれます。特定の上流素材の
+  権利根拠・版の記録には未解決項目があります。Bevy の crate ライセンス欄だけで
+  全素材が確認済みとはせず、[監査の残項目](docs/release/commercial-distribution-audit.md)
+  を商用配布前に解決してください
 
 ## Original Swift Sport aircraft (2026-10-01)
 
 `assets/aircraft/swift_sport.glb` and its editable `.blend` are original procedural geometry created for this repository in Blender 4.3.2. The reproducible source is `tools/blender/build_swift_sport.py`. No third-party mesh, texture, logo or branded aircraft design is included. These assets and the source script use this repository's MIT OR Apache-2.0 license.
 
 Swift Sport is a generic two-seat sport aircraft, not certified data for any real aircraft. Its representative dynamics, camera and input settings are in `assets/aircraft/swift_sport.json`; the external model measures approximately7.12m long and9.4m span. The legacy Light Single model keeps its existing attribution and redistribution terms.
+
+## NOAA monthly climate
+
+Climate data provided by NOAA Physical Sciences Laboratory, Boulder, Colorado, USA:
+NCEP/NCAR Reanalysis 1 monthly 1991-2020 long-term means. These public-domain federal
+data were transformed into a compact offline atlas; no NOAA endorsement is implied.
+
+- https://www.psl.noaa.gov/data/help/
+- [Exact fields, processing and scientific limits](docs/data/global-climate.md)
+
+These are reanalysis climatology, not live weather, forecast or airport observations.
+Cloud fraction is a reanalysis field. Temperature altitude adjustment, broad biome
+labels, cloud-layer geometry and snow/ice visual cues are modeled approximations.

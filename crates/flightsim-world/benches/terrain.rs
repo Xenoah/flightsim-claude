@@ -11,7 +11,9 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use flightsim_core::{Degrees, Geodetic, Meters};
 use flightsim_world::dem::io::{read_tile, write_tile};
-use flightsim_world::{DemTile, HeightGrid, LodSelector, MemoryTileSource, Terrain, TileId};
+use flightsim_world::{
+    ClimateDate, DemTile, GlobalClimate, HeightGrid, LodSelector, MemoryTileSource, Terrain, TileId,
+};
 use std::hint::black_box;
 
 /// 起伏のある格子。平坦だと分岐予測が効きすぎて実態から外れる。
@@ -143,5 +145,53 @@ fn benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmarks);
+/// Full public climate samples, including the annual regional classification.
+/// Keep loading out of the timed loop; the real runtime shares this snapshot.
+fn climate_benchmarks(criterion: &mut Criterion) {
+    let climate = GlobalClimate::bundled().expect("bundled climate data validates");
+    let date = ClimateDate::from_month(7).expect("valid month");
+    let mut group = criterion.benchmark_group("climate_lookup");
+    group.throughput(criterion::Throughput::Elements(1));
+    for (label, point) in [
+        ("midlatitude", Geodetic::from_degrees(35.55, 139.78, 1500.0)),
+        ("dateline", Geodetic::from_degrees(-45.0, 179.999, 3000.0)),
+        ("north_pole", Geodetic::from_degrees(90.0, 0.0, 500.0)),
+    ] {
+        group.bench_function(label, |bencher| {
+            bencher.iter(|| black_box(climate.sample(black_box(point), black_box(date))));
+        });
+    }
+    group.bench_function("bundled_snapshot_clone", |bencher| {
+        bencher.iter(|| black_box(GlobalClimate::bundled().expect("already validated")));
+    });
+    group.finish();
+
+    // Match the UI raster dimensions, without a dependency on its Bevy crate.
+    // This measures only climate CPU sampling, not terrain, palette, upload,
+    // UI frame time or the interactive app's total map latency.
+    let probes: Vec<_> = (0..360)
+        .flat_map(|row| {
+            (0..720).map(move |col| {
+                Geodetic::from_degrees(
+                    90.0 - (f64::from(row) + 0.5) * 0.5,
+                    (f64::from(col) + 0.5) * 0.5 - 180.0,
+                    0.0,
+                )
+            })
+        })
+        .collect();
+    let mut group = criterion.benchmark_group("climate_map");
+    group.sample_size(10);
+    group.throughput(criterion::Throughput::Elements(720 * 360));
+    group.bench_function("full_sample_720x360", |bencher| {
+        bencher.iter(|| {
+            for &point in &probes {
+                black_box(climate.sample(black_box(point), black_box(date)));
+            }
+        });
+    });
+    group.finish();
+}
+
+criterion_group!(benches, benchmarks, climate_benchmarks);
 criterion_main!(benches);

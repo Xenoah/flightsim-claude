@@ -34,7 +34,16 @@ pub(super) struct ModelDefinition {
 #[serde(deny_unknown_fields)]
 pub(super) struct ControlDefinition {
     pub surface_rate: f64,
+    /// Optional pitch ramp rate for keyboard and rate-mode bindings.
+    /// Old custom profiles retain surface_rate when this field is absent.
+    /// Absolute analog positions are unaffected by this ramp rate.
+    #[serde(default)]
+    pub elevator_rate: Option<f64>,
     pub centering_rate: f64,
+    /// Optional pitch-only spring return for keyboard/rate-mode input. Missing
+    /// values preserve legacy centering; absolute analog positions stay direct.
+    #[serde(default)]
+    pub elevator_centering_rate: Option<f64>,
     pub throttle_rate: f64,
     pub flap_rate: f64,
     pub default_trim: f64,
@@ -104,7 +113,10 @@ impl AircraftProfile {
         let c = self.controls;
         let mut result = PilotControls::default();
         result.aileron = AxisState::new(c.surface_rate, c.centering_rate);
-        result.elevator = AxisState::new(c.surface_rate, c.centering_rate);
+        result.elevator = AxisState::new(
+            c.elevator_rate.unwrap_or(c.surface_rate),
+            c.elevator_centering_rate.unwrap_or(c.centering_rate),
+        );
         result.rudder = AxisState::new(c.surface_rate, c.centering_rate);
         result.throttle = RampAxis::new(
             if approach { c.approach_throttle } else { 0.0 },
@@ -202,13 +214,24 @@ impl AircraftProfile {
             return Err("engine_sound must be piston or turbine".into());
         }
         let c = self.controls;
-        for value in [c.surface_rate, c.throttle_rate, c.flap_rate, c.trim_rate] {
+        for value in [
+            c.surface_rate,
+            c.elevator_rate.unwrap_or(c.surface_rate),
+            c.throttle_rate,
+            c.flap_rate,
+            c.trim_rate,
+        ] {
             if !value.is_finite() || !(0.01..=10.0).contains(&value) {
                 return Err("control rates must be finite and within 0.01..=10".into());
             }
         }
         if !c.centering_rate.is_finite()
             || !(0.0..=10.0).contains(&c.centering_rate)
+            || !c
+                .elevator_centering_rate
+                .unwrap_or(c.centering_rate)
+                .is_finite()
+            || !(0.0..=10.0).contains(&c.elevator_centering_rate.unwrap_or(c.centering_rate))
             || !c.default_trim.is_finite()
             || !(-1.0..=1.0).contains(&c.default_trim)
             || !c.approach_speed_mps.is_finite()
@@ -494,5 +517,64 @@ mod tests {
         json["model"]["path"] = serde_json::json!("aircraft/swift_sport.glb");
         json["version"] = serde_json::json!(999);
         assert!(AircraftProfile::parse(&json.to_string()).is_err());
+    }
+    #[test]
+    fn optional_elevator_rate_preserves_old_custom_profiles_and_validates_bounds() {
+        let profile = AircraftProfile::builtin("light-single").unwrap();
+        let mut value = serde_json::to_value(&profile).unwrap();
+        value["controls"]
+            .as_object_mut()
+            .unwrap()
+            .remove("elevator_rate");
+        value["controls"]
+            .as_object_mut()
+            .unwrap()
+            .remove("elevator_centering_rate");
+        let old = AircraftProfile::parse(&value.to_string()).unwrap();
+        assert_eq!(old.controls.elevator_rate, None);
+        assert_eq!(old.controls.elevator_centering_rate, None);
+        let mut controls = old.pilot_controls(false);
+        controls.update(
+            flightsim_core::Seconds(0.1),
+            flightsim_input::PilotKeys {
+                pitch_up: true,
+                ..Default::default()
+            },
+        );
+        assert!((controls.elevator.value() - old.controls.surface_rate * 0.1).abs() < 1e-12);
+        controls.elevator.set_absolute(1.0);
+        controls.update(flightsim_core::Seconds(0.1), Default::default());
+        assert!(
+            (controls.elevator.value() - (1.0 - old.controls.centering_rate * 0.1)).abs() < 1e-12
+        );
+        for rate in [0.0, -0.1, 10.01, f64::NAN, f64::INFINITY] {
+            let mut invalid = profile.clone();
+            invalid.controls.elevator_rate = Some(rate);
+            assert!(invalid.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn optional_pitch_centering_is_validated_and_does_not_change_other_axes() {
+        let mut profile = AircraftProfile::builtin("light-single").unwrap();
+        profile.controls.elevator_centering_rate = Some(3.0);
+        profile.validate().unwrap();
+        let mut controls = profile.pilot_controls(false);
+        controls.elevator.set_absolute(1.0);
+        controls.aileron.set_absolute(1.0);
+        controls.rudder.set_absolute(-1.0);
+        controls.update(flightsim_core::Seconds(0.1), Default::default());
+        assert!((controls.elevator.value() - 0.7).abs() < 1e-12);
+        let ordinary = 1.0 - profile.controls.centering_rate * 0.1;
+        assert!((controls.aileron.value() - ordinary).abs() < 1e-12);
+        assert!((controls.rudder.value() + ordinary).abs() < 1e-12);
+        for rate in [-0.01, 10.01, f64::NAN, f64::INFINITY] {
+            profile.controls.elevator_centering_rate = Some(rate);
+            assert!(profile.validate().is_err());
+        }
+        for rate in [0.0, 10.0] {
+            profile.controls.elevator_centering_rate = Some(rate);
+            assert!(profile.validate().is_ok());
+        }
     }
 }

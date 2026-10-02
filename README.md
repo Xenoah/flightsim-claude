@@ -12,6 +12,12 @@
 [検証記録](docs/qa/overnight-status-2026-10-01.md)、設計上の範囲は
 [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
 
+2026-10-02 の開発版には、オフラインの全世界地形と月別気候、地図からの新規飛行を追加しました。
+`M` で世界地図を開けます。全球の基礎格子は約 20 km、地域 DEM があればそちらを優先します。
+気候は 1991–2020 年の月別再解析値とモデル近似で、現在の天気ではありません。
+[世界地図の操作とデータ](docs/global-map.md)、[最終統合 QA](docs/qa/global-map-integration-2026-10-02.md)、
+[商用配布候補の検証と未解決項目](docs/qa/commercial-staging-2026-10-02.md) を参照してください。
+
 ---
 
 ## 何ができるか（今）
@@ -94,8 +100,12 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   Light Single の地上開始は従来の 0.09、Swift Sport は 0.08。
   進入開始は各機体の専用トリム・姿勢・出力を使い、無風・海面付近の 3 度進入を
   30 秒間保持する数値回帰がある。一般の高度・風や接地までの無操縦飛行は保証しない。
-  旧 Light Single のトリム無し試験では、舵中立の釣り合いが約 107 kt なので、機首を下げて加速しようとし、
-  **離陸直後の高度では最初の一振りで地面に届く**（実測: 60 m で手を離すと 8.8 秒後に接地）
+  キーを離してもスロットルとトリムは保持するが、ピッチ舵は中立へ戻る。
+  引き続けると失速し、早すぎる離陸は失速していなくても沈下し得る。地上では約 75 kt EAS から
+  S / Down を穏やかに入れ、機首が最初に上がり始めたら離して様子を見る（水平な滑走路で約 3 度が目安）。
+  一定秒数の押下や離陸までの引き続けを目安にしない。初期上昇は 70–80 kt EAS、
+  トリムは安定後に必要な方向だけ調整する。
+  機種認証された速度や無操縦飛行の保証ではない。詳しくは [キーボード操縦ガイド](docs/keyboard-flight.md)
 - **一時停止とやり直し** — `Esc` で止まり、`R` でその場で最初からやり直す。
   **失敗しても再起動しなくていい。** やり直すと飛行記録・着陸評価・案内も一緒に
   戻る（機体だけ戻すと、前回の結果が画面に残り続ける）
@@ -116,7 +126,9 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   夏至の東京の南中高度 77.75°、分点の日の出は真東、極の白夜と極夜まで一致する
 - **決定論的な雲層と雲中視程** — 雲量は `--cloud-cover`（0〜1）、雲底・雲頂は
   `--cloud-base` / `--cloud-top`（楕円体高 m）、雲中視程は `--cloud-visibility`（m）で
-  指定する。同じ設定なら同じ雲場になり、雲へ入ると外が見えにくくなる。既定は快晴
+  指定する。同じ設定なら同じ雲場になり、雲へ入ると外が見えにくくなる。
+  通常の新規飛行では月別の地域気候から雲量を近似し、明示した雲設定を優先する。
+  `--cloud-cover 0` で快晴にできる。現在の観測天気ではない
 
 - **練習用交通とローカル/LAN 同期** — `--traffic synthetic` の決定論的な周辺機、
   `--host` / `--join` の version 1 UDP セッション、補間・stale 表示・タイムアウト・再接続。
@@ -299,3 +311,12 @@ OpenStreetMap と ESA WorldCover は帰属表示が**法的に必須**です。
 ## ライセンス
 
 [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE)
+
+## Offline global map and climate (development branch)
+
+Press `M` for geographic destinations, exact coordinates and monthly previews, or
+start with `--world-map`. Bundled coarse world terrain and NOAA 1991-2020 climate
+means work offline; local DEMs take priority. This is not live weather or globally
+detailed30m terrain. See [the global map guide](docs/global-map.md),
+[data provenance](docs/data/global-sources.md) and [ADR-0011](docs/adr/0011-offline-global-terrain-climate.md).
+Validation and publication status are reported separately.

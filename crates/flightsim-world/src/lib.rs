@@ -18,11 +18,13 @@
 //! | [`airport`] | 飛行場の幾何。滑走路の位置・向き・矩形上の判定 |
 //! | [`tile`] | 地理座標系クアッドツリー。タイル ID と範囲、隣接関係 |
 //! | [`dem`] | 標高格子とバイリニアサンプリング、幾何誤差の算出 |
+//! | [`global`] | Real low-resolution world atlas beneath regional DEM tiles |
 //! | [`dem::io`] | 実行時タイル形式 `.fsdem` の読み書き（ADR-0005） |
 //! | [`lod`] | 幾何誤差ベースの screen-space error による細分化判定 |
 //! | [`streaming`] | 優先度付き読み込みキューと、バイト数上限つき LRU キャッシュ |
 //! | [`terrain`] | 焼かれたタイルから測地座標の標高を引く層 |
 //! | [`mesh`] | 描画用メッシュ**データ**の生成。GPU には触らない |
+//! | [`seams`] | Actual-edge bridges and shared corner caps for a visible tile cut |
 //!
 //! ## 使い方
 //!
@@ -59,9 +61,12 @@
 //! ```
 
 pub mod airport;
+pub mod climate;
 pub mod dem;
+pub mod global;
 pub mod lod;
 pub mod mesh;
+pub mod seams;
 pub mod streaming;
 pub mod terrain;
 pub mod tile;
@@ -73,10 +78,20 @@ pub use airport::io::{
     TaxiwayGeometryError, TaxiwayLighting, TaxiwayMetadata,
 };
 pub use airport::{Runway, RunwayGeometryError, RunwayOffsets};
+pub use climate::{
+    ClimateDataError, ClimateDate, ClimateSample, ClimateSource, ClimateZone,
+    GLOBAL_CLIMATE_DATASET_ID, GLOBAL_CLIMATE_FINGERPRINT, GlobalClimate,
+};
 pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};
 pub use lod::{LodSelection, LodSelector};
 pub use mesh::{MeshOptions, TerrainMesh, build_mesh};
+pub use seams::{
+    TerrainBoundary, TerrainBoundaryVertex, TerrainEdge, TerrainSeam, TerrainSeamKey,
+    TerrainSeamPlanner, TerrainSeamPlanningUsage, plan_seams,
+};
 pub use streaming::{StreamingScheduler, TileCache};
-pub use terrain::{DiskTileSource, MemoryTileSource, Terrain, TerrainError, TileSource};
+pub use terrain::{
+    DiskTileSource, EmptyTileSource, MemoryTileSource, Terrain, TerrainError, TileSource,
+};
 pub use tile::{Direction, GeoBounds, TileId};

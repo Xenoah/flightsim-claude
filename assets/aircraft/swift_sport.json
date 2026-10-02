@@ -94,6 +94,8 @@
   },
   "controls": {
     "surface_rate": 2.0,
+    "elevator_rate": 0.25,
+    "elevator_centering_rate": 5.0,
     "centering_rate": 1.6,
     "throttle_rate": 0.25,
     "flap_rate": 0.25,

@@ -1,0 +1,38 @@
+GLOBAL TERRAIN AND CLIMATE DATA NOTICES
+
+The bundled world atlas is a modified, coarse simulator dataset. It is not an
+unmodified official data product or an aviation/navigation-quality database.
+
+NOAA NCEI ETOPO 2022
+NOAA National Centers for Environmental Information (2022): ETOPO 2022 15
+Arc-Second Global Relief Model. DOI: 10.25921/fd45-gt74. Accessed 2026-10-02.
+ETOPO is CC0-1.0. The accompanying NGA-derived EGM2008 geoid is public domain.
+https://www.ncei.noaa.gov/products/etopo-global-relief-model
+
+NATURAL EARTH
+Made with Natural Earth. Land v5.1.1 and lakes v5.0.0 are public domain.
+https://www.naturalearthdata.com/about/terms-of-use/
+
+COPERNICUS GLO-90 SURFACE CORRECTIONS
+produced using Copernicus WorldDEM™-90 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved
+
+The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM™-90
+
+The applicable COP-DEM-GLO-90-F terms are distributed with this program at
+docs/data/copernicus-glo90-license.pdf. Preserve these terms and notices when
+redistributing the derived atlas. No provider endorsement is implied.
+
+NOAA MONTHLY CLIMATE
+Climate data provided by NOAA Physical Sciences Laboratory, Boulder, Colorado,
+USA. NCEP/NCAR Reanalysis 1 monthly 1991-2020 long-term means.
+https://www.psl.noaa.gov/data/help/
+
+These public-domain federal data are climatology, not live weather, a forecast,
+airport observations or an official NOAA product. Altitude lapse adjustments,
+biome labels, cloud-layer geometry and snow/ice visual cues are modeled. Cloud
+fraction itself is an interpolated monthly reanalysis field.
+
+Full exact sources, correction policy, hashes and scientific limitations:
+docs/data/global-sources.md
+docs/data/global-climate.md
+docs/global-terrain.md

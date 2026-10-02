@@ -1,0 +1,161 @@
+{
+  "status": "COMPLETE",
+  "dataset_id": "NOAA-NCEP-NCAR-R1-1991-2020-monthly-EGM2008-v1",
+  "description": "NCEP/NCAR Reanalysis 1 monthly 1991–2020 long-term means, provided by NOAA PSL",
+  "data_status": "reanalysis climatology, not live observations or forecast",
+  "license": "US Government public domain; https://www.psl.noaa.gov/data/help/",
+  "source_grid": {
+    "rows": 94,
+    "columns": 192,
+    "months": 12,
+    "latitude": "nonuniform Gaussian, exact NOAA coordinates preserved",
+    "longitude_spacing_degrees": 1.875
+  },
+  "polar_cap": "Two extra +/-90 degree rows are longitude-independent means of the nearest Gaussian row, before quantization",
+  "quantization": {
+    "temperature_kelvin": 0.01,
+    "precipitation_water_metres_per_second": 1e-10,
+    "cloud_fraction": 0.00392156862745098,
+    "model_geopotential_height_metres": 1,
+    "geoid_undulation_metres": 0.1
+  },
+  "geoid_input": {
+    "file": "etopo_geoid_north_to_south_10min.npy",
+    "sha256": "85a413d02f13f92c8571797331e65574038e70530ac7846e9c577178c50fa318",
+    "axes": {
+      "schema": "flightsim-global-terrain-inputs-v1",
+      "reviewed_access_date_utc": "2026-10-02",
+      "sources": {
+        "etopo_surface_10min.dods": {
+          "url": "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_surface_elev_netcdf/ETOPO_2022_v1_60s_N90W180_surface.nc.dods?z[0:10:10799][0:10:21599]",
+          "bytes": 9357398,
+          "sha256": "575c7a0c84f18b41430a723f26475fa41b1d787c94fa641f0d0705291e3991fd"
+        },
+        "etopo_geoid_10min.dods": {
+          "url": "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_geoid_netcdf/ETOPO_2022_v1_60s_N90W180_geoid.nc.dods?z[0:10:10799][0:10:21599]",
+          "bytes": 9357389,
+          "sha256": "0bdb4e88ed0d65c08052d2ae62bd981353333859c24a80dfd57c088efe45a600"
+        },
+        "natural_earth_land_10m.zip": {
+          "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_land.zip",
+          "bytes": 3269070,
+          "sha256": "e547d749445eaa0964aba76738090ec88f5e63c4585122170f98c67a7ea922dc"
+        }
+      },
+      "shape": [
+        1080,
+        2160
+      ],
+      "row_order": "north-to-south",
+      "column_order": "eastward, periodic",
+      "latitude_origin_deg": 89.84166666666667,
+      "longitude_origin_deg": 0.008333333333325754,
+      "latitude_step_deg": -0.16666666666666666,
+      "longitude_step_deg": 0.16666666666666666,
+      "elevation": "float32 little-endian EGM2008 orthometric height H in metres",
+      "geoid": "float32 little-endian EGM2008 undulation N in metres; h = H + N",
+      "land": "uint8: 0 ocean, 1 Natural Earth polygon interior; independent of elevation",
+      "method": "ETOPO2022 v1 60s ice-surface source, point decimation stride10; Natural Earth5.1.1 land polygons tested at exact sample nodes; no ellipsoidal conversion, ocean flattening or height quantization performed here",
+      "limitations": [
+        "Coarse 10 arc-minute samples (~18.5 km at the equator), not high-resolution terrain",
+        "Peaks and small islands may be missed; coastline and DEM use different source geometry",
+        "Land mask is coastline-only and does not model inland lake water surfaces",
+        "Strided grid is not symmetrically cell-centered; retain the explicit origins",
+        "Neither source samples the exact poles; runtime must define a continuous pole cap",
+        "NOAA data are not for navigation; this is a derived simulator asset, not an official product"
+      ],
+      "outputs": {
+        "elevation.f32le": {
+          "bytes": 9331200,
+          "sha256": "1d651c98645ce9a0604f912754a5720c3b5a4d406706172554be98903dd98b65"
+        },
+        "geoid.f32le": {
+          "bytes": 9331200,
+          "sha256": "d7dc76e9a96a42e0de9668665f4b7c9ce66196131c594139d32266b8c64ef193"
+        },
+        "land.u8": {
+          "bytes": 2332800,
+          "sha256": "b70a947473ab876287d6d237f3b0714904929af61f0483d54e5d6f732628399d"
+        },
+        "etopo_orthometric_north_to_south_10min.npy": {
+          "bytes": 9331328,
+          "sha256": "d1c4a00bbbf59a912e11a0da93af17f498bb26968df5b53749846d46fc30daa8"
+        },
+        "etopo_geoid_north_to_south_10min.npy": {
+          "bytes": 9331328,
+          "sha256": "85a413d02f13f92c8571797331e65574038e70530ac7846e9c577178c50fa318"
+        },
+        "ne_land_north_to_south_10min.npy": {
+          "bytes": 2332928,
+          "sha256": "bd5d96cce57c9e4e500604114a67d851eb148e825097119f61737e23c45140a3"
+        },
+        "terrain_latitude_north_to_south_10min.npy": {
+          "bytes": 8768,
+          "sha256": "4fb2533bdc95ef38da6206584639438e1137852e92dfec12f49cb4dbffa94e47"
+        },
+        "terrain_longitude_10min.npy": {
+          "bytes": 17408,
+          "sha256": "5513a8c9bd1467d0eaef7a94f1441cbce60e539d6239276dd14c3cdb9aba9463"
+        }
+      },
+      "validation": {
+        "land_nodes": 772407,
+        "below_sea_level_land_nodes": 3375,
+        "elevation_range_m": [
+          -10511.001953125,
+          6734.1728515625
+        ],
+        "geoid_range_m": [
+          -106.87641143798828,
+          85.65536499023438
+        ]
+      },
+      "preparation_packages": {
+        "numpy": "2.3.5",
+        "pyshp": "3.1.6",
+        "shapely": "2.1.2"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "file": "air.2m.mon.ltm.1991-2020.nc",
+      "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/surface_gauss/air.2m.mon.ltm.1991-2020.nc",
+      "sha256": "c86a3c575010ca2c9414b24022361c43be6966dcdc62c821c1918e9c44ca9be9",
+      "units": "degK",
+      "minimum": 199.70785522460938,
+      "maximum": 312.0749816894531
+    },
+    {
+      "file": "prate.sfc.mon.ltm.1991-2020.nc",
+      "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/surface_gauss/prate.sfc.mon.ltm.1991-2020.nc",
+      "sha256": "35c390d9b82128925f960b8189992f3f617d131d8f4af4051dcd216d40825798",
+      "units": "Kg/m^2/s",
+      "minimum": 5.989180351662071e-08,
+      "maximum": 0.00031119867344386876
+    },
+    {
+      "file": "tcdc.eatm.mon.ltm.1991-2020.nc",
+      "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/other_gauss/tcdc.eatm.mon.ltm.1991-2020.nc",
+      "sha256": "61c7021d96fdf65d06ca63c8b1106b2e0dd94b93412a41b80463f3b306f7ef7e",
+      "units": "%",
+      "minimum": 0.062364362180233,
+      "maximum": 89.59660339355469
+    },
+    {
+      "file": "hgt.sfc.gauss.nc",
+      "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/surface_gauss/hgt.sfc.gauss.nc",
+      "sha256": "0862a41820743c04e94c89b0475d734232f517431951dd9d413658e87d6f5d88",
+      "units": "m",
+      "minimum": -539.0,
+      "maximum": 5760.0
+    }
+  ],
+  "baked": {
+    "file": "ncep-ncar-1991-2020.fsclim",
+    "metadata_file": "climate_metadata.rs",
+    "bytes": 1180456,
+    "sha256": "b1841fe206dd0b1154868335f7ff09ea9a0e5f17c87baa70029240871fd3bf1a",
+    "fnv1a64_payload": "33f6a12038b9f6b8"
+  }
+}

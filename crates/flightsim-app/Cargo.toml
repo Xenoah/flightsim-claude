@@ -8,6 +8,12 @@ edition.workspace = true
 rust-version = "1.89"
 license.workspace = true
 
+[features]
+# Local commercial candidate: original Swift Sport, isolated adjacent assets.
+# This feature is not a legal clearance or a Steam release switch.
+default = []
+commercial-staging = []
+
 [dependencies]
 flightsim-core.workspace = true
 flightsim-fdm.workspace = true

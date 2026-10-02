@@ -663,8 +663,17 @@ mod tests {
 
     fn ecs_app() -> App {
         let mut app = App::new();
-        app.add_plugins((MinimalPlugins, InputPlugin, crate::FlightsimInputPlugin));
+        app.add_plugins((MinimalPlugins, InputPlugin, crate::FlightsimInputPlugin))
+            .add_systems(Update, advance_sample_for_test.after(InputSystems::Sample));
         app
+    }
+
+    fn advance_sample_for_test(
+        sample: Res<crate::SampledPilotInput>,
+        mut controls: ResMut<PilotControls>,
+    ) {
+        // The application now owns advancement inside the simulation loop.
+        controls.update_from_sample(Seconds(1.0 / 120.0), &sample);
     }
 
     fn connection(app: &mut App, entity: Entity, connection: GamepadConnection) {
@@ -775,6 +784,10 @@ mod tests {
     #[test]
     fn ecs_hotplug_discards_stale_samples_and_recovers_without_panicking() {
         let mut app = ecs_app();
+        app.world_mut()
+            .resource_mut::<InputSettings>()
+            .configuration
+            .roll = Some(lever("Stick", AxisId::Other(5)));
         let entity = app.world_mut().spawn_empty().id();
         let connected = GamepadConnection::Connected {
             name: "Stick".into(),
@@ -821,6 +834,7 @@ mod tests {
         );
         axis_event(&mut app, entity, GamepadAxis::Other(5), 0.125);
         app.update();
+        assert!((app.world().resource::<PilotControls>().aileron.value() - 0.125).abs() < 1e-12);
         assert!(
             (app.world().resource::<InputDevices>().devices()[0].axes[&AxisId::Other(5)] - 0.125)
                 .abs()
@@ -1048,6 +1062,50 @@ mod tests {
         assert_eq!(device.entity, Entity::from_bits(9));
         assert!(device.axes.is_empty());
         assert_eq!(devices.devices.len(), 2);
+    }
+
+    #[test]
+    fn sampled_controller_state_is_immutable_until_explicitly_resampled() {
+        let mut devices = fixture();
+        devices.devices[0].axes.insert(AxisId::Other(7), -0.75);
+        devices.devices[1].axes.insert(AxisId::Other(19), 0.5);
+        let configuration = InputConfiguration {
+            pitch: Some(lever("Stick", AxisId::Other(7))),
+            throttle: Some(lever("Throttle", AxisId::Other(19))),
+            ..InputConfiguration::default()
+        };
+        let sample =
+            crate::SampledPilotInput::from_bindings(PilotKeys::default(), &configuration, &devices);
+        devices.devices[0].axes.insert(AxisId::Other(7), 0.25);
+        devices.devices[1].axes.insert(AxisId::Other(19), -1.0);
+        let mut controls = PilotControls::default();
+        for _ in 0..30 {
+            controls.update_from_sample(Seconds(1.0 / 120.0), &sample);
+            assert!((controls.elevator.value() + 0.75).abs() < 1e-12);
+            assert!((controls.throttle.value() - 0.75).abs() < 1e-12);
+        }
+        controls.release_transient_controls();
+        assert!(controls.elevator.value().abs() < 1e-12);
+        let resumed =
+            crate::SampledPilotInput::from_bindings(PilotKeys::default(), &configuration, &devices);
+        controls.update_from_sample(Seconds(1.0 / 120.0), &resumed);
+        assert!((controls.elevator.value() - 0.25).abs() < 1e-12);
+        assert!(controls.throttle.value().abs() < 1e-12);
+        devices.disconnect(Entity::from_bits(1));
+        devices.disconnect(Entity::from_bits(2));
+        let disconnected = crate::SampledPilotInput::from_bindings(
+            PilotKeys {
+                pitch_down: true,
+                throttle_up: true,
+                ..PilotKeys::default()
+            },
+            &configuration,
+            &devices,
+        );
+        controls.release_transient_controls();
+        controls.update_from_sample(Seconds(0.1), &disconnected);
+        assert!((controls.elevator.value() + 0.25).abs() < 1e-12);
+        assert!((controls.throttle.value() - 0.025).abs() < 1e-12);
     }
 
     #[test]

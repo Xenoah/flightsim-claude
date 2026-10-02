@@ -41,3 +41,7 @@ desktop.ini
 # `F9` の保存と `record_takeoff` / `render_engine` の例が既定でここへ書く。
 *.fsreplay
 *.wav
+
+# Reproducible offline Python preparation caches.
+__pycache__/
+*.pyc

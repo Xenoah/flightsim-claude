@@ -33,7 +33,9 @@
 //! ```
 //!
 //! 隙間を「埋める」のではなく「裏が見えないように隠す」手法なので、
-//! 深さが足りないと隙間が残る。LOD 差 1 段ぶんの標高差を賄える深さが要る。
+//! 深さが足りないと隙間が残る。自動深さは標高差のヒューリスティックであり、
+//! 曲率や任意の LOD / データソース差を塞ぐ保証ではない。表示 cut の実際の
+//! 境界ポリラインをつなぐ [`crate::seams`] と併用する。
 
 use crate::dem::DemTile;
 use crate::tile::TileId;
@@ -96,6 +98,8 @@ pub struct MeshOptions {
     /// `2^n + 1` にすると隣接 LOD で頂点位置が揃う。
     pub resolution: u32,
     /// スカートの深さ。`None` なら幾何誤差から自動で決める。
+    /// This height-only heuristic is not a mixed-LOD closure contract; use
+    /// [`crate::seams`] to join actual visible neighbouring edges.
     pub skirt_depth: Option<Meters>,
 }
 

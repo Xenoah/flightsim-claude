@@ -72,12 +72,12 @@ impl FixedStep {
     #[must_use]
     pub fn with_max_frame_time(fixed_dt: Seconds, max_frame_time: Seconds) -> Self {
         assert!(
-            fixed_dt.get() > 0.0,
-            "fixed_dt must be positive, got {fixed_dt}"
+            fixed_dt.is_finite() && fixed_dt.get() > 0.0,
+            "fixed_dt must be positive and finite, got {fixed_dt}"
         );
         assert!(
-            max_frame_time.get() > 0.0,
-            "max_frame_time must be positive, got {max_frame_time}"
+            max_frame_time.is_finite() && max_frame_time.get() > 0.0,
+            "max_frame_time must be positive and finite, got {max_frame_time}"
         );
         Self {
             fixed_dt,
@@ -118,12 +118,24 @@ impl FixedStep {
     /// 1 描画フレーム分の実時間を投入し、**実行すべき物理ステップ数**を返す。
     ///
     /// 返り値は `max_frame_time / fixed_dt` で上限が付く（death spiral 防止）。
-    /// 負の `frame_time` は 0 として扱う。
+    /// Negative or non-finite frame times do not advance the clock.
+    /// A boundary within 64 scaled f64 roundoff units is treated as exact,
+    /// avoiding a whole missing tick from partitions such as 144 Hz into 120 Hz.
     pub fn advance(&mut self, frame_time: Seconds) -> u32 {
+        if !frame_time.is_finite() || frame_time.get() <= 0.0 {
+            return 0;
+        }
         let clamped = frame_time.clamp(Seconds::ZERO, self.max_frame_time);
         self.accumulator += clamped;
 
-        let steps = (self.accumulator / self.fixed_dt).floor();
+        let ratio = self.accumulator / self.fixed_dt;
+        let nearest = ratio.round();
+        let roundoff = 64.0 * f64::EPSILON * ratio.abs().max(1.0);
+        let steps = if (ratio - nearest).abs() <= roundoff {
+            nearest
+        } else {
+            ratio.floor()
+        };
 
         // `max_frame_time` によるクランプで上限が保証されているため、
         // u32 への変換で切り捨てや溢れは起きない。念のため上限も明示しておく。
@@ -134,7 +146,10 @@ impl FixedStep {
         )]
         let steps = steps.clamp(0.0, f64::from(u32::MAX)) as u32;
 
-        self.accumulator -= self.fixed_dt * f64::from(steps);
+        let remainder = self.accumulator - self.fixed_dt * f64::from(steps);
+        // A rounded-up boundary may leave a negative residual of a few ULPs.
+        // Do not carry that artificial debt into the next otherwise exact tick.
+        self.accumulator = Seconds(remainder.get().max(0.0));
         self.elapsed += self.fixed_dt * f64::from(steps);
 
         steps
@@ -181,12 +196,106 @@ mod tests {
         for _ in 0..144 {
             total += clock.advance(Seconds(1.0 / 144.0));
         }
-        // 1 秒ぶん投入したので 120 ステップ前後になる。
-        assert!(
-            (119..=120).contains(&total),
-            "got {total} steps in one second"
-        );
+        assert_eq!(total, 120, "144 Hz must not lose a boundary tick");
         assert_close!(clock.elapsed().get(), f64::from(total) / 120.0, 1e-9);
+    }
+
+    #[test]
+    fn shared_frame_boundaries_produce_exact_tick_counts() {
+        for fps in [30, 60, 144] {
+            let mut clock = FixedStep::new(HZ_120);
+            let frame = Seconds(1.0 / f64::from(fps));
+            let first: u32 = (0..fps / 3).map(|_| clock.advance(frame)).sum();
+            assert_eq!(first, 40, "one-third second at {fps} Hz");
+            let rest: u32 = (fps / 3..fps).map(|_| clock.advance(frame)).sum();
+            assert_eq!(first + rest, 120, "one second at {fps} Hz");
+            for _ in 0..10 {
+                assert_eq!(clock.advance(Seconds::ZERO), 0);
+            }
+            assert!((0.0..1.0).contains(&clock.interpolation_alpha()));
+        }
+    }
+
+    #[test]
+    fn an_hour_of_common_frame_rates_has_exact_tick_count() {
+        for fps in [30, 60, 144] {
+            let mut clock = FixedStep::new(HZ_120);
+            let mut ticks = 0_u64;
+            for _ in 0..fps * 3600 {
+                ticks += u64::from(clock.advance(Seconds(1.0 / f64::from(fps))));
+            }
+            assert_eq!(ticks, 432_000, "one hour at {fps} Hz");
+            assert!(clock.accumulated().get() < HZ_120.get() * 64.0 * f64::EPSILON);
+            assert_close!(clock.elapsed().get(), 3600.0, 1e-7);
+        }
+    }
+
+    #[test]
+    fn nonfinite_frame_time_cannot_poison_a_valid_remainder() {
+        let mut clock = FixedStep::new(HZ_120);
+        clock.advance(HZ_120 / 2.0);
+        let before = clock.accumulated().get().to_bits();
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(clock.advance(Seconds(value)), 0);
+            assert_eq!(clock.accumulated().get().to_bits(), before);
+            assert_eq!(clock.elapsed(), Seconds::ZERO);
+        }
+        assert_eq!(clock.advance(HZ_120 / 2.0), 1);
+    }
+
+    #[test]
+    fn roundoff_policy_does_not_consume_a_real_subtick_gap() {
+        let dt = HZ_120.get();
+        let gap = dt * 1024.0 * f64::EPSILON;
+        let mut below = FixedStep::new(HZ_120);
+        assert_eq!(below.advance(Seconds(dt - gap)), 0);
+        assert!(below.interpolation_alpha() < 1.0);
+        assert_eq!(below.advance(Seconds(gap)), 1);
+        let mut above = FixedStep::new(HZ_120);
+        assert_eq!(above.advance(Seconds(dt + gap)), 1);
+        assert!(above.accumulated().get() > 0.0);
+        assert!(above.accumulated().get() < 2.0 * gap);
+        let mut one_ulp_below = FixedStep::new(HZ_120);
+        assert_eq!(
+            one_ulp_below.advance(Seconds(f64::from_bits(dt.to_bits() - 1))),
+            1
+        );
+        assert_eq!(one_ulp_below.accumulated(), Seconds::ZERO);
+        assert_eq!(one_ulp_below.advance(Seconds::ZERO), 0);
+    }
+
+    #[test]
+    fn jittered_partitions_preserve_total_ticks_and_reset() {
+        let mut clock = FixedStep::new(HZ_120);
+        let mut ticks = 0;
+        for _ in 0..1200 {
+            for part in [1, 2, 3, 4, 5, 6, 7] {
+                ticks += clock.advance(Seconds(HZ_120.get() * f64::from(part) / 28.0));
+                assert!((0.0..1.0).contains(&clock.interpolation_alpha()));
+            }
+        }
+        assert_eq!(ticks, 1200);
+        assert_close!(
+            clock.elapsed().get() + clock.accumulated().get(),
+            10.0,
+            1e-11
+        );
+        clock.reset();
+        assert_eq!(clock.elapsed(), Seconds::ZERO);
+        assert_eq!(clock.advance(Seconds::ZERO), 0);
+        assert_eq!(clock.advance(HZ_120), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "fixed_dt must be positive and finite")]
+    fn infinite_fixed_step_is_rejected() {
+        let _ = FixedStep::new(Seconds(f64::INFINITY));
+    }
+
+    #[test]
+    #[should_panic(expected = "max_frame_time must be positive and finite")]
+    fn infinite_frame_limit_is_rejected() {
+        let _ = FixedStep::with_max_frame_time(HZ_120, Seconds(f64::INFINITY));
     }
 
     #[test]
