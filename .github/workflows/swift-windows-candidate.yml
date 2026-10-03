@@ -1,0 +1,84 @@
+name: Swift Windows candidate
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# Engineering evidence only. This workflow never publishes executable bytes.
+permissions:
+  contents: read
+
+env:
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+
+concurrency:
+  group: swift-windows-candidate-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  check_candidate:
+    name: check extracted Swift-only Windows candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_sha == github.sha &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install the exact Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'toolchain installation failed' }
+      # Deliberately no Rust/Actions cache: a cache can also distribute binaries.
+      - name: Build and check the runner-local candidate
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python scripts/check-swift-windows-candidate.py `
+            --expected-source $env:EXPECTED_SOURCE_SHA `
+            --work (Join-Path $env:RUNNER_TEMP 'swift-windows-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'swift-windows-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'Swift candidate engineering acceptance failed' }
+      - name: Validate the evidence allowlist even after a failed check
+        if: always()
+        id: evidence
+        shell: pwsh
+        run: |
+          python scripts/check-swift-windows-candidate.py `
+            --validate-evidence (Join-Path $env:RUNNER_TEMP 'swift-windows-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'evidence validation failed; nothing may be uploaded' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Upload only text evidence and the validated Swift screenshot
+        if: always() && steps.evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: swift-windows-evidence-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swift-windows-evidence/acceptance.json
+            ${{ runner.temp }}/swift-windows-evidence/source-inputs.json
+            ${{ runner.temp }}/swift-windows-evidence/dependency-inventory.json
+            ${{ runner.temp }}/swift-windows-evidence/commercial-readiness.json
+            ${{ runner.temp }}/swift-windows-evidence/commands.log
+            ${{ runner.temp }}/swift-windows-evidence/default-swift.log
+            ${{ runner.temp }}/swift-windows-evidence/absent-light-single.log
+            ${{ runner.temp }}/swift-windows-evidence/default-rejects-legacy.log
+            ${{ runner.temp }}/swift-windows-evidence/legacy-no-model.log
+            ${{ runner.temp }}/swift-windows-evidence/default-swift.png
+          if-no-files-found: error
+          retention-days: 7
