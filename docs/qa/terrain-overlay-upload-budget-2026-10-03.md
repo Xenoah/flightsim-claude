@@ -1,6 +1,9 @@
 # Atomic ground-overlay upload budget
 
 Scope: renderer-only continuation of the 2026-10-02 regional surface branch.
+The accepted ef971772 snapshot policy below is superseded on the isolated
+[copy-pacing candidate](terrain-overlay-copy-pacing-2026-10-03.md); its focused
+functional gates passed, while measured/native acceptance remains pending.
 No changes to physical terrain, authored lifts, clipping or optional priority.
 
 ## Contract
@@ -17,12 +20,15 @@ No changes to physical terrain, authored lifts, clipping or optional priority.
   indivisible output larger than that target is admitted only as the first
   upload, with a hard 524,288-vertex maximum. Further nonempty uploads wait.
   This is explicitly not a sub-65k hard upload guarantee or a frame-time claim.
-- Terrain snapshots copy at most 262,144 actual surface vertices per update and
-  at most two sources, still under the remaining shared attempt allowance. The
-  transaction-wide existing vertex/source limits continue to apply. Index
-  inspection is capped per source mesh at 6 times that vertex cap (at most two
-  such scans per update) and avoids an intermediate
-  copy of the complete index buffer.
+- The accepted ef971772 snapshot policy copies at most 262,144 actual surface
+  vertices and two sources per update, under the remaining shared attempt
+  allowance. Its per-source index cap is 6 times that vertex cap, so two scans
+  imply a 3,145,728-index bound. The isolated copy-pacing candidate preserves
+  the hard vertex/index-work bounds and per-source/transaction admission limits,
+  while changing per-update source count to pack small snapshots under
+  8,450-vertex / 52,224-index normal targets. It separately reports charged and
+  actually scanned indices; see its pending acceptance record. Both paths avoid
+  an intermediate copy of the complete index buffer.
 - Every generated asset has a non-rendered ownership child under its original
   caller-owned root. Root despawn frees current and unpublished generated mesh
   assets even though the caller caches only its original handle. The original

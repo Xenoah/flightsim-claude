@@ -162,7 +162,8 @@ fn positions(fixture: &Fixture) -> Vec<[f32; 3]> {
 fn finish(fixture: &mut Fixture) {
     for _ in 0..2000 {
         fixture.app.update();
-        assert!(fixture.app.world().resource::<Script>().progress.prepared <= 1);
+        let script = fixture.app.world().resource::<Script>();
+        assert!(script.progress.prepared <= script.budget);
         if !fixture
             .app
             .world()
@@ -807,4 +808,75 @@ fn optional_clear_then_terrain_reset_reclaims_mixed_pending_children_once() {
     enqueue(&mut fixture, 20.0, false);
     finish(&mut fixture);
     assert_eq!(fixture.app.world().resource::<Assets<Mesh>>().len(), 2);
+}
+
+#[test]
+fn snapshot_pacing_preserves_final_geometry_and_atomic_visible_cut_across_budgets() {
+    let mut expected = None;
+    for budget in [1, 8] {
+        let mut fixture = fixture();
+        fixture.app.world_mut().resource_mut::<Script>().budget = budget;
+        enqueue(&mut fixture, 10.0, false);
+        finish(&mut fixture);
+        let before = positions(&fixture);
+        let old_cut = visible_entities(&mut fixture);
+        let assets = fixture.app.world().resource::<Assets<Mesh>>().len();
+        enqueue(&mut fixture, 110.0, true);
+        let mut finished = false;
+        for _ in 0..2000 {
+            fixture.app.update();
+            let progress = fixture.app.world().resource::<Script>().progress;
+            assert!(progress.prepared <= budget);
+            let work = progress.overlay_work;
+            assert!(work.copy_indices_scanned <= work.copy_indices_charged);
+            assert!(work.copy_indices_charged <= flightsim_render::OVERLAY_COPY_INDICES_PER_FRAME);
+            assert!(work.copied_vertices <= flightsim_render::OVERLAY_COPY_VERTICES_PER_FRAME);
+            if !fixture
+                .app
+                .world()
+                .resource::<TerrainTiles>()
+                .is_stitching()
+            {
+                finished = true;
+                break;
+            }
+            assert_eq!(positions(&fixture), before);
+            assert_eq!(visible_entities(&mut fixture), old_cut);
+            assert_eq!(
+                fixture.app.world().get::<Visibility>(fixture.overlay),
+                Some(&Visibility::Inherited)
+            );
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(finished);
+        assert_ne!(positions(&fixture), before);
+        assert_eq!(fixture.app.world().resource::<Assets<Mesh>>().len(), assets);
+        let handle = &fixture
+            .app
+            .world()
+            .get::<Mesh3d>(fixture.overlay)
+            .unwrap()
+            .0;
+        let mesh = fixture
+            .app
+            .world()
+            .resource::<Assets<Mesh>>()
+            .get(handle)
+            .unwrap();
+        let normals = match mesh.attribute(Mesh::ATTRIBUTE_NORMAL).unwrap() {
+            VertexAttributeValues::Float32x3(values) => values.clone(),
+            _ => panic!("normals"),
+        };
+        let colors = match mesh.attribute(Mesh::ATTRIBUTE_COLOR).unwrap() {
+            VertexAttributeValues::Float32x4(values) => values.clone(),
+            _ => panic!("colors"),
+        };
+        let indices = mesh.indices().unwrap().iter().collect::<Vec<_>>();
+        let geometry = (positions(&fixture), normals, colors, indices);
+        if let Some(expected) = &expected {
+            assert_eq!(&geometry, expected);
+        } else {
+            expected = Some(geometry);
+        }
+    }
 }

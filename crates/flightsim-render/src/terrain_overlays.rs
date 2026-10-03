@@ -22,7 +22,19 @@ pub const MAX_OPTIONAL_OVERLAYS: usize = 24;
 pub const MAX_OPTIONAL_SOURCE_TRIANGLES: usize = 40_000;
 pub const MAX_OVERLAY_TERRAIN_TILES: usize = 512;
 pub const MAX_OVERLAY_TERRAIN_VERTICES: usize = 262_144;
-pub const OVERLAY_TILE_COPIES_PER_FRAME: usize = 2;
+/// Normal snapshot allowance: two maximum 65×65 surface grids. The render
+/// boundary in `terrain::prepare_tile_with_global_shading` admits at most 65.
+/// Skirt positions are excluded from copied surface vertices.
+pub const OVERLAY_COPY_VERTEX_TARGET: usize = 2 * 65 * 65;
+/// Two full 65×65 meshes: 6*(65-1)^2 surface indices plus 4*(65-1)*6 skirt
+/// indices each. See world::mesh::build_mesh and append_skirt. Inspection charges
+/// the complete buffer even though skirt triangles are omitted from the copy.
+pub const OVERLAY_COPY_INDEX_TARGET: usize = 2 * (6 * 64 * 64 + 4 * 64 * 6);
+const MAX_OVERLAY_TERRAIN_INDICES: usize = 6 * MAX_OVERLAY_TERRAIN_VERTICES;
+/// Preserve the previous worst case: two sources at the unchanged per-source
+/// index limit. Normally the smaller target applies; one indivisible first
+/// source can exceed that target and must then be the only copy this update.
+pub const OVERLAY_COPY_INDICES_PER_FRAME: usize = 2 * MAX_OVERLAY_TERRAIN_INDICES;
 /// Normal aggregate upload target. One indivisible mesh may exceed this only
 /// as the first upload of an update, up to MAX_OVERLAY_OUTPUT_VERTICES.
 pub const OVERLAY_UPLOAD_VERTEX_TARGET: usize = 65_536;
@@ -119,6 +131,14 @@ struct UploadedOverlay {
 pub struct TerrainOverlayFrameWork {
     pub copy_attempts: usize,
     pub copied_vertices: usize,
+    /// Full bounded index buffers reserved for admitted copy attempts. An
+    /// invalid position attribute or transaction limit may fail before scanning;
+    /// such an attempt is still charged. Missing/oversized index buffers reserve
+    /// zero because copy_terrain rejects them without entering its scan.
+    pub copy_indices_charged: usize,
+    /// Index entries actually consumed by the snapshot triangle iterator,
+    /// including rejected skirt triangles. Never exceeds copy_indices_charged.
+    pub copy_indices_scanned: usize,
     pub upload_attempts: usize,
     pub uploaded_meshes: usize,
     pub uploaded_vertices: usize,
@@ -622,20 +642,26 @@ impl TerrainOverlays {
             return (false, 0);
         }
         let mut copied = 0;
-        for _ in 0..budget.min(OVERLAY_TILE_COPIES_PER_FRAME) {
+        for _ in 0..budget {
             let Some(source) = prep.sources.get(prep.next_source) else {
                 break;
             };
-            if source.surface_vertices
-                > OVERLAY_COPY_VERTICES_PER_FRAME.saturating_sub(self.frame_work.copied_vertices)
-                && copied != 0
-            {
+            let index_charge = snapshot_index_charge(meshes, source);
+            if !snapshot_fits_frame(&self.frame_work, source.surface_vertices, index_charge) {
                 break;
             }
-            // A failed attempt is still charged, including missing mesh data.
+            // Reserve complete bounded index buffers before validation. A
+            // rejected snapshot consumes its attempt/reservation, without
+            // claiming that its indices were actually inspected.
             copied += 1;
             self.frame_work.copy_attempts += 1;
-            match copy_terrain(meshes, source, prep.copied_vertices) {
+            self.frame_work.copy_indices_charged += index_charge;
+            match copy_terrain(
+                meshes,
+                source,
+                prep.copied_vertices,
+                &mut self.frame_work.copy_indices_scanned,
+            ) {
                 Ok(terrain) => {
                     prep.precision.push(PrecisionSource {
                         footprint: source.footprint,
@@ -1076,10 +1102,42 @@ fn prepare_overlays_with_budget(
     result
 }
 
+/// O(1) metadata only: do not clone/scan a candidate to decide its budget.
+/// Buffers above the unchanged per-source cap are rejected before scanning and
+/// reserve zero here. Other validation failures may reserve but not scan.
+fn snapshot_index_charge(meshes: &Assets<Mesh>, source: &OverlayTerrainSource) -> usize {
+    meshes
+        .get(&source.mesh)
+        .and_then(Mesh::indices)
+        .map_or(0, |indices| {
+            if indices.len() <= MAX_OVERLAY_TERRAIN_INDICES {
+                indices.len()
+            } else {
+                0
+            }
+        })
+}
+
+fn snapshot_fits_frame(work: &TerrainOverlayFrameWork, vertices: usize, indices: usize) -> bool {
+    if indices > OVERLAY_COPY_INDICES_PER_FRAME.saturating_sub(work.copy_indices_charged) {
+        return false;
+    }
+    if work.copy_attempts == 0 {
+        // One indivisible source always gets a turn. The unchanged source and
+        // transaction checks reject oversized/invalid geometry before copying.
+        return true;
+    }
+    work.copied_vertices <= OVERLAY_COPY_VERTEX_TARGET
+        && work.copy_indices_charged <= OVERLAY_COPY_INDEX_TARGET
+        && vertices <= OVERLAY_COPY_VERTEX_TARGET.saturating_sub(work.copied_vertices)
+        && indices <= OVERLAY_COPY_INDEX_TARGET.saturating_sub(work.copy_indices_charged)
+}
+
 fn copy_terrain(
     meshes: &Assets<Mesh>,
     source: &OverlayTerrainSource,
     already_copied: usize,
+    scanned_indices: &mut usize,
 ) -> Result<DrapeTerrain, DrapeError> {
     if source.surface_vertices > MAX_OVERLAY_TERRAIN_VERTICES.saturating_sub(already_copied) {
         return Err(DrapeError::TerrainLimit);
@@ -1096,12 +1154,13 @@ fn copy_terrain(
     if source.surface_vertices > positions.len() {
         return Err(DrapeError::InvalidMesh);
     }
-    if indices.len() > 6 * MAX_OVERLAY_TERRAIN_VERTICES || indices.len() % 3 != 0 {
+    if indices.len() > MAX_OVERLAY_TERRAIN_INDICES || indices.len() % 3 != 0 {
         return Err(DrapeError::TerrainLimit);
     }
     let mut surface_indices = Vec::new();
     let mut indices = indices.iter();
     while let (Some(a), Some(b), Some(c)) = (indices.next(), indices.next(), indices.next()) {
+        *scanned_indices += 3;
         let triangle = [a, b, c];
         if triangle
             .iter()
@@ -1504,6 +1563,323 @@ mod tests {
                 world
                     .get::<Children>(root)
                     .is_none_or(|children| children.is_empty())
+            );
+        }
+    }
+
+    /// Keep a final impossible-to-fit sentinel so copy-only tests do not start
+    /// clipping jobs. It is not reached until a later otherwise-empty update.
+    fn snapshot_fixture(sizes: &[(usize, usize)]) -> UploadFixture {
+        let (mut registry, world, mut meshes, originals) = upload_fixture(1);
+        queue_result(&mut registry, sized_outputs(&[3]));
+        let origin = registry.registered[0].source.origin;
+        let id = TileId::containing(13, origin.to_geodetic());
+        let prep = registry.preparation.as_mut().unwrap();
+        prep.result = None;
+        for (index, &(vertices, indices)) in sizes.iter().enumerate() {
+            let tag = f32::from(u16::try_from(index).unwrap());
+            let mesh = meshes.add(
+                Mesh::new(
+                    bevy::mesh::PrimitiveTopology::TriangleList,
+                    bevy::asset::RenderAssetUsages::default(),
+                )
+                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[tag, 0.0, 0.0]; vertices])
+                .with_inserted_indices(bevy::mesh::Indices::U32(vec![0; indices])),
+            );
+            prep.sources.push(OverlayTerrainSource {
+                key: OverlaySourceKey::Tile(id, u64::try_from(index).unwrap()),
+                footprint: [id, id],
+                required: true,
+                origin,
+                surface_vertices: vertices,
+                mesh,
+            });
+        }
+        prep.sources.push(OverlayTerrainSource {
+            key: OverlaySourceKey::Tile(id, u64::MAX),
+            footprint: [id, id],
+            required: true,
+            origin,
+            surface_vertices: MAX_OVERLAY_TERRAIN_VERTICES,
+            mesh: Handle::default(),
+        });
+        (registry, world, meshes, originals)
+    }
+
+    #[test]
+    fn snapshot_targets_match_two_actual_maximum_grids_including_skirt_scan() {
+        let id = TileId::containing(13, Geodetic::from_degrees(47.0, 9.0, 0.0));
+        let grid = flightsim_world::build_mesh(
+            id,
+            &flightsim_world::DemTile::new(
+                id.bounds(),
+                flightsim_world::HeightGrid::flat(65, 65, Meters(40.0)),
+            ),
+            &flightsim_world::MeshOptions {
+                resolution: 65,
+                skirt_depth: Some(Meters(20.0)),
+            },
+        );
+        assert_eq!(grid.surface_vertex_count, 4_225);
+        assert_eq!(grid.positions.len(), 4_225 + 4 * 64);
+        assert_eq!(grid.indices.len(), 24_576 + 1_536);
+        assert_eq!(OVERLAY_COPY_VERTEX_TARGET, 2 * grid.surface_vertex_count);
+        assert_eq!(OVERLAY_COPY_INDEX_TARGET, 2 * grid.indices.len());
+        let mut meshes = Assets::<Mesh>::default();
+        let source = OverlayTerrainSource {
+            key: OverlaySourceKey::Tile(id, 1),
+            footprint: [id, id],
+            required: true,
+            origin: grid.origin,
+            surface_vertices: grid.surface_vertex_count,
+            mesh: meshes.add(crate::to_bevy_mesh(&grid)),
+        };
+        let mut scanned = 0;
+        let copy = copy_terrain(&meshes, &source, 0, &mut scanned).unwrap();
+        assert_eq!(copy.positions, grid.positions[..4_225]);
+        assert_eq!(copy.indices, grid.indices[..24_576]);
+        assert_eq!(
+            scanned, 26_112,
+            "discarded skirt triangles still cost index inspection"
+        );
+        assert_eq!(snapshot_index_charge(&meshes, &source), scanned);
+    }
+
+    #[test]
+    fn snapshot_tiny_sources_pack_to_remaining_attempt_allowance_without_visibility_change() {
+        for budget in [0, 1, 3, 8] {
+            let (mut registry, mut world, mut meshes, originals) =
+                snapshot_fixture(&[(140, 816); 9]);
+            let asset_count = meshes.len();
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, budget),
+                (false, budget)
+            );
+            world.flush();
+            let work = registry.usage().frame_work;
+            assert_eq!(work.copy_attempts, budget);
+            assert_eq!(work.copied_vertices, 140 * budget);
+            assert_eq!(work.copy_indices_charged, 816 * budget);
+            assert_eq!(work.copy_indices_scanned, 816 * budget);
+            assert_eq!(registry.preparation.as_ref().unwrap().next_source, budget);
+            assert_eq!(meshes.len(), asset_count);
+            assert_eq!(
+                world.get::<Mesh3d>(originals[0].0).unwrap().0,
+                originals[0].1
+            );
+            assert_eq!(
+                world.get::<Visibility>(originals[0].0),
+                Some(&Visibility::Inherited)
+            );
+        }
+    }
+
+    #[test]
+    fn snapshot_normal_vertex_and_index_targets_defer_next_whole_source() {
+        for (sizes, vertices, indices) in [
+            (vec![(4_225, 26_112); 3], 8_450, 52_224),
+            (vec![(8_449, 0), (1, 0), (1, 0)], 8_450, 0),
+            (vec![(3, 52_221), (3, 3), (3, 3)], 6, 52_224),
+        ] {
+            let (mut registry, mut world, mut meshes, _) = snapshot_fixture(&sizes);
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, 8),
+                (false, 2)
+            );
+            assert_eq!(registry.usage().frame_work.copied_vertices, vertices);
+            assert_eq!(registry.usage().frame_work.copy_indices_charged, indices);
+            assert_eq!(registry.usage().frame_work.copy_indices_scanned, indices);
+            assert_eq!(registry.preparation.as_ref().unwrap().next_source, 2);
+        }
+    }
+
+    #[test]
+    fn snapshot_indivisible_first_source_progresses_without_admitting_a_second() {
+        for (vertices, indices) in [
+            (OVERLAY_COPY_VERTEX_TARGET + 1, 0),
+            (3, OVERLAY_COPY_INDEX_TARGET + 3),
+            (3, MAX_OVERLAY_TERRAIN_INDICES),
+        ] {
+            let (mut registry, mut world, mut meshes, _) =
+                snapshot_fixture(&[(vertices, indices), (1, 0)]);
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, 8),
+                (false, 1)
+            );
+            let work = registry.usage().frame_work;
+            assert_eq!(work.copied_vertices, vertices);
+            assert_eq!(work.copy_indices_charged, indices);
+            assert_eq!(work.copy_indices_scanned, indices);
+            assert!(work.copied_vertices <= OVERLAY_COPY_VERTICES_PER_FRAME);
+            assert!(work.copy_indices_charged <= OVERLAY_COPY_INDICES_PER_FRAME);
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, 8),
+                (false, 1)
+            );
+            assert_eq!(registry.usage().frame_work.copied_vertices, 1);
+        }
+    }
+
+    #[test]
+    fn snapshot_charged_indices_are_distinct_from_scanned_entries_on_early_failure() {
+        for (vertices, indices, remove_positions, expected_charge) in [
+            (3, 12, true, 12),
+            (
+                3,
+                OVERLAY_COPY_INDEX_TARGET + 1,
+                false,
+                OVERLAY_COPY_INDEX_TARGET + 1,
+            ),
+            (3, MAX_OVERLAY_TERRAIN_INDICES + 1, false, 0),
+            (MAX_OVERLAY_TERRAIN_VERTICES + 1, 3, false, 3),
+        ] {
+            let (mut registry, mut world, mut meshes, originals) =
+                snapshot_fixture(&[(vertices, indices)]);
+            if remove_positions {
+                let mesh = registry.preparation.as_ref().unwrap().sources[0]
+                    .mesh
+                    .clone();
+                meshes
+                    .get_mut(&mesh)
+                    .unwrap()
+                    .remove_attribute(Mesh::ATTRIBUTE_POSITION);
+            }
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, 8),
+                (true, 1)
+            );
+            let work = registry.usage().frame_work;
+            assert_eq!(work.copy_attempts, 1);
+            assert_eq!(work.copied_vertices, 0);
+            assert_eq!(work.copy_indices_charged, expected_charge);
+            assert_eq!(work.copy_indices_scanned, 0);
+            world.flush();
+            assert_eq!(
+                world.get::<Mesh3d>(originals[0].0).unwrap().0,
+                originals[0].1
+            );
+        }
+    }
+
+    #[test]
+    fn snapshot_packed_prefix_preserves_required_optional_failure_policy_and_charges() {
+        bevy::tasks::AsyncComputeTaskPool::get_or_init(bevy::tasks::TaskPool::new);
+        for required in [true, false] {
+            let (mut registry, mut world, mut meshes, originals) =
+                snapshot_fixture(&[(140, 816); 5]);
+            let prep = registry.preparation.as_mut().unwrap();
+            if !required {
+                // Production discovery sorts all required sources before the
+                // optional suffix; do not put required work after this failure.
+                for source in &mut prep.sources[2..] {
+                    source.required = false;
+                }
+            }
+            let rejected = prep.sources[2].mesh.clone();
+            meshes
+                .get_mut(&rejected)
+                .unwrap()
+                .remove_attribute(Mesh::ATTRIBUTE_POSITION);
+            let cancelled = Arc::clone(&prep.cancelled);
+            let assets = meshes.len();
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert_eq!(
+                registry.advance(&mut world.commands(), &mut meshes, 8),
+                (required, 3)
+            );
+            let work = registry.usage().frame_work;
+            assert_eq!(work.copy_attempts, 3);
+            assert_eq!(work.copied_vertices, 280);
+            assert_eq!(work.copy_indices_charged, 3 * 816);
+            assert_eq!(work.copy_indices_scanned, 2 * 816);
+            let prep = registry.preparation.as_ref().unwrap();
+            assert_eq!(prep.copied_vertices, 280);
+            assert_eq!(prep.required_tiles, 2);
+            if required {
+                assert!(matches!(prep.result, Some(Err(DrapeError::InvalidMesh))));
+                assert_eq!(prep.next_source, 2);
+            } else {
+                assert!(prep.optional_disabled);
+                assert_eq!(prep.next_source, prep.sources.len());
+                assert!(prep.task.is_some());
+            }
+            registry.reset();
+            assert!(cancelled.load(Ordering::Relaxed));
+            world.flush();
+            assert_eq!(meshes.len(), assets);
+            assert_eq!(
+                world.get::<Mesh3d>(originals[0].0).unwrap().0,
+                originals[0].1
+            );
+            assert_eq!(
+                world.get::<Visibility>(originals[0].0),
+                Some(&Visibility::Inherited)
+            );
+        }
+    }
+
+    #[test]
+    fn snapshot_packing_keeps_exact_source_order_and_geometry_across_cadences() {
+        let mut expected = None;
+        for budget in [1, 2, 8] {
+            let (mut registry, mut world, mut meshes, originals) =
+                snapshot_fixture(&[(140, 816); 9]);
+            let cancelled = Arc::clone(&registry.preparation.as_ref().unwrap().cancelled);
+            let mut frames = 0;
+            while registry.preparation.as_ref().unwrap().next_source < 9 {
+                registry.begin_frame(&mut world.commands(), &mut meshes);
+                let (ready, attempts) =
+                    registry.advance(&mut world.commands(), &mut meshes, budget);
+                assert!(!ready);
+                assert!(attempts <= budget);
+                frames += 1;
+                assert!(frames <= 9);
+                let work = registry.usage().frame_work;
+                assert!(work.copy_indices_scanned <= work.copy_indices_charged);
+                assert!(work.copy_indices_charged <= OVERLAY_COPY_INDICES_PER_FRAME);
+            }
+            assert_eq!(frames, 9_usize.div_ceil(budget));
+            let geometry: Vec<_> = registry
+                .preparation
+                .as_ref()
+                .unwrap()
+                .terrain
+                .iter()
+                .map(|terrain| {
+                    (
+                        terrain.origin,
+                        terrain.footprint,
+                        terrain.positions.clone(),
+                        terrain.indices.clone(),
+                    )
+                })
+                .collect();
+            if let Some(expected) = &expected {
+                assert_eq!(&geometry, expected);
+            } else {
+                expected = Some(geometry);
+            }
+            registry.reset();
+            assert!(cancelled.load(Ordering::Relaxed));
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            world.flush();
+            assert!(!registry.has_preparation());
+            assert_eq!(
+                world.get::<Mesh3d>(originals[0].0).unwrap().0,
+                originals[0].1
+            );
+            assert_eq!(
+                world.get::<Visibility>(originals[0].0),
+                Some(&Visibility::Inherited)
+            );
+            assert_eq!(
+                registry.usage().frame_work,
+                TerrainOverlayFrameWork::default()
             );
         }
     }

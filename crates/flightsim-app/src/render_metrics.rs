@@ -191,12 +191,14 @@ pub(super) fn report_overlay_work(enabled: bool, work: flightsim_render::Terrain
         return;
     }
     info!(
-        "terrain overlay frame work: {} copy attempts, {} copied vertices, {} upload attempts, {} uploaded meshes, {} uploaded vertices; CPU asset submissions, not GPU timestamps",
+        "terrain overlay frame work: {} copy attempts, {} copied vertices, {} upload attempts, {} uploaded meshes, {} uploaded vertices; {} snapshot indices charged, {} snapshot indices actually scanned; CPU asset submissions, not GPU timestamps",
         work.copy_attempts,
         work.copied_vertices,
         work.upload_attempts,
         work.uploaded_meshes,
         work.uploaded_vertices,
+        work.copy_indices_charged,
+        work.copy_indices_scanned,
     );
 }
 

@@ -42,8 +42,11 @@ contact at every fragment.
 The existing terrain cut is retained while immutable source discovery and
 clipping run on the compute pool. Discovery uses at most 40,960 bounded metadata
 records (8,192 surfaces plus their existing 4N seam bound), without deep mesh
-copies. At most two relevant terrain meshes are copied per update, additionally
-charged against the existing mesh-preparation budget. The source generation is
+copies. Snapshot copies consume the existing remaining mesh-preparation budget.
+The accepted ef971772 policy permits two sources per update; the isolated
+[copy-pacing candidate](terrain-overlay-copy-pacing-2026-10-03.md) instead packs
+small sources under two maximum-grid vertex/index targets, with unchanged hard
+source/transaction limits and its own pending acceptance gates. The source generation is
 frozen until airport/scenery mesh contents and terrain visibility commit together.
 A same-ID source replacement invalidates the cache; distant unchanged airport
 facets reuse their previous overlay geometry. Cancellation is checked during
