@@ -909,7 +909,10 @@ fn tree_with_roots(
     let trunk = color([0.27, 0.20, 0.13]);
     let vertex =
         |north: f64, east: f64, up: f64| frame.ned_to_ecef_position(Ned::new(north, east, -up));
-    for side in 0..6 {
+    // Retain the original side/trunk vertices and collect their six existing
+    // rim positions per crown. The bases below need no new coordinate transforms.
+    let mut crown_rims = [[builder.origin; 6]; 2];
+    for side in 0..6_u8 {
         let a = f64::from(side) * core::f64::consts::TAU / 6.0;
         let b = f64::from(side + 1) * core::f64::consts::TAU / 6.0;
         if !builder.quad(
@@ -924,16 +927,33 @@ fn tree_with_roots(
         ) {
             return false;
         }
-        for (bottom, top, radius) in [(0.24, 0.80, 0.24), (0.48, 1.0, 0.18)] {
+        for (crown, (bottom, top, radius)) in [(0.24, 0.80, 0.24), (0.48, 1.0, 0.18)]
+            .into_iter()
+            .enumerate()
+        {
+            let rim = vertex(a.cos() * h * radius, a.sin() * h * radius, h * bottom);
+            crown_rims[crown][usize::from(side)] = rim;
             if !builder.triangle(
                 [
                     vertex(b.cos() * h * radius, b.sin() * h * radius, h * bottom),
-                    vertex(a.cos() * h * radius, a.sin() * h * radius, h * bottom),
+                    rim,
                     vertex(0.0, 0.0, h * top),
                 ],
                 foliage,
                 false,
             ) {
+                return false;
+            }
+        }
+    }
+    // Opaque, back-face-culled crown shells otherwise disappear from below.
+    // Four triangles close each hexagon, bringing one tree from 72 to 96
+    // vertices (24 to 32 triangles). Increasing north/east angle winds down;
+    // top=false must preserve that winding. The caller rolls back a whole tree
+    // if a cap exhausts the unchanged vertex budget or observes cancellation.
+    for rim in crown_rims {
+        for side in 1..5 {
+            if !builder.triangle([rim[0], rim[side], rim[side + 1]], foliage, false) {
                 return false;
             }
         }
@@ -952,6 +972,10 @@ pub fn scenery_material() -> StandardMaterial {
         ..default()
     }
 }
+
+#[cfg(test)]
+#[path = "scenery_canopy_tests.rs"]
+mod canopy_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1108,7 +1132,7 @@ mod tests {
             };
             let old = make(Meters::ZERO);
             let new = make(FOUNDATION_DEPTH);
-            assert_eq!(old.count_vertices(), 72);
+            assert_eq!(old.count_vertices(), 96);
             assert_eq!(new.count_vertices(), old.count_vertices());
             assert_eq!(
                 old.indices().unwrap().iter().collect::<Vec<_>>(),

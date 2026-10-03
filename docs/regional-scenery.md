@@ -45,7 +45,9 @@ data. More requested LOD cannot manufacture missing source coverage. See the
   database. Widths and heights may be explicit source values or labeled defaults
 - Flat roofs, facade colours/windows, road paint and individual conifer-shaped
   trees are original procedural depiction. Trees are placed only within sourced
-  forest polygons; they are not a surveyed vegetation inventory
+  forest polygons; they are not a surveyed vegetation inventory. Each tree has
+  two closed, downward-facing crown bases so opaque foliage stays visible from
+  below (96 vertices / 32 triangles per tree, within the unchanged batch limits)
 - Roads and land polygons are clipped/draped onto the actual displayed terrain
   facets and swap atomically with that terrain. Airport pavement/markings and
   supported light fixtures use the same path; compound signs are not included
