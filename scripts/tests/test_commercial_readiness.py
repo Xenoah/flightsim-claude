@@ -81,6 +81,25 @@ class StagingChecks(unittest.TestCase):
     def test_collection_without_review_stays_blocked(self):
         self.assertIn("DEPENDENCY_REVIEW_REQUIRED", self.codes(review=False))
 
+    def test_release_only_assets_are_neither_required_nor_allowed_in_commercial_candidate(self):
+        release_only = ["assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"]
+        for relative in release_only:
+            path = self.repo / relative
+            path.write_bytes(("original source fixture: " + relative).encode())
+            self.manifest["assets"].append({"path": relative, "review_state": "original_source_recorded", "sha256": gate.digest(path)})
+        self.manifest["release_external_assets"] = [self.asset, *release_only]
+        write_json(self.manifest_path, self.manifest)
+        shutil.copyfile(self.manifest_path, self.bundle / "docs/release/asset-rights-manifest.json")
+        self.inventory["asset_manifest_sha256"] = gate.digest(self.manifest_path)
+        write_json(self.inventory_path, self.inventory)
+        self.refresh_review()
+        self.assertEqual(self.result()["status"], "checks_passed")
+        for relative in release_only:
+            destination = self.bundle / relative
+            shutil.copyfile(self.repo / relative, destination)
+            self.assertTrue(any(b["code"] == "UNAPPROVED_ASSET" and relative in b["message"] for b in self.result()["blockers"]))
+            destination.unlink()
+
     def test_source_only_does_not_claim_bundle_passed(self):
         result = gate.check(self.repo, None)
         self.assertIn("BUNDLE_NOT_CHECKED", {b["code"] for b in result["blockers"]})

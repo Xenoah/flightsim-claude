@@ -18,6 +18,8 @@ The existing commercial checker is reused for SOURCE/dependency preflight. Its
 BUNDLE_NOT_CHECKED marker is expected here and is never called a bundle pass.
 All its other blockers remain fatal. Bundle byte/allowlist verification happens
 again before archiving and after extraction; no commercial checker is relaxed.
+The release asset allowlist refers to exact hashes and reviewed states in the
+shared asset records; it does not expand the Swift-only commercial candidate.
 The legacy two-aircraft recipe below intentionally remains blocked by existing
 rights evidence. To release a reviewed Swift-only payload, change the recipe,
 feature/smoke expectations together, supply exact target dependency evidence,
@@ -139,7 +141,16 @@ def inspect(root):
     assets = {a["path"]: a for a in manifest["assets"]}
     if len(assets) != len(manifest["assets"]):
         raise ValueError("duplicate asset record")
-    allowed_assets = set(manifest["commercial_external_assets"])
+    release_assets = manifest["release_external_assets"]
+    if (not isinstance(release_assets, list)
+            or any(not isinstance(path, str) for path in release_assets)
+            or len(set(release_assets)) != len(release_assets)):
+        raise ValueError("release asset allowlist must contain unique paths")
+    allowed_assets = set(release_assets)
+    for relative in allowed_assets:
+        asset = assets.get(relative)
+        if not relative.startswith("assets/") or not asset or asset["review_state"] not in REVIEWED_STATES:
+            block("INVALID_RELEASE_ASSET_ALLOWLIST", f"Release allowlist entry lacks reviewed source record: {relative}")
     unresolved_hashes = {a["sha256"] for a in assets.values() if a["review_state"] not in REVIEWED_STATES}
     for relative, asset in assets.items():
         if asset.get("delivery") == "embedded" and asset["review_state"] not in REVIEWED_STATES:
@@ -170,15 +181,18 @@ def inspect(root):
     for relative in sorted(set(SOURCE_FILES) | set(manifest["required_bundle_files"])):
         add_file(relative, relative)
     # Do not accept data supplied merely by an ignored/untracked local file.
-    inventory_path = root / DEPENDENCY_INVENTORY
-    review_path = root / DEPENDENCY_REVIEW
-    inventory = None
+    inventory_path = review_path = None
     if DEPENDENCY_INVENTORY not in tracked or DEPENDENCY_REVIEW not in tracked:
         block("DEPENDENCY_REVIEW_MISSING", "Exact target dependency inventory, notices and completed review must be committed before release")
-    else:
+    if DEPENDENCY_INVENTORY in tracked:
+        # An absent review must not hide the inventory's actual unresolved
+        # evidence. Only committed inputs may influence the release preflight.
         inventory_path = regular(DEPENDENCY_INVENTORY)
-        review_path = regular(DEPENDENCY_REVIEW)
-        inventory, review = read_object(inventory_path), read_object(review_path)
+        inventory = read_object(inventory_path)
+        review = None
+        if DEPENDENCY_REVIEW in tracked:
+            review_path = regular(DEPENDENCY_REVIEW)
+            review = read_object(review_path)
         if inventory.get("target") != TARGET:
             block("DEPENDENCY_TARGET_MISMATCH", "Reviewed dependency target must be Windows x86_64 MSVC")
         app = [p for p in inventory.get("packages", []) if p.get("name") == "flightsim-app"]
@@ -188,10 +202,11 @@ def inspect(root):
             block("DEPENDENCY_BUILD_MISMATCH", "Dependency app version/features do not match this exact build recipe")
         for relative in staging.notice_files(inventory_path.parent, inventory, review):
             add_file((inventory_path.parent / relative).relative_to(root).as_posix(), "third-party/" + relative)
-        add_file(DEPENDENCY_REVIEW, DEPENDENCY_REVIEW)
+        if review_path is not None:
+            add_file(DEPENDENCY_REVIEW, DEPENDENCY_REVIEW)
     # Reuse the established dependency integrity + substantive review rules.
     # This source-only preflight does not claim an absent bundle was checked.
-    result = readiness.check(root, None, inventory_path if inventory else None, review_path if inventory else None)
+    result = readiness.check(root, None, inventory_path, review_path)
     for item in result["blockers"]:
         if item["code"] != "BUNDLE_NOT_CHECKED":
             block(item["code"], item["message"])

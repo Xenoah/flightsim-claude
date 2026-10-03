@@ -38,7 +38,8 @@ class ReleaseAuthorizationTests(unittest.TestCase):
             "schema_version": 1,
             "assets": [{"path": p, "review_state": "original_source_recorded", "sha256": gate.readiness.digest(self.repo / p)}
                        for p in gate.SOURCE_FILES if p.startswith("assets/")],
-            "commercial_external_assets": [p for p in gate.SOURCE_FILES if p.startswith("assets/")],
+            "commercial_external_assets": ["assets/aircraft/swift_sport.glb", "assets/aircraft/swift_sport.json"],
+            "release_external_assets": [p for p in gate.SOURCE_FILES if p.startswith("assets/")],
             "required_bundle_files": ["LICENSE-MIT", "LICENSE-APACHE", gate.ASSET_MANIFEST],
         }
         self.write_json(gate.ASSET_MANIFEST, self.manifest)
@@ -160,10 +161,45 @@ class ReleaseAuthorizationTests(unittest.TestCase):
 
     def test_current_unresolved_mesh_cannot_be_authorized_by_a_receipt(self):
         self.manifest["assets"][0]["review_state"] = "unresolved"
-        self.manifest["commercial_external_assets"].remove(gate.SOURCE_FILES[0])
+        self.manifest["release_external_assets"].remove(gate.SOURCE_FILES[0])
         self.refresh_evidence()
         self.authorize_fixture()
         self.assertTrue({"UNRESOLVED_ASSET_RIGHTS", "ASSET_NOT_ALLOWLISTED"} <= self.codes())
+
+    def test_release_allows_reviewed_profile_and_blender_source_without_commercial_expansion(self):
+        self.authorize_fixture()
+        result, plan = gate.inspect(self.repo)
+        self.assertTrue(result["authorized"], result)
+        paths = {item["path"] for item in plan["files"]}
+        for relative in ("assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"):
+            self.assertNotIn(relative, self.manifest["commercial_external_assets"])
+            self.assertIn(relative, paths)
+
+    def test_release_allowlist_does_not_approve_changed_profile_or_blender_bytes(self):
+        for relative in ("assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"):
+            self.write(relative, "unreviewed replacement")
+        self.commit()
+        self.authorize_fixture()
+        result, _ = gate.inspect(self.repo)
+        for relative in ("assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"):
+            self.assertTrue(any(b["code"] == "ASSET_CHANGED" and relative in b["message"] for b in result["blockers"]))
+        self.assertFalse(result["authorized"])
+
+    def test_release_allowlist_cannot_override_unresolved_state(self):
+        self.manifest["assets"][0]["review_state"] = "unresolved"
+        self.refresh_evidence()
+        self.authorize_fixture()
+        self.assertTrue({"INVALID_RELEASE_ASSET_ALLOWLIST", "UNRESOLVED_ASSET_RIGHTS", "ASSET_NOT_ALLOWLISTED"} <= self.codes())
+
+    def test_unresolved_mesh_renamed_to_release_allowlisted_blender_path_is_blocked(self):
+        self.manifest["assets"][0]["review_state"] = "unresolved"
+        destination = "assets/aircraft/swift_sport.blend"
+        self.write(destination, (self.repo / gate.SOURCE_FILES[0]).read_text())
+        self.refresh_evidence()
+        self.authorize_fixture()
+        result, _ = gate.inspect(self.repo)
+        self.assertTrue(any(b["code"] == "UNRESOLVED_ASSET_RIGHTS" and destination in b["message"] for b in result["blockers"]))
+        self.assertIn("ASSET_CHANGED", {b["code"] for b in result["blockers"]})
 
     def test_renamed_unresolved_asset_in_notice_is_rejected(self):
         # A text-like asset cannot hide under a referenced license path either.
@@ -180,7 +216,54 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         (self.repo / gate.DEPENDENCY_REVIEW).unlink()
         self.commit()
         self.authorize_fixture()
-        self.assertIn("DEPENDENCY_REVIEW_MISSING", self.codes())
+        codes = self.codes()
+        self.assertTrue({"DEPENDENCY_REVIEW_MISSING", "DEPENDENCY_REVIEW_REQUIRED"} <= codes)
+        self.assertNotIn("DEPENDENCY_INVENTORY_MISSING", codes)
+
+    def test_inventory_without_review_reports_unresolved_evidence_and_never_writes_plan(self):
+        self.inventory["packages"][0]["unresolved"] = ["Missing primary grant"]
+        self.inventory["unresolved"] = [{"id": "flightsim-app@1.2.3", "reason": "Missing primary grant"}]
+        self.refresh_evidence()
+        (self.repo / gate.DEPENDENCY_REVIEW).unlink()
+        self.commit()
+        codes = self.codes()
+        self.assertTrue({"DEPENDENCY_REVIEW_MISSING", "DEPENDENCY_REVIEW_REQUIRED", "DEPENDENCY_UNRESOLVED", "AUTHORIZATION_MISSING"} <= codes)
+        self.assertNotIn("DEPENDENCY_INVENTORY_MISSING", codes)
+        output = self.root / "plan.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(gate.main(["--repo", str(self.repo), "--allow-blocked", "--inventory-file", str(output)]), 0)
+        self.assertFalse(output.exists())
+
+    def test_untracked_review_cannot_resolve_committed_inventory(self):
+        review_bytes = (self.repo / gate.DEPENDENCY_REVIEW).read_bytes()
+        self.git("rm", gate.DEPENDENCY_REVIEW)
+        self.commit()
+        (self.repo / gate.DEPENDENCY_REVIEW).write_bytes(review_bytes)
+        self.write_json(gate.AUTHORIZATION, self.receipt())
+        self.git("add", gate.AUTHORIZATION)
+        self.git("commit", "-qm", "Synthetic authorization with untracked review")
+        codes = self.codes()
+        self.assertTrue({"DEPENDENCY_REVIEW_MISSING", "DEPENDENCY_REVIEW_REQUIRED"} <= codes)
+        self.assertNotIn("DEPENDENCY_INVENTORY_MISSING", codes)
+
+    def test_untracked_inventory_is_not_used_despite_committed_review(self):
+        inventory_bytes = (self.repo / gate.DEPENDENCY_INVENTORY).read_bytes()
+        self.git("rm", gate.DEPENDENCY_INVENTORY)
+        self.commit()
+        (self.repo / gate.DEPENDENCY_INVENTORY).write_bytes(inventory_bytes)
+        self.assertTrue({"DEPENDENCY_REVIEW_MISSING", "DEPENDENCY_INVENTORY_MISSING", "AUTHORIZATION_MISSING"} <= self.codes())
+
+    def test_inventory_without_review_still_rejects_wrong_target_features_and_notice_bytes(self):
+        self.inventory["target"] = "x86_64-pc-windows-gnu"
+        self.inventory["packages"][0]["features"] = ["default", "commercial-staging"]
+        self.refresh_evidence()
+        (self.repo / gate.DEPENDENCY_REVIEW).unlink()
+        self.commit()
+        self.assertTrue({"DEPENDENCY_TARGET_MISMATCH", "DEPENDENCY_BUILD_MISMATCH", "DEPENDENCY_REVIEW_REQUIRED"} <= self.codes())
+        self.write(self.notice, "unreviewed replacement notice")
+        self.commit()
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            gate.inspect(self.repo)
 
     def test_unresolved_dependency_survives_truncated_summary_and_receipt(self):
         self.inventory["packages"][0]["unresolved"] = ["Missing primary grant"]
@@ -325,6 +408,24 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         (bundle / executable.name).symlink_to(executable)
         with self.assertRaisesRegex(ValueError, "symlink"):
             gate.verify_bundle(bundle, plan, executable)
+
+
+class RepositoryAssetPolicyTests(unittest.TestCase):
+    def test_release_records_match_existing_bytes_and_preserve_swift_only_commercial_recipe(self):
+        root = SCRIPT.parents[1]
+        manifest = json.loads((root / gate.ASSET_MANIFEST).read_text())
+        commercial = ["assets/aircraft/swift_sport.glb", "assets/aircraft/swift_sport.json"]
+        self.assertEqual(manifest["commercial_external_assets"], commercial)
+        self.assertEqual([p for p in gate.staging.SOURCE_FILES if p.startswith("assets/")], commercial)
+        self.assertEqual(set(manifest["release_external_assets"]), set(commercial) | {
+            "assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"})
+        assets = {a["path"]: a for a in manifest["assets"]}
+        for relative in manifest["release_external_assets"]:
+            self.assertIn(assets[relative]["review_state"], gate.REVIEWED_STATES)
+            self.assertEqual(gate.readiness.digest(root / relative), assets[relative]["sha256"])
+        legacy = "assets/aircraft/light_single.glb"
+        self.assertIn(legacy, gate.SOURCE_FILES)
+        self.assertEqual(assets[legacy]["review_state"], "unresolved")
 
 
 if __name__ == "__main__":

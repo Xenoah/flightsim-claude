@@ -31,6 +31,8 @@ class CommercialCandidateTests(unittest.TestCase):
             path.write_bytes(("fixture: " + relative).encode())
         # A recursive assets/ copy would leak this unverified asset and secret.
         (self.repo / "assets/aircraft/light_single.glb").write_bytes(b"EXCLUDED MESHy")
+        for relative in ("assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"):
+            (self.repo / relative).write_bytes(b"original source excluded from commercial candidate")
         (self.repo / ".env").write_bytes(b"DO NOT PACKAGE")
         license_path = self.notices / "licenses/example-1.0/LICENSE"
         license_path.parent.mkdir(parents=True)
@@ -70,6 +72,8 @@ class CommercialCandidateTests(unittest.TestCase):
     def test_blocked_review_candidate_keeps_all_hashes_and_excludes_unapproved_assets(self):
         self.assertTrue(self.assemble())
         self.assertFalse((self.output / "assets/aircraft/light_single.glb").exists())
+        self.assertFalse((self.output / "assets/aircraft/light_single.json").exists())
+        self.assertFalse((self.output / "assets/aircraft/swift_sport.blend").exists())
         self.assertFalse((self.output / ".env").exists())
         self.assertTrue((self.repo / "assets/aircraft/light_single.glb").is_file())
         manifest = json.loads((self.output / "bundle-manifest.json").read_text())

@@ -7,6 +7,12 @@
     "assets/aircraft/swift_sport.glb",
     "assets/aircraft/swift_sport.json"
   ],
+  "release_external_assets": [
+    "assets/aircraft/light_single.json",
+    "assets/aircraft/swift_sport.glb",
+    "assets/aircraft/swift_sport.json",
+    "assets/aircraft/swift_sport.blend"
+  ],
   "assets": [
     {
       "id": "assets-aircraft-light_single-glb",
