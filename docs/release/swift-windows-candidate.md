@@ -42,7 +42,16 @@ candidate, even if counts happen to agree. The collector always retains
 `not_reviewed`; this recipe supplies neither a dependency-review record nor an
 authorization receipt. Final-manifest changes require recollection.
 
-Every tracked source input is hashed, and the source SHA/tree, source inventory,
+Every tracked source input records its canonical Git blob identity and the
+SHA-256/size of its actual checked-out bytes separately. The five legacy
+identity pins are checked against raw Git blobs and then require byte-exact
+checkout equality; semantic changes and newline differences both fail. The
+workflow fixes process-local `core.autocrlf=false` **and** `core.eol=lf`, because
+`text=auto` can otherwise use native Windows CRLF even with automatic conversion
+disabled. Upstream notice paths marked `-text` retain their original bytes;
+no source or notice content is rewritten or normalized by the checker.
+
+The source SHA/tree, source inventory,
 compiler identity/flags, commands, executable, private archive, bundle manifest,
 metadata and dependency-inventory digests are recorded. Dirty/untracked source
 changes fail both before and after the run. Raw Cargo metadata contains local

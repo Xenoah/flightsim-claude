@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -57,6 +58,90 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_all_frozen_legacy_sources_match_independent_baseline(self):
         for relative, expected in candidate.LEGACY_SOURCE_HASHES.items():
             self.assertEqual(candidate.digest(ROOT / relative), expected, relative)
+            blob = subprocess.check_output(["git", "show", "HEAD:" + relative], cwd=ROOT)
+            self.assertEqual(candidate.hashlib.sha256(blob).hexdigest(), expected, relative)
+
+    def source_fixture(self):
+        repo = self.root / "source"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        # Use the actual attributes: Rust is text=auto, profiles explicitly LF,
+        # and verbatim license text explicitly bypasses all EOL conversion.
+        for relative in (*candidate.LEGACY_SOURCE_HASHES, ".gitattributes",
+                         "assets/aircraft/.gitattributes", "docs/release/.gitattributes"):
+            target = repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((ROOT / relative).read_bytes())
+        notice = repo / "docs/release/licenses/upstream/NOTICE"
+        notice.parent.mkdir(parents=True)
+        notice.write_bytes(b"Verbatim upstream fixture\r\nKeep these CRLF bytes.\r\n")
+        self.commit_source_fixture(repo)
+        return repo, notice
+
+    def commit_source_fixture(self, repo):
+        subprocess.run(["git", "-c", "core.autocrlf=false", "add", "."], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                        "commit", "-qm", "source fixture"], cwd=repo, check=True)
+        return candidate.git(repo, "rev-parse", "HEAD")
+
+    def checkout_source_fixture(self, repo, eol):
+        # Keep the simulated platform policy active for status/diff as well as
+        # checkout. These settings affect only this disposable fixture repo.
+        subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "core.eol", eol], cwd=repo, check=True)
+        # Force an actual checkout, independent of Git's cached stat metadata.
+        for path in subprocess.check_output(["git", "ls-files", "-z"], cwd=repo).decode().split("\0"):
+            if path:
+                (repo / path).write_bytes(b"force fixture recheckout")
+        subprocess.run(["git", "-c", "core.autocrlf=false", "-c", "core.eol=" + eol,
+                        "checkout-index", "--force", "--all", "--index"], cwd=repo, check=True)
+
+    def test_windows_native_checkout_failure_then_explicit_lf_preserves_raw_notices(self):
+        repo, notice = self.source_fixture()
+        notice_bytes = notice.read_bytes()
+        expected = candidate.git(repo, "rev-parse", "HEAD")
+        self.checkout_source_fixture(repo, "crlf")
+        aircraft = repo / "crates/flightsim-fdm/src/aircraft.rs"
+        self.assertEqual(aircraft.read_bytes().count(b"\r\n"), 799)
+        self.assertEqual(candidate.digest(repo / "assets/aircraft/light_single.json"),
+                         candidate.LEGACY_SOURCE_HASHES["assets/aircraft/light_single.json"])
+        self.assertEqual(notice.read_bytes(), notice_bytes)
+        self.assertEqual(candidate.git(repo, "status", "--porcelain"), "")
+        with self.assertRaisesRegex(ValueError, "legacy checkout differs") as failure:
+            candidate.source_inputs(repo, expected)
+        self.assertIn("expected_sha256=72091944", str(failure.exception))
+        self.assertIn("canonical_sha256=72091944", str(failure.exception))
+        self.assertIn("checkout_sha256=5fb95408", str(failure.exception))
+
+        self.checkout_source_fixture(repo, "lf")
+        self.assertEqual(aircraft.read_bytes().count(b"\r\n"), 0)
+        self.assertEqual(notice.read_bytes(), notice_bytes)
+        evidence = candidate.source_inputs(repo, expected)
+        self.assertEqual(evidence["schema_version"], 2)
+        self.assertEqual(evidence["canonical_git_object_format"], "sha1")
+        record = next(r for r in evidence["files"] if r["path"] == "docs/release/licenses/upstream/NOTICE")
+        self.assertEqual(record["checkout_sha256"], candidate.digest(notice))
+        self.assertEqual(record["checkout_bytes"], len(notice_bytes))
+        self.assertEqual(record["canonical_git_blob"], candidate.git(repo, "rev-parse", "HEAD:" + record["path"]))
+        for relative, pinned in candidate.LEGACY_SOURCE_HASHES.items():
+            identity = evidence["legacy_source_evidence"][relative]
+            self.assertEqual(identity["canonical_sha256"], pinned)
+            self.assertEqual(identity["checkout_sha256"], pinned)
+            self.assertEqual(identity["canonical_bytes"], identity["checkout_bytes"])
+
+    def test_canonical_semantic_change_is_not_accepted_as_a_checkout_fix(self):
+        repo, _ = self.source_fixture()
+        path = repo / "assets/aircraft/light_single.json"
+        original = path.read_bytes()
+        changed = original.replace(b'"mass_kg": 1043.0', b'"mass_kg": 1044.0')
+        self.assertNotEqual(original, changed)
+        path.write_bytes(changed)
+        expected = self.commit_source_fixture(repo)
+        with self.assertRaisesRegex(ValueError, "legacy canonical baseline changed") as failure:
+            candidate.source_inputs(repo, expected)
+        self.assertIn("expected_sha256=8cf101b6", str(failure.exception))
+        self.assertIn("canonical_sha256=" + candidate.digest(path), str(failure.exception))
+        self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
 
     def test_legacy_header_records_actual_u16_version_and_fixed_identity(self):
         path = self.root / "fixture.fsreplay"
@@ -252,6 +337,9 @@ class CandidateWorkflowTests(unittest.TestCase):
                       "head_repository.full_name == github.repository", "persist-credentials: false",
                       "ref: ${{ github.event.workflow_run.head_sha }}", "timeout-minutes: 90"):
             self.assertIn(guard, text)
+        for setting in ("GIT_CONFIG_COUNT: '2'", "GIT_CONFIG_KEY_0: core.autocrlf",
+                        "GIT_CONFIG_VALUE_0: 'false'", "GIT_CONFIG_KEY_1: core.eol", "GIT_CONFIG_VALUE_1: 'lf'"):
+            self.assertIn(setting, text)
         for forbidden in ("contents: write", "uses: Swatinem/rust-cache", "uses: actions/cache",
                           "gh release", "git tag", "workflow_dispatch:"):
             self.assertNotIn(forbidden, text)

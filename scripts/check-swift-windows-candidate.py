@@ -83,17 +83,38 @@ def source_inputs(repo, expected):
     require(re.fullmatch(r"[0-9a-f]{40}", expected), "expected source must be a full lowercase SHA")
     require(git(repo, "rev-parse", "HEAD") == expected, "checkout is not the expected source")
     require(not git(repo, "status", "--porcelain", "--untracked-files=all"), "source checkout must be clean")
-    paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=repo).decode("utf-8").split("\0")
+    tree = subprocess.check_output(["git", "ls-tree", "-r", "-z", "HEAD"], cwd=repo).decode("utf-8")
     records = []
-    for relative in sorted(p for p in paths if p):
+    for entry in sorted(p for p in tree.split("\0") if p):
+        metadata, relative = entry.split("\t", 1)
+        mode, kind, object_id = metadata.split()
+        require(kind == "blob" and mode in ("100644", "100755"), f"non-regular canonical input: {relative}")
         path = repo / relative
         require(path.is_file() and not path.is_symlink(), f"non-regular source input: {relative}")
-        records.append({"path": relative, "bytes": path.stat().st_size, "sha256": digest(path)})
+        records.append({"path": relative, "canonical_git_blob": object_id, "git_mode": mode,
+                        "checkout_bytes": path.stat().st_size, "checkout_sha256": digest(path)})
+    records.sort(key=lambda record: record["path"])
+    by_path = {record["path"]: record for record in records}
+    legacy_sources = {}
     for relative, expected_hash in LEGACY_SOURCE_HASHES.items():
-        require(digest(repo / relative) == expected_hash, f"legacy baseline changed: {relative}")
-    return {"source_sha": expected, "source_tree": git(repo, "rev-parse", "HEAD^{tree}"),
+        record = by_path[relative]
+        blob = subprocess.check_output(["git", "cat-file", "blob", record["canonical_git_blob"]], cwd=repo)
+        canonical_hash = hashlib.sha256(blob).hexdigest()
+        diagnostic = (f"{relative}; expected_sha256={expected_hash}; canonical_sha256={canonical_hash}; "
+                      f"checkout_sha256={record['checkout_sha256']}")
+        require(canonical_hash == expected_hash, "legacy canonical baseline changed: " + diagnostic)
+        # Exact compiled bytes still matter. No hashing normalization or newline
+        # equivalence is accepted; the workflow explicitly selects LF checkout.
+        require(record["checkout_sha256"] == canonical_hash,
+                "legacy checkout differs from canonical Git blob (check core.eol=lf): " + diagnostic)
+        legacy_sources[relative] = {"canonical_sha256": canonical_hash, "canonical_bytes": len(blob),
+                                    "canonical_git_blob": record["canonical_git_blob"],
+                                    "checkout_sha256": record["checkout_sha256"],
+                                    "checkout_bytes": record["checkout_bytes"]}
+    return {"schema_version": 2, "source_sha": expected, "source_tree": git(repo, "rev-parse", "HEAD^{tree}"),
+            "canonical_git_object_format": git(repo, "rev-parse", "--show-object-format"),
             "legacy_baseline": LEGACY_BASELINE, "legacy_source_sha256": LEGACY_SOURCE_HASHES,
-            "files": records}
+            "legacy_source_evidence": legacy_sources, "files": records}
 
 
 def candidate_commands():
