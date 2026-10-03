@@ -77,3 +77,14 @@ palette correction; colours were not arbitrarily brightened.
 Geometry, physical sampling, DEM data, normal policy and palette remain unchanged
 by this diagnosis. Radial polar striping is an **unresolved visual limitation**.
 Final integration/native QA and release-rights gates remain separate authorities.
+
+
+## 2026-10-03 continuation
+
+This earlier unresolved finding is retained as the diagnostic record. Fresh
+source-quantization isolation and a 505 m render-only normal filter remove the
+radial striping in a matched, settled South-Pole frame without changing source,
+geometry or palette inputs. This is a visual filtering policy with explicit
+accuracy/cost tradeoffs, not recovered fine terrain. See the
+[production-candidate record](polar-visual-normals-2026-10-03.md); North-Pole and
+combined-shadow acceptance remain separate gates.

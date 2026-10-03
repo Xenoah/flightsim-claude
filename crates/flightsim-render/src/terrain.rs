@@ -258,11 +258,37 @@ pub fn prepare_tile_with_options<M: Material>(
     options: &flightsim_world::MeshOptions,
     color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
 ) -> PreparedTerrainTile {
+    prepare_tile_with_global_shading(
+        commands, meshes, material, frame, id, dem, options, color, None,
+    )
+}
+
+/// Prepare with source-aware visual normals from the app-supplied global atlas.
+/// Without global shading context, preserve the existing terrain normal policy.
+/// Geometry, DEM heights, indices, physical sampling and replay identity are unchanged.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "existing preparation context plus explicit global shading provenance"
+)]
+pub fn prepare_tile_with_global_shading<M: Material>(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<M>,
+    frame: &RenderFrame,
+    id: TileId,
+    dem: &flightsim_world::DemTile,
+    options: &flightsim_world::MeshOptions,
+    color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
+    global_shading: Option<crate::terrain_polar_normals::GlobalTerrainShading<'_>>,
+) -> PreparedTerrainTile {
     assert!(
         (2..=65).contains(&options.resolution),
         "runtime terrain resolution must be in 2..=65"
     );
-    let source = build_mesh(id, dem, options);
+    let mut source = build_mesh(id, dem, options);
+    if let Some(global_shading) = global_shading {
+        global_shading.apply(id, &mut source);
+    }
     let boundary = flightsim_world::seams::TerrainBoundary::from_mesh(id, &source);
     let (entity, mesh) = spawn_source(commands, meshes, material, frame, id, &source, color);
     PreparedTerrainTile {

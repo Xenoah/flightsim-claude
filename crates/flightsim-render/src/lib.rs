@@ -72,6 +72,7 @@ pub mod terrain;
 pub mod terrain_detail;
 pub mod terrain_drape;
 mod terrain_overlays;
+pub mod terrain_polar_normals;
 pub use terrain_overlays::{
     OVERLAY_COPY_VERTICES_PER_FRAME, OVERLAY_UPLOAD_VERTEX_TARGET, TerrainOverlayFrameWork,
     TerrainOverlayRegistration, TerrainOverlaySwap, TerrainOverlayUsage,
@@ -88,8 +89,8 @@ pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
 pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
 pub use terrain_selection::{
-    TerrainSelectionState, TerrainUpdate, update_terrain_selection,
-    update_terrain_selection_with_surface,
+    TerrainMeshProvenance, TerrainSelectionState, TerrainUpdate, update_terrain_selection,
+    update_terrain_selection_with_surface, update_terrain_selection_with_surface_and_provenance,
 };
 pub use weather::{CloudDeckSurface, CloudDistanceFog, CloudLayer, CloudLayerError};
 

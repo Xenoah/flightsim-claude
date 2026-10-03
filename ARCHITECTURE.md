@@ -181,6 +181,17 @@ primary precedence; configured directories and mutable sources remain discoverab
 LOD can use a local terrain-height reference so
 elevated airports are not incorrectly treated as kilometres above ground.
 
+Global fallback polar shading uses a fixed 505 m physical half-stencil from the
+already validated atlas, only when the selector identifies a fallback read.
+It changes visual normal attributes before bridge boundary extraction, never
+positions, slopes, palette inputs, DEMs, physics or replay identities. Filtering
+is complete in the inner 75% of each canonical source cap and fades to the original
+normal at its boundary. It intentionally suppresses some retained angular relief;
+outside-cap vertices are unchanged, but coarse facets can interpolate pole shading
+farther out. Regional/primary DEM normals stay unchanged. The bounded four-sample
+policy and its CPU/visual acceptance limits are recorded in
+[polar visual normals](docs/qa/polar-visual-normals-2026-10-03.md).
+
 The new branch implementation and its eventual test/runtime evidence are distinct
 from the still-unmerged alpha21 release/publication state described below.
 

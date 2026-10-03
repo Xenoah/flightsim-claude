@@ -41,9 +41,10 @@ use flightsim_render::{
     CameraWorldPosition, CloudLayer, FlightsimRenderPlugin, ModelAxis, ModelFit, RenderOrigin,
     RenderSet, SunDirection, TerrainRenderConfig, TerrainTiles, WorldOrientation, WorldPosition,
     extents_in_model_space,
-    terrain::prepare_tile_with_options,
+    terrain::prepare_tile_with_global_shading,
+    terrain_polar_normals::GlobalTerrainShading,
     terrain_stitching::{advance_stitched_update, apply_stitched_update},
-    update_terrain_selection_with_surface,
+    update_terrain_selection_with_surface_and_provenance,
 };
 use flightsim_sim::{GroundSampler, Simulation};
 use flightsim_ui::{DataAttribution, FlightsimUiPlugin, HudState};
@@ -3655,6 +3656,7 @@ fn stream_terrain(
     mode: Res<ViewMode>,
     tower: Res<TowerViewAnchor>,
     scenery: Res<scenery_runtime::SceneryRuntime>,
+    mut metrics: ResMut<render_metrics::RenderMetrics>,
 ) {
     let camera = camera_position.0.to_ecef();
     let camera_ground = if *mode == ViewMode::Tower {
@@ -3680,12 +3682,13 @@ fn stream_terrain(
             config.load_budget_per_frame,
             color,
         );
+        metrics.observe_terrain_update(true, None, &progress);
         render_metrics::report_overlay_work(startup.render_stats, progress.overlay_work);
         return;
     }
     let mut prepared = Vec::new();
     let selector = scenery.terrain_selector(streaming.selector, camera_position.0);
-    let update = update_terrain_selection_with_surface(
+    let update = update_terrain_selection_with_surface_and_provenance(
         &selector,
         &streaming.source,
         &mut streaming.cache,
@@ -3693,8 +3696,8 @@ fn stream_terrain(
         camera,
         camera_ground,
         config.load_budget_per_frame,
-        &mut |id, dem| {
-            prepared.push(prepare_tile_with_options(
+        &mut |id, dem, provenance| {
+            prepared.push(prepare_tile_with_global_shading(
                 &mut commands,
                 &mut meshes,
                 streaming.material.clone(),
@@ -3703,12 +3706,17 @@ fn stream_terrain(
                 dem,
                 &scenery.terrain_mesh_options(id, dem),
                 color,
+                Some(GlobalTerrainShading {
+                    atlas: &world.global,
+                    provenance,
+                }),
             ));
         },
     );
     for tile in prepared {
         tiles.insert_prepared(tile);
     }
+    metrics.observe_terrain_update(false, Some(&update), &Default::default());
     let progress = apply_stitched_update(
         &mut commands,
         &mut meshes,
@@ -3719,6 +3727,7 @@ fn stream_terrain(
         config.load_budget_per_frame,
         color,
     );
+    metrics.observe_terrain_update(false, None, &progress);
     render_metrics::report_overlay_work(startup.render_stats, progress.overlay_work);
 }
 

@@ -28,3 +28,7 @@ workspace = true
 [[bench]]
 name = "scenery_mesh"
 harness = false
+
+[[bench]]
+name = "terrain_polar_normals"
+harness = false

@@ -382,6 +382,14 @@ pub struct TerrainUpdate {
     pub capacity_limited: bool,
 }
 
+/// Provenance of the exact cached DEM handed to mesh preparation.
+/// Never infer this from a missing directory or from a tile's resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainMeshProvenance {
+    Primary,
+    Fallback,
+}
+
 /// Prepare and select render tiles without changing terrain sampling.
 ///
 /// `frame_budget` independently caps source reads (including failures/misses) and
@@ -450,6 +458,35 @@ pub fn update_terrain_selection_with_surface<S: TileSource>(
     )
 }
 
+/// Preparation callback preserving the successful read's provenance.
+/// The existing wrappers intentionally retain their two-argument callback API.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "streaming context and explicit ground reference"
+)]
+pub fn update_terrain_selection_with_surface_and_provenance<S: TileSource>(
+    selector: &LodSelector,
+    source: &S,
+    cache: &mut TileCache,
+    state: &mut TerrainSelectionState,
+    camera: Ecef,
+    ground_elevation: Meters,
+    frame_budget: usize,
+    mesh_sink: &mut dyn FnMut(TileId, &DemTile, TerrainMeshProvenance),
+) -> TerrainUpdate {
+    let selection = selector.select_with_surface(camera, ground_elevation);
+    state.lod_truncated = selection.truncated;
+    update_selected_tiles_with_provenance(
+        selection.tiles.into_iter().collect(),
+        source,
+        cache,
+        state,
+        camera,
+        frame_budget,
+        mesh_sink,
+    )
+}
+
 fn update_selected_tiles<S: TileSource>(
     wanted: BTreeSet<TileId>,
     source: &S,
@@ -458,6 +495,26 @@ fn update_selected_tiles<S: TileSource>(
     camera: Ecef,
     frame_budget: usize,
     mesh_sink: &mut dyn FnMut(TileId, &DemTile),
+) -> TerrainUpdate {
+    update_selected_tiles_with_provenance(
+        wanted,
+        source,
+        cache,
+        state,
+        camera,
+        frame_budget,
+        &mut |id, dem, _provenance| mesh_sink(id, dem),
+    )
+}
+
+fn update_selected_tiles_with_provenance<S: TileSource>(
+    wanted: BTreeSet<TileId>,
+    source: &S,
+    cache: &mut TileCache,
+    state: &mut TerrainSelectionState,
+    camera: Ecef,
+    frame_budget: usize,
+    mesh_sink: &mut dyn FnMut(TileId, &DemTile, TerrainMeshProvenance),
 ) -> TerrainUpdate {
     let mut active = BTreeSet::new();
     for &leaf in &wanted {
@@ -661,7 +718,7 @@ fn prepare_cached(
     state: &mut TerrainSelectionState,
     camera: Ecef,
     frame_budget: usize,
-    mesh_sink: &mut dyn FnMut(TileId, &DemTile),
+    mesh_sink: &mut dyn FnMut(TileId, &DemTile, TerrainMeshProvenance),
     update: &mut TerrainUpdate,
 ) {
     while update.prepared.len() < frame_budget {
@@ -673,7 +730,12 @@ fn prepare_cached(
             break;
         }
         let tile = cache.get(id).expect("prepared tile has a cached DEM");
-        mesh_sink(id, tile);
+        let provenance = if state.fallback_cache.contains(&id) {
+            TerrainMeshProvenance::Fallback
+        } else {
+            TerrainMeshProvenance::Primary
+        };
+        mesh_sink(id, tile, provenance);
         state.resident.insert(id);
         if state.fallback_cache.contains(&id) {
             state.fallback_resident.insert(id);
@@ -1736,6 +1798,71 @@ mod tests {
             }
         }
         assert!(replaced, "real DEM retry never replaced global fallback");
+    }
+
+    #[test]
+    fn provenance_callback_tracks_same_id_primary_superseding_fallback() {
+        let id = parent();
+        let mut source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        let mut seen = Vec::new();
+        for _ in 0..32 {
+            update_selected_tiles_with_provenance(
+                BTreeSet::from([id]),
+                &source,
+                &mut cache,
+                &mut state,
+                camera(),
+                1,
+                &mut |prepared, _dem, provenance| {
+                    if prepared == id {
+                        seen.push(provenance);
+                    }
+                },
+            );
+        }
+        assert_eq!(seen, vec![TerrainMeshProvenance::Fallback]);
+        assert!(state.fallback_cache.contains(&id));
+        // Source returns the same numerical DEM fixture through its primary
+        // lane. Height matching must never be mistaken for fallback provenance.
+        source.tiles.insert(
+            id,
+            DemTile::new(id.bounds(), HeightGrid::flat(9, 9, Meters(5.0))),
+        );
+        let mut replaced = false;
+        for _ in 0..160 {
+            let update = update_selected_tiles_with_provenance(
+                BTreeSet::from([id]),
+                &source,
+                &mut cache,
+                &mut state,
+                camera(),
+                1,
+                &mut |prepared, _dem, provenance| {
+                    if prepared == id {
+                        seen.push(provenance);
+                    }
+                },
+            );
+            if update.replaced.contains(&id) {
+                replaced = true;
+                break;
+            }
+        }
+        assert!(replaced);
+        assert_eq!(
+            seen,
+            vec![
+                TerrainMeshProvenance::Fallback,
+                TerrainMeshProvenance::Primary
+            ]
+        );
+        assert!(!state.fallback_cache.contains(&id));
+        assert!(!state.fallback_resident.contains(&id));
     }
 
     #[test]
