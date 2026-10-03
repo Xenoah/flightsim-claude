@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 import zlib
 
 
@@ -328,6 +329,180 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 candidate.run_candidate(ROOT, "a" * 40, self.root / "work", self.root / "evidence")
         self.assertFalse((self.root / "work").exists())
 
+    def capture_fixture(self, first="timeout", probe="success"):
+        work, evidence = self.root / "capture-work", self.root / "capture-evidence"
+        evidence.mkdir()
+        app = work / "extracted/swift-candidate/flightsim-app.exe"
+        app.parent.mkdir(parents=True)
+        app.write_bytes(b"MZ synthetic executable, never run")
+        unrelated = work / "unrelated-cwd"
+        unrelated.mkdir()
+        report = self.evidence_report(evidence)
+        report["executable_sha256"] = candidate.digest(app)
+        report["runtime_capture_rust_log"] = candidate.CAPTURE_TRACE
+        calls = []
+        primary = subprocess.TimeoutExpired(candidate.capture_command(app, work / candidate.PNG_NAME), 180)
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs))
+            self.assertEqual(kwargs["cwd"], unrelated)
+            self.assertEqual(kwargs["timeout"], 180)
+            self.assertIs(kwargs["runtime"], True)
+            self.assertEqual(command[0], str(app))
+            outcome = first if len(calls) == 1 else probe
+            if len(calls) > 1:
+                self.assertEqual(len(calls), 2, "probe must never loop")
+                self.assertIs(kwargs["release_parity"], True)
+            else:
+                self.assertNotIn("release_parity", kwargs)
+            if outcome == "timeout":
+                kwargs["output"].write_text("INFO capturing a screenshot\nTRACE still waiting\n", encoding="utf-8")
+                Path(command[2]).write_bytes(b"partial private screenshot")
+                raise primary if len(calls) == 1 else subprocess.TimeoutExpired(command, 180)
+            kwargs["output"].write_text(SWIFT_LOG, encoding="utf-8")
+            if outcome == "success":
+                Path(command[2]).write_bytes(png_bytes())
+            return subprocess.CompletedProcess(command, 0 if outcome == "success" else 2), SWIFT_LOG
+
+        return run, app, unrelated, work, evidence, report, calls, primary
+
+    def seal_report(self, evidence, report):
+        report["evidence_files"] = {
+            p.name: {"bytes": p.stat().st_size, "sha256": candidate.digest(p)}
+            for p in evidence.iterdir() if p.name != "acceptance.json"
+        }
+        candidate.write_json(evidence / "acceptance.json", report)
+
+    def test_successful_probe_cannot_turn_primary_timeout_into_acceptance(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture()
+        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["checks"], {})
+        probe = report["diagnostics"]["release_launcher_probe"]
+        self.assertEqual(probe["status"], "passed")
+        self.assertFalse(probe["qualifies_acceptance"])
+        self.assertFalse((evidence / candidate.PNG_NAME).exists())
+        self.assertTrue((evidence / candidate.PROBE_PNG_NAME).exists())
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+        report["checks"]["default_swift"] = {"status": "passed", "exit_code": 0}
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "cannot replace or pass primary timeout"):
+            candidate.validate_evidence(evidence)
+
+    def test_probe_timeout_is_single_and_partial_images_never_enter_evidence(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="timeout")
+        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(report["diagnostics"]["release_launcher_probe"]["status"], "timed_out")
+        self.assertFalse(any((evidence / name).exists() for name in candidate.PNG_EVIDENCE))
+        self.assertTrue((work / candidate.PROBE_PNG_NAME).exists())
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+
+    def test_primary_success_or_non_timeout_failure_never_launches_probe(self):
+        run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="success")
+        candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("diagnostics", report)
+        self.assertIn("default_swift", report["checks"])
+        # A fresh isolated fixture is needed because outputs are never replaced.
+        self.root = self.root / "next"
+        self.root.mkdir()
+        run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="failure")
+        with self.assertRaisesRegex(ValueError, "did not exit 0"):
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("diagnostics", report)
+
+    def test_diagnostic_preparation_error_cannot_replace_original_timeout(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture()
+        original_digest = candidate.digest
+
+        def fail_probe_preparation(path):
+            if path.name == "default-swift.log":
+                raise OSError("injected diagnostic hash read failure")
+            return original_digest(path)
+
+        with patch.object(candidate, "digest", side_effect=fail_probe_preparation):
+            with self.assertRaises(subprocess.TimeoutExpired) as failed:
+                candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(report["checks"], {})
+        self.assertIn("hash read failure", report["diagnostics"]["release_launcher_probe"]["failure"])
+
+    def test_nonzero_probe_is_failed_diagnostics_and_never_primary_success(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure")
+        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.assertEqual(len(calls), 2)
+        probe = report["diagnostics"]["release_launcher_probe"]
+        self.assertEqual((probe["status"], probe["exit_code"]), ("failed", 2))
+        self.assertEqual(report["checks"], {})
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+
+    def test_diagnostic_png_requires_own_valid_proof_and_unchanged_log(self):
+        run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+        probe = report["diagnostics"]["release_launcher_probe"]
+        probe["rust_log"] = "info"
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "identity/launch differs"):
+            candidate.validate_evidence(evidence)
+        probe["rust_log"] = candidate.CAPTURE_TRACE
+        probe["status"] = "failed"
+        probe["failure"] = "injected failure"
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "unproven diagnostic image"):
+            candidate.validate_evidence(evidence)
+        probe["status"] = "passed"
+        (evidence / candidate.PROBE_LOG_NAME).write_text(SWIFT_LOG + "ERROR capture failed", encoding="utf-8")
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "diagnostic log changed"):
+            candidate.validate_evidence(evidence)
+        probe["log_sha256"] = candidate.digest(evidence / candidate.PROBE_LOG_NAME)
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "runtime logged"):
+            candidate.validate_evidence(evidence)
+        (evidence / candidate.PROBE_LOG_NAME).write_text(SWIFT_LOG, encoding="utf-8")
+        probe["log_sha256"] = candidate.digest(evidence / candidate.PROBE_LOG_NAME)
+        (evidence / candidate.PROBE_PNG_NAME).write_bytes(png_bytes() + b"hidden bytes")
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "trailing bytes"):
+            candidate.validate_evidence(evidence)
+
+    def test_optional_probe_files_without_original_timeout_are_rejected(self):
+        evidence = self.root / "evidence"
+        evidence.mkdir()
+        (evidence / candidate.PROBE_PNG_NAME).write_bytes(png_bytes())
+        self.evidence_report(evidence)
+        with self.assertRaisesRegex(ValueError, "lack a timeout/probe record"):
+            candidate.validate_evidence(evidence)
+
+    def test_release_parity_requests_only_one_time_console_and_show_flags(self):
+        with patch.object(candidate.subprocess, "STARTUPINFO", SimpleNamespace, create=True), \
+                patch.object(candidate.subprocess, "STARTF_USESHOWWINDOW", 1, create=True), \
+                patch.object(candidate.subprocess, "CREATE_NEW_CONSOLE", 16, create=True):
+            options = candidate.release_parity_startup()
+        self.assertEqual(options["creationflags"], 16)
+        self.assertEqual(vars(options["startupinfo"]), {"dwFlags": 1, "wShowWindow": 1})
+        self.assertEqual(candidate.BASELINE_LAUNCH, {"creationflags": 0, "startupinfo": None})
+
 
 class CandidateWorkflowTests(unittest.TestCase):
     def test_workflow_is_exact_successful_main_ci_diagnostics_only(self):
@@ -345,7 +520,7 @@ class CandidateWorkflowTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         block = text.split("          path: |\n", 1)[1].split("          if-no-files-found:", 1)[0]
         names = {line.strip().rsplit("/", 1)[1] for line in block.splitlines() if line.strip()}
-        self.assertEqual(names, candidate.TEXT_EVIDENCE | {candidate.PNG_NAME})
+        self.assertEqual(names, candidate.TEXT_EVIDENCE | candidate.PNG_EVIDENCE)
         self.assertNotIn("*", block)
         self.assertIn("steps.evidence.outputs.validated == 'true'", text)
         self.assertNotIn("release.yml", text)

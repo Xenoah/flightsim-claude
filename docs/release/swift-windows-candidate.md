@@ -119,9 +119,48 @@ startup-negative/metadata handshakes 30 seconds. There is deliberately no Cargo
 or Actions cache, because cached compiled output could also distribute a blocked
 binary. Runtime/GPU checks are never inferred from the Python boundary tests.
 
+### Bounded screenshot diagnostics
+
+Windowed screenshot launches retain the original Python startup behavior and
+180-second deadline. Existing rendering/task-pool tracing is enabled through
+the following exact `RUST_LOG` selectors, recorded with the run:
+
+```text
+info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,wgpu_core::command::transfer=trace,wgpu_hal::dx12=debug,bevy_app::task_pool_plugin=trace
+```
+
+Only a timeout of the default Swift capture triggers **one** fresh diagnostic
+process. It uses the same extracted executable, scene, WARP settings, unrelated
+working directory, asset-isolation environment, trace selectors and 180-second
+limit. The only launch-setting difference is `CREATE_NEW_CONSOLE` plus
+`STARTF_USESHOWWINDOW`/`SW_SHOWNORMAL`, matching the console/show requests in
+the release's PowerShell `Start-Process` path. Python pipe redirection remains
+in use; this is not complete harness equivalence. Requested flags, actual
+executable SHA-256 and the probe result are recorded separately.
+
+This tests a launcher hypothesis, not an established cause of a missing capture
+callback. Continued CPU world updates do not prove swapchain rendering. Process
+order, driver/shader/filesystem cache warm-up, trace overhead and CPU scheduling
+can confound a comparison. There is no timeout increase, offscreen replacement,
+repeated focus operation, rendering change or task-pool change.
+
+The original timeout remains the engineering failure even if the diagnostic
+process saves a valid image. The diagnostic cannot populate any of the four
+required checks; remaining acceptance stops after the failed primary capture.
+Primary success and failures other than timeout do not run the probe. The
+optional `diagnostic-release-launch.log` retains its complete sanitized output.
+Only successful model/path/fit, exit-zero, unchanged-executable and full PNG
+validation can expose `diagnostic-release-launch.png`, with its own digest and
+proof. A partial/unproven image remains in the private work directory.
+
+### Evidence export
+
 Only explicit filenames from a separate evidence directory can be uploaded:
 acceptance/source-input/dependency-inventory/readiness JSON, sanitized command
-and four runtime logs, and `default-swift.png`. Every allowed file gets a size
+and four runtime logs, `default-swift.png`, and the optional diagnostic log/image
+pair above. Complete runtime logs appear once in their own files; `commands.log`
+records the command, exit status and log reference/hash without duplicating
+verbose trace output. Every allowed file gets a size
 and SHA-256 in the report; the report excludes its own digest. Text must be
 bounded UTF-8 without NUL bytes. The PNG requires signature, chunk CRCs, bounded
 dimensions, complete decoded rows and terminal IEND without trailing data or

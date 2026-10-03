@@ -84,5 +84,7 @@ jobs:
             ${{ runner.temp }}/swift-windows-evidence/default-rejects-legacy.log
             ${{ runner.temp }}/swift-windows-evidence/legacy-no-model.log
             ${{ runner.temp }}/swift-windows-evidence/default-swift.png
+            ${{ runner.temp }}/swift-windows-evidence/diagnostic-release-launch.log
+            ${{ runner.temp }}/swift-windows-evidence/diagnostic-release-launch.png
           if-no-files-found: error
           retention-days: 7

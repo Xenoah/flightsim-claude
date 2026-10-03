@@ -38,12 +38,22 @@ LEGACY_SOURCE_HASHES = {
     "crates/flightsim-sim/src/replay.rs": "0b783ceed247b984729021ae57c74b061936d627c04275a850e59079266a18c1",
     "crates/flightsim-app/src/aircraft_profile.rs": "59c6deb0db1822178b30a0ba4e2fcbcac9e2177e1f0f0851f54c74510f3c6da0",
 }
-TEXT_EVIDENCE = {
+REQUIRED_TEXT_EVIDENCE = {
     "acceptance.json", "source-inputs.json", "dependency-inventory.json",
     "commercial-readiness.json", "commands.log", "default-swift.log",
     "absent-light-single.log", "default-rejects-legacy.log", "legacy-no-model.log",
 }
 PNG_NAME = "default-swift.png"
+PROBE_LOG_NAME = "diagnostic-release-launch.log"
+PROBE_PNG_NAME = "diagnostic-release-launch.png"
+TEXT_EVIDENCE = REQUIRED_TEXT_EVIDENCE | {PROBE_LOG_NAME}
+PNG_EVIDENCE = {PNG_NAME, PROBE_PNG_NAME}
+CAPTURE_TRACE = ("info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,"
+                 "wgpu_core::command::transfer=trace,wgpu_hal::dx12=debug,"
+                 "bevy_app::task_pool_plugin=trace")
+# These are process-start requests, not recurring window/focus operations.
+BASELINE_LAUNCH = {"creationflags": 0, "startupinfo": None}
+RELEASE_PARITY_LAUNCH = {"creationflags": 0x10, "startupinfo": {"dwFlags": 0x1, "wShowWindow": 1}}
 SWIFT_MODEL_LOG = "aircraft model: <private-work>/extracted/swift-candidate/assets/aircraft/swift_sport.glb"
 MAX_EVIDENCE_BYTES = 32 * 1024 * 1024
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -254,11 +264,122 @@ def legacy_identity(path):
     return {"format_version": version, "name": name, "fingerprint": f"{observed:016x}", "sha256": digest(path)}
 
 
+def capture_command(executable, screenshot):
+    return [str(executable), "--screenshot", str(screenshot), "--screenshot-delay", "5",
+            "--exit-after-screenshot", "--view", "chase"]
+
+
+def release_parity_startup():
+    """Match Start-Process' console/show requests, keeping Python pipe handling."""
+    startup = subprocess.STARTUPINFO()
+    startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
+    startup.wShowWindow = 1  # SW_SHOWNORMAL
+    return {"creationflags": subprocess.CREATE_NEW_CONSOLE, "startupinfo": startup}
+
+
+def check_default_capture(run, repo, app, unrelated, work, evidence, report):
+    """One required attempt; timeout alone permits one non-qualifying comparison."""
+    require(digest(app) == report["executable_sha256"], "executable changed before primary capture")
+    screenshot = work / PNG_NAME
+    command = capture_command(app, screenshot)
+    try:
+        result, log = run(command, cwd=unrelated, timeout=180, runtime=True,
+                          output=evidence / "default-swift.log")
+    except subprocess.TimeoutExpired as primary:
+        primary_message = sanitize(str(primary), repo, work)
+        report["primary_capture_failure"] = {
+            "kind": "timeout", "message": primary_message, "timeout_seconds": 180,
+            "command": [sanitize(arg, repo, work) for arg in command],
+            "launch": BASELINE_LAUNCH,
+        }
+        probe_command = capture_command(app, work / PROBE_PNG_NAME)
+        probe = {
+            "status": "failed", "attempts": 1, "qualifies_acceptance": False,
+            "timeout_seconds": 180, "command": [sanitize(arg, repo, work) for arg in probe_command],
+            "working_directory": sanitize(str(unrelated), repo, work),
+            "launch": RELEASE_PARITY_LAUNCH, "rust_log": CAPTURE_TRACE,
+        }
+        report["diagnostics"] = {"release_launcher_probe": probe}
+        try:
+            report["primary_capture_failure"]["log_sha256"] = digest(evidence / "default-swift.log")
+            probe["executable_sha256"] = digest(app)
+            require(probe["executable_sha256"] == report["executable_sha256"], "executable changed before diagnostic probe")
+            result, log = run(probe_command, cwd=unrelated, timeout=180, runtime=True,
+                              accepted=None, output=evidence / PROBE_LOG_NAME, release_parity=True)
+            probe["exit_code"] = result.returncode
+            validate_smoke(log, result.returncode, model=True)
+            png = validate_png(work / PROBE_PNG_NAME)
+            require(digest(app) == probe["executable_sha256"], "executable changed during diagnostic probe")
+            probe["executable_sha256_after"] = digest(app)
+            probe["png"] = png
+            # Private/evidence directories share the runner volume. Rename a
+            # fully validated image atomically; partial copies never appear.
+            require(not (evidence / PROBE_PNG_NAME).exists(), "diagnostic image destination already exists")
+            (work / PROBE_PNG_NAME).rename(evidence / PROBE_PNG_NAME)
+            probe["status"] = "passed"
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zlib.error) as error:
+            probe["status"] = "timed_out" if isinstance(error, subprocess.TimeoutExpired) else "failed"
+            probe["failure"] = sanitize(str(error), repo, work)
+        finally:
+            try:
+                if (evidence / PROBE_LOG_NAME).is_file():
+                    probe["log_sha256"] = digest(evidence / PROBE_LOG_NAME)
+            except OSError as error:
+                probe["failure"] = sanitize(str(error), repo, work)
+                probe["status"] = "failed"
+        # Never replace this failure, enter required checks, or continue the
+        # acceptance run on the strength of a successful diagnostic image.
+        raise primary from None
+    validate_smoke(log, result.returncode, model=True)
+    png = validate_png(screenshot)
+    report["checks"]["default_swift"] = {"status": "passed", "exit_code": result.returncode,
+                                           "png": png, "log_sha256": digest(evidence / "default-swift.log")}
+    shutil.copyfile(screenshot, evidence / PNG_NAME)
+
+
+def validate_probe_evidence(directory, report):
+    diagnostics = report.get("diagnostics")
+    has_pair = any((directory / name).exists() for name in (PROBE_LOG_NAME, PROBE_PNG_NAME))
+    if diagnostics is None:
+        require(not has_pair, "diagnostic files lack a timeout/probe record")
+        return
+    require(isinstance(diagnostics, dict) and set(diagnostics) == {"release_launcher_probe"}, "unexpected diagnostic record")
+    require(isinstance(report.get("executable_sha256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", report["executable_sha256"]), "diagnostic binary digest is missing")
+    primary = report.get("primary_capture_failure", {})
+    require(report["status"] == "failed" and primary.get("kind") == "timeout"
+            and primary.get("timeout_seconds") == 180 and report.get("failure") == primary.get("message")
+            and not report["checks"] and not (directory / PNG_NAME).exists(),
+            "diagnostic probe cannot replace or pass primary timeout")
+    expected_exe = "<private-work>/extracted/swift-candidate/flightsim-app.exe"
+    require(primary.get("command") == capture_command(expected_exe, "<private-work>/" + PNG_NAME)
+            and primary.get("launch") == BASELINE_LAUNCH, "primary launch changed")
+    require(digest(directory / "default-swift.log") == primary.get("log_sha256"), "primary timeout log changed")
+    probe = diagnostics["release_launcher_probe"]
+    require(probe.get("attempts") == 1 and probe.get("qualifies_acceptance") is False
+            and probe.get("timeout_seconds") == 180 and probe.get("launch") == RELEASE_PARITY_LAUNCH
+            and probe.get("working_directory") == "<private-work>/unrelated-cwd"
+            and probe.get("command") == capture_command(expected_exe, "<private-work>/" + PROBE_PNG_NAME)
+            and probe.get("rust_log") == CAPTURE_TRACE
+            and probe.get("executable_sha256") == report.get("executable_sha256"), "diagnostic probe identity/launch differs")
+    if (directory / PROBE_LOG_NAME).exists():
+        require(digest(directory / PROBE_LOG_NAME) == probe.get("log_sha256"), "diagnostic log changed")
+    if probe.get("status") == "passed":
+        require(probe.get("exit_code") == 0 and probe.get("executable_sha256_after") == probe["executable_sha256"],
+                "diagnostic probe lacks exit/binary proof")
+        require(validate_png(directory / PROBE_PNG_NAME) == probe.get("png"), "diagnostic PNG does not match proof")
+        validate_smoke((directory / PROBE_LOG_NAME).read_text(encoding="utf-8"), 0, model=True)
+    else:
+        require(probe.get("status") in ("failed", "timed_out") and isinstance(probe.get("failure"), str)
+                and probe["failure"] and not (directory / PROBE_PNG_NAME).exists(),
+                "unproven diagnostic image cannot be uploaded")
+
+
 def validate_evidence(directory):
     require(directory.is_dir() and not directory.is_symlink(), "missing evidence directory")
     for path in directory.iterdir():
         require(path.is_file() and not path.is_symlink(), "evidence must contain only regular files")
-        require(path.name in TEXT_EVIDENCE | {PNG_NAME}, f"unapproved evidence path: {path.name}")
+        require(path.name in TEXT_EVIDENCE | PNG_EVIDENCE, f"unapproved evidence path: {path.name}")
         require(path.stat().st_size <= MAX_EVIDENCE_BYTES, "evidence exceeds size bound")
         if path.name in TEXT_EVIDENCE:
             data = path.read_bytes()
@@ -281,7 +402,7 @@ def validate_evidence(directory):
                 "invalid acceptance check state")
     if report.get("status") == "engineering_checks_passed":
         require(set(checks) == set(expected_checks), "successful report lacks required checks")
-        require((directory / PNG_NAME).exists() and all((directory / name).is_file() for name in TEXT_EVIDENCE),
+        require((directory / PNG_NAME).exists() and all((directory / name).is_file() for name in REQUIRED_TEXT_EVIDENCE),
                 "successful report lacks required evidence")
         require(report.get("legacy_replay", {}).get("fingerprint") == LEGACY_FINGERPRINT,
                 "successful report lacks frozen legacy fingerprint")
@@ -302,6 +423,7 @@ def validate_evidence(directory):
         log = (directory / "default-swift.log").read_text(encoding="utf-8")
         require(digest(directory / "default-swift.log") == proof.get("log_sha256"), "Swift log changed")
         validate_smoke(log, proof["exit_code"], model=True)
+    validate_probe_evidence(directory, report)
 
 
 def run_candidate(repo, expected, work, evidence):
@@ -319,22 +441,25 @@ def run_candidate(repo, expected, work, evidence):
                   "Bundled AgX/Filmic LUTs remain enabled and retain unresolved review records",
                   "Software D3D12 fallback is not physical GPU/controller/audio or Steam qualification",
                   "Legacy check proves original identity and replay startup, not whole-flight/cross-version reproduction"],
-              "commands": candidate_commands()}
+              "commands": candidate_commands(), "runtime_capture_rust_log": CAPTURE_TRACE}
     env = os.environ.copy()
     for name in ("CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS"):
         env.pop(name, None)
     env.update(CARGO_TARGET_DIR=str(work / "target"), RUSTFLAGS="-D warnings", CARGO_TERM_COLOR="never")
     report["compiler_flags"] = {"RUSTFLAGS": env["RUSTFLAGS"], "CARGO_TARGET_DIR": "<private-work>/target"}
 
-    def run(command, *, cwd=repo, timeout=3600, accepted=(0,), output=None, runtime=False):
+    def run(command, *, cwd=repo, timeout=3600, accepted=(0,), output=None, runtime=False, release_parity=False):
         run_env = env.copy()
         if runtime:
             run_env.update(WGPU_BACKEND="dx12", WGPU_FORCE_FALLBACK_ADAPTER="1",
                            BEVY_ASSET_ROOT=str(repo), CARGO_MANIFEST_DIR=str(repo))
+            if "--screenshot" in command:
+                run_env["RUST_LOG"] = CAPTURE_TRACE
+        launch = release_parity_startup() if release_parity else {}
         timed_out = None
         try:
             result = subprocess.run([str(x) for x in command], cwd=cwd, env=run_env,
-                                    capture_output=True, timeout=timeout)
+                                    capture_output=True, timeout=timeout, **launch)
         except subprocess.TimeoutExpired as error:
             # subprocess.run kills and waits for its process. Keep the captured
             # diagnostic bytes, but no partial screenshot enters evidence.
@@ -348,11 +473,13 @@ def run_candidate(repo, expected, work, evidence):
         with (evidence / "commands.log").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps([str(x).replace(str(work), "<private-work>").replace(str(repo), "<source>") for x in command]) + "\n")
             stream.write(f"exit_code={result.returncode}\n")
-            if "metadata" not in command:
+            if output:
+                stream.write(f"log={output.name} sha256={digest(output)}\n")
+            elif "metadata" not in command:
                 stream.write(log.replace(str(work), "<private-work>").replace(str(repo), "<source>") + "\n")
         if timed_out is not None:
             raise timed_out
-        require(result.returncode in accepted, f"command failed with {result.returncode}: {command[0]}")
+        require(accepted is None or result.returncode in accepted, f"command failed with {result.returncode}: {command[0]}")
         return result, log
 
     try:
@@ -414,16 +541,7 @@ def run_candidate(repo, expected, work, evidence):
         info = json.loads(first.stdout)
         require(info == json.loads((bundle / "distribution-info.json").read_text(encoding="utf-8")), "extracted distribution identity changed")
         report["distribution"] = info
-        screenshot = work / PNG_NAME
-        result, log = run([app, "--screenshot", screenshot, "--screenshot-delay", "5", "--exit-after-screenshot",
-                           "--view", "chase"], cwd=unrelated, timeout=180, runtime=True,
-                          output=evidence / "default-swift.log")
-        validate_smoke(log, result.returncode, model=True)
-        png = validate_png(screenshot)
-        report["checks"]["default_swift"] = {"status": "passed", "exit_code": result.returncode,
-                                               "png": png, "log_sha256": digest(evidence / "default-swift.log")}
-        # Publishable evidence appears only after all Swift image prerequisites pass.
-        shutil.copyfile(screenshot, evidence / PNG_NAME)
+        check_default_capture(run, repo, app, unrelated, work, evidence, report)
         result, log = run([app, "--aircraft", "light-single"], cwd=unrelated, timeout=30, accepted=(2,),
                           runtime=True, output=evidence / "absent-light-single.log")
         require("selected aircraft model is missing: aircraft/light_single.glb" in log, "wrong absent-model failure")
