@@ -94,6 +94,23 @@ pub(super) fn record(
     }
 }
 
+/// Emit once from the terrain update itself so idle/modal frames cannot repeat
+/// a stale counter snapshot. These are CPU asset-submission counts, not GPU
+/// upload completion or wall-time measurements. Disabled by default.
+pub(super) fn report_overlay_work(enabled: bool, work: flightsim_render::TerrainOverlayFrameWork) {
+    if !enabled || (work.copy_attempts == 0 && work.upload_attempts == 0) {
+        return;
+    }
+    info!(
+        "terrain overlay frame work: {} copy attempts, {} copied vertices, {} upload attempts, {} uploaded meshes, {} uploaded vertices; CPU asset submissions, not GPU timestamps",
+        work.copy_attempts,
+        work.copied_vertices,
+        work.upload_attempts,
+        work.uploaded_meshes,
+        work.uploaded_vertices,
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -51,6 +51,9 @@ pub struct TerrainTiles {
 impl TerrainTiles {
     /// Register an immutable airport footprint for exact, atomic terrain draping.
     /// The entity and handle must already belong to this scene and be unique.
+    /// Successful commits switch its Mesh3d handle and retire the original
+    /// asset. Generated assets have ownership-only children: despawn the root
+    /// including its children; removing the cached original handle is harmless.
     ///
     /// # Errors
     /// Registration exceeds the scene bound or duplicates an existing target.
@@ -65,6 +68,9 @@ impl TerrainTiles {
 
     /// Stop managing one overlay before its owner despawns/removes its assets.
     /// Any in-flight result is cancelled; the next cut uses the updated registry.
+    /// Generated mesh assets are reclaimed by root despawn (including children)
+    /// or the next terrain advance. Reusing the root requires updating Mesh3d;
+    /// its old generated handle is no longer managed as a displayed overlay.
     pub fn unregister_overlay(&mut self, entity: Entity) -> bool {
         self.overlays.unregister(entity)
     }
@@ -169,12 +175,15 @@ impl TerrainTiles {
     }
 
     /// Remove every asset owned by this terrain scene, including old same-ID
-    /// meshes and pending/visible bridges. The caller despawns returned entities
-    /// and removes returned mesh handles; useful for an explicit new flight.
+    /// meshes, pending/visible bridges and unpublished generated-overlay
+    /// ownership children of still-registered roots. Caller-owned overlay roots
+    /// and their committed generated assets remain intact. The caller despawns
+    /// returned entities and removes returned handles; useful for a new flight.
     pub fn drain_all(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
         self.overlays.reset();
         let mut assets: Vec<_> = self.entities.drain().map(|(_, asset)| asset).collect();
         assets.extend(self.stitching.drain_all());
+        assets.extend(self.overlays.drain_cancelled_uploads());
         assets
     }
 

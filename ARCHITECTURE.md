@@ -195,6 +195,14 @@ preparation share the existing mesh budget; a pending bridge transaction pauses
 selection and preserves the old displayed cut until surfaces and bridges can
 commit together. Same-ID source replacement preserves the old entity until that
 commit. New-flight reset drains pending, visible and retired terrain assets.
+Exact ground overlays stage replacement mesh assets across updates under the
+same remaining mesh-attempt allowance; old overlay handles and the old cut stay
+visible until one atomic handle/visibility commit. Uploads target 65,536 actual
+vertices per update, allowing one indivisible first mesh up to the existing
+524,288-vertex cap. Generated assets use ownership-only children so original
+scene-owner handles remain sufficient for cleanup. Cancellation and retired
+meshes are reclaimed synchronously; these are work/residency bounds, not latency
+or total-process-memory guarantees ([overlay upload QA](docs/qa/terrain-overlay-upload-budget-2026-10-03.md)).
 The selector retains its 8,192-ID bound; one transition may additionally retain
 one frame's outgoing surface batch (at most 8,192), and at most two bridge sets
 of 4×8,192 meshes each. Compact boundaries and logical geometry bytes are

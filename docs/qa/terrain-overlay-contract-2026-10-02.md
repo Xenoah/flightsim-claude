@@ -99,8 +99,12 @@ precision remain separate acceptance limits.
 ## Ownership and dynamic scenery
 
 `TerrainTiles::register_overlay` manages an essential mesh already owned by the
-caller. New entities should start hidden. Draping replaces `Mesh` contents under
-the original handle; it does not create a second scenery/airport handle.
+caller. New entities should start hidden. As of the bounded upload continuation
+([upload QA](terrain-overlay-upload-budget-2026-10-03.md)), draping stages new
+Mesh assets across updates, then atomically switches the root Mesh3d handle.
+The renderer retires the original asset on first successful commit and owns
+generated assets through non-rendered children. Caller cleanup may continue to
+remove its cached original handle and despawn the root including its children.
 
 `replace_optional_overlays` admits a complete hidden scenery cohort and returns
 `TerrainOverlaySwap { revision, retired }`. Rejection leaves the old registry
@@ -113,10 +117,13 @@ On explicit relocation/reset, call `clear_optional_overlays` first. It cancels
 pending work and returns both staged-new and retained-old optional targets for
 caller cleanup exactly once. Essential airport registrations are retained.
 `unregister_overlay` also handles retained optional targets and must precede an
-individual caller-owned despawn. `TerrainTiles::drain_all` owns only terrain,
-retired terrain and seam assets: it cancels overlay work but does not return or
-despawn caller-owned airport/scenery meshes. Avoid duplicate cleanup against the
-caller's own ground-mesh lists. Solid scenery remains outside this API.
+individual caller-owned despawn. `TerrainTiles::drain_all` returns terrain,
+retired terrain, seams and unpublished generated-overlay ownership children of
+still-registered roots. It cancels overlay work but never returns caller-owned
+airport/scenery roots or their committed generated meshes. Optional clear/root
+despawn and the next terrain advance reclaim removed roots' generated assets.
+Avoid duplicate cleanup against the caller's ground-root lists. Solid scenery
+remains outside this API.
 
 ## Verification scope
 

@@ -143,7 +143,14 @@ fn positions(fixture: &Fixture) -> Vec<[f32; 3]> {
         .app
         .world()
         .resource::<Assets<Mesh>>()
-        .get(&fixture.mesh)
+        .get(
+            &fixture
+                .app
+                .world()
+                .get::<Mesh3d>(fixture.overlay)
+                .unwrap()
+                .0,
+        )
         .unwrap()
         .attribute(Mesh::ATTRIBUTE_POSITION)
         .unwrap()
@@ -558,4 +565,246 @@ fn optional_swap_commits_before_owner_retires_old_assets() {
         fixture.app.world().get::<Visibility>(entity),
         Some(&Visibility::Inherited)
     );
+}
+
+#[test]
+fn staged_uploads_share_one_attempt_budget_and_switch_all_visible_handles_together() {
+    let mut fixture = fixture();
+    let (second, _) = register_extra(&mut fixture);
+    let (third, _) = register_extra(&mut fixture);
+    enqueue(&mut fixture, 10.0, false);
+    finish(&mut fixture);
+    let entities = [fixture.overlay, second, third];
+    let before: Vec<_> = entities
+        .iter()
+        .map(|&entity| fixture.app.world().get::<Mesh3d>(entity).unwrap().0.clone())
+        .collect();
+    let terrain_before = visible_entities(&mut fixture);
+    let baseline = fixture.app.world().resource::<Assets<Mesh>>().len();
+    enqueue(&mut fixture, 90.0, true);
+    let mut observed_partial = 0;
+    let mut uploads = 0;
+    for _ in 0..2000 {
+        fixture.app.update();
+        let progress = fixture.app.world().resource::<Script>().progress;
+        assert!(progress.prepared <= 1);
+        assert!(progress.overlay_work.upload_attempts + progress.overlay_work.copy_attempts <= 1);
+        assert!(
+            progress.overlay_work.uploaded_vertices
+                <= flightsim_render::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES
+        );
+        uploads += progress.overlay_work.uploaded_meshes;
+        if !fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .is_stitching()
+        {
+            break;
+        }
+        for (&entity, original) in entities.iter().zip(&before) {
+            assert_eq!(
+                &fixture.app.world().get::<Mesh3d>(entity).unwrap().0,
+                original
+            );
+            assert_eq!(
+                fixture.app.world().get::<Visibility>(entity),
+                Some(&Visibility::Inherited)
+            );
+        }
+        assert_eq!(visible_entities(&mut fixture), terrain_before);
+        if progress.overlay_work.uploaded_meshes != 0 {
+            observed_partial += 1;
+            fixture.app.world_mut().resource_mut::<Script>().budget = 0;
+            fixture.app.update();
+            assert_eq!(
+                fixture
+                    .app
+                    .world()
+                    .resource::<Script>()
+                    .progress
+                    .overlay_work
+                    .uploaded_meshes,
+                0
+            );
+            fixture.app.world_mut().resource_mut::<Script>().budget = 1;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert_eq!(observed_partial, 2);
+    assert_eq!(uploads, 3);
+    assert!(
+        !fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .is_stitching()
+    );
+    for (&entity, original) in entities.iter().zip(&before) {
+        assert_ne!(
+            &fixture.app.world().get::<Mesh3d>(entity).unwrap().0,
+            original
+        );
+        assert!(
+            fixture
+                .app
+                .world()
+                .resource::<Assets<Mesh>>()
+                .get(original)
+                .is_none()
+        );
+    }
+    assert_eq!(
+        fixture.app.world().resource::<Assets<Mesh>>().len(),
+        baseline
+    );
+}
+
+#[test]
+fn unregister_despawn_reclaims_committed_and_staged_generated_assets() {
+    let mut fixture = fixture();
+    let (other, _) = register_extra(&mut fixture);
+    enqueue(&mut fixture, 10.0, false);
+    finish(&mut fixture);
+    let committed = fixture
+        .app
+        .world()
+        .get::<Mesh3d>(fixture.overlay)
+        .unwrap()
+        .0
+        .clone();
+    enqueue(&mut fixture, 90.0, true);
+    for _ in 0..2000 {
+        fixture.app.update();
+        if fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .overlay_usage()
+            .uploaded_meshes
+            == 1
+        {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(
+        fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .is_stitching()
+    );
+    let pending_count = fixture.app.world().resource::<Assets<Mesh>>().len();
+    assert!(
+        fixture
+            .app
+            .world_mut()
+            .resource_mut::<TerrainTiles>()
+            .unregister_overlay(fixture.overlay)
+    );
+    fixture
+        .app
+        .world_mut()
+        .entity_mut(fixture.overlay)
+        .despawn();
+    fixture
+        .app
+        .world_mut()
+        .resource_mut::<Assets<Mesh>>()
+        .remove(&fixture.mesh);
+    assert!(
+        fixture
+            .app
+            .world()
+            .resource::<Assets<Mesh>>()
+            .get(&committed)
+            .is_none()
+    );
+    assert_eq!(
+        fixture.app.world().resource::<Assets<Mesh>>().len(),
+        pending_count - 2,
+        "root despawn releases old and unpublished generated meshes; original was retired at commit"
+    );
+    finish(&mut fixture);
+    assert_eq!(
+        fixture.app.world().get::<Visibility>(other),
+        Some(&Visibility::Inherited)
+    );
+    assert_eq!(
+        fixture.app.world().resource::<Assets<Mesh>>().len(),
+        2,
+        "only other generated overlay and one terrain surface remain"
+    );
+}
+
+#[test]
+fn optional_clear_then_terrain_reset_reclaims_mixed_pending_children_once() {
+    let mut fixture = fixture();
+    let optional: Vec<_> = (0..2)
+        .map(|_| optional_registration(&mut fixture))
+        .collect();
+    fixture
+        .app
+        .world_mut()
+        .resource_mut::<TerrainTiles>()
+        .replace_optional_overlays(optional)
+        .unwrap();
+    enqueue(&mut fixture, 10.0, false);
+    finish(&mut fixture);
+    enqueue(&mut fixture, 90.0, true);
+    for _ in 0..2000 {
+        fixture.app.update();
+        if fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .overlay_usage()
+            .uploaded_meshes
+            == 2
+        {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert_eq!(
+        fixture
+            .app
+            .world()
+            .resource::<TerrainTiles>()
+            .overlay_usage()
+            .uploaded_meshes,
+        2
+    );
+    let removed = fixture
+        .app
+        .world_mut()
+        .resource_mut::<TerrainTiles>()
+        .clear_optional_overlays();
+    for (entity, mesh) in removed {
+        fixture.app.world_mut().entity_mut(entity).despawn();
+        fixture
+            .app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .remove(&mesh);
+    }
+    let drained = fixture
+        .app
+        .world_mut()
+        .resource_mut::<TerrainTiles>()
+        .drain_all();
+    for (entity, mesh) in drained {
+        // A returned child must still exist: clear already despawned optional roots.
+        fixture.app.world_mut().entity_mut(entity).despawn();
+        fixture
+            .app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .remove(&mesh);
+    }
+    assert_eq!(fixture.app.world().resource::<Assets<Mesh>>().len(), 1);
+    enqueue(&mut fixture, 20.0, false);
+    finish(&mut fixture);
+    assert_eq!(fixture.app.world().resource::<Assets<Mesh>>().len(), 2);
 }

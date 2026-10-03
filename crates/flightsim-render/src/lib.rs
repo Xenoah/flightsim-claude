@@ -49,7 +49,7 @@
     reason = "Bevy の system は Res<T> / Query<T> を値で受け取るのが必須のイディオム。参照に変えると system として登録できない"
 )]
 
-use bevy::{pbr::Material, prelude::*};
+use bevy::{light::CascadeShadowConfigBuilder, pbr::Material, prelude::*};
 use flightsim_core::{Ecef, Geodetic, Meters, RenderFrame};
 use flightsim_world::{MeshOptions, TerrainMesh};
 
@@ -72,7 +72,10 @@ pub mod terrain;
 pub mod terrain_detail;
 pub mod terrain_drape;
 mod terrain_overlays;
-pub use terrain_overlays::{TerrainOverlayRegistration, TerrainOverlaySwap, TerrainOverlayUsage};
+pub use terrain_overlays::{
+    OVERLAY_COPY_VERTICES_PER_FRAME, OVERLAY_UPLOAD_VERTEX_TARGET, TerrainOverlayFrameWork,
+    TerrainOverlayRegistration, TerrainOverlaySwap, TerrainOverlayUsage,
+};
 mod terrain_selection;
 pub mod terrain_stitching;
 pub mod weather;
@@ -312,6 +315,12 @@ pub fn sun_light_direction(sun: SunDirection) -> Vec3 {
 ///
 /// 影を落とすのは 1 つだけにすること。平行光源ごとにカスケードシャドウマップを
 /// 持つので、増やすと素直に重くなる。
+///
+/// Shadows cover a fixed local 2 km of camera-forward depth. Bevy's 150 m
+/// default loses most ground receivers even in low flight. Keep its four native
+/// cascades, 10 m first split, 20% overlap, resolution and biases: the aircraft's
+/// closest cascade is unchanged, while farther maps trade detail for reach.
+/// This is not horizon-wide coverage or a contact-shadow/bias correction.
 #[must_use]
 pub fn sun_light_bundle(lighting: &SunLighting, sun: SunDirection) -> impl Bundle {
     (
@@ -321,6 +330,11 @@ pub fn sun_light_bundle(lighting: &SunLighting, sun: SunDirection) -> impl Bundl
             shadows_enabled: true,
             ..default()
         },
+        CascadeShadowConfigBuilder {
+            maximum_distance: 2_000.0,
+            ..default()
+        }
+        .build(),
         Transform::default().looking_to(sun_light_direction(sun), Vec3::Y),
         Name::new("sun"),
     )

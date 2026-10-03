@@ -3671,7 +3671,7 @@ fn stream_terrain(
     // Preserve the old visible cut until every bridge for the next cut is ready.
     // Pausing selection makes the complete existing mesh budget available here.
     if tiles.is_stitching() {
-        advance_stitched_update(
+        let progress = advance_stitched_update(
             &mut commands,
             &mut meshes,
             &mut tiles,
@@ -3680,6 +3680,7 @@ fn stream_terrain(
             config.load_budget_per_frame,
             color,
         );
+        render_metrics::report_overlay_work(startup.render_stats, progress.overlay_work);
         return;
     }
     let mut prepared = Vec::new();
@@ -3708,7 +3709,7 @@ fn stream_terrain(
     for tile in prepared {
         tiles.insert_prepared(tile);
     }
-    apply_stitched_update(
+    let progress = apply_stitched_update(
         &mut commands,
         &mut meshes,
         &mut tiles,
@@ -3718,6 +3719,7 @@ fn stream_terrain(
         config.load_budget_per_frame,
         color,
     );
+    render_metrics::report_overlay_work(startup.render_stats, progress.overlay_work);
 }
 
 /// 読み込みが終わったモデルの倍率を決める。

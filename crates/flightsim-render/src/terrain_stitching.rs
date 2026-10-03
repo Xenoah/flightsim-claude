@@ -39,6 +39,8 @@ pub struct StitchProgress {
     pub resident: usize,
     /// Airport overlay copies/jobs pending for this same atomic cut.
     pub overlays_pending: bool,
+    /// Actual overlay snapshot/upload work charged this update.
+    pub overlay_work: crate::TerrainOverlayFrameWork,
 }
 
 /// Logical geometry owned by the stitched path, including pending/retired
@@ -237,6 +239,7 @@ impl TerrainStitching {
         StitchProgress {
             planning_work,
             overlays_pending: false,
+            overlay_work: crate::TerrainOverlayFrameWork::default(),
             planning_pending: self
                 .pending
                 .as_ref()
@@ -349,6 +352,7 @@ pub fn advance_stitched_update<M: Material>(
     mesh_budget: usize,
     color: Option<&dyn Fn(Geodetic, Radians) -> [f32; 4]>,
 ) -> StitchProgress {
+    tiles.overlays.begin_frame(commands, meshes);
     let mut state = std::mem::take(&mut tiles.stitching);
     let mut prepared_count = 0;
     let mut planning_work = 0;
@@ -501,9 +505,10 @@ pub fn advance_stitched_update<M: Material>(
             tiles.overlays.begin(sources);
             pending.overlays_started = true;
         }
-        let (ready, copied) = tiles
-            .overlays
-            .advance(meshes, mesh_budget.saturating_sub(prepared_count));
+        let (ready, copied) =
+            tiles
+                .overlays
+                .advance(commands, meshes, mesh_budget.saturating_sub(prepared_count));
         overlays_ready = ready;
         prepared_count += copied;
     }
@@ -534,6 +539,7 @@ pub fn advance_stitched_update<M: Material>(
     tiles.overlays.apply_precision(commands, frame);
     let mut progress = state.progress(prepared_count, planning_work);
     progress.overlays_pending = tiles.overlays.has_preparation();
+    progress.overlay_work = tiles.overlays.usage().frame_work;
     tiles.stitching = state;
     progress
 }

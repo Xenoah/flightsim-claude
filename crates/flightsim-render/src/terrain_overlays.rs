@@ -5,6 +5,7 @@
 use crate::terrain_drape::{
     DrapeError, DrapeTerrain, DrapedOverlay, OverlayPrecision, TerrainOverlay,
 };
+use bevy::ecs::{lifecycle::HookContext, world::DeferredWorld};
 use bevy::mesh::VertexAttributeValues;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
@@ -22,10 +23,18 @@ pub const MAX_OPTIONAL_SOURCE_TRIANGLES: usize = 40_000;
 pub const MAX_OVERLAY_TERRAIN_TILES: usize = 512;
 pub const MAX_OVERLAY_TERRAIN_VERTICES: usize = 262_144;
 pub const OVERLAY_TILE_COPIES_PER_FRAME: usize = 2;
+/// Normal aggregate upload target. One indivisible mesh may exceed this only
+/// as the first upload of an update, up to MAX_OVERLAY_OUTPUT_VERTICES.
+pub const OVERLAY_UPLOAD_VERTEX_TARGET: usize = 65_536;
+/// Snapshot copies have their own actual-vertex cap, including bridges.
+pub const OVERLAY_COPY_VERTICES_PER_FRAME: usize = MAX_OVERLAY_TERRAIN_VERTICES;
 const MAX_DISCOVERY_SOURCES: usize = 5 * 8_192;
 
 /// A staged, initially hidden ground mesh. Its owner keeps its material and
-/// world-position components; the terrain transaction replaces only mesh data.
+/// world-position components; the terrain transaction atomically switches its
+/// Mesh3d handle and retires the original asset at its first successful commit.
+/// The caller may retain/remove that original handle and despawns the root
+/// normally (including its generated-asset ownership children).
 #[derive(Debug)]
 pub struct TerrainOverlayRegistration {
     pub entity: Entity,
@@ -77,6 +86,44 @@ struct PreparedOverlays {
     outputs: Vec<Option<DrapedOverlay>>,
     errors: [Option<DrapeError>; 2],
 }
+/// An ownership-only child, never a second rendered surface. Despawning the
+/// caller-owned root also releases pending/current generated mesh assets, even
+/// if the caller resets the scene before the next terrain advance.
+#[derive(Component)]
+#[component(on_remove = release_owned_mesh)]
+struct OwnedOverlayMesh(Handle<Mesh>);
+
+fn release_owned_mesh(mut world: DeferredWorld, context: HookContext) {
+    let id = world
+        .get::<OwnedOverlayMesh>(context.entity)
+        .unwrap()
+        .0
+        .id();
+    if let Some(mut meshes) = world.get_resource_mut::<Assets<Mesh>>() {
+        meshes.remove(id);
+    }
+}
+
+#[derive(Debug)]
+struct UploadedOverlay {
+    owner: Entity,
+    target: Entity,
+    mesh: Handle<Mesh>,
+    precision: OverlayPrecision,
+    vertices: usize,
+}
+
+/// Actual work submitted by one terrain update. Attempts include rejected
+/// snapshot sources and upload targets; polling/atomic visibility do not count.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct TerrainOverlayFrameWork {
+    pub copy_attempts: usize,
+    pub copied_vertices: usize,
+    pub upload_attempts: usize,
+    pub uploaded_meshes: usize,
+    pub uploaded_vertices: usize,
+}
+
 type DrapeResult = Result<PreparedOverlays, DrapeError>;
 #[derive(Debug)]
 struct Preparation {
@@ -92,6 +139,8 @@ struct Preparation {
     optional_disabled: bool,
     task: Option<Task<DrapeResult>>,
     result: Option<DrapeResult>,
+    next_upload: usize,
+    uploaded: Vec<Option<UploadedOverlay>>,
     cancelled: Arc<AtomicBool>,
 }
 impl Drop for Preparation {
@@ -110,6 +159,10 @@ pub struct TerrainOverlayUsage {
     pub pending: bool,
     pub copied_tiles: usize,
     pub copied_vertices: usize,
+    /// Most recent update's actual work, separate from cumulative preparation.
+    pub frame_work: TerrainOverlayFrameWork,
+    pub uploaded_meshes: usize,
+    pub uploaded_vertices: usize,
     pub rejected_transactions: u64,
     pub dirty: bool,
     pub revision: u64,
@@ -140,6 +193,12 @@ pub(crate) struct TerrainOverlays {
     retired_optional: Vec<RegisteredOverlay>,
     optional_swap_pending: bool,
     omitted_optional: BTreeSet<Entity>,
+    visible_uploads: BTreeMap<Entity, UploadedOverlay>,
+    cancelled_uploads: Vec<UploadedOverlay>,
+    // Owners may already have despawned these roots. Release with try_despawn
+    // during advance, never return their potentially stale child IDs to drain.
+    retiring_uploads: Vec<UploadedOverlay>,
+    frame_work: TerrainOverlayFrameWork,
 }
 
 impl TerrainOverlays {
@@ -210,6 +269,18 @@ impl TerrainOverlays {
             .iter()
             .map(|overlay| overlay.mesh.id())
             .collect();
+        meshes.extend(
+            self.visible_uploads
+                .values()
+                .chain(&self.cancelled_uploads)
+                .chain(&self.retiring_uploads)
+                .chain(
+                    self.preparation
+                        .iter()
+                        .flat_map(|prep| prep.uploaded.iter().flatten()),
+                )
+                .map(|upload| upload.mesh.id()),
+        );
         for addition in additions {
             if !entities.insert(addition.entity)
                 || !meshes.insert(addition.mesh.id())
@@ -278,12 +349,38 @@ impl TerrainOverlays {
         } else {
             return false;
         }
+        self.retire_target_uploads(entity);
         self.omitted_optional.remove(&entity);
         self.displayed.remove(&entity);
         self.output_precision.remove(&entity);
         self.precision_hidden.remove(&entity);
         self.reset();
         true
+    }
+
+    fn retire_target_uploads(&mut self, entity: Entity) {
+        if let Some(upload) = self.visible_uploads.remove(&entity) {
+            self.retiring_uploads.push(upload);
+        }
+        let mut index = 0;
+        while index < self.cancelled_uploads.len() {
+            if self.cancelled_uploads[index].target == entity {
+                self.retiring_uploads
+                    .push(self.cancelled_uploads.swap_remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        if let Some(prep) = &mut self.preparation {
+            for output in &mut prep.uploaded {
+                if output
+                    .as_ref()
+                    .is_some_and(|upload| upload.target == entity)
+                {
+                    self.retiring_uploads.push(output.take().unwrap());
+                }
+            }
+        }
     }
 
     pub(crate) fn clear_optional(&mut self) -> Vec<(Entity, Handle<Mesh>)> {
@@ -300,6 +397,7 @@ impl TerrainOverlays {
         let result = removed
             .into_iter()
             .map(|overlay| {
+                self.retire_target_uploads(overlay.entity);
                 self.displayed.remove(&overlay.entity);
                 self.output_precision.remove(&overlay.entity);
                 self.precision_hidden.remove(&overlay.entity);
@@ -351,6 +449,18 @@ impl TerrainOverlays {
                 .preparation
                 .as_ref()
                 .map_or(0, |prep| prep.copied_vertices),
+            frame_work: self.frame_work,
+            uploaded_meshes: self
+                .preparation
+                .as_ref()
+                .map_or(0, |prep| prep.uploaded.iter().flatten().count()),
+            uploaded_vertices: self.preparation.as_ref().map_or(0, |prep| {
+                prep.uploaded
+                    .iter()
+                    .flatten()
+                    .map(|upload| upload.vertices)
+                    .sum()
+            }),
             rejected_transactions: self.rejected_transactions,
             dirty: self.is_dirty(),
             revision: self.revision,
@@ -373,6 +483,7 @@ impl TerrainOverlays {
     }
 
     pub(crate) fn begin(&mut self, sources: Vec<OverlayTerrainSource>) {
+        self.cancel_preparation();
         let cancelled = Arc::new(AtomicBool::new(false));
         let templates: Vec<_> = self
             .registered
@@ -431,17 +542,39 @@ impl TerrainOverlays {
             } else {
                 None
             },
+            next_upload: 0,
+            uploaded: Vec::new(),
             cancelled,
         });
     }
 
-    /// Returns readiness and copies charged against the existing mesh budget.
-    pub(crate) fn advance(&mut self, meshes: &Assets<Mesh>, budget: usize) -> (bool, usize) {
+    /// Begin one update even when bridge work consumes all available attempts.
+    pub(crate) fn begin_frame(&mut self, commands: &mut Commands, meshes: &mut Assets<Mesh>) {
+        self.frame_work = TerrainOverlayFrameWork::default();
+        for upload in self
+            .cancelled_uploads
+            .drain(..)
+            .chain(self.retiring_uploads.drain(..))
+        {
+            release_upload(commands, meshes, upload);
+        }
+    }
+
+    /// Returns readiness and attempts charged against the shared mesh budget.
+    pub(crate) fn advance(
+        &mut self,
+        commands: &mut Commands,
+        meshes: &mut Assets<Mesh>,
+        budget: usize,
+    ) -> (bool, usize) {
         let Some(prep) = &mut self.preparation else {
             return (true, 0);
         };
+        if prep.revision != self.revision || prep.cancelled.load(Ordering::Relaxed) {
+            return (false, 0);
+        }
         if prep.result.is_some() {
-            return (true, 0);
+            return self.upload(commands, meshes, budget);
         }
         if let Some(discovery) = &mut prep.discovery {
             let Some(result) = block_on(poll_once(discovery)) else {
@@ -484,13 +617,24 @@ impl TerrainOverlays {
                 prep.result = Some(result);
                 prep.task = None;
             }
-            return (prep.result.is_some(), 0);
+            // Upload on a subsequent update so polling never admits an entire
+            // completed job outside the remaining mesh/vertex allowance.
+            return (false, 0);
         }
         let mut copied = 0;
         for _ in 0..budget.min(OVERLAY_TILE_COPIES_PER_FRAME) {
             let Some(source) = prep.sources.get(prep.next_source) else {
                 break;
             };
+            if source.surface_vertices
+                > OVERLAY_COPY_VERTICES_PER_FRAME.saturating_sub(self.frame_work.copied_vertices)
+                && copied != 0
+            {
+                break;
+            }
+            // A failed attempt is still charged, including missing mesh data.
+            copied += 1;
+            self.frame_work.copy_attempts += 1;
             match copy_terrain(meshes, source, prep.copied_vertices) {
                 Ok(terrain) => {
                     prep.precision.push(PrecisionSource {
@@ -504,6 +648,7 @@ impl TerrainOverlays {
                     });
                     prep.required_tiles += usize::from(source.required);
                     prep.copied_vertices += terrain.positions.len();
+                    self.frame_work.copied_vertices += terrain.positions.len();
                     prep.terrain.push(terrain);
                 }
                 Err(error) if source.required => {
@@ -517,7 +662,6 @@ impl TerrainOverlays {
                 }
             }
             prep.next_source += 1;
-            copied += 1;
         }
         if prep.next_source == prep.sources.len() {
             let sources: Vec<_> = self
@@ -542,6 +686,63 @@ impl TerrainOverlays {
         (false, copied)
     }
 
+    fn upload(
+        &mut self,
+        commands: &mut Commands,
+        meshes: &mut Assets<Mesh>,
+        budget: usize,
+    ) -> (bool, usize) {
+        let prep = self.preparation.as_mut().expect("pending preparation");
+        let Some(Ok(result)) = &mut prep.result else {
+            return (true, 0);
+        };
+        if result.reuse {
+            return (true, 0);
+        }
+        if prep.uploaded.is_empty() {
+            prep.uploaded.resize_with(result.outputs.len(), || None);
+        }
+        let mut attempts = 0;
+        while prep.next_upload < result.outputs.len() {
+            let index = prep.next_upload;
+            let Some(output) = result.outputs[index].as_ref() else {
+                prep.next_upload += 1;
+                continue;
+            };
+            let vertices = output.mesh.count_vertices();
+            if attempts == budget
+                || (self.frame_work.uploaded_meshes != 0
+                    && vertices
+                        > OVERLAY_UPLOAD_VERTEX_TARGET
+                            .saturating_sub(self.frame_work.uploaded_vertices))
+            {
+                break;
+            }
+            attempts += 1;
+            self.frame_work.upload_attempts += 1;
+            assert!(vertices <= crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES);
+            let output = result.outputs[index].take().unwrap();
+            let mesh = meshes.add(output.mesh);
+            let owner = commands
+                .spawn((
+                    OwnedOverlayMesh(mesh.clone()),
+                    ChildOf(self.registered[index].entity),
+                ))
+                .id();
+            prep.uploaded[index] = Some(UploadedOverlay {
+                owner,
+                target: self.registered[index].entity,
+                mesh,
+                precision: output.precision,
+                vertices,
+            });
+            self.frame_work.uploaded_meshes += 1;
+            self.frame_work.uploaded_vertices += vertices;
+            prep.next_upload += 1;
+        }
+        (prep.next_upload == result.outputs.len(), attempts)
+    }
+
     pub(crate) fn commit(&mut self, commands: &mut Commands, meshes: &mut Assets<Mesh>) {
         let Some(mut prep) = self.preparation.take() else {
             return;
@@ -559,6 +760,12 @@ impl TerrainOverlays {
         if result.as_ref().is_ok_and(|result| result.reuse) {
             return;
         }
+        for overlay in &self.retired_optional {
+            commands.entity(overlay.entity).insert(Visibility::Hidden);
+        }
+        for (_, upload) in std::mem::take(&mut self.visible_uploads) {
+            release_upload(commands, meshes, upload);
+        }
         self.retired_optional.clear();
         self.optional_swap_pending = false;
         self.committed_precision = std::mem::take(&mut prep.precision);
@@ -568,8 +775,13 @@ impl TerrainOverlays {
         self.omitted_optional.clear();
         match result {
             Ok(result) => {
-                let omitted: usize = result
-                    .outputs
+                assert_eq!(
+                    prep.next_upload,
+                    result.outputs.len(),
+                    "commit only after all uploads"
+                );
+                let omitted: usize = prep
+                    .uploaded
                     .iter()
                     .flatten()
                     .map(|output| output.precision.omitted_support_facets)
@@ -595,7 +807,7 @@ impl TerrainOverlays {
                             let omitted = self
                                 .registered
                                 .iter()
-                                .zip(&result.outputs)
+                                .zip(&prep.uploaded)
                                 .filter(|(overlay, output)| overlay.optional && output.is_none())
                                 .count();
                             warn!(
@@ -605,17 +817,24 @@ impl TerrainOverlays {
                         }
                     }
                 }
-                for (overlay, output) in self.registered.iter().zip(result.outputs) {
+                for (overlay, output) in self
+                    .registered
+                    .iter()
+                    .zip(std::mem::take(&mut prep.uploaded))
+                {
                     if let Some(output) = output {
-                        if let Some(mesh) = meshes.get_mut(&overlay.mesh) {
-                            *mesh = output.mesh;
-                            self.output_precision
-                                .insert(overlay.entity, output.precision);
-                            self.displayed.insert(overlay.entity);
-                            commands
-                                .entity(overlay.entity)
-                                .insert(Visibility::Inherited);
-                        }
+                        // The immutable template already captured authored
+                        // geometry. Keeping its source Mesh would duplicate
+                        // every displayed cohort indefinitely. Owner cleanup
+                        // may still remove this original handle harmlessly.
+                        meshes.remove(&overlay.mesh);
+                        self.output_precision
+                            .insert(overlay.entity, output.precision.clone());
+                        self.displayed.insert(overlay.entity);
+                        commands
+                            .entity(overlay.entity)
+                            .insert((Mesh3d(output.mesh.clone()), Visibility::Inherited));
+                        self.visible_uploads.insert(overlay.entity, output);
                     } else {
                         if overlay.optional {
                             self.omitted_optional.insert(overlay.entity);
@@ -693,14 +912,40 @@ impl TerrainOverlays {
         }
     }
 
+    fn cancel_preparation(&mut self) {
+        if let Some(mut prep) = self.preparation.take() {
+            prep.cancelled.store(true, Ordering::Relaxed);
+            self.cancelled_uploads
+                .extend(std::mem::take(&mut prep.uploaded).into_iter().flatten());
+            drop(prep);
+        }
+    }
+
+    /// The terrain reset caller can synchronously release all unpublished GPU
+    /// assets without removing the still registered/visible airport roots.
+    pub(crate) fn drain_cancelled_uploads(
+        &mut self,
+    ) -> impl Iterator<Item = (Entity, Handle<Mesh>)> + '_ {
+        self.cancelled_uploads
+            .drain(..)
+            .map(|upload| (upload.owner, upload.mesh))
+    }
+
     pub(crate) fn reset(&mut self) {
-        self.preparation = None;
+        self.cancel_preparation();
         self.committed_signature = None;
         self.revision = self
             .revision
             .checked_add(1)
             .expect("overlay generation exhausted");
     }
+}
+
+fn release_upload(commands: &mut Commands, meshes: &mut Assets<Mesh>, upload: UploadedOverlay) {
+    if let Some(mesh) = meshes.remove(&upload.mesh) {
+        drop(mesh);
+    }
+    commands.entity(upload.owner).try_despawn();
 }
 
 /// Bound both actual GPU affine evaluations relative to the canonical f64
@@ -851,14 +1096,18 @@ fn copy_terrain(
     if source.surface_vertices > positions.len() {
         return Err(DrapeError::InvalidMesh);
     }
+    if indices.len() > 6 * MAX_OVERLAY_TERRAIN_VERTICES || indices.len() % 3 != 0 {
+        return Err(DrapeError::TerrainLimit);
+    }
     let mut surface_indices = Vec::new();
-    let indices: Vec<_> = indices.iter().collect();
-    for triangle in indices.chunks_exact(3) {
+    let mut indices = indices.iter();
+    while let (Some(a), Some(b), Some(c)) = (indices.next(), indices.next(), indices.next()) {
+        let triangle = [a, b, c];
         if triangle
             .iter()
             .all(|&index| index < source.surface_vertices)
         {
-            for &index in triangle {
+            for index in triangle {
                 surface_indices.push(u32::try_from(index).map_err(|_| DrapeError::InvalidMesh)?);
             }
         }
@@ -1017,9 +1266,321 @@ mod tests {
             optional_disabled: false,
             task: None,
             result: Some(Ok(result)),
+            next_upload: 0,
+            uploaded: Vec::new(),
             cancelled: Arc::clone(&cancelled),
         });
         cancelled
+    }
+
+    fn upload_ready(registry: &mut TerrainOverlays, world: &mut World, meshes: &mut Assets<Mesh>) {
+        for _ in 0..MAX_TERRAIN_OVERLAYS {
+            registry.begin_frame(&mut world.commands(), meshes);
+            let (ready, attempts) = registry.advance(&mut world.commands(), meshes, 1);
+            assert!(attempts <= 1);
+            world.flush();
+            if ready {
+                return;
+            }
+        }
+        panic!("bounded uploads did not finish");
+    }
+
+    fn sized_outputs(sizes: &[usize]) -> PreparedOverlays {
+        PreparedOverlays {
+            reuse: false,
+            outputs: sizes
+                .iter()
+                .map(|&vertices| {
+                    Some(DrapedOverlay {
+                        mesh: Mesh::new(
+                            bevy::mesh::PrimitiveTopology::TriangleList,
+                            bevy::asset::RenderAssetUsages::default(),
+                        )
+                        .with_inserted_attribute(
+                            Mesh::ATTRIBUTE_POSITION,
+                            vec![[0.0, 0.0, 0.0]; vertices],
+                        ),
+                        precision: OverlayPrecision {
+                            terrain_sources: Vec::new(),
+                            support_cosine: 1.0,
+                            output_extent: 1.0,
+                            authored_displacement: Meters::ZERO,
+                            omitted_support_facets: 0,
+                        },
+                    })
+                })
+                .collect(),
+            errors: [None; 2],
+        }
+    }
+
+    type UploadFixture = (
+        TerrainOverlays,
+        World,
+        Assets<Mesh>,
+        Vec<(Entity, Handle<Mesh>)>,
+    );
+
+    fn upload_fixture(count: usize) -> UploadFixture {
+        let mut registry = TerrainOverlays::default();
+        let mut world = World::new();
+        let mut meshes = Assets::default();
+        let mut originals = Vec::new();
+        for _ in 0..count {
+            let item = registration(&mut world, &mut meshes);
+            world
+                .entity_mut(item.entity)
+                .insert((Mesh3d(item.mesh.clone()), Visibility::Inherited));
+            originals.push((item.entity, item.mesh.clone()));
+            registry
+                .register(item.entity, item.mesh, item.source)
+                .unwrap();
+        }
+        (registry, world, meshes, originals)
+    }
+
+    #[test]
+    fn upload_attempt_and_actual_vertex_boundaries_are_independent() {
+        for (sizes, budget, expected, ready) in [
+            (vec![32_768, 32_768], 2, 65_536, true),
+            (vec![65_536, 1], 2, 65_536, false),
+            (vec![65_537, 1], 2, 65_537, false),
+            (
+                vec![crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES, 1],
+                2,
+                crate::terrain_drape::MAX_OVERLAY_OUTPUT_VERTICES,
+                false,
+            ),
+            (vec![3, 3], 1, 3, false),
+            (vec![3, 3], 0, 0, false),
+        ] {
+            let (mut registry, mut world, mut meshes, originals) = upload_fixture(sizes.len());
+            let baseline = meshes.len();
+            queue_result(&mut registry, sized_outputs(&sizes));
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            let (actual_ready, attempts) =
+                registry.advance(&mut world.commands(), &mut meshes, budget);
+            world.flush();
+            let usage = registry.usage();
+            assert_eq!(actual_ready, ready);
+            assert!(attempts <= budget);
+            assert_eq!(attempts, usage.frame_work.upload_attempts);
+            assert_eq!(usage.frame_work.uploaded_vertices, expected);
+            assert_eq!(meshes.len(), baseline + usage.frame_work.uploaded_meshes);
+            for (entity, original) in originals {
+                assert_eq!(
+                    world.get::<Mesh3d>(entity).unwrap().0,
+                    original,
+                    "upload cannot change the displayed handle"
+                );
+                assert_eq!(
+                    world.get::<Visibility>(entity),
+                    Some(&Visibility::Inherited)
+                );
+            }
+            if !ready && budget != 0 {
+                registry.begin_frame(&mut world.commands(), &mut meshes);
+                assert!(
+                    registry.advance(&mut world.commands(), &mut meshes, 2).0,
+                    "an indivisible maximum output must not starve later meshes"
+                );
+                world.flush();
+            }
+        }
+    }
+
+    #[test]
+    fn reset_reclaims_every_partial_upload_including_ready_to_commit() {
+        for staged in 0..=3 {
+            let (mut registry, mut world, mut meshes, originals) = upload_fixture(3);
+            let baseline = meshes.len();
+            let cancelled = queue_result(&mut registry, sized_outputs(&[3, 3, 3]));
+            for _ in 0..staged {
+                registry.begin_frame(&mut world.commands(), &mut meshes);
+                assert_eq!(registry.advance(&mut world.commands(), &mut meshes, 1).1, 1);
+                world.flush();
+            }
+            assert_eq!(meshes.len(), baseline + staged);
+            registry.reset();
+            assert!(cancelled.load(Ordering::Relaxed));
+            registry.commit(&mut world.commands(), &mut meshes);
+            for (entity, mesh) in registry.drain_cancelled_uploads() {
+                world.entity_mut(entity).despawn();
+                meshes.remove(&mesh);
+            }
+            world.flush();
+            assert_eq!(meshes.len(), baseline);
+            for (entity, original) in originals {
+                assert_eq!(world.get::<Mesh3d>(entity).unwrap().0, original);
+                assert_eq!(
+                    world.get::<Visibility>(entity),
+                    Some(&Visibility::Inherited)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cancel_and_restart_before_commands_flush_leaves_only_new_ownership() {
+        let (mut registry, mut world, mut meshes, originals) = upload_fixture(1);
+        let baseline = meshes.len();
+        queue_result(&mut registry, sized_outputs(&[3]));
+        registry.begin_frame(&mut world.commands(), &mut meshes);
+        assert!(registry.advance(&mut world.commands(), &mut meshes, 1).0);
+        registry.reset();
+        queue_result(&mut registry, sized_outputs(&[6]));
+        registry.begin_frame(&mut world.commands(), &mut meshes);
+        assert!(registry.advance(&mut world.commands(), &mut meshes, 1).0);
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        assert_eq!(meshes.len(), baseline);
+        let root = originals[0].0;
+        assert_eq!(world.get::<Children>(root).unwrap().len(), 1);
+        assert_eq!(
+            meshes
+                .get(&world.get::<Mesh3d>(root).unwrap().0)
+                .unwrap()
+                .count_vertices(),
+            6
+        );
+    }
+
+    #[test]
+    fn generated_mesh_handles_cannot_be_admitted_as_another_owned_source() {
+        let (mut registry, mut world, mut meshes, originals) = upload_fixture(1);
+        queue_result(&mut registry, sized_outputs(&[3]));
+        upload_ready(&mut registry, &mut world, &mut meshes);
+        registry.commit(&mut world.commands(), &mut meshes);
+        world.flush();
+        let generated = world.get::<Mesh3d>(originals[0].0).unwrap().0.clone();
+        let item = registration(&mut world, &mut meshes);
+        assert_eq!(
+            registry.register(item.entity, generated, item.source),
+            Err(DrapeError::InvalidMesh)
+        );
+        assert_eq!(registry.usage().registered, 1);
+    }
+
+    #[test]
+    fn repeated_cancel_and_retained_root_replacement_reclaim_generated_assets() {
+        let (mut registry, mut world, mut meshes, originals) = upload_fixture(1);
+        let baseline = meshes.len();
+        let (root, mut original) = originals[0].clone();
+        let authored = meshes.get(&original).unwrap().clone();
+        let source = (*registry.registered[0].source).clone();
+        for _ in 0..16 {
+            queue_result(
+                &mut registry,
+                sized_outputs(&[OVERLAY_UPLOAD_VERTEX_TARGET]),
+            );
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            assert!(registry.advance(&mut world.commands(), &mut meshes, 1).0);
+            world.flush();
+            registry.reset();
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            world.flush();
+            assert_eq!(meshes.len(), baseline);
+            queue_result(&mut registry, sized_outputs(&[3]));
+            upload_ready(&mut registry, &mut world, &mut meshes);
+            registry.commit(&mut world.commands(), &mut meshes);
+            world.flush();
+            assert_eq!(meshes.len(), baseline);
+            assert_eq!(world.get::<Children>(root).unwrap().len(), 1);
+            assert!(registry.unregister(root));
+            original = meshes.add(authored.clone());
+            world.entity_mut(root).insert(Mesh3d(original.clone()));
+            registry
+                .register(root, original.clone(), source.clone())
+                .unwrap();
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            world.flush();
+            assert_eq!(
+                meshes.len(),
+                baseline,
+                "retaining the root must not retain orphaned generated meshes"
+            );
+            assert!(
+                world
+                    .get::<Children>(root)
+                    .is_none_or(|children| children.is_empty())
+            );
+        }
+    }
+
+    #[test]
+    fn snapshot_actual_vertex_cap_charges_rejected_excess_on_next_frame() {
+        let (mut registry, mut world, mut meshes, _) = upload_fixture(1);
+        queue_result(&mut registry, sized_outputs(&[3]));
+        let origin = registry.registered[0].source.origin;
+        let id = TileId::containing(13, origin.to_geodetic());
+        let prep = registry.preparation.as_mut().unwrap();
+        prep.result = None;
+        for vertices in [MAX_OVERLAY_TERRAIN_VERTICES, 1] {
+            let mesh = meshes.add(
+                Mesh::new(
+                    bevy::mesh::PrimitiveTopology::TriangleList,
+                    bevy::asset::RenderAssetUsages::default(),
+                )
+                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.0, 0.0, 0.0]; vertices])
+                .with_inserted_indices(bevy::mesh::Indices::U32(Vec::new())),
+            );
+            prep.sources.push(OverlayTerrainSource {
+                key: OverlaySourceKey::Tile(id, 1),
+                footprint: [id, id],
+                required: true,
+                origin,
+                surface_vertices: vertices,
+                mesh,
+            });
+        }
+        registry.begin_frame(&mut world.commands(), &mut meshes);
+        assert_eq!(
+            registry.advance(&mut world.commands(), &mut meshes, 2),
+            (false, 1)
+        );
+        assert_eq!(
+            registry.usage().frame_work.copied_vertices,
+            MAX_OVERLAY_TERRAIN_VERTICES
+        );
+        registry.begin_frame(&mut world.commands(), &mut meshes);
+        assert_eq!(
+            registry.advance(&mut world.commands(), &mut meshes, 2),
+            (true, 1)
+        );
+        assert_eq!(registry.usage().frame_work.copied_vertices, 0);
+        assert_eq!(registry.usage().frame_work.copy_attempts, 1);
+        assert!(matches!(
+            registry.preparation.as_ref().unwrap().result,
+            Some(Err(DrapeError::TerrainLimit))
+        ));
+    }
+
+    #[test]
+    fn failed_snapshot_attempts_are_charged_including_optional_sources() {
+        for required in [false, true] {
+            let (mut registry, mut world, mut meshes, _) = upload_fixture(1);
+            queue_result(&mut registry, sized_outputs(&[3]));
+            let prep = registry.preparation.as_mut().unwrap();
+            prep.result = None;
+            let id = TileId::containing(13, registry.registered[0].source.origin.to_geodetic());
+            prep.sources.push(OverlayTerrainSource {
+                key: OverlaySourceKey::Tile(id, 1),
+                footprint: [id, id],
+                required,
+                origin: registry.registered[0].source.origin,
+                surface_vertices: 3,
+                mesh: Handle::default(),
+            });
+            registry.begin_frame(&mut world.commands(), &mut meshes);
+            // Optional rejection starts a worker after exhausting source copies.
+            bevy::tasks::AsyncComputeTaskPool::get_or_init(bevy::tasks::TaskPool::new);
+            let (_, attempts) = registry.advance(&mut world.commands(), &mut meshes, 1);
+            assert_eq!(attempts, 1);
+            assert_eq!(registry.usage().frame_work.copy_attempts, 1);
+            assert_eq!(registry.usage().frame_work.copied_vertices, 0);
+            registry.reset();
+        }
     }
 
     #[test]
@@ -1213,6 +1774,7 @@ mod tests {
             0,
         );
         queue_result(&mut registry, partial);
+        upload_ready(&mut registry, &mut world, &mut meshes);
         registry.commit(&mut world.commands(), &mut meshes);
         world.flush();
         assert_eq!(registry.usage().omitted_optional, 1);
@@ -1236,6 +1798,7 @@ mod tests {
                 errors: [None; 2],
             },
         );
+        upload_ready(&mut registry, &mut world, &mut meshes);
         registry.commit(&mut world.commands(), &mut meshes);
         world.flush();
         assert_eq!(
@@ -1253,6 +1816,7 @@ mod tests {
         );
         let complete = prepare_overlays(&sources, &terrain, 1, &AtomicBool::new(false), false);
         queue_result(&mut registry, complete);
+        upload_ready(&mut registry, &mut world, &mut meshes);
         registry.commit(&mut world.commands(), &mut meshes);
         world.flush();
         assert_eq!(registry.usage().omitted_optional, 0);
@@ -1271,6 +1835,7 @@ mod tests {
             0,
         );
         queue_result(&mut registry, next);
+        upload_ready(&mut registry, &mut world, &mut meshes);
         registry.commit(&mut world.commands(), &mut meshes);
         world.flush();
         assert_eq!(registry.usage().omitted_optional, 2);
@@ -1279,6 +1844,7 @@ mod tests {
         let removed = registry.clear_optional();
         assert_eq!(removed.len(), 2);
         assert!(cancelled.load(Ordering::Relaxed));
+        upload_ready(&mut registry, &mut world, &mut meshes);
         registry.commit(&mut world.commands(), &mut meshes);
         world.flush();
         assert_eq!(registry.usage().omitted_optional, 0);
