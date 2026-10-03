@@ -286,7 +286,7 @@ pub(super) fn flight_controls_active(capture: Res<MapCapture>) -> bool {
     !capture.captured
 }
 
-fn capture_map_input(map: Res<WorldMapState>, mut capture: ResMut<MapCapture>) {
+pub(super) fn capture_map_input(map: Res<WorldMapState>, mut capture: ResMut<MapCapture>) {
     capture.captured = map.visible || capture.previously_visible;
     capture.previously_visible = map.visible;
 }

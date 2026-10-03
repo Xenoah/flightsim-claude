@@ -58,6 +58,7 @@ pub mod apron;
 pub mod biome;
 pub mod cockpit;
 pub mod daylight;
+pub mod graphics_quality;
 pub mod holding_position;
 pub mod model;
 pub mod runway;
@@ -184,7 +185,8 @@ pub struct FlightsimRenderPlugin;
 
 impl Plugin for FlightsimRenderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CameraWorldPosition>()
+        app.add_plugins(graphics_quality::GraphicsQualityPlugin)
+            .init_resource::<CameraWorldPosition>()
             .init_resource::<SunDirection>()
             .init_resource::<TimeOfDay>()
             .init_resource::<SunLighting>()

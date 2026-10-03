@@ -454,6 +454,7 @@ mod tests {
             on_ground,
             terrain_available: true,
             view_mode: "CHASE",
+            graphics_quality: "LIGHT",
             wind_from: Radians(0.0),
             wind_speed: MetersPerSecond(0.0),
             log: crate::FlightSummary::default(),

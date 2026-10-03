@@ -107,3 +107,13 @@ The control principles are consistent with the FAA Airplane Flying Handbook:
 [Chapter 5, stall prevention and recovery](https://www.faa.gov/sites/faa.gov/files/regulations_policies/handbooks_manuals/aviation/airplane_handbook/06_afh_ch5.pdf),
 and [Chapter 6, takeoffs and departure climbs](https://www.faa.gov/sites/faa.gov/files/regulations_policies/handbooks_manuals/aviation/airplane_handbook/07_afh_ch6.pdf).
 Those sources inform the general explanation, not the game's numerical targets.
+
+
+## Graphics while flying
+
+**F4** cycles LIGHT → HIGH → ULTRA. **Shift+F4** immediately selects LIGHT,
+including while paused. The default LIGHT keeps the existing visuals; the higher
+tiers improve sky lighting, atmosphere sampling and shadows on existing objects.
+The map captures these keys while open and on its closing frame. See
+[graphics quality](graphics-quality.md) for startup options, resource budgets and
+adapter fallbacks.

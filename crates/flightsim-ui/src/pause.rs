@@ -77,6 +77,8 @@ pub fn pause_text() -> String {
         "",
         "Esc ... resume",
         "R ..... restart this flight",
+        "F4 .... graphics quality",
+        "Shift+F4 ... restore LIGHT",
     ]
     .join("\n")
 }

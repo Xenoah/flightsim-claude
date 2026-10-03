@@ -61,6 +61,7 @@ use std::path::PathBuf;
 mod aircraft_profile;
 mod airport_drape_runtime;
 mod distribution;
+mod graphics_runtime;
 mod render_metrics;
 mod replay_runtime;
 mod scenery_runtime;
@@ -268,6 +269,8 @@ struct Startup {
     scenery: Option<PathBuf>,
     scenery_error: Option<String>,
     surface_detail: bool,
+    graphics_quality: flightsim_render::graphics_quality::GraphicsQuality,
+    graphics_error: Option<String>,
     render_stats: bool,
     start: Geodetic,
     /// `--start` が明示されたか。
@@ -380,6 +383,8 @@ impl Default for Startup {
             scenery: None,
             scenery_error: None,
             surface_detail: true,
+            graphics_quality: default(),
+            graphics_error: None,
             render_stats: false,
             start: runway.takeoff_start(),
             start_was_explicit: false,
@@ -485,6 +490,10 @@ fn main() -> bevy::app::AppExit {
         return bevy::app::AppExit::Success;
     }
     let (mut startup, mut diagnostics) = parse_arguments();
+    if let Some(error) = startup.graphics_error.as_ref() {
+        eprintln!("{error}");
+        std::process::exit(2);
+    }
     if let Some(error) = startup.scenery_error.as_ref() {
         eprintln!("invalid scenery options: {error}");
         std::process::exit(2);
@@ -666,6 +675,12 @@ fn main() -> bevy::app::AppExit {
         .insert_resource(flightsim_render::terrain_detail::SurfaceDetailSettings {
             enabled: startup.surface_detail,
         })
+        .insert_resource(startup.graphics_quality)
+        .insert_resource(
+            flightsim_render::graphics_quality::GraphicsQualityDiagnostics {
+                enabled: startup.render_stats,
+            },
+        )
         .insert_resource(render_metrics::RenderMetrics::new(startup.render_stats))
         .insert_resource(startup)
         .insert_resource(diagnostics)
@@ -750,6 +765,7 @@ fn main() -> bevy::app::AppExit {
             ),
         );
 
+    graphics_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
     configure_live_input_scheduling(&mut app);
@@ -788,6 +804,7 @@ fn application_help() -> &'static str {
 --airports FILE.fsairports                       Offline airport database\n\
 --scenery FILE.fsscenery                        Offline regional surface scenery\n\
 --surface-detail on|off                        Procedural terrain material detail\n\
+--graphics-quality light|high|ultra             Visual preset (default light)\n\
 --render-stats                                 Bounded CPU/wall-frame diagnostics\n\
 --wind FROM_DEG/KNOTS --turbulence calm|light|moderate|severe\n\
 --time HH:MM --time-rate N                      Local mean solar time\n\
@@ -806,7 +823,7 @@ fn application_help() -> &'static str {
 --screenshot-delay SECONDS                     Finite delay in 0..600\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
 [ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
-F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
+F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
 }
 
 /// Recorded location must drive airport lookup, while airport selection must not
@@ -1123,6 +1140,16 @@ fn parse_arguments_from(
                 Some(path) => startup.scenery = Some(PathBuf::from(path)),
                 None => startup.scenery_error = Some("--scenery needs a .fsscenery file".into()),
             },
+            "--graphics-quality" => {
+                if let Some(quality) = next_argument_value(&mut arguments)
+                    .as_deref()
+                    .and_then(flightsim_render::graphics_quality::GraphicsQuality::parse)
+                {
+                    startup.graphics_quality = quality;
+                } else {
+                    startup.graphics_error = Some("--graphics-quality expects light, high or ultra".into());
+                }
+            }
             "--surface-detail" => match next_argument_value(&mut arguments).as_deref() {
                 Some("on") => startup.surface_detail = true,
                 Some("off") => startup.surface_detail = false,
@@ -2361,21 +2388,22 @@ struct StallWarningStatus {
 /// the audio-thread bridge and all HUD readers. Shared resources alone do not
 /// specify which writer or reader runs first in Bevy's schedule.
 fn configure_flight_presentation(app: &mut App) {
-    app.add_systems(
-        Update,
-        (
-            publish_sound
-                .after(advance_simulation)
-                .before(flightsim_audio::publish_sound),
-            publish_hud
-                .after(publish_sound)
-                .before(flightsim_ui::update_hud)
-                .before(flightsim_ui::update_flight_log_display)
-                .before(flightsim_ui::update_tutorial_prompt)
-                .before(flightsim_ui::instruments::update_instruments)
-                .before(RenderSet::Rebase),
-        ),
-    );
+    app.init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
+        .add_systems(
+            Update,
+            (
+                publish_sound
+                    .after(advance_simulation)
+                    .before(flightsim_audio::publish_sound),
+                publish_hud
+                    .after(publish_sound)
+                    .before(flightsim_ui::update_hud)
+                    .before(flightsim_ui::update_flight_log_display)
+                    .before(flightsim_ui::update_tutorial_prompt)
+                    .before(flightsim_ui::instruments::update_instruments)
+                    .before(RenderSet::Rebase),
+            ),
+        );
 }
 
 impl StallWarningStatus {
@@ -3384,6 +3412,7 @@ fn setup(
     commands.spawn((
         Camera3d::default(),
         world_runtime::FlightCamera,
+        flightsim_render::graphics_quality::GraphicsQualityCamera,
         // Keep HUD roots on this camera when the dedicated map camera exists.
         IsDefaultUiCamera,
         Projection::Perspective(perspective()),
@@ -3870,7 +3899,10 @@ fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
     playback: Option<Res<ReplayPlayback>>,
-    mode: Res<ViewMode>,
+    (mode, quality): (
+        Res<ViewMode>,
+        Res<flightsim_render::graphics_quality::GraphicsQuality>,
+    ),
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
     warning: Res<StallWarningStatus>,
@@ -3919,6 +3951,7 @@ fn publish_hud(
         on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
+        graphics_quality: quality.name(),
         wind_from: simulation.0.wind().from,
         wind_speed: simulation.0.wind().speed,
         // 計器の照明に使う。ui は render に依存できないので app が渡す。
