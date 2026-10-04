@@ -61,12 +61,15 @@ use std::path::PathBuf;
 mod aircraft_profile;
 mod airport_drape_runtime;
 mod cloud_runtime;
+mod distance_runtime;
 mod distribution;
 mod graphics_runtime;
+mod region_runtime;
 mod render_metrics;
 mod replay_runtime;
 mod scenery_runtime;
 mod screen_capture;
+mod water_runtime;
 use replay_runtime::ReplayPlayback;
 #[cfg(test)]
 mod controls_runtime_tests;
@@ -262,6 +265,9 @@ struct Startup {
     native_controllers: bool,
     input_arguments_invalid: bool,
     tiles: Option<PathBuf>,
+    regions: region_runtime::Options,
+    active_region: Option<std::sync::Arc<flightsim_content::InstalledPackage>>,
+    airport_enabled: bool,
     /// オフライン変換済みの OSM 空港 DB（`.fsairports`）。
     ///
     /// 生の PBF は実行時に読まない（ADR-0003 / ADR-0008）。
@@ -272,6 +278,8 @@ struct Startup {
     surface_detail: bool,
     graphics_quality: flightsim_render::graphics_quality::GraphicsQuality,
     cloud_quality: flightsim_render::cloud_volume::CloudQuality,
+    water_quality: flightsim_render::water::WaterQuality,
+    draw_distance: flightsim_world::draw_distance::DrawDistancePreset,
     graphics_error: Option<String>,
     render_stats: bool,
     start: Geodetic,
@@ -381,12 +389,17 @@ impl Default for Startup {
             native_controllers: false,
             input_arguments_invalid: false,
             tiles: None,
+            regions: region_runtime::Options::default(),
+            active_region: None,
+            airport_enabled: true,
             airports: None,
             scenery: None,
             scenery_error: None,
             surface_detail: true,
             graphics_quality: default(),
             cloud_quality: default(),
+            water_quality: default(),
+            draw_distance: default(),
             graphics_error: None,
             render_stats: false,
             start: runway.takeoff_start(),
@@ -493,6 +506,18 @@ fn main() -> bevy::app::AppExit {
         return bevy::app::AppExit::Success;
     }
     let (mut startup, mut diagnostics) = parse_arguments();
+    if let Some(error) = startup.regions.error.as_ref() {
+        eprintln!("invalid region options: {error}");
+        return bevy::app::AppExit::error();
+    }
+    match region_runtime::run_cli(&startup.regions) {
+        Ok(true) => return bevy::app::AppExit::Success,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("{error}");
+            return bevy::app::AppExit::error();
+        }
+    }
     if let Some(error) = startup.graphics_error.as_ref() {
         eprintln!("{error}");
         std::process::exit(2);
@@ -604,6 +629,10 @@ fn main() -> bevy::app::AppExit {
             return bevy::app::AppExit::error();
         }
     };
+    let water_atlas = startup
+        .world
+        .global_terrain
+        .then(|| flightsim_render::water::WaterAtlas(world_runtime.global.clone()));
     let scenery_runtime = match scenery_runtime::SceneryRuntime::new(&startup) {
         Ok(runtime) => runtime,
         Err(error) => {
@@ -663,6 +692,7 @@ fn main() -> bevy::app::AppExit {
         .add_plugins((
             FlightsimRenderPlugin,
             flightsim_render::terrain_detail::TerrainDetailPlugin,
+            flightsim_render::water::WaterSurfacePlugin,
             FlightsimInputPlugin,
             FlightsimUiPlugin,
             flightsim_audio::FlightAudioPlugin,
@@ -680,6 +710,10 @@ fn main() -> bevy::app::AppExit {
         })
         .insert_resource(startup.graphics_quality)
         .insert_resource(startup.cloud_quality)
+        .insert_resource(startup.water_quality)
+        .insert_resource(distance_runtime::DrawDistanceSettings(
+            startup.draw_distance,
+        ))
         .insert_resource(
             flightsim_render::graphics_quality::GraphicsQualityDiagnostics {
                 enabled: startup.render_stats,
@@ -769,10 +803,16 @@ fn main() -> bevy::app::AppExit {
             ),
         );
 
+    if let Some(atlas) = water_atlas {
+        app.insert_resource(atlas);
+    }
+    water_runtime::configure(&mut app);
     graphics_runtime::configure(&mut app);
     cloud_runtime::configure(&mut app);
+    distance_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
+    region_runtime::configure(&mut app);
     configure_live_input_scheduling(&mut app);
     configure_flight_presentation(&mut app);
 
@@ -801,6 +841,9 @@ fn application_help() -> &'static str {
 --difficulty beginner|normal|realistic          Environment/help preset\n\
 --approach [NM] | --drop METRES                  Approach or drop scenario\n\
 --tiles DIR --start LAT,LON --max-level N        Local DEM over global baseline\n\
+--import-region FILE.zip                       Install prepared local package, then exit\n\
+--list-regions [--region-store DIR]              List installed local versions, then exit\n\
+--region ID@VERSION [--region-store DIR]          Select pending region on map; Start applies\n\
 --world-map --map-layer terrain|climate         Initial world map view\n\
 --map-credits                                 Open world data credits\n\
 --fly METRES                                   Airborne AGL start\n\
@@ -810,6 +853,8 @@ fn application_help() -> &'static str {
 --scenery FILE.fsscenery                        Offline regional surface scenery\n\
 --surface-detail on|off                        Procedural terrain material detail\n\
 --graphics-quality light|high|ultra             Visual preset (default light)\n\
+--draw-distance short|standard|long            Local detail range (default standard)\n\
+--water-quality light|high|ultra                Water preset (default light)\n\
 --cloud-quality off|light|high|ultra            Cloud preset (default light)\n\
 --render-stats                                 Bounded CPU/wall-frame diagnostics\n\
 --wind FROM_DEG/KNOTS --turbulence calm|light|moderate|severe\n\
@@ -829,7 +874,7 @@ fn application_help() -> &'static str {
 --screenshot-delay SECONDS                     Finite delay in 0..600\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
 [ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
-F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
+F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
 }
 
 /// Recorded location must drive airport lookup, while airport selection must not
@@ -864,6 +909,10 @@ fn resolve_replay(
     diagnostics: &mut StartupDiagnostics,
 ) -> Option<flightsim_sim::Recording> {
     let path = startup.replay.clone()?;
+    if !region_runtime::replay_allowed(startup) || startup.regions.select.is_some() {
+        diagnostics.0.push(region_runtime::REPLAY_NOTICE.into());
+        return None;
+    }
     let file = match std::fs::File::open(&path) {
         Ok(file) => file,
         Err(error) => {
@@ -1040,6 +1089,17 @@ fn parse_arguments_from(
             startup.clouds_were_given = true;
         }
         match flag.as_str() {
+            "--import-region" | "--region" | "--region-store" => {
+                if let Some(value) = next_argument_value(&mut arguments) {
+                    let duplicate = match flag.as_str() {
+                        "--import-region" => startup.regions.import.replace(PathBuf::from(value)).is_some(),
+                        "--region-store" => startup.regions.store.replace(PathBuf::from(value)).is_some(),
+                        _ => startup.regions.select.replace(value).is_some(),
+                    };
+                    if duplicate { startup.regions.error = Some(format!("{flag} may only be specified once")); }
+                } else { startup.regions.error = Some(format!("{flag} needs a value")); }
+            },
+            "--list-regions" => startup.regions.list = true,
             "--world-map" => startup.world.map_open = true,
             "--map-credits" => {
                 startup.world.map_open = true;
@@ -1146,6 +1206,15 @@ fn parse_arguments_from(
                 Some(path) => startup.scenery = Some(PathBuf::from(path)),
                 None => startup.scenery_error = Some("--scenery needs a .fsscenery file".into()),
             },
+            "--draw-distance" => {
+                if let Some(preset) = next_argument_value(&mut arguments)
+                    .and_then(|value| value.parse().ok())
+                {
+                    startup.draw_distance = preset;
+                } else {
+                    startup.graphics_error = Some("--draw-distance expects short, standard or long".into());
+                }
+            }
             "--graphics-quality" => {
                 if let Some(quality) = next_argument_value(&mut arguments)
                     .as_deref()
@@ -1154,6 +1223,16 @@ fn parse_arguments_from(
                     startup.graphics_quality = quality;
                 } else {
                     startup.graphics_error = Some("--graphics-quality expects light, high or ultra".into());
+                }
+            }
+            "--water-quality" => {
+                if let Some(quality) = next_argument_value(&mut arguments)
+                    .as_deref()
+                    .and_then(flightsim_render::water::WaterQuality::parse)
+                {
+                    startup.water_quality = quality;
+                } else {
+                    startup.graphics_error = Some("--water-quality expects light, high or ultra".into());
                 }
             }
             "--cloud-quality" => {
@@ -1487,6 +1566,7 @@ fn parse_arguments_from(
         notes.push("invalid cloud arguments; using the clear default".to_owned());
     }
 
+    region_runtime::validate_options(&mut startup);
     (startup, StartupDiagnostics(notes))
 }
 
@@ -2314,6 +2394,7 @@ fn control_replay(
     mut landing: ResMut<flightsim_ui::LandingReportState>,
     keyboard: Res<ButtonInput<KeyCode>>,
     recorder: Res<FlightRecorder>,
+    startup: Option<Res<Startup>>,
     mut simulation: ResMut<FlightSimulation>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut rig: ResMut<CameraRig>,
@@ -2321,6 +2402,13 @@ fn control_replay(
 ) {
     let Some(mut playback) = playback else {
         if keyboard.just_pressed(KeyCode::F9) {
+            if startup
+                .as_deref()
+                .is_some_and(|startup| !region_runtime::replay_allowed(startup))
+            {
+                warn!("{}", region_runtime::REPLAY_NOTICE);
+                return;
+            }
             save_recording(recorder.0.recording());
         }
         return;
@@ -2407,6 +2495,9 @@ fn configure_flight_presentation(app: &mut App) {
     app.init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
         .init_resource::<flightsim_render::cloud_volume::CloudQuality>()
         .init_resource::<flightsim_render::cloud_volume::CloudVolumeDiagnostics>()
+        .init_resource::<distance_runtime::DrawDistanceSettings>()
+        .init_resource::<flightsim_render::water::WaterQuality>()
+        .init_resource::<flightsim_render::water::WaterDiagnostics>()
         .add_systems(
             Update,
             (
@@ -2600,7 +2691,7 @@ fn publish_replay_status(
 fn report_landings(
     mut commands: Commands,
     simulation: Res<FlightSimulation>,
-    runway: Res<ActiveRunway>,
+    runway: Option<Res<ActiveRunway>>,
     playback: Option<Res<ReplayPlayback>>,
     mut landing: ResMut<flightsim_ui::LandingReportState>,
     mut seen: Local<u32>,
@@ -2624,8 +2715,9 @@ fn report_landings(
         return;
     };
 
-    let (on_runway, heading_error) =
-        landing_runway_metrics(runway.0, touchdown.position, touchdown.heading);
+    let (on_runway, heading_error) = runway.map_or((None, None), |runway| {
+        landing_runway_metrics(runway.0, touchdown.position, touchdown.heading)
+    });
 
     commands.insert_resource(flightsim_ui::LandingReport {
         sink_rate: touchdown.sink_rate,
@@ -2686,10 +2778,14 @@ fn report_arguments(diagnostics: Res<StartupDiagnostics>) {
 /// 同じ `Terrain` を共有すると、描画のタイル読み込みが物理のキャッシュを
 /// 押し出して、接地判定のたびにディスクへ行くことになる。
 fn make_source(startup: &Startup) -> BoxedSource {
-    let primary = startup.tiles.as_ref().map_or_else(
-        || Box::new(EmptyTileSource) as BoxedSource,
-        |path| Box::new(DiskTileSource::new(path)) as BoxedSource,
-    );
+    let primary = if let Some(package) = &startup.active_region {
+        Box::new(package.tile_source()) as BoxedSource
+    } else {
+        startup.tiles.as_ref().map_or_else(
+            || Box::new(EmptyTileSource) as BoxedSource,
+            |path| Box::new(DiskTileSource::new(path)) as BoxedSource,
+        )
+    };
     if startup.world.global_terrain {
         let global = flightsim_world::global::GlobalTerrain::bundled()
             .expect("world data validated before startup");
@@ -3220,6 +3316,7 @@ fn setup(
                         origin,
                     ),
                     Name::new(format!("holding sign OSM feature {}", holding.source_id())),
+                    airport_drape_runtime::AirportGeometry,
                 ));
                 rendered_signs += 1;
             }
@@ -3411,13 +3508,16 @@ fn setup(
     // --- 地形 ---
 
     commands.insert_resource(TerrainStreaming {
-        selector: LodSelector::new(
-            config.screen_space_error,
-            1_080.0,
-            Degrees(60.0).to_radians(),
-            startup.max_level,
-            config.root_geometric_error,
-        ),
+        selector: startup
+            .draw_distance
+            .policy()
+            .apply_to_selector(LodSelector::new(
+                config.screen_space_error,
+                1_080.0,
+                Degrees(60.0).to_radians(),
+                startup.max_level,
+                config.root_geometric_error,
+            )),
         source: make_source(&startup),
         cache: TileCache::new(config.cache_bytes),
         live: flightsim_render::TerrainSelectionState::default(),
@@ -3507,6 +3607,7 @@ fn advance_simulation(
     paused: Res<flightsim_ui::Paused>,
     mut simulation: ResMut<FlightSimulation>,
     mut recorder: ResMut<FlightRecorder>,
+    startup: Option<Res<Startup>>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut aircraft: Query<(&mut WorldPosition, &mut WorldOrientation), With<Aircraft>>,
 ) {
@@ -3535,7 +3636,12 @@ fn advance_simulation(
                     // Record the exact input used by each executed physics step,
                     // with its PRE-step state. Render-end snapshots lose ramp
                     // history and cannot reproduce this controlled flight.
-                    recorder.0.record(fixed_dt, input, Some(before));
+                    if startup
+                        .as_deref()
+                        .is_none_or(region_runtime::replay_allowed)
+                    {
+                        recorder.0.record(fixed_dt, input, Some(before));
+                    }
                     input
                 })
                 .diverged
@@ -3922,11 +4028,14 @@ fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
     playback: Option<Res<ReplayPlayback>>,
-    (mode, quality, cloud_quality, cloud_status, startup): (
+    (mode, quality, cloud_quality, cloud_status, distance, water_quality, water_status, startup): (
         Res<ViewMode>,
         Res<flightsim_render::graphics_quality::GraphicsQuality>,
         Res<flightsim_render::cloud_volume::CloudQuality>,
         Res<flightsim_render::cloud_volume::CloudVolumeDiagnostics>,
+        Res<distance_runtime::DrawDistanceSettings>,
+        Res<flightsim_render::water::WaterQuality>,
+        Res<flightsim_render::water::WaterDiagnostics>,
         Option<Res<Startup>>,
     ),
     sun: Res<SunDirection>,
@@ -3978,6 +4087,8 @@ fn publish_hud(
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
         graphics_quality: quality.name(),
+        draw_distance: distance_runtime::label(distance.0),
+        water_quality: water_runtime::quality_label(*water_quality, &water_status),
         cloud_quality: cloud_runtime::quality_label(*cloud_quality, &cloud_status),
         cloud_source: startup
             .as_deref()

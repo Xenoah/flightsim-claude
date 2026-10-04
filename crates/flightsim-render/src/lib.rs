@@ -76,6 +76,7 @@ pub mod terrain_detail;
 pub mod terrain_drape;
 mod terrain_overlays;
 pub mod terrain_polar_normals;
+pub mod water;
 pub use terrain_overlays::{
     OVERLAY_COPY_INDEX_TARGET, OVERLAY_COPY_INDICES_PER_FRAME, OVERLAY_COPY_VERTEX_TARGET,
     OVERLAY_COPY_VERTICES_PER_FRAME, OVERLAY_UPLOAD_VERTEX_TARGET, TerrainOverlayFrameWork,

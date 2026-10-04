@@ -63,6 +63,7 @@
 pub mod airport;
 pub mod climate;
 pub mod dem;
+pub mod draw_distance;
 pub mod global;
 pub mod lod;
 pub mod mesh;

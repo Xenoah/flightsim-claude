@@ -8,6 +8,7 @@ use flightsim_render::scenery::{
 };
 use flightsim_render::terrain_drape::{ATTRIBUTE_OVERLAY_LIFT, TerrainOverlay};
 use flightsim_render::{TerrainOverlayRegistration, TerrainOverlaySwap};
+use flightsim_world::draw_distance::DrawDistancePolicy;
 use flightsim_world::scenery::{
     LandCoverClass, SceneryDatabase, SceneryFeatureRef, ScenerySourceKind,
 };
@@ -17,10 +18,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-const VIEW_RADIUS: Meters = Meters(4_500.0);
 /// Includes the 1.8 km tree radius plus the largest road-width/clearance margin.
 const TREE_EXCLUSION_RADIUS: Meters = Meters(2_300.0);
-const TERRAIN_DETAIL_RADIUS: Meters = Meters(5_500.0);
 const RESELECT_DISTANCE: Meters = Meters(450.0);
 const CELL_METRES: f64 = 1_024.0;
 const MAX_SELECTED: usize = 4_096;
@@ -49,6 +48,8 @@ pub(super) struct SceneryRuntime {
     selected_at: Option<Geodetic>,
     generation: u64,
     reset_revision: u64,
+    draw_distance: DrawDistancePolicy,
+    distance_dirty: bool,
     pending: Option<PendingBuild>,
     prepared: VecDeque<SceneryMesh>,
     staged: Vec<(Entity, Handle<Mesh>)>,
@@ -98,16 +99,34 @@ struct BuildResult {
 }
 
 impl SceneryRuntime {
+    /// Invalidate prepared/staged scenery before changing the query radius.
+    /// Keep the single cancelled worker until it finishes, so rapid changes
+    /// cannot accumulate background jobs. `stream` reclaims the old assets
+    /// before polling/uploading and starts only the latest requested policy.
+    pub(super) fn set_draw_distance(&mut self, policy: DrawDistancePolicy) -> bool {
+        if self.draw_distance == policy {
+            return false;
+        }
+        self.draw_distance = policy;
+        self.distance_dirty = true;
+        self.generation = self.generation.wrapping_add(1);
+        if let Some(pending) = &self.pending {
+            pending.cancel.store(true, Ordering::Relaxed);
+        }
+        true
+    }
+
     /// Derive the local refinement request from immutable loaded coverage, not
     /// from asynchronously changing render batches. Leaving/re-entering a pack
     /// or relocating the map therefore cannot retain an old regional request.
     pub(super) fn terrain_selector(&self, selector: LodSelector, camera: Geodetic) -> LodSelector {
+        let radius = self.draw_distance.terrain_detail_radius();
         if self
             .database
             .as_ref()
-            .is_some_and(|database| database.bounds().intersects(camera, TERRAIN_DETAIL_RADIUS))
+            .is_some_and(|database| database.bounds().intersects(camera, radius))
         {
-            selector.with_near_detail(TERRAIN_DETAIL_RADIUS, 13)
+            selector.with_near_detail(radius, 13)
         } else {
             selector.without_near_detail()
         }
@@ -159,6 +178,13 @@ impl SceneryRuntime {
             || self.ready_to_admit
     }
     pub fn new(startup: &Startup) -> Result<Self, String> {
+        Self::new_with_draw_distance(startup, startup.draw_distance.policy())
+    }
+
+    pub(super) fn new_with_draw_distance(
+        startup: &Startup,
+        draw_distance: DrawDistancePolicy,
+    ) -> Result<Self, String> {
         if startup.scenery.is_some() && !startup.world.global_terrain && startup.tiles.is_none() {
             return Err("regional scenery needs --global-terrain on or an explicit --tiles directory for displayed ground support".into());
         }
@@ -171,7 +197,7 @@ impl SceneryRuntime {
                     .map_err(|error| format!("{}: {error}", path.display()))
             })
             .transpose()?;
-        Ok(Self {
+        let mut runtime = Self {
             build_config: database
                 .as_ref()
                 .map(|_| Arc::new(SceneryBuildConfig::new(startup))),
@@ -180,6 +206,8 @@ impl SceneryRuntime {
             selected_at: None,
             generation: 0,
             reset_revision: 0,
+            draw_distance: DrawDistancePolicy::default(),
+            distance_dirty: false,
             pending: None,
             prepared: VecDeque::new(),
             staged: Vec::new(),
@@ -190,7 +218,18 @@ impl SceneryRuntime {
             overlay_swap: None,
             ready_to_admit: false,
             prepared_stats: BuildStatistics::default(),
-        })
+        };
+        runtime.set_draw_distance(draw_distance);
+        runtime.distance_dirty = false;
+        Ok(runtime)
+    }
+
+    /// A regional free flight does not retain depiction built with the old
+    /// terrain or airport exclusions. No stale worker can upload after clear.
+    pub(super) fn suppress_after_source_change(&mut self) {
+        self.database = None;
+        self.build_config = None;
+        self.pending = None;
     }
 
     pub fn attribution(&self) -> Option<&'static str> {
@@ -237,6 +276,7 @@ fn reset_owned_assets(
     runtime.prepared.clear();
     runtime.selected_at = None;
     runtime.ready_to_admit = false;
+    runtime.distance_dirty = false;
     let mut owned = BTreeMap::new();
     for pair in runtime
         .visible
@@ -281,7 +321,7 @@ pub(super) fn stream(
     if runtime.database.is_none() {
         return;
     }
-    if runtime.reset_revision != reset.0 {
+    if runtime.reset_revision != reset.0 || runtime.distance_dirty {
         runtime.reset_revision = reset.0;
         for (entity, mesh) in reset_owned_assets(runtime, Some(&mut tiles)) {
             commands.entity(entity).despawn();
@@ -434,8 +474,10 @@ pub(super) fn stream(
             .expect("loaded scenery configuration"),
     );
     let observer = camera.0;
-    let task = AsyncComputeTaskPool::get()
-        .spawn(async move { build_scene_config(&database, &config, observer, &job_cancel) });
+    let draw_distance = runtime.draw_distance;
+    let task = AsyncComputeTaskPool::get().spawn(async move {
+        build_scene_config(&database, &config, observer, &job_cancel, draw_distance)
+    });
     runtime.pending = Some(PendingBuild {
         generation: runtime.generation,
         cancel,
@@ -522,6 +564,8 @@ impl SceneryBuildConfig {
     fn new(startup: &Startup) -> Self {
         let source = Startup {
             tiles: startup.tiles.clone(),
+            active_region: startup.active_region.clone(),
+            airport_enabled: startup.airport_enabled,
             world: world_runtime::WorldOptions {
                 global_terrain: startup.world.global_terrain,
                 ..Default::default()
@@ -574,6 +618,7 @@ fn build_scene(
         &SceneryBuildConfig::new(startup),
         observer,
         cancel,
+        DrawDistancePolicy::default(),
     )
 }
 
@@ -582,10 +627,11 @@ fn build_scene_config(
     config: &SceneryBuildConfig,
     observer: Geodetic,
     cancel: &AtomicBool,
+    draw_distance: DrawDistancePolicy,
 ) -> BuildResult {
     let startup = &config.source;
     let start = std::time::Instant::now();
-    let selected = database.query_near(observer, VIEW_RADIUS, MAX_SELECTED);
+    let selected = database.query_near(observer, draw_distance.scenery_radius(), MAX_SELECTED);
     let tree_neighbours = database.query_near(observer, TREE_EXCLUSION_RADIUS, MAX_SELECTED);
     let mut exclusions = Exclusions::new(&tree_neighbours, startup);
     // Truncation may omit a road, building or water exclusion. Suppress trees
@@ -637,6 +683,12 @@ fn build_scene_config(
             break;
         }
         let mut options = SceneryMeshOptions::near(observer);
+        options.vegetation_distance = Meters(
+            options
+                .vegetation_distance
+                .get()
+                .min(draw_distance.scenery_radius().get()),
+        );
         options.max_vertices = MAX_VERTICES - statistics.vertices;
         options.max_ground_vertices =
             MAX_GROUND_VERTICES.saturating_sub(statistics.ground_vertices);

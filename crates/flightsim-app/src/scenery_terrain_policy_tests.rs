@@ -61,7 +61,8 @@ fn dem(id: TileId, width: u32, height: u32) -> DemTile {
 #[test]
 fn no_pack_and_remote_pack_restore_exact_baseline_selection() {
     let base = selector(13);
-    let configured = base.with_near_detail(TERRAIN_DETAIL_RADIUS, 13);
+    let configured =
+        base.with_near_detail(DrawDistancePolicy::default().terrain_detail_radius(), 13);
     for position in [anchor(), Geodetic::from_degrees(90.0, 180.0, 1000.0)] {
         assert_eq!(
             policy_runtime(false)
@@ -212,7 +213,12 @@ fn narrower_tree_query_avoids_unrelated_outer_view_truncation() {
     roads.extend((2..=4097).map(|id| road(id, 3000.0, 10.0)));
     let db = database(roads);
     assert_eq!(
-        db.query_near(anchor(), VIEW_RADIUS, MAX_SELECTED).len(),
+        db.query_near(
+            anchor(),
+            DrawDistancePolicy::default().scenery_radius(),
+            MAX_SELECTED
+        )
+        .len(),
         MAX_SELECTED
     );
     let neighbors = db.query_near(anchor(), TREE_EXCLUSION_RADIUS, MAX_SELECTED);

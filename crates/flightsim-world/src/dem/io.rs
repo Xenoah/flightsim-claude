@@ -62,6 +62,10 @@ pub const FILE_EXTENSION: &str = "fsdem";
 /// 4096 でもペイロードは 32 MiB あり、正当なタイルとしては十分すぎる。
 pub const MAX_GRID_DIMENSION: u32 = 4096;
 
+/// Maximum encoded file length, checked before allocating a disk-file buffer.
+pub const MAX_TILE_FILE_BYTES: u64 =
+    HEADER_LEN as u64 + (MAX_GRID_DIMENSION as u64) * (MAX_GRID_DIMENSION as u64) * 2;
+
 // FNV-1a 64bit。依存を増やさずに済ませるためこれを選んだ。
 // 検出したいのはビット腐敗と部分書き込みであり、暗号学的強度は不要（ADR-0005）。
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;

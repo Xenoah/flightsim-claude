@@ -18,7 +18,7 @@ fail() {
 }
 
 # 検査対象のクレート。
-CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim flightsim-assetgen flightsim-net)
+CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim-sim flightsim-assetgen flightsim-net flightsim-content)
 
 # `cargo tree` の出力からパッケージ名の一覧を得る。
 # --edges normal で dev-dependencies と build-dependencies を除外する
@@ -105,6 +105,17 @@ for crate in flightsim-core flightsim-fdm flightsim-world; do
     if deps_of "$crate" | grep -qE '^flightsim-sim$'; then
         fail "$crate depends on flightsim-sim" \
              "sim is the integration layer above fdm and world. Depending on it upwards defeats the fdm/world separation (ADR-0006)."
+    fi
+done
+
+# Local packages sit above world/core. They validate data and never depend on
+# simulation, Bevy layers, networking or offline raw-data decoders.
+if deps_of flightsim-content | grep -qE '^flightsim-(fdm|sim|tilegen|render|input|ui|audio|app|net)$'; then
+    fail "flightsim-content depends on an unrelated runtime/tool layer" "content may depend on world/core only; app owns activation."
+fi
+for crate in flightsim-core flightsim-fdm flightsim-world flightsim-sim; do
+    if deps_of "$crate" | grep -qE '^flightsim-content$'; then
+        fail "$crate depends on the package integration layer" "content sits above world; app wires validated package sources."
     fi
 done
 

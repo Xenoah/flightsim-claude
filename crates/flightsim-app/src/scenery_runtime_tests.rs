@@ -755,7 +755,7 @@ fn actual_restart_and_rewind_controls_invalidate_scenery() {
 }
 
 #[test]
-fn scenery_preparation_staging_and_resets_leave_physics_and_replay_bytes_exact() {
+fn draw_distance_and_scenery_resets_leave_physics_and_replay_bytes_exact() {
     let mut baseline = physics_app();
     baseline
         .world_mut()
@@ -778,6 +778,12 @@ fn scenery_preparation_staging_and_resets_leave_physics_and_replay_bytes_exact()
         )
     );
     for frame in 0..120 {
+        detailed
+            .world_mut()
+            .resource_mut::<SceneryRuntime>()
+            .set_draw_distance(
+                flightsim_world::draw_distance::DrawDistancePreset::ALL[frame % 3].policy(),
+            );
         detailed
             .world_mut()
             .resource_mut::<flightsim_render::terrain_detail::SurfaceDetailSettings>()
@@ -823,6 +829,12 @@ fn scenery_preparation_staging_and_resets_leave_physics_and_replay_bytes_exact()
         app.insert_resource(playback);
     }
     for frame in 0..130 {
+        detailed
+            .world_mut()
+            .resource_mut::<SceneryRuntime>()
+            .set_draw_distance(
+                flightsim_world::draw_distance::DrawDistancePreset::ALL[frame % 3].policy(),
+            );
         if frame % 23 == 0 {
             detailed
                 .world_mut()
@@ -1374,8 +1386,13 @@ fn ground_swap_retains_old_ground_and_solids_until_exact_terrain_revision_commit
 }
 
 #[test]
-fn clear_restart_and_rewind_remove_pending_new_and_retained_old_ground_registrations() {
-    for key in [None, Some(KeyCode::KeyR), Some(KeyCode::F8)] {
+fn draw_distance_clear_restart_and_rewind_remove_pending_and_retained_ground() {
+    for (key, distance_change) in [
+        (None, false),
+        (Some(KeyCode::KeyR), false),
+        (Some(KeyCode::F8), false),
+        (None, true),
+    ] {
         let mut app = physics_app();
         install_supporting_terrain(&mut app);
         prepare_ground_replacement(&mut app);
@@ -1414,6 +1431,13 @@ fn clear_restart_and_rewind_remove_pending_new_and_retained_old_ground_registrat
             app.world_mut()
                 .resource_mut::<ButtonInput<KeyCode>>()
                 .clear();
+        } else if distance_change {
+            app.world_mut()
+                .resource_mut::<SceneryRuntime>()
+                .set_draw_distance(
+                    flightsim_world::draw_distance::DrawDistancePreset::Short.policy(),
+                );
+            app.update();
         } else {
             clear(app.world_mut());
         }
@@ -1443,5 +1467,99 @@ fn clear_restart_and_rewind_remove_pending_new_and_retained_old_ground_registrat
             1,
             "only the supporting terrain remains after {key:?}"
         );
+    }
+}
+
+#[test]
+fn rapid_draw_distance_changes_cancel_single_worker_before_any_stale_upload() {
+    use flightsim_world::draw_distance::DrawDistancePreset;
+    let mut app = fixture_app();
+    let old = owned_mesh(app.world_mut(), false);
+    let staged = owned_mesh(app.world_mut(), true);
+    let pending = ready_build(result(16), 7, false);
+    let cancel = Arc::clone(&pending.cancel);
+    {
+        let mut runtime = app.world_mut().resource_mut::<SceneryRuntime>();
+        runtime.prepared.push_back(batch());
+        runtime.pending = Some(pending);
+        assert!(runtime.set_draw_distance(DrawDistancePreset::Long.policy()));
+        assert!(runtime.set_draw_distance(DrawDistancePreset::Short.policy()));
+        assert!(runtime.set_draw_distance(DrawDistancePreset::Standard.policy()));
+        assert!(!runtime.set_draw_distance(DrawDistancePreset::Standard.policy()));
+        assert_eq!(runtime.generation, 10);
+        assert_eq!(runtime.pending.as_ref().unwrap().generation, 7);
+        assert!(cancel.load(Ordering::Relaxed));
+    }
+    app.update();
+    let runtime = app.world().resource::<SceneryRuntime>();
+    assert_eq!(runtime.draw_distance, DrawDistancePolicy::default());
+    assert!(runtime.visible.is_empty() && runtime.staged.is_empty() && runtime.prepared.is_empty());
+    assert!(app.world().get_entity(old.0).is_err());
+    assert!(app.world().get_entity(staged.0).is_err());
+    assert!(app.world().resource::<Assets<Mesh>>().is_empty());
+}
+
+#[test]
+fn draw_distance_changes_actual_scenery_query_without_expanding_geometry_caps() {
+    use flightsim_world::draw_distance::DrawDistancePreset;
+    let buildings = [0.0, 3000.0, 6000.0]
+        .into_iter()
+        .enumerate()
+        .map(|(index, north)| {
+            let mut value = building(u32::try_from(index).unwrap());
+            for p in &mut value.footprint {
+                *p = p.offset_by(Meters(north), Meters::ZERO);
+            }
+            value
+        })
+        .collect();
+    let database = database(buildings);
+    let config = SceneryBuildConfig::new(&startup());
+    for (preset, count) in [
+        (DrawDistancePreset::Short, 1),
+        (DrawDistancePreset::Standard, 2),
+        (DrawDistancePreset::Long, 3),
+    ] {
+        let result = build_scene_config(
+            &database,
+            &config,
+            anchor(),
+            &AtomicBool::new(false),
+            preset.policy(),
+        );
+        assert_eq!(result.statistics.selected, count);
+        assert!(result.statistics.vertices <= MAX_VERTICES);
+        assert!(result.meshes.len() <= MAX_BATCHES);
+        assert!(result.statistics.ground_vertices <= MAX_GROUND_VERTICES);
+        assert!(result.statistics.trees <= MAX_TREES);
+        assert!(result.statistics.tree_candidates <= MAX_TREE_CANDIDATES);
+    }
+}
+
+#[test]
+fn repeated_distance_changes_keep_only_one_cancelled_inflight_worker() {
+    use flightsim_world::draw_distance::DrawDistancePreset;
+    let mut app = fixture_app();
+    let cancel = Arc::new(AtomicBool::new(false));
+    app.world_mut().resource_mut::<SceneryRuntime>().pending = Some(PendingBuild {
+        generation: 7,
+        cancel: Arc::clone(&cancel),
+        task: AsyncComputeTaskPool::get().spawn(std::future::pending()),
+    });
+    for preset in DrawDistancePreset::ALL.into_iter().cycle().take(12) {
+        app.world_mut()
+            .resource_mut::<SceneryRuntime>()
+            .set_draw_distance(preset.policy());
+        app.update();
+        let runtime = app.world().resource::<SceneryRuntime>();
+        let pending = runtime
+            .pending
+            .as_ref()
+            .expect("retain worker until completion");
+        assert_eq!(pending.generation, 7);
+        assert!(Arc::ptr_eq(&pending.cancel, &cancel));
+        assert!(pending.cancel.load(Ordering::Relaxed));
+        assert_eq!(runtime.draw_distance, preset.policy());
+        assert!(runtime.prepared.is_empty() && runtime.staged.is_empty());
     }
 }

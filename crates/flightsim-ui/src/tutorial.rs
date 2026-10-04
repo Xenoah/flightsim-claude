@@ -455,6 +455,8 @@ mod tests {
             terrain_available: true,
             view_mode: "CHASE",
             graphics_quality: "LIGHT",
+            draw_distance: "STANDARD 4.5km",
+            water_quality: "LIGHT",
             cloud_quality: "LIGHT",
             cloud_source: "MONTHLY MODEL",
             wind_from: Radians(0.0),

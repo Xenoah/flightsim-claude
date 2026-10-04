@@ -1,21 +1,22 @@
 # Windows dependency notice collection
 
-Collected 2026-10-03 with Rust 1.93.0 for `flightsim-app` 0.6.0-alpha.21,
+Updated 2026-10-04 with Rust 1.93.0 for `flightsim-app` 0.6.0-alpha.21,
 default application features, target `x86_64-pc-windows-msvc`. This is mechanical
 source/notice evidence, **not completed dependency review or permission to
 publish**. The inventory remains `not_reviewed`, with four unresolved records.
-No application build, Windows runtime check or release was performed for this
-collection. The release recipe and commercial-staging policy are unchanged.
+This collection does not establish an application build, Windows runtime check
+or release. The release recipe and commercial-staging policy are unchanged.
 
 ## Exact scope and reproduction
 
 The [inventory](licenses/dependency-evidence/dependency-inventory.json) contains
-347 packages in the conservative normal/build closure, 682 package notice files
+359 packages in the conservative normal/build closure, 705 package notice files
 and two supplemental font/LUT notices. Dev-only edges are excluded. `earcutr`
 belongs to the offline generator and is absent from this application closure.
 
-The unchanged collector used fresh target-filtered metadata from the current
-checkout and existing cached sources, without network access. Keep the metadata
+The unchanged collector used fresh default-feature, target-filtered metadata
+from the current checkout. Required official-registry sources were downloaded
+first; the final default-feature metadata/collection pass ran offline. Keep the metadata
 outside source control: it contains host-specific source paths. Its exact byte
 hash is recorded in the inventory, together with the Cargo.lock, asset manifest
 and supplement manifest hashes. Recollect after any relevant input change;
@@ -37,10 +38,15 @@ on a Linux host using the exact MSVC platform filter. This supplies a conservati
 source graph, not an attestation of a Windows build or a linked-binary SBOM.
 
 Verification compared each collected notice with its original cached crate,
-workspace license or version-pinned supplement. All 337 registry archive checksums,
+workspace license or version-pinned supplement. All 348 registry archive checksums,
 supplement hashes, four enabled embedded-asset hashes, inventory bindings and
 the stager's referenced-file/text/path checks passed. Collection output includes
 no raw metadata, absolute host paths, reviewer record or authorization receipt.
+
+The local terrain package edge adds `flightsim-content`, `rawzip`, `fs2`,
+`tempfile`, `sha2` and their previously absent normal/build dependencies. All
+previously collected notice bytes remain identical; new notice files were copied
+from the exact locked package sources. No existing unresolved record was removed.
 
 ## Review still required
 

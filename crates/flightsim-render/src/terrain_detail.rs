@@ -78,7 +78,7 @@ impl MaterialExtension for TerrainDetail {
 // columns are ECEF axes expressed in render space, so dot(column, relative)
 // recovers the ECEF displacement without a second coordinate implementation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Reflect, ShaderType)]
-struct TerrainDetailUniform {
+pub(crate) struct TerrainDetailUniform {
     ecef_x: Vec4,
     ecef_y: Vec4,
     ecef_z: Vec4,
@@ -94,7 +94,7 @@ impl TerrainDetailUniform {
         clippy::cast_possible_truncation,
         reason = "reciprocal of four fixed power-of-two metre scales is exactly representable"
     )]
-    fn for_frame(frame: &RenderFrame, enabled: bool) -> Self {
+    pub(crate) fn for_frame(frame: &RenderFrame, enabled: bool) -> Self {
         let origin = frame.anchor().to_ecef().as_vec();
         let ecef_x = frame.vector_to_render(glam::DVec3::X).extend(0.0);
         let ecef_y = frame.vector_to_render(glam::DVec3::Y).extend(0.0);

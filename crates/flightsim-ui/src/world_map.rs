@@ -16,6 +16,13 @@ use bevy::text::LineHeight;
 use bevy::ui::{FocusPolicy, RelativeCursorPosition};
 use flightsim_core::{Degrees, Geodetic, Meters};
 
+#[path = "regions.rs"]
+mod regions;
+pub use regions::{
+    RegionAction, RegionSummary, RegionsActions, RegionsButton, RegionsState, RegionsText,
+    WorldMapRegionsRoot,
+};
+
 /// Bounded global raster: one sample per half degree, north at the top.
 pub const WORLD_MAP_WIDTH: u32 = 720;
 pub const WORLD_MAP_HEIGHT: u32 = 360;
@@ -207,6 +214,7 @@ enum CoordinateField {
 #[derive(Resource, Debug, Clone)]
 pub struct WorldMapState {
     pub visible: bool,
+    pub regions: RegionsState,
     pub aircraft: Option<Geodetic>,
     pub selected: Geodetic,
     pub selected_name: String,
@@ -232,6 +240,7 @@ impl Default for WorldMapState {
     fn default() -> Self {
         Self {
             visible: false,
+            regions: RegionsState::default(),
             aircraft: None,
             selected: WORLD_MAP_DESTINATIONS[0].position(),
             selected_name: WORLD_MAP_DESTINATIONS[0].name.to_owned(),
@@ -252,10 +261,20 @@ impl Default for WorldMapState {
 }
 
 impl WorldMapState {
+    /// Open regional package selection without applying any flight changes.
+    pub fn show_regions(&mut self) {
+        self.visible = true;
+        self.regions.show();
+        self.credits_visible = false;
+        self.coordinate_field = None;
+        self.coordinate_error.clear();
+    }
+
     /// Open the first credits page, including from application startup.
     /// Dismiss any unfinished coordinate edit without applying it.
     pub fn show_credits(&mut self) {
         self.visible = true;
+        self.regions.visible = false;
         self.credits_visible = true;
         self.credits_page = 0;
         self.coordinate_field = None;
@@ -343,6 +362,7 @@ impl WorldMapState {
 /// App consumes with `take()`. No unbounded event queue or implicit flight move.
 #[derive(Resource, Debug, Clone, Default)]
 pub struct WorldMapActions {
+    pub regions: RegionsActions,
     pub start_at: Option<WorldMapStart>,
     /// A preview notification only. Do not apply it to the current flight.
     pub month_changed: Option<u8>,
@@ -448,6 +468,7 @@ pub struct WorldMapCreditsRoot;
 pub struct WorldMapImage;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorldMapText {
+    Regions(RegionsText),
     Month,
     Selection,
     Latitude,
@@ -467,6 +488,8 @@ pub enum WorldMapMarker {
 }
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorldMapButton {
+    OpenRegions,
+    Regions(RegionsButton),
     Close,
     OpenCredits,
     CloseCredits,
@@ -515,6 +538,7 @@ pub fn spawn_world_map(
         }).with_children(|header| {
             header.spawn((Text::new("WORLD EXPLORER"), TextFont { font_size: 25.0, ..default() }, TextColor(TEXT)));
             header.spawn((Text::new("M / Esc: return to flight"), TextFont { font_size: 14.0, ..default() }, TextColor(MUTED)));
+            spawn_button(header, "Regions [G]", WorldMapButton::OpenRegions, px(100.0));
             spawn_button(header, "Data credits", WorldMapButton::OpenCredits, px(118.0));
             spawn_button(header, "Close", WorldMapButton::Close, px(90.0));
         });
@@ -604,6 +628,7 @@ pub fn spawn_world_map(
             });
         });
         root.spawn((Text::new("Preview only until Start. A new flight resets the current flight recording.    M / Esc closes this map."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { height: px(MAP_FOOTER_HEIGHT), flex_shrink: 0.0, ..default() }));
+        regions::spawn_regions(root);
         root.spawn((
             Node {
                 position_type: PositionType::Absolute,
@@ -756,6 +781,7 @@ fn marker_node(point: MapPoint, size: f32) -> Node {
 )]
 pub fn handle_world_map_input(
     mut keys: ResMut<ButtonInput<KeyCode>>,
+    mut logical_keys: Option<ResMut<ButtonInput<Key>>>,
     mut keyboard: MessageReader<KeyboardInput>,
     mut focus_lost: MessageReader<KeyboardFocusLost>,
     mut control_modifiers: Local<[bool; 2]>,
@@ -775,11 +801,17 @@ pub fn handle_world_map_input(
     let editing_allowed = !lost_focus
         && state.visible
         && !state.credits_visible
+        && !state.regions.visible
         && !keys.just_pressed(KeyCode::KeyM)
         && !keys.just_pressed(KeyCode::Escape)
         && !buttons.iter().any(|(interaction, button)| {
             *interaction == Interaction::Pressed
-                && matches!(button, WorldMapButton::Close | WorldMapButton::OpenCredits)
+                && matches!(
+                    button,
+                    WorldMapButton::Close
+                        | WorldMapButton::OpenCredits
+                        | WorldMapButton::OpenRegions
+                )
         });
     // Bevy resolves pointer Interaction in PreUpdate. Establish that frame's
     // clicked field before consuming its keyboard messages, so a quick
@@ -820,19 +852,66 @@ pub fn handle_world_map_input(
     }
     if keys.just_pressed(KeyCode::KeyM) {
         state.visible = !state.visible;
+        regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
+        state.regions.dismiss(&mut actions.regions);
         state.credits_visible = false;
         state.coordinate_field = None;
         state.coordinate_error.clear();
-        if !state.visible {
-            actions.start_at = None;
-        }
+        actions.start_at = None;
+        consume_start_keys(&mut keys);
         keys.clear_just_pressed(KeyCode::KeyM);
+        keys.clear_just_pressed(KeyCode::Escape);
         return;
     }
     if !state.visible {
         return;
     }
+    if state.regions.visible {
+        let keyboard_button = regions::keyboard_button(&keys, logical_keys.as_deref());
+        regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
+        // The complete frame belongs to the panel, including its close frame.
+        // Consume Enter so returning to the map cannot submit a stale start.
+        actions.start_at = None;
+        consume_start_keys(&mut keys);
+        let close = keys.just_pressed(KeyCode::Escape)
+            || buttons.iter().any(|(interaction, button)| {
+                *interaction == Interaction::Pressed
+                    && *button == WorldMapButton::Regions(RegionsButton::Close)
+            });
+        if close {
+            state.regions.dismiss(&mut actions.regions);
+            keys.clear_just_pressed(KeyCode::Escape);
+            return;
+        }
+        // Cancel wins even when a selection/refresh is pressed in this frame.
+        if keyboard_button == Some(RegionsButton::Cancel)
+            || buttons.iter().any(|(interaction, button)| {
+                *interaction == Interaction::Pressed
+                    && *button == WorldMapButton::Regions(RegionsButton::Cancel)
+            })
+        {
+            state
+                .regions
+                .act(RegionsButton::Cancel, &mut actions.regions);
+            return;
+        }
+        if let Some(button) = keyboard_button {
+            state.regions.act(button, &mut actions.regions);
+            return;
+        }
+        for (interaction, button) in &buttons {
+            if *interaction == Interaction::Pressed
+                && let WorldMapButton::Regions(button) = button
+            {
+                state.regions.act(*button, &mut actions.regions);
+            }
+        }
+        return;
+    }
     if state.credits_visible {
+        regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
+        actions.start_at = None;
+        consume_start_keys(&mut keys);
         let close = keys.just_pressed(KeyCode::Escape)
             || buttons.iter().any(|(interaction, button)| {
                 *interaction == Interaction::Pressed && *button == WorldMapButton::CloseCredits
@@ -865,12 +944,29 @@ pub fn handle_world_map_input(
         *interaction == Interaction::Pressed && *button == WorldMapButton::Close
     });
     if keys.just_pressed(KeyCode::Escape) || close_button {
+        regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
         state.visible = false;
+        state.regions.dismiss(&mut actions.regions);
         state.coordinate_field = None;
         state.coordinate_error.clear();
         actions.start_at = None;
+        consume_start_keys(&mut keys);
         // App pause handlers must not also act on the map's close key.
         keys.clear_just_pressed(KeyCode::Escape);
+        return;
+    }
+    if (state.coordinate_field.is_none()
+        && !coordinate_enter
+        && regions::shortcuts_allowed(&keys, logical_keys.as_deref())
+        && keys.just_pressed(KeyCode::KeyG))
+        || buttons.iter().any(|(interaction, button)| {
+            *interaction == Interaction::Pressed && *button == WorldMapButton::OpenRegions
+        })
+    {
+        regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
+        state.show_regions();
+        actions.start_at = None;
+        consume_start_keys(&mut keys);
         return;
     }
     if buttons.iter().any(|(interaction, button)| {
@@ -878,6 +974,7 @@ pub fn handle_world_map_input(
     }) {
         state.show_credits();
         actions.start_at = None;
+        consume_start_keys(&mut keys);
         return;
     }
     // Even a repeated Enter in the same message batch must never submit a
@@ -912,6 +1009,8 @@ pub fn handle_world_map_input(
         }
         match *button {
             WorldMapButton::Close
+            | WorldMapButton::OpenRegions
+            | WorldMapButton::Regions(_)
             | WorldMapButton::OpenCredits
             | WorldMapButton::CloseCredits
             | WorldMapButton::PreviousCreditsPage
@@ -938,6 +1037,11 @@ pub fn handle_world_map_input(
             WorldMapButton::Latitude | WorldMapButton::Longitude => {}
         }
     }
+}
+
+fn consume_start_keys(keys: &mut ButtonInput<KeyCode>) {
+    keys.clear_just_pressed(KeyCode::Enter);
+    keys.clear_just_pressed(KeyCode::NumpadEnter);
 }
 
 /// Apply one ordered key event. The bool means an editor Enter was handled,
@@ -1020,6 +1124,13 @@ type CreditsVisibilityFilter = (
     With<WorldMapCreditsRoot>,
     Without<WorldMapRoot>,
     Without<WorldMapMarker>,
+    Without<WorldMapRegionsRoot>,
+);
+
+type RegionsVisibilityFilter = (
+    With<WorldMapRegionsRoot>,
+    Without<WorldMapRoot>,
+    Without<WorldMapMarker>,
 );
 
 /// Upload changed raster once, then update text/markers without resampling world
@@ -1034,6 +1145,7 @@ pub fn update_world_map(
     mut images: ResMut<Assets<Image>>,
     mut roots: Query<&mut Visibility, (With<WorldMapRoot>, Without<WorldMapMarker>)>,
     mut credits: Query<&mut Visibility, CreditsVisibilityFilter>,
+    mut region_panels: Query<&mut Visibility, RegionsVisibilityFilter>,
     map_images: Query<&ImageNode, With<WorldMapImage>>,
     mut texts: Query<(&WorldMapText, &mut Text)>,
     mut markers: Query<(&WorldMapMarker, &mut Node, &mut Visibility), Without<WorldMapRoot>>,
@@ -1048,6 +1160,13 @@ pub fn update_world_map(
     }
     for mut visibility in &mut credits {
         *visibility = if state.credits_visible {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for mut visibility in &mut region_panels {
+        *visibility = if state.regions.visible {
             Visibility::Inherited
         } else {
             Visibility::Hidden
@@ -1084,12 +1203,14 @@ pub fn update_world_map(
     let last_credit_page = credit_pages(&state.source_credits).len() - 1;
     for (button, interaction, mut color) in &mut buttons {
         let selected = matches!(button, WorldMapButton::Layer(layer) if *layer == state.layer)
+            || matches!(button, WorldMapButton::Regions(button) if state.regions.button_selected(*button))
             || matches!(
                 (button, state.coordinate_field),
                 (WorldMapButton::Latitude, Some(CoordinateField::Latitude))
                     | (WorldMapButton::Longitude, Some(CoordinateField::Longitude))
             );
         let disabled = (*button == WorldMapButton::Start && !state.navigation_enabled)
+            || matches!(button, WorldMapButton::Regions(button) if state.regions.button_disabled(*button))
             || (*button == WorldMapButton::PreviousCreditsPage && state.credits_page == 0)
             || (*button == WorldMapButton::NextCreditsPage
                 && state.credits_page >= last_credit_page);
@@ -1116,6 +1237,7 @@ pub fn format_world_map_text(
     raster: &WorldMapRaster,
 ) -> String {
     match kind {
+        WorldMapText::Regions(kind) => regions::format_regions_text(kind, &state.regions),
         WorldMapText::Month => format!(
             "{} (preview)",
             MONTHS[usize::from(state.preview_month() - 1)]
@@ -2057,7 +2179,10 @@ mod tests {
             "sidebar outside body: {side_rect:?}, {body_rect:?}"
         );
         for (entity, kind) in world.query::<(Entity, &WorldMapText)>().iter(world) {
-            if matches!(kind, WorldMapText::Credits | WorldMapText::CreditsPage) {
+            if matches!(
+                kind,
+                WorldMapText::Credits | WorldMapText::CreditsPage | WorldMapText::Regions(_)
+            ) {
                 continue;
             }
             let rect = computed_rect(world, entity);
@@ -2071,6 +2196,8 @@ mod tests {
             if matches!(
                 button,
                 WorldMapButton::Close
+                    | WorldMapButton::OpenRegions
+                    | WorldMapButton::Regions(_)
                     | WorldMapButton::OpenCredits
                     | WorldMapButton::CloseCredits
                     | WorldMapButton::PreviousCreditsPage
@@ -2151,6 +2278,533 @@ mod tests {
                     );
                     assert!(rect.height() >= MAP_BUTTON_HEIGHT - 1.0);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn regions_reopen_and_dismiss_cancel_pending_work_and_consume_start_keys() {
+        let mut app = input_app();
+        app.world_mut().resource_mut::<WorldMapState>().visible = true;
+        let open = app
+            .world_mut()
+            .spawn((Interaction::None, WorldMapButton::OpenRegions))
+            .id();
+        for close in [KeyCode::Escape, KeyCode::KeyM, KeyCode::Escape] {
+            app.world_mut().resource_mut::<WorldMapState>().visible = true;
+            *app.world_mut().get_mut::<Interaction>(open).unwrap() = Interaction::Pressed;
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Enter);
+            app.update();
+            assert!(app.world().resource::<WorldMapState>().regions.visible);
+            assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+            *app.world_mut().get_mut::<Interaction>(open).unwrap() = Interaction::None;
+            app.world_mut().resource_mut::<WorldMapState>().regions.busy = true;
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending = Some(RegionAction::Refresh);
+            app.world_mut().resource_mut::<WorldMapActions>().start_at = Some(WorldMapStart {
+                position: WORLD_MAP_DESTINATIONS[0].position(),
+                month: 7,
+            });
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(close);
+            app.update();
+            assert!(!app.world().resource::<WorldMapState>().regions.visible);
+            assert_eq!(
+                app.world().resource::<WorldMapState>().visible,
+                close == KeyCode::Escape
+            );
+            let actions = app.world_mut().resource_mut::<WorldMapActions>();
+            assert!(actions.start_at.is_none());
+            assert_eq!(actions.regions.pending, Some(RegionAction::Cancel));
+            let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            assert!(!keys.just_pressed(close));
+            assert!(!keys.just_pressed(KeyCode::Enter));
+            keys.release(close);
+            keys.release(KeyCode::Enter);
+        }
+    }
+
+    #[test]
+    fn regions_capture_underlying_controls_and_selection_is_a_single_app_action() {
+        let mut app = input_app();
+        {
+            let mut state = app.world_mut().resource_mut::<WorldMapState>();
+            state.show_regions();
+            state.regions.set_installed([RegionSummary {
+                key: "alps@1.2.3".into(),
+                name: "Alps".into(),
+            }]);
+        }
+        let original = app.world().resource::<WorldMapState>().selected;
+        app.world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::Start));
+        app.world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::NextMonth));
+        app.world_mut().spawn((
+            Interaction::Pressed,
+            WorldMapButton::Regions(RegionsButton::Row(0)),
+        ));
+        app.world_mut().spawn((
+            RelativeCursorPosition {
+                cursor_over: true,
+                normalized: Some(Vec2::ZERO),
+            },
+            WorldMapCanvas,
+        ));
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Left);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::NumpadEnter);
+        let mut repeated = key_event(KeyCode::NumpadEnter, Key::Enter, None, ButtonState::Pressed);
+        repeated.repeat = true;
+        send_keys(&mut app, [repeated.clone(), repeated]);
+        app.update();
+        let state = app.world().resource::<WorldMapState>();
+        assert_eq!(state.selected, original);
+        assert_eq!(state.month, 7);
+        assert!(state.regions.selected.is_none() && state.regions.active.is_none());
+        let mut actions = app.world_mut().resource_mut::<WorldMapActions>();
+        assert!(actions.start_at.is_none());
+        assert_eq!(
+            actions.regions.pending.take(),
+            Some(RegionAction::Select(Some("alps@1.2.3".into())))
+        );
+        app.update();
+        assert!(
+            app.world()
+                .resource::<WorldMapActions>()
+                .regions
+                .pending
+                .is_none()
+        );
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        assert!(
+            !app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .just_pressed(KeyCode::NumpadEnter)
+        );
+    }
+
+    #[test]
+    fn regions_close_button_cancels_before_other_actions() {
+        let mut app = input_app();
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .show_regions();
+        app.world_mut()
+            .resource_mut::<WorldMapActions>()
+            .regions
+            .pending = Some(RegionAction::Select(None));
+        for button in [
+            RegionsButton::Refresh,
+            RegionsButton::Close,
+            RegionsButton::Base,
+        ] {
+            app.world_mut()
+                .spawn((Interaction::Pressed, WorldMapButton::Regions(button)));
+        }
+        app.update();
+        assert!(app.world().resource::<WorldMapState>().visible);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        assert_eq!(
+            app.world().resource::<WorldMapActions>().regions.pending,
+            Some(RegionAction::Cancel)
+        );
+    }
+
+    #[test]
+    fn regions_simultaneous_m_escape_and_enter_are_consumed_on_dismissal() {
+        let mut app = input_app();
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .show_regions();
+        app.world_mut().resource_mut::<WorldMapState>().regions.busy = true;
+        for key in [
+            KeyCode::KeyM,
+            KeyCode::Escape,
+            KeyCode::Enter,
+            KeyCode::NumpadEnter,
+        ] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(key);
+        }
+        app.update();
+        let state = app.world().resource::<WorldMapState>();
+        assert!(!state.visible && !state.regions.visible);
+        let keys = app.world().resource::<ButtonInput<KeyCode>>();
+        assert_eq!(keys.get_just_pressed().count(), 0);
+        let actions = app.world().resource::<WorldMapActions>();
+        assert!(actions.start_at.is_none());
+        assert_eq!(actions.regions.pending, Some(RegionAction::Cancel));
+    }
+
+    fn region_keys(app: &mut App, pressed: &[KeyCode]) {
+        let mut keys = ButtonInput::<KeyCode>::default();
+        for key in pressed {
+            keys.press(*key);
+        }
+        app.insert_resource(keys);
+        app.update();
+    }
+
+    #[test]
+    fn regions_keyboard_opens_selects_visible_rows_and_leaves_activation_to_app() {
+        let mut app = input_app();
+        {
+            let mut state = app.world_mut().resource_mut::<WorldMapState>();
+            state.visible = true;
+            state
+                .regions
+                .set_installed((0..7).map(|index| RegionSummary {
+                    key: format!("region-{index}@1.0.0"),
+                    name: format!("Region {index}"),
+                }));
+            state.regions.credits = vec!["Credit"; 80].join("\n");
+        }
+        let original = app.world().resource::<WorldMapState>().selected;
+        region_keys(&mut app, &[KeyCode::KeyG, KeyCode::Enter, KeyCode::Digit1]);
+        assert!(app.world().resource::<WorldMapState>().regions.visible);
+        assert!(
+            app.world()
+                .resource::<WorldMapActions>()
+                .regions
+                .pending
+                .is_none()
+        );
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        assert_eq!(
+            app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .get_just_pressed()
+                .count(),
+            0
+        );
+        region_keys(&mut app, &[KeyCode::PageDown, KeyCode::Digit1]);
+        assert!(
+            regions::format_regions_text(
+                RegionsText::Page,
+                &app.world().resource::<WorldMapState>().regions
+            )
+            .starts_with("2 / 2")
+        );
+        assert!(
+            app.world()
+                .resource::<WorldMapActions>()
+                .regions
+                .pending
+                .is_none()
+        );
+        region_keys(&mut app, &[KeyCode::Digit1]);
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending
+                .take(),
+            Some(RegionAction::Select(Some("region-5@1.0.0".into())))
+        );
+        assert_eq!(app.world().resource::<WorldMapState>().selected, original);
+        assert!(
+            app.world()
+                .resource::<WorldMapState>()
+                .regions
+                .selected
+                .is_none()
+        );
+        assert!(
+            app.world()
+                .resource::<WorldMapState>()
+                .regions
+                .active
+                .is_none()
+        );
+        region_keys(&mut app, &[KeyCode::Digit5]);
+        assert!(
+            app.world()
+                .resource::<WorldMapActions>()
+                .regions
+                .pending
+                .is_none()
+        );
+        region_keys(&mut app, &[KeyCode::PageUp]);
+        region_keys(&mut app, &[KeyCode::Digit5]);
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending
+                .take(),
+            Some(RegionAction::Select(Some("region-4@1.0.0".into())))
+        );
+        region_keys(&mut app, &[KeyCode::Digit0]);
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending
+                .take(),
+            Some(RegionAction::Select(None))
+        );
+        region_keys(&mut app, &[KeyCode::ArrowRight]);
+        assert!(
+            regions::format_regions_text(
+                RegionsText::CreditsPage,
+                &app.world().resource::<WorldMapState>().regions
+            )
+            .starts_with("Page 2 /")
+        );
+        region_keys(&mut app, &[KeyCode::ArrowLeft]);
+        assert!(
+            regions::format_regions_text(
+                RegionsText::CreditsPage,
+                &app.world().resource::<WorldMapState>().regions
+            )
+            .starts_with("Page 1 /")
+        );
+        region_keys(&mut app, &[KeyCode::KeyR]);
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending
+                .take(),
+            Some(RegionAction::Refresh)
+        );
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        assert_eq!(app.world().resource::<WorldMapState>().month, 7);
+    }
+
+    #[test]
+    fn regions_keyboard_preserves_busy_pending_modifier_and_close_guards() {
+        let mut app = input_app();
+        {
+            let mut state = app.world_mut().resource_mut::<WorldMapState>();
+            state.show_regions();
+            state.regions.set_installed([RegionSummary {
+                key: "alps@1.0.0".into(),
+                name: "Alps".into(),
+            }]);
+        }
+        for busy in [true, false] {
+            {
+                let mut state = app.world_mut().resource_mut::<WorldMapState>();
+                state.regions.busy = busy;
+                state.regions.operations_enabled = busy;
+            }
+            for key in [KeyCode::KeyR, KeyCode::Digit0, KeyCode::Digit1] {
+                region_keys(&mut app, &[key]);
+                assert!(
+                    app.world()
+                        .resource::<WorldMapActions>()
+                        .regions
+                        .pending
+                        .is_none()
+                );
+                assert!(
+                    !app.world()
+                        .resource::<ButtonInput<KeyCode>>()
+                        .just_pressed(key)
+                );
+            }
+        }
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .regions
+            .operations_enabled = true;
+        for modifier in [KeyCode::ControlLeft, KeyCode::AltRight, KeyCode::SuperLeft] {
+            region_keys(&mut app, &[modifier, KeyCode::KeyR, KeyCode::Digit0]);
+            assert!(
+                app.world()
+                    .resource::<WorldMapActions>()
+                    .regions
+                    .pending
+                    .is_none()
+            );
+        }
+        app.world_mut()
+            .resource_mut::<WorldMapActions>()
+            .regions
+            .pending = Some(RegionAction::Refresh);
+        region_keys(&mut app, &[KeyCode::Digit1]);
+        assert_eq!(
+            app.world().resource::<WorldMapActions>().regions.pending,
+            Some(RegionAction::Refresh)
+        );
+        app.world_mut().spawn((
+            Interaction::Pressed,
+            WorldMapButton::Regions(RegionsButton::Row(0)),
+        ));
+        region_keys(&mut app, &[KeyCode::KeyX, KeyCode::KeyR]);
+        assert_eq!(
+            app.world().resource::<WorldMapActions>().regions.pending,
+            Some(RegionAction::Cancel)
+        );
+        for close in [KeyCode::Escape, KeyCode::KeyM] {
+            app.world_mut()
+                .resource_mut::<WorldMapState>()
+                .show_regions();
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .regions
+                .pending = Some(RegionAction::Refresh);
+            region_keys(
+                &mut app,
+                &[close, KeyCode::KeyR, KeyCode::Digit1, KeyCode::Enter],
+            );
+            assert!(!app.world().resource::<WorldMapState>().regions.visible);
+            assert_eq!(
+                app.world().resource::<WorldMapActions>().regions.pending,
+                Some(RegionAction::Cancel)
+            );
+            assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+            assert_eq!(
+                app.world()
+                    .resource::<ButtonInput<KeyCode>>()
+                    .get_just_pressed()
+                    .count(),
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn regions_shortcuts_do_not_steal_hidden_map_or_coordinate_editor_frames() {
+        let mut app = input_app();
+        region_keys(&mut app, &[KeyCode::KeyG, KeyCode::KeyR, KeyCode::PageUp]);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        assert_eq!(
+            app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .get_just_pressed()
+                .count(),
+            3
+        );
+        app.world_mut().resource_mut::<WorldMapState>().visible = true;
+        region_keys(&mut app, &[KeyCode::ControlLeft, KeyCode::KeyG]);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        // Same-frame field focus owns typed G, even though the physical key is
+        // also the map shortcut. It remains an invalid coordinate edit.
+        let field = app
+            .world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::Latitude))
+            .id();
+        send_keys(&mut app, [typed(KeyCode::KeyG, "g")]);
+        region_keys(&mut app, &[KeyCode::KeyG]);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        assert!(
+            app.world()
+                .resource::<WorldMapState>()
+                .coordinate_field
+                .is_some()
+        );
+        *app.world_mut().get_mut::<Interaction>(field).unwrap() = Interaction::None;
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .coordinate_draft = "12".into();
+        send_keys(
+            &mut app,
+            [key_event(
+                KeyCode::Enter,
+                Key::Enter,
+                None,
+                ButtonState::Pressed,
+            )],
+        );
+        region_keys(&mut app, &[KeyCode::KeyG, KeyCode::Enter]);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        near(
+            app.world()
+                .resource::<WorldMapState>()
+                .selected
+                .latitude_degrees(),
+            12.0,
+        );
+        // G must not dismiss or replace a higher-priority credits modal.
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .show_credits();
+        region_keys(&mut app, &[KeyCode::KeyG, KeyCode::Digit1]);
+        assert!(app.world().resource::<WorldMapState>().credits_visible);
+        assert!(!app.world().resource::<WorldMapState>().regions.visible);
+        assert_eq!(
+            app.world()
+                .resource::<ButtonInput<KeyCode>>()
+                .get_just_pressed()
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn real_layout_keeps_region_rows_credits_and_controls_inside_panel() {
+        let mut state = WorldMapState::default();
+        state.regions.set_installed((0..256).map(|n| RegionSummary {
+            key: format!("{}@1.2.{n}", "a".repeat(80)),
+            name: "W".repeat(80),
+        }));
+        state.regions.selected = Some("S".repeat(112));
+        state.regions.active = Some("A".repeat(112));
+        state.regions.status = "W".repeat(200);
+        state.regions.error = "W".repeat(200);
+        state.regions.store = "W".repeat(400);
+        state.regions.credits = vec!["W".repeat(60); 34].join("\n");
+        state.show_regions();
+        let mut app = real_layout_app(state);
+        let world = app.world_mut();
+        let overlay = world
+            .query_filtered::<Entity, With<WorldMapRegionsRoot>>()
+            .single(world)
+            .unwrap();
+        let panel = world.get::<Children>(overlay).unwrap()[0];
+        let panel_rect = computed_rect(world, panel);
+        assert!(
+            panel_rect.min.x >= 0.0
+                && panel_rect.min.y >= 0.0
+                && panel_rect.max.x <= 1280.0
+                && panel_rect.max.y <= 720.0
+        );
+        for (entity, kind) in world.query::<(Entity, &WorldMapText)>().iter(world) {
+            if let WorldMapText::Regions(_) = kind {
+                let rect = computed_rect(world, entity);
+                assert!(
+                    panel_rect.contains(rect.min) && panel_rect.contains(rect.max),
+                    "region text outside panel: {kind:?}, {rect:?}"
+                );
+                assert_text_fits(world, entity);
+            }
+        }
+        for (entity, _) in world.query::<(Entity, &Text)>().iter(world) {
+            let mut ancestor = world.get::<ChildOf>(entity).map(ChildOf::parent);
+            while let Some(parent) = ancestor {
+                if parent == panel {
+                    let rect = computed_rect(world, entity);
+                    assert!(
+                        panel_rect.contains(rect.min) && panel_rect.contains(rect.max),
+                        "region static text outside panel: {rect:?}"
+                    );
+                    assert_text_fits(world, entity);
+                    break;
+                }
+                ancestor = world.get::<ChildOf>(parent).map(ChildOf::parent);
+            }
+        }
+        for (entity, button) in world.query::<(Entity, &WorldMapButton)>().iter(world) {
+            if let WorldMapButton::Regions(_) = button {
+                let rect = computed_rect(world, entity);
+                assert!(
+                    panel_rect.contains(rect.min) && panel_rect.contains(rect.max),
+                    "region control outside panel: {button:?}, {rect:?}"
+                );
+                assert!(rect.height() >= MAP_BUTTON_HEIGHT - 1.0);
             }
         }
     }

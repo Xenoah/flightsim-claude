@@ -5,6 +5,7 @@ members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
     "crates/flightsim-world",
+    "crates/flightsim-content",
     "crates/flightsim-tilegen",
     "crates/flightsim-assetgen",
     "crates/flightsim-sim",
@@ -26,6 +27,7 @@ license = "MIT OR Apache-2.0"
 flightsim-core = { path = "crates/flightsim-core" }
 flightsim-fdm = { path = "crates/flightsim-fdm" }
 flightsim-world = { path = "crates/flightsim-world" }
+flightsim-content = { path = "crates/flightsim-content" }
 flightsim-tilegen = { path = "crates/flightsim-tilegen" }
 flightsim-sim = { path = "crates/flightsim-sim" }
 flightsim-render = { path = "crates/flightsim-render" }

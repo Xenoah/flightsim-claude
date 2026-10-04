@@ -251,8 +251,13 @@ pub(super) fn data_attribution(startup: &Startup) -> DataAttribution {
     if startup.world.climate_enabled {
         sources.push("Climate: NOAA PSL 1991-2020");
     }
-    if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. }) {
+    if startup.airport_enabled
+        && matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. })
+    {
         sources.push(OSM_AIRPORT_ATTRIBUTION);
+    }
+    if startup.active_region.is_some() {
+        sources.push("Region: recording/export unavailable; credits in M > Regions");
     }
     DataAttribution::new(sources.join(" | "))
 }
@@ -266,10 +271,14 @@ pub(super) fn data_attribution_with_scenery(startup: &Startup, scenery: &str) ->
         sources.push("Climate: NOAA normals");
     }
     sources.push(scenery);
-    if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. })
+    if startup.airport_enabled
+        && matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. })
         && !scenery.contains("OpenStreetMap")
     {
         sources.push(OSM_AIRPORT_ATTRIBUTION);
+    }
+    if startup.active_region.is_some() {
+        sources.push("Region: recording/export unavailable; credits in M > Regions");
     }
     DataAttribution::new(sources.join(" | "))
 }
@@ -452,16 +461,27 @@ fn initialize_map(startup: Res<Startup>, mut map: ResMut<WorldMapState>) {
     if startup.replay.is_none() && !startup.world.global_terrain {
         map.navigation_note = LEGACY_MAP_NOTICE.into();
     }
+    refresh_map_credits(&startup, &mut map);
+    if startup.world.map_credits {
+        map.show_credits();
+    }
+}
+
+fn refresh_map_credits(startup: &Startup, map: &mut WorldMapState) {
     // Preserve full UTF-8 legal notices in the distributed file. The default
     // Bevy font needs ASCII display spellings for copyright/trademark symbols.
     map.source_credits = include_str!("../../../docs/data/NOTICE-GLOBAL-TERRAIN.txt")
         .replace('©', "(c)")
         .replace('™', "(TM)");
-    if matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. }) {
+    if startup.airport_enabled
+        && matches!(startup.runway_source, RunwaySource::OpenStreetMap { .. })
+    {
         map.source_credits.push_str("\nAIRPORT DATA\n(c) OpenStreetMap contributors, ODbL1.0\nhttps://www.openstreetmap.org/copyright\n");
     }
-    if startup.world.map_credits {
-        map.show_credits();
+    if let Some(package) = &startup.active_region {
+        map.source_credits.push_str("\nACTIVE REGIONAL TERRAIN\n");
+        map.source_credits
+            .push_str(&region_runtime::credits(package.manifest()));
     }
 }
 
@@ -521,8 +541,8 @@ pub(super) fn tower_anchor(terrain: &mut Terrain<BoxedSource>, start: Geodetic) 
 /// Atomically replace one flight after all new state/data have been validated.
 /// An exclusive system keeps the restart transaction independent of Bevy's
 /// deferred Commands and prevents one stale frame of camera/recording state.
-fn apply_world_map_start(world: &mut World) {
-    let Some(request) = world.resource_mut::<WorldMapActions>().start_at.take() else {
+pub(super) fn apply_world_map_start(world: &mut World) {
+    let Some((request, package)) = region_runtime::take_start(world) else {
         return;
     };
     if world.contains_resource::<ReplayPlayback>() {
@@ -546,6 +566,13 @@ fn apply_world_map_start(world: &mut World) {
         map.navigation_enabled = false;
         map.navigation_note = LEGACY_MAP_NOTICE.into();
         return;
+    }
+    let source_changed = startup.active_region.as_ref().map(|p| p.identity())
+        != package.as_ref().map(|p| p.identity());
+    startup.active_region = package;
+    if source_changed {
+        startup.airport_enabled = false;
+        startup.scenery = None;
     }
     startup.world.climate_enabled = true;
     startup.world.climate_date = date;
@@ -613,11 +640,19 @@ fn apply_world_map_start(world: &mut World) {
         }
     }
     scenery_runtime::clear(world);
+    if source_changed {
+        region_runtime::clear_airport(world);
+        if let Some(mut scenery) = world.get_resource_mut::<scenery_runtime::SceneryRuntime>() {
+            scenery.suppress_after_source_change();
+        }
+    }
     let mut tiles = world.remove_resource::<TerrainTiles>().unwrap_or_default();
     // Cancel an in-flight stitching transaction too: it owns hidden bridges
     // and may retain the old visible mesh for a same-ID source replacement.
     for (entity, mesh) in tiles.drain_all() {
-        world.entity_mut(entity).despawn();
+        if let Ok(entity) = world.get_entity_mut(entity) {
+            entity.despawn();
+        }
         world.resource_mut::<Assets<Mesh>>().remove(&mesh);
     }
     world.insert_resource(tiles);
@@ -629,6 +664,8 @@ fn apply_world_map_start(world: &mut World) {
     }
     let mut map = world.resource_mut::<WorldMapState>();
     map.visible = false;
+    map.regions.visible = false;
+    refresh_map_credits(&startup, &mut map);
     map.aircraft = Some(state.geodetic());
     info!(
         "world flight: {:.5},{:.5}, 1000 m AGL, month {}; NOAA reanalysis climatology, not live weather",
@@ -660,13 +697,18 @@ fn publish_world_map(
         return;
     }
     map.aircraft = Some(simulation.0.state().geodetic());
-    map.navigation_enabled = playback.is_none() && startup.world.global_terrain;
+    map.navigation_enabled =
+        playback.is_none() && startup.world.global_terrain && !map.regions.busy;
     map.navigation_note = if let Some(error) = &runtime.last_navigation_error {
         error.clone()
     } else if playback.is_some() {
         "Replay preview only\nNew-flight relocation is disabled".into()
     } else if !startup.world.global_terrain {
         LEGACY_MAP_NOTICE.into()
+    } else if map.regions.busy {
+        "Inspecting region; current flight unchanged".into()
+    } else if map.regions.selected.is_some() || startup.active_region.is_some() {
+        "New free flight: 1000 m AGL\nRegional replay recording/export unavailable".into()
     } else {
         "New flight: 1000 m AGL\nUnsaved recording will be reset".into()
     };

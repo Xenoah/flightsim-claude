@@ -58,5 +58,34 @@ fn polar_benchmarks(c: &mut Criterion) {
     }
     group.finish();
 }
-criterion_group!(benches, polar_benchmarks);
+fn water_mask_benchmarks(c: &mut Criterion) {
+    use criterion::BatchSize;
+    use flightsim_render::water::WaterMaskBuilder;
+    use std::hint::black_box;
+    use std::time::Duration;
+
+    let atlas = GlobalTerrain::bundled().expect("validated bundled atlas");
+    let mut group = c.benchmark_group("water_mask");
+    group
+        .sample_size(10)
+        .warm_up_time(Duration::from_secs(1))
+        .measurement_time(Duration::from_secs(2));
+    group.bench_function("batch_8192", |b| {
+        b.iter_batched_ref(
+            || WaterMaskBuilder::new(atlas.clone()),
+            |builder| black_box(builder.advance()),
+            BatchSize::PerIteration,
+        );
+    });
+    group.bench_function("complete_512_cube", |b| {
+        b.iter(|| {
+            let mut builder = WaterMaskBuilder::new(atlas.clone());
+            while !builder.advance() {}
+            black_box(builder.completed_texels())
+        });
+    });
+    group.finish();
+}
+
+criterion_group!(benches, polar_benchmarks, water_mask_benchmarks);
 criterion_main!(benches);

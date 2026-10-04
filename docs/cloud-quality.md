@@ -68,8 +68,10 @@ The upper renderer uses one curved layer, bounded ray integration, approximate
 single scattering and ambient illumination. Distant density is spatially averaged;
 it does not preserve every distant cloud silhouette. It respects opaque scene
 and aircraft depth. Arbitrary future transparent/transmissive objects need further
-integration. Terrain cloud shadows, multiple weather layers, precipitation and
-live-weather downloads are outside this implementation.
+integration. Light retains its legacy PBR plane shadows. The upper volume currently has no
+terrain cloud-shadow pass, so switching tiers can also change ground brightness.
+Multiple weather layers, precipitation and live-weather downloads are outside
+this implementation.
 
 ## Optional future meteorological inputs
 

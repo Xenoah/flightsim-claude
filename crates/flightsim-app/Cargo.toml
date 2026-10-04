@@ -18,6 +18,7 @@ commercial-staging = []
 flightsim-core.workspace = true
 flightsim-fdm.workspace = true
 flightsim-world.workspace = true
+flightsim-content.workspace = true
 flightsim-sim.workspace = true
 flightsim-render.workspace = true
 flightsim-input.workspace = true

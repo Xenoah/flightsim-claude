@@ -48,7 +48,7 @@ jobs:
     env:
       HEADLESS: >-
         -p flightsim-core -p flightsim-fdm -p flightsim-world
-        -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net
+        -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net -p flightsim-content
 
     steps:
       - uses: actions/checkout@v4

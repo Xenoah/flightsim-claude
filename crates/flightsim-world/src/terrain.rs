@@ -19,7 +19,7 @@
 //! [`dem::io`]: crate::dem::io
 
 use crate::dem::DemTile;
-use crate::dem::io::{TileReadError, read_tile, tile_relative_path};
+use crate::dem::io::{MAX_TILE_FILE_BYTES, TileReadError, read_tile, tile_relative_path};
 use crate::streaming::TileCache;
 use crate::tile::{MAX_LEVEL, TileId};
 use flightsim_core::{Geodetic, Meters};
@@ -157,18 +157,50 @@ impl TileSource for DiskTileSource {
     fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
         let path = self.root.join(tile_relative_path(id));
 
-        let bytes = match std::fs::read(&path) {
-            Ok(bytes) => bytes,
+        let file = match std::fs::File::open(&path) {
+            Ok(file) => file,
             // 焼かれていないタイルは存在しないのが正常。
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(source) => return Err(TerrainError::Io { path, source }),
         };
 
-        let stored =
-            read_tile(&mut bytes.as_slice()).map_err(|source| TerrainError::Malformed {
+        use std::io::Read;
+        let metadata = file.metadata().map_err(|source| TerrainError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        if !metadata.is_file() || metadata.len() > MAX_TILE_FILE_BYTES {
+            return Err(TerrainError::Io {
+                path,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "tile exceeds encoded size limit or is not a regular file",
+                ),
+            });
+        }
+        // Stream the bounded input. Never allocate a Vec from an untrusted disk file's length.
+        let mut reader = std::io::BufReader::new(file.take(MAX_TILE_FILE_BYTES + 1));
+        let stored = read_tile(&mut reader).map_err(|source| TerrainError::Malformed {
+            path: path.clone(),
+            source,
+        })?;
+
+        if reader
+            .read(&mut [0u8; 1])
+            .map_err(|source| TerrainError::Io {
                 path: path.clone(),
                 source,
-            })?;
+            })?
+            != 0
+        {
+            return Err(TerrainError::Io {
+                path,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "trailing bytes in tile",
+                ),
+            });
+        }
 
         // パスと中身が食い違うタイルは使わない。使うと別の場所の地形になる。
         if stored.id != id {
@@ -724,6 +756,29 @@ mod tests {
         assert!(terrain.load_failures().is_empty());
 
         std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn oversized_disk_tiles_and_trailing_data_are_rejected_before_unbounded_reads() {
+        let directory = std::env::temp_dir().join(format!(
+            "flightsim-terrain-bounded-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let id = TileId::new(9, 300, 180);
+        let path = directory.join(tile_relative_path(id));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let oversized = std::fs::File::create(&path).unwrap();
+        oversized.set_len(MAX_TILE_FILE_BYTES + 1).unwrap();
+        drop(oversized);
+        let source = DiskTileSource::new(&directory);
+        assert!(matches!(source.load(id), Err(TerrainError::Io { .. })));
+        let mut bytes = Vec::new();
+        write_tile(&mut bytes, id, ramp_tile(id, 9, 10.0).grid()).unwrap();
+        bytes.push(0);
+        std::fs::write(&path, bytes).unwrap();
+        assert!(matches!(source.load(id), Err(TerrainError::Io { .. })));
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

@@ -48,6 +48,7 @@ pub struct LodSelector {
     root_geometric_error: Meters,
     max_tiles: usize,
     near_detail: Option<(Meters, u8)>,
+    refinement_radius: Option<(Meters, u8)>,
 }
 
 impl LodSelector {
@@ -92,6 +93,7 @@ impl LodSelector {
             root_geometric_error,
             max_tiles: DEFAULT_MAX_TILES,
             near_detail: None,
+            refinement_radius: None,
         }
     }
 
@@ -137,6 +139,48 @@ impl LodSelector {
     #[must_use]
     pub const fn without_near_detail(mut self) -> Self {
         self.near_detail = None;
+        self
+    }
+
+    /// Replace the visual error threshold without altering leaf/work budgets.
+    ///
+    /// # Panics
+    /// The threshold must be positive and finite.
+    #[must_use]
+    pub fn with_screen_space_error(mut self, pixels: f64) -> Self {
+        assert!(
+            pixels.is_finite() && pixels > 0.0,
+            "invalid screen-space error"
+        );
+        self.max_screen_space_error = pixels;
+        self
+    }
+
+    /// Stop further subdivision beyond a horizontal footprint radius once the
+    /// coarse level is reached. Existing leaves still cover the entire globe;
+    /// this is a refinement boundary, never a terrain/physical-data clip plane.
+    /// The cap also bounds optional near-detail requests.
+    ///
+    /// # Panics
+    /// Radius must be finite/positive and the coarse level within the scheme.
+    #[must_use]
+    pub fn with_refinement_radius(mut self, radius: Meters, coarse_level: u8) -> Self {
+        assert!(
+            radius.is_finite() && radius.get() > 0.0,
+            "invalid refinement radius"
+        );
+        assert!(
+            coarse_level <= crate::tile::MAX_LEVEL,
+            "invalid coarse level"
+        );
+        self.refinement_radius = Some((radius, coarse_level));
+        self
+    }
+
+    /// Restore unrestricted geographic SSE refinement, retaining all budgets.
+    #[must_use]
+    pub const fn without_refinement_radius(mut self) -> Self {
+        self.refinement_radius = None;
         self
     }
 
@@ -192,6 +236,14 @@ impl LodSelector {
             Meters::ZERO
         };
         let camera_position = camera.to_geodetic();
+        let refinement_reference = self.refinement_radius.map(|(radius, coarse_level)| {
+            let position = Geodetic::new(
+                camera_position.latitude,
+                camera_position.longitude,
+                Meters::ZERO,
+            );
+            (position.to_ecef(), radius, coarse_level)
+        });
         let near_reference = self.near_detail.map(|(radius, level)| {
             let surface = Geodetic::new(
                 camera_position.latitude,
@@ -204,6 +256,12 @@ impl LodSelector {
         let mut pending = BinaryHeap::new();
         let enqueue = |id: TileId, pending: &mut BinaryHeap<(bool, u64, Reverse<TileId>)>| {
             if id.level >= self.max_level {
+                return;
+            }
+            if refinement_reference.is_some_and(|(surface, radius, coarse_level)| {
+                id.level >= coarse_level
+                    && conservative_distance_to_bounds(surface, id.bounds()).get() > radius.get()
+            }) {
                 return;
             }
             let distance = distance_to_bounds_at_elevation(
@@ -251,13 +309,28 @@ impl LodSelector {
     }
 }
 
-/// カメラから範囲内の最近点までの距離。
+/// Distance to the independently clamped geographic coordinates. This legacy
+/// SSE estimate is not a conservative nearest-footprint distance near poles.
+/// Use [`conservative_distance_to_bounds`] for hard radius rejection.
 ///
 /// 経度は日付変更線をまたいで循環するため、単純なクランプでは正しく求まらない。
 /// 範囲の中心からの符号付き角差を `[-π, π]` に正規化してから判定している。
 #[must_use]
 pub fn distance_to_bounds(camera: Ecef, camera_position: Geodetic, bounds: GeoBounds) -> Meters {
     distance_to_bounds_at_elevation(camera, camera_position, bounds, Meters::ZERO)
+}
+
+/// Lower bound for the distance to any point of a zero-altitude footprint.
+/// An enclosing core-owned WGS84 box deliberately permits false positives,
+/// retaining intersecting terrain even at off-meridian polar viewpoints.
+#[must_use]
+pub fn conservative_distance_to_bounds(camera: Ecef, bounds: GeoBounds) -> Meters {
+    camera.distance_lower_bound_to_surface_rectangle(
+        bounds.south,
+        bounds.north,
+        bounds.west,
+        bounds.east,
+    )
 }
 
 /// Distance to the clamped geographic footprint on a local reference-height

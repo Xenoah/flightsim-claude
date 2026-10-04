@@ -208,6 +208,79 @@ impl Ecef {
         Meters(self.0.distance(other.0))
     }
 
+    /// Conservative ECEF distance to a geographic rectangle on the WGS84
+    /// ellipsoid (zero altitude). Useful for rejecting distant surface regions.
+    /// This lower bound may include extra terrain; it never intentionally
+    /// excludes a point within the requested distance.
+    ///
+    /// The containing Cartesian box uses all possible coordinate extrema:
+    /// latitude endpoints/the equator and longitude endpoints/cardinal meridians.
+    /// WGS84 z is monotone in latitude, and its horizontal radius is monotone on
+    /// either side of the equator. Thus these at most 21 points bound the entire
+    /// curved patch, including poles. A micrometre padding covers f64 rounding.
+    ///
+    /// # Panics
+    /// Angles must be finite, ordered, and in latitude [-π/2, π/2] or longitude
+    /// [-π, π], allowing 16 epsilon radians of endpoint rounding. Split a
+    /// rectangle that crosses the date line into two intervals.
+    #[must_use]
+    pub fn distance_lower_bound_to_surface_rectangle(
+        self,
+        south: Radians,
+        north: Radians,
+        west: Radians,
+        east: Radians,
+    ) -> Meters {
+        use core::f64::consts::{FRAC_PI_2, PI};
+        const ENDPOINT_ROUNDING: f64 = 16.0 * f64::EPSILON;
+        assert!(
+            [south, north, west, east]
+                .into_iter()
+                .all(Radians::is_finite)
+                && -FRAC_PI_2 - ENDPOINT_ROUNDING <= south.get()
+                && south.get() <= north.get()
+                && north.get() <= FRAC_PI_2 + ENDPOINT_ROUNDING
+                && -PI - ENDPOINT_ROUNDING <= west.get()
+                && west.get() <= east.get()
+                && east.get() <= PI + ENDPOINT_ROUNDING,
+            "surface rectangle must have ordered finite geographic bounds"
+        );
+        // Tile endpoint arithmetic can land one ulp beyond a pole/date line.
+        // Normalize those endpoints; the Cartesian padding exceeds this error.
+        let south = Radians(south.get().clamp(-FRAC_PI_2, FRAC_PI_2));
+        let north = Radians(north.get().clamp(-FRAC_PI_2, FRAC_PI_2));
+        let west = Radians(west.get().clamp(-PI, PI));
+        let east = Radians(east.get().clamp(-PI, PI));
+        let mut minimum = DVec3::splat(f64::INFINITY);
+        let mut maximum = DVec3::splat(f64::NEG_INFINITY);
+        for latitude in [south, north, Radians::ZERO] {
+            if latitude.get() < south.get() || latitude.get() > north.get() {
+                continue;
+            }
+            for longitude in [
+                west,
+                east,
+                Radians(-PI),
+                Radians(-FRAC_PI_2),
+                Radians::ZERO,
+                Radians(FRAC_PI_2),
+                Radians(PI),
+            ] {
+                if longitude.get() < west.get() || longitude.get() > east.get() {
+                    continue;
+                }
+                let point = Geodetic::new(latitude, longitude, Meters::ZERO).to_ecef().0;
+                minimum = minimum.min(point);
+                maximum = maximum.max(point);
+            }
+        }
+        let padding = DVec3::splat(1.0e-6);
+        Meters(
+            self.0
+                .distance(self.0.clamp(minimum - padding, maximum + padding)),
+        )
+    }
+
     #[must_use]
     pub fn is_finite(self) -> bool {
         self.0.is_finite()
@@ -508,5 +581,56 @@ mod tests {
             b.great_circle_distance(a).get(),
             1e-6
         );
+    }
+}
+
+#[cfg(test)]
+mod surface_rectangle_tests {
+    use super::*;
+
+    #[test]
+    fn surface_box_bound_never_exceeds_distances_to_dense_footprint_samples() {
+        // Include intervals crossing coordinate extrema, whole hemispheres,
+        // both polar caps and separate sides of the date line.
+        for (south, north, west, east) in [
+            (-90.0, 90.0, -180.0, 180.0),
+            (-90.0, -87.1875, 177.1875, 180.0),
+            (87.1875, 90.0, -180.0, -177.1875),
+            (-20.0, 30.0, -100.0, 120.0),
+            (0.0, 10.0, 0.0, 10.0),
+            (-45.0, -44.0, 179.0, 180.0),
+        ] {
+            for (latitude, longitude) in [
+                (-89.95, 0.0),
+                (89.95, 0.0),
+                (89.95, 179.999),
+                (0.0, -179.999),
+                (5.0, 5.0),
+                (40.0, 50.0),
+            ] {
+                let camera = Geodetic::from_degrees(latitude, longitude, 0.0).to_ecef();
+                let bound = camera.distance_lower_bound_to_surface_rectangle(
+                    Degrees(south).to_radians(),
+                    Degrees(north).to_radians(),
+                    Degrees(west).to_radians(),
+                    Degrees(east).to_radians(),
+                );
+                assert!(bound.is_finite() && bound.get() >= 0.0);
+                for row in 0..=32 {
+                    for column in 0..=32 {
+                        let point = Geodetic::from_degrees(
+                            south + (north - south) * f64::from(row) / 32.0,
+                            west + (east - west) * f64::from(column) / 32.0,
+                            0.0,
+                        )
+                        .to_ecef();
+                        assert!(
+                            bound.get() <= camera.distance_to(point).get(),
+                            "bound exceeds distance to an included surface point"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

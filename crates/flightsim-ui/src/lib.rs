@@ -99,6 +99,10 @@ pub struct HudState {
     pub terrain_available: bool,
     pub view_mode: &'static str,
     /// Display-only label supplied by app; UI does not depend on the renderer.
+    /// Requested local scenery/detail range. Coarse distant terrain remains visible.
+    pub draw_distance: &'static str,
+    /// Requested water tier; pending upper rendering is visibly labeled.
+    pub water_quality: &'static str,
     pub graphics_quality: &'static str,
     /// Requested cloud rendering tier and provenance, supplied by app.
     pub cloud_quality: &'static str,
@@ -588,6 +592,8 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
 \
          WND  {}\n\
          VIEW {}{terrain}\n\
+         WTR  {} [F1]\n\
+         DST  {} [F2]\n\
          GFX  {} [F4]\n\
          CLD  {} [F3]\n\
          {}",
@@ -603,6 +609,8 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         state.trim,
         format_wind(state.wind_from, state.wind_speed),
         state.view_mode,
+        state.water_quality,
+        state.draw_distance,
         state.graphics_quality,
         state.cloud_quality,
         state.cloud_source,
@@ -690,6 +698,8 @@ mod tests {
             terrain_available: true,
             view_mode: "COCKPIT",
             graphics_quality: "LIGHT",
+            draw_distance: "STANDARD 4.5km",
+            water_quality: "LIGHT",
             cloud_quality: "LIGHT",
             cloud_source: "MONTHLY MODEL",
             wind_from: Radians(0.0),

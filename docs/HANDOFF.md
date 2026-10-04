@@ -30,6 +30,12 @@ Steam へ出荷できるという承認ではない。公開版・PR の状態�
 三角形の描画面と物理のバイリニア補間、建物の基礎、遠方の精度制限は残る。
 最終集約試験・実画面・公開の状態は、その時点の QA 記録と対象 commit の CI で確認する。
 
+2026-10-04 の追加は [地域 ZIP](content-packages.md)、[描画距離](draw-distance.md)、
+[水面品質](water-quality.md) と [統合 QA](qa/expansion-integration-2026-10-04.md) を参照。
+地域 ZIP は prepared DEM-only schema v1 のローカル読み込みで、GitHub ダウンロードや
+任意の ZIP/生 DEM 自動変換は次の段階。F1 は水面、F2 は局所詳細距離、F3 は雲、F4 は
+グラフィックス。最軽量の既定値と既存の配布審査ゲートを維持している。
+
 ---
 
 ## 1. 現状を 30 秒で

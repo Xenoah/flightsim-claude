@@ -49,6 +49,7 @@ ECEF のスナップショットと通信状態を app が描画・UI に結線�
 | `flightsim-core` | WGS84 測地系、ECEF/ENU/NED 変換、単位型、シミュレーション時刻 | ✗ | architect |
 | `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、着陸装置、積分器 | ✗ | simulation |
 | `flightsim-world` | タイル分割、DEM、LOD 選択、ストリーミング、地形高度クエリ | ✗ | world |
+| `flightsim-content` | Data-only local package validation, immutable installation and hash-checked regional tile sources | ✗ | architect/world |
 | `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
@@ -158,6 +159,22 @@ pub struct Radians(pub f64);
 
 ## 6. ワールドデータ
 
+### Local regional packages (schema v1)
+
+`flightsim-content` sits above `world`/`core`, with no simulation, Bevy or raw-data
+converter dependency. It accepts prepared local ZIP packages containing declared,
+size/SHA-256-verified FSDM and inert license/provenance text. It never executes
+package code, downloads repositories, or activates a region. Strict portable paths,
+file/count/inflation limits and runtime-reader validation precede an atomic,
+non-overwriting version install. See [package format and lifecycle](docs/content-packages.md).
+
+App may activate one fully inspected immutable package only when creating a new
+flight; import/selection/cancel never mutate a current flight. The package TileSource
+retains global fallback through the existing world composition and verifies declared
+hashes at runtime reads. Legacy replay v1/v2 cannot represent regional identity and
+must be explicitly blocked for package-backed flights. Their bytes are unchanged;
+a future format must record and verify package ID, version and exact manifest hash.
+
 ### Offline global baseline and regional climate (2026-10-02 branch)
 
 [ADR-0011](docs/adr/0011-offline-global-terrain-climate.md) adds a compact, complete
@@ -233,6 +250,17 @@ in [mixed-LOD stitching QA](docs/qa/terrain-mixed-lod-stitching-2026-10-02.md) a
 タイル分割は **地理座標系クアッドツリー**（level 0 = 経度方向2タイル × 緯度方向1タイル）。Cesium の geographic tiling scheme と同一にして、既存タイルセットとの互換を保つ。
 
 LOD は幾何誤差ベースの screen-space error で選択する（距離ベースではなく）。理由は山岳と平野で必要ポリゴン数が桁違いに違うため。
+
+Visual draw-distance settings additionally bound the geographic region that may
+refine beyond coarse terrain. `world::draw_distance` provides validated Short,
+Standard and Long policies; Standard preserves the existing SSE-only cut.
+Short caps subdivision outside 10 km after level 6, retaining complete planetary
+coverage, while Long requests more local detail under the same leaf, cache,
+load, mesh and scenery limits. Scenery query radius, regional terrain-detail
+radius and camera far plane are distinct controls. App replaces the actual LOD
+selector and cancels stale scenery generations before upload; physical DEM
+sampling and replay identity never read this visual policy. See
+[draw-distance policy](docs/draw-distance.md) for values, bounds and integration.
 
 描画の SSE 選択は要求精度であり、実タイルの存在を意味しない。欠落・読込失敗時は
 予算内で祖先を探し、非表示でメッシュを準備してから、非重複の cut を一括表示する。

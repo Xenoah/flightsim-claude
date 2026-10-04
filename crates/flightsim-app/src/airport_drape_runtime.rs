@@ -3,6 +3,9 @@ use super::*;
 use flightsim_core::Ecef;
 use flightsim_render::terrain_drape::TerrainOverlay;
 
+#[derive(Component, Debug)]
+pub(super) struct AirportGeometry;
+
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Support {
     Surface,
@@ -50,6 +53,7 @@ pub(super) fn spawn(
         .spawn((
             flightsim_render::terrain_mesh_bundle(handle.clone(), material, origin),
             Name::new(name.clone()),
+            AirportGeometry,
         ))
         .id();
     if let Some(source) = source {
