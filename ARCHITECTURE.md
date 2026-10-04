@@ -160,10 +160,14 @@ pub struct Radians(pub f64);
   commits only after every bounded substep and endpoint succeeds; no hidden
   governor history is permitted. [Exact profile v3](docs/aircraft-profile-v3.md)
   and schema-3 identity preserve that model's full immutable configuration.
-  This foundation does not select a new app aircraft or reuse replay v1–v4 for
-  engine state. A complete host/replay integration and authored flight checks
-  are required before exposing a turboprop preset. See
-  [ADR-0018](docs/adr/0018-bounded-running-turboprop.md).
+  Its separate pure host and [replay v5](docs/replay-v5.md) preserve complete
+  endpoints, controller/clock/contact history and exact report provenance.
+  Seek reconstructs from frame zero within 240 attempts, including terminal
+  probes. This does not select a new app aircraft or reuse replay v1–v4 for
+  engine state. App integration and authored flight checks are required before
+  exposing a turboprop preset. See
+  [ADR-0018](docs/adr/0018-bounded-running-turboprop.md) and
+  [ADR-0019](docs/adr/0019-turboprop-full-state-replay-v5.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を

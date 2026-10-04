@@ -361,6 +361,35 @@ class CandidateAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "frozen reviewed FDM module input changed"):
             candidate.load_replay_contract(repo)
 
+    def test_turboprop_replay_review_rejects_export_and_old_codec_dispatch_drift(self):
+        repo, _ = self.source_fixture()
+        # Pure v5 is separately exported. It must not enter either existing
+        # dispatch path or silently disappear from this reviewed sim root.
+        # These exact source mutations exercise admission, not Rust execution.
+        mutations = (
+            ("crates/flightsim-sim/src/lib.rs", b'pub mod replay_v5;\n', b''),
+            ("crates/flightsim-sim/src/lib.rs", b'pub mod turboprop_simulation;\n', b''),
+            ("crates/flightsim-sim/src/replay_v4.rs",
+             b'if version == MODEL_FORMAT_VERSION {',
+             b'if version == MODEL_FORMAT_VERSION || version == 5 {'),
+            ("crates/flightsim-sim/src/replay/current.rs",
+             b'CURRENT_FORMAT_VERSION => Ok(Self::V3(',
+             b'CURRENT_FORMAT_VERSION | 5 => Ok(Self::V3('),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
     def test_native_dispatch_review_rejects_model_routing_and_legacy_adapter_drift(self):
         repo, _ = self.source_fixture()
         mutations = (

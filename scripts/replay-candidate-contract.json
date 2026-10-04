@@ -1,6 +1,6 @@
 {
   "contract": "swift-candidate-replay-v3-v1",
-  "reviewed_source": "e0a33318507dc4e3a8331617ab1a3ba030d24a3e",
+  "reviewed_source": "28cd909f576ce0a11e4a00a3beaaed67788e19b5",
   "schema_version": 1,
   "source_sha256": {
     "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
@@ -31,7 +31,7 @@
     "crates/flightsim-fdm/src/lib.rs": "2328631f895921e4152de6f8107c4d6f07ba764b6f6225189a4b826c6f9f013c",
     "crates/flightsim-sim/Cargo.toml": "81183643e7fb6c77ad3e0a6455befe734b17bf8592af4570ea43bc340ae6804e",
     "crates/flightsim-sim/examples/record_takeoff.rs": "53fa3903cd8af2f81659f5646aca948590f6efe90be3b53d37278eaecd0d0f59",
-    "crates/flightsim-sim/src/lib.rs": "720e183b52120966c4f75ec59058b3b3ea6e9024413bc2b240423a7e4d8e501b",
+    "crates/flightsim-sim/src/lib.rs": "11b56a2b89154643b3c0c5fe9d20f580dc7187ab02e2b868f9ddbda122eda69c",
     "crates/flightsim-sim/src/replay.rs": "7705e17336554ee00f2c5c5332865a01b64c18b7a220920df096cc4e8bc0f7b1",
     "crates/flightsim-sim/src/replay/current.rs": "4e972bcf4eea01b220b57217c27c32ec1e1f9f7342ffa88c6dc5693d9adf28ea",
     "crates/flightsim-sim/src/replay/identity.rs": "b702fa49a2c7138adf4b9f90a81cdab9178e2f8a071f8376ecc578efa5751eae",

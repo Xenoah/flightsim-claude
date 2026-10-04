@@ -125,8 +125,9 @@ identity algorithm 1, schema 3,
 kind 3, FDM law 1; turbine/propeller/governor component schema 1 and isolated
 propeller convention 1. The unchanged Mach-aero component remains schema 1.
 No existing version is reused with a new meaning. The byte layout
-and its version meanings are fixed. A later replay format requires
-its own codec; this change does not implement or advertise replay v5 support.
+and its version meanings are fixed. The separate [replay v5 codec](replay-v5.md)
+now preserves the complete engine state; this profile loader itself performs no
+replay or app dispatch.
 
 Canonical bytes are little endian and preserve validated f64 bit patterns:
 

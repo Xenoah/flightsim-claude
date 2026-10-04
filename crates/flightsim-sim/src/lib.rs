@@ -72,8 +72,10 @@ pub mod model_identity;
 pub mod model_simulation;
 pub mod replay;
 pub mod replay_v4;
+pub mod replay_v5;
 pub mod simulation;
 pub mod turboprop_identity;
+pub mod turboprop_simulation;
 pub mod weather;
 
 pub use crash::{Crash, CrashCause, CrashLimits};
