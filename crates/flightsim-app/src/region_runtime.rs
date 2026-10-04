@@ -1402,16 +1402,29 @@ mod tests {
 
     #[test]
     fn store_defaults_to_absolute_user_data_and_override_is_explicit() {
-        let path = default_store_from("linux", |name| {
-            (name == "HOME").then(|| PathBuf::from("/users/test"))
-        })
-        .unwrap();
-        assert_eq!(
-            path,
-            PathBuf::from("/users/test/.local/share/flightsim-claude/regions")
-        );
-        assert!(default_store_from("linux", |_| None).is_err());
-        assert!(default_store_from("linux", |_| Some(PathBuf::from("relative"))).is_err());
+        // PathBuf validates absolute paths using the host platform's syntax.
+        // A POSIX-looking fixture has no drive prefix on Windows.
+        let user_data = TestDirectory::new();
+        let root = user_data.0.canonicalize().unwrap();
+        let path = default_store_from("linux", |name| (name == "HOME").then(|| root.to_path_buf()))
+            .unwrap();
+        assert_eq!(path, root.join(".local/share/flightsim-claude/regions"));
+        for (os, variable, suffix) in [
+            ("windows", "LOCALAPPDATA", "flightsim-claude/regions"),
+            (
+                "macos",
+                "HOME",
+                "Library/Application Support/flightsim-claude/regions",
+            ),
+            ("linux", "XDG_DATA_HOME", "flightsim-claude/regions"),
+        ] {
+            let selected =
+                default_store_from(os, |name| (name == variable).then(|| root.to_path_buf()))
+                    .unwrap();
+            assert_eq!(selected, root.join(suffix));
+            assert!(default_store_from(os, |_| None).is_err());
+            assert!(default_store_from(os, |_| Some(PathBuf::from("relative"))).is_err());
+        }
         assert_eq!(
             store(&Options {
                 store: Some(PathBuf::from("explicit")),

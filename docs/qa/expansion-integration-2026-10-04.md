@@ -151,3 +151,19 @@ package notice files plus two supplements and 348 registry checksums. Its status
 remains `not_reviewed`. Existing rights, review and release-authorization gates
 remain active; this milestone does not establish a distributable commercial
 binary or publish a new alpha release.
+
+## Windows CI follow-up
+
+The first published integration, `73fee1a`, exposed two Windows-only failures in
+CI run `37171954038`. A contended `fs2` file lock returned the native
+`ERROR_LOCK_VIOLATION` rather than Rust's `WouldBlock` kind. The follow-up maps
+the platform error identified by `fs2::lock_contended_error()` to `StoreBusy`,
+while retaining nonblocking acquisition and propagating every unrelated I/O
+error. The existing concurrency/no-overwrite assertion remains intact.
+
+The app's per-user-store test also used `/users/test` as an absolute path on
+every platform. Windows correctly rejects that drive-less fixture. The test now
+uses a native absolute temporary directory and checks HOME, XDG_DATA_HOME and
+LOCALAPPDATA routing without changing environment variables or production path
+validation. Local focused checks do not substitute for the new exact Windows
+CI run; its terminal result is part of the delivery receipt.

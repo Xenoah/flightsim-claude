@@ -70,7 +70,12 @@ impl StagedPackage {
             .truncate(false)
             .open(lock_path)?;
         lock.try_lock_exclusive().map_err(|e| {
-            if e.kind() == std::io::ErrorKind::WouldBlock {
+            // Windows reports ERROR_LOCK_VIOLATION, whose Rust ErrorKind is
+            // not WouldBlock. Use fs2's platform contract, not a guessed code.
+            if e.kind() == std::io::ErrorKind::WouldBlock
+                || e.raw_os_error()
+                    .is_some_and(|code| Some(code) == fs2::lock_contended_error().raw_os_error())
+            {
                 Error::StoreBusy
             } else {
                 Error::Io(e)

@@ -285,7 +285,11 @@ fn commit_lock_is_nonblocking_and_concurrent_publication_never_replaces() {
         .open(store.join(".install.lock"))
         .unwrap();
     lock.lock_exclusive().unwrap();
-    assert!(matches!(stage.commit(), Err(Error::StoreBusy)));
+    let result = stage.commit();
+    assert!(
+        matches!(&result, Err(Error::StoreBusy)),
+        "contended store must return StoreBusy; got {result:?}"
+    );
     drop(lock);
     let a = stage_zip_with_progress(&input, &store, |_| true).unwrap();
     let b = stage_zip_with_progress(&input, &store, |_| true).unwrap();
