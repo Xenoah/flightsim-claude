@@ -1,4 +1,4 @@
-//! App-owned explicit three-family dispatch. Each replay owns its only simulation.
+//! App-owned explicit four-family dispatch. Each replay owns its only simulation.
 use crate::{BoxedSource, StartCondition, Startup};
 use bevy::prelude::*;
 use flightsim_core::{Geodetic, Meters, MetersPerSecond, Radians, Seconds};
@@ -7,8 +7,10 @@ use flightsim_input::{PilotControls, SampledPilotInput};
 use flightsim_sim::{
     Simulation,
     model_simulation::{JetEnvironment, JetSimulation, JetTerrain},
+    near_static_turboprop_simulation::NearStaticTurbopropSimulation,
     replay_v4::{JetRecorder, JetReplayPlayer},
     replay_v5::{TurbopropRecorder, TurbopropReplayPlayer},
+    replay_v6::{NearStaticTurbopropRecorder, NearStaticTurbopropReplayPlayer},
     turboprop_simulation::TurbopropSimulation,
 };
 
@@ -44,6 +46,21 @@ pub(super) enum FlightSession {
         pending_seek: Option<u32>,
         total: Seconds,
     },
+    NearStaticTurbopropLive {
+        simulation: NearStaticTurbopropSimulation,
+        recorder: NearStaticTurbopropRecorder,
+        parking_brake: bool,
+        pending_parking_toggle: bool,
+        last_controls: ControlInputs,
+        recording_error: Option<String>,
+        fault: Option<String>,
+    },
+    NearStaticTurbopropReplay {
+        player: NearStaticTurbopropReplayPlayer,
+        fault: Option<String>,
+        pending_seek: Option<u32>,
+        total: Seconds,
+    },
 }
 impl From<Simulation<BoxedSource>> for FlightSession {
     fn from(value: Simulation<BoxedSource>) -> Self {
@@ -67,6 +84,15 @@ impl FlightSession {
     pub fn replay_turboprop(player: TurbopropReplayPlayer) -> Self {
         let total = player.recording().duration();
         Self::TurbopropReplay {
+            player,
+            total,
+            fault: None,
+            pending_seek: None,
+        }
+    }
+    pub fn replay_near_static_turboprop(player: NearStaticTurbopropReplayPlayer) -> Self {
+        let total = player.recording().duration();
+        Self::NearStaticTurbopropReplay {
             player,
             total,
             fault: None,
@@ -135,7 +161,10 @@ impl FlightSession {
     pub fn is_turboprop(&self) -> bool {
         matches!(
             self,
-            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. }
+            Self::TurbopropLive { .. }
+                | Self::TurbopropReplay { .. }
+                | Self::NearStaticTurbopropLive { .. }
+                | Self::NearStaticTurbopropReplay { .. }
         )
     }
     pub fn uses_bounded_model(&self) -> bool {
@@ -145,6 +174,8 @@ impl FlightSession {
                 | Self::JetReplay { .. }
                 | Self::TurbopropLive { .. }
                 | Self::TurbopropReplay { .. }
+                | Self::NearStaticTurbopropLive { .. }
+                | Self::NearStaticTurbopropReplay { .. }
         )
     }
     pub fn prepare_bounded(
@@ -159,6 +190,9 @@ impl FlightSession {
             crate::aircraft_profile::SelectedAircraftProfile::Turboprop(_) => {
                 crate::turboprop_session::prepare(startup, clock, start)
             }
+            crate::aircraft_profile::SelectedAircraftProfile::NearStaticTurboprop(_) => {
+                crate::near_static_turboprop_session::prepare(startup, clock, start)
+            }
             crate::aircraft_profile::SelectedAircraftProfile::Legacy(_) => {
                 Err("bounded session requires an explicit jet or turboprop profile".into())
             }
@@ -171,12 +205,31 @@ impl FlightSession {
             _ => None,
         }
     }
+    pub fn is_near_static_turboprop(&self) -> bool {
+        matches!(
+            self,
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. }
+        )
+    }
+    pub fn near_static_turboprop(&self) -> Option<&NearStaticTurbopropSimulation> {
+        match self {
+            Self::NearStaticTurbopropLive { simulation, .. } => Some(simulation),
+            Self::NearStaticTurbopropReplay { player, .. } => Some(player.simulation()),
+            _ => None,
+        }
+    }
     pub fn model_conditions(&self) -> Option<flightsim_sim::replay::EnvironmentConditions> {
         match self {
             Self::JetLive { simulation, .. } => Some(simulation.environment().conditions),
             Self::JetReplay { player, .. } => Some(player.simulation().environment().conditions),
             Self::TurbopropLive { simulation, .. } => Some(simulation.environment().conditions),
+            Self::NearStaticTurbopropLive { simulation, .. } => {
+                Some(simulation.environment().conditions)
+            }
             Self::TurbopropReplay { player, .. } => {
+                Some(player.simulation().environment().conditions)
+            }
+            Self::NearStaticTurbopropReplay { player, .. } => {
                 Some(player.simulation().environment().conditions)
             }
             Self::Legacy(_) => None,
@@ -187,16 +240,31 @@ impl FlightSession {
             Self::JetLive { simulation, .. } => Some(simulation.environment().weather),
             Self::JetReplay { player, .. } => Some(player.simulation().environment().weather),
             Self::TurbopropLive { simulation, .. } => Some(simulation.environment().weather),
+            Self::NearStaticTurbopropLive { simulation, .. } => {
+                Some(simulation.environment().weather)
+            }
             Self::TurbopropReplay { player, .. } => Some(player.simulation().environment().weather),
+            Self::NearStaticTurbopropReplay { player, .. } => {
+                Some(player.simulation().environment().weather)
+            }
             Self::Legacy(_) => None,
         }
     }
     pub fn is_replay(&self) -> bool {
-        matches!(self, Self::JetReplay { .. } | Self::TurbopropReplay { .. })
+        matches!(
+            self,
+            Self::JetReplay { .. }
+                | Self::TurbopropReplay { .. }
+                | Self::NearStaticTurbopropReplay { .. }
+        )
     }
     pub fn jet(&self) -> Option<&JetSimulation> {
         match self {
-            Self::Legacy(_) | Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => None,
+            Self::Legacy(_)
+            | Self::TurbopropLive { .. }
+            | Self::TurbopropReplay { .. }
+            | Self::NearStaticTurbopropLive { .. }
+            | Self::NearStaticTurbopropReplay { .. } => None,
             Self::JetLive { simulation, .. } => Some(simulation),
             Self::JetReplay { player, .. } => Some(player.simulation()),
         }
@@ -229,7 +297,11 @@ impl FlightSession {
             Self::JetLive { simulation, .. } => simulation.state(),
             Self::JetReplay { player, .. } => player.simulation().state(),
             Self::TurbopropLive { simulation, .. } => &simulation.state().rigid_body,
+            Self::NearStaticTurbopropLive { simulation, .. } => &simulation.state().rigid_body,
             Self::TurbopropReplay { player, .. } => &player.simulation().state().rigid_body,
+            Self::NearStaticTurbopropReplay { player, .. } => {
+                &player.simulation().state().rigid_body
+            }
         }
     }
     pub fn elapsed(&self) -> Seconds {
@@ -239,6 +311,9 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().elapsed()
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().elapsed()
+            }
         }
     }
     pub fn interpolated(&self) -> flightsim_sim::InterpolatedState {
@@ -247,7 +322,9 @@ impl FlightSession {
             Self::JetLive { simulation, .. } => simulation.interpolated(),
             Self::JetReplay { player, .. } => player.interpolated(),
             Self::TurbopropLive { simulation, .. } => simulation.interpolated(),
+            Self::NearStaticTurbopropLive { simulation, .. } => simulation.interpolated(),
             Self::TurbopropReplay { player, .. } => player.interpolated(),
+            Self::NearStaticTurbopropReplay { player, .. } => player.interpolated(),
         }
     }
     pub fn ground(&self) -> flightsim_sim::GroundPlane {
@@ -256,6 +333,9 @@ impl FlightSession {
             Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().snapshot().ground,
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().snapshot().ground
+            }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().snapshot().ground
             }
         }
     }
@@ -285,6 +365,9 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().climate_sample()
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().climate_sample()
+            }
         }
     }
     pub fn atmosphere_sample(&self) -> flightsim_fdm::AtmosphereSample {
@@ -296,6 +379,9 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().atmosphere_sample()
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().atmosphere_sample()
+            }
         }
     }
     pub fn aero_angles(&self) -> flightsim_fdm::AeroAngles {
@@ -304,6 +390,9 @@ impl FlightSession {
             Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().aero_angles(),
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().aero_angles()
+            }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().aero_angles()
             }
         }
     }
@@ -314,6 +403,9 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().airspeed()
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().airspeed()
+            }
         }
     }
     pub fn log(&self) -> flightsim_sim::FlightLog {
@@ -322,6 +414,9 @@ impl FlightSession {
             Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().log(),
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().log()
+            }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop().unwrap().log()
             }
         }
     }
@@ -346,6 +441,12 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().snapshot().touchdown_count
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop()
+                    .unwrap()
+                    .snapshot()
+                    .touchdown_count
+            }
         }
     }
     pub fn last_touchdown(&self) -> Option<flightsim_sim::Touchdown> {
@@ -356,6 +457,12 @@ impl FlightSession {
             }
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().snapshot().last_touchdown
+            }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop()
+                    .unwrap()
+                    .snapshot()
+                    .last_touchdown
             }
         }
     }
@@ -368,6 +475,12 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().presentation().on_ground
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => {
+                self.near_static_turboprop()
+                    .unwrap()
+                    .presentation()
+                    .on_ground
+            }
         }
     }
     pub fn fault(&self) -> Option<&str> {
@@ -376,7 +489,9 @@ impl FlightSession {
             Self::JetLive { fault, .. }
             | Self::JetReplay { fault, .. }
             | Self::TurbopropLive { fault, .. }
-            | Self::TurbopropReplay { fault, .. } => fault.as_deref(),
+            | Self::TurbopropReplay { fault, .. }
+            | Self::NearStaticTurbopropLive { fault, .. }
+            | Self::NearStaticTurbopropReplay { fault, .. } => fault.as_deref(),
         }
     }
     pub fn terminal_message(&self) -> Option<String> {
@@ -388,6 +503,13 @@ impl FlightSession {
                 turboprop.terminal().map(|event| {
                     format!(
                         "TURBOPROP STOPPED at step {}: {}",
+                        event.cursor, event.failure
+                    )
+                })
+            } else if let Some(simulation) = self.near_static_turboprop() {
+                simulation.terminal().map(|event| {
+                    format!(
+                        "NEAR-STATIC TURBOPROP STOPPED at step {}: {}",
                         event.cursor, event.failure
                     )
                 })
@@ -418,7 +540,23 @@ impl FlightSession {
             Self::TurbopropLive {
                 simulation, fault, ..
             } => simulation.terminal().is_some() || fault.is_some(),
+            Self::NearStaticTurbopropLive {
+                simulation, fault, ..
+            } => simulation.terminal().is_some() || fault.is_some(),
             Self::TurbopropReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                pending_seek.is_some()
+                    || player.paused()
+                    || player.seeking()
+                    || player.finished()
+                    || player.faulted()
+                    || fault.is_some()
+            }
+            Self::NearStaticTurbopropReplay {
                 player,
                 fault,
                 pending_seek,
@@ -445,17 +583,23 @@ impl FlightSession {
                 pending_seek,
                 ..
             } => pending_seek.is_some() || player.seeking(),
+            Self::NearStaticTurbopropReplay {
+                player,
+                pending_seek,
+                ..
+            } => pending_seek.is_some() || player.seeking(),
             _ => false,
         }
     }
     pub fn last_controls(&self) -> Option<ControlInputs> {
         match self {
             Self::Legacy(_) => None,
-            Self::JetLive { last_controls, .. } | Self::TurbopropLive { last_controls, .. } => {
-                Some(*last_controls)
-            }
+            Self::JetLive { last_controls, .. }
+            | Self::TurbopropLive { last_controls, .. }
+            | Self::NearStaticTurbopropLive { last_controls, .. } => Some(*last_controls),
             Self::JetReplay { player, .. } => Some(player.last_controls()),
             Self::TurbopropReplay { player, .. } => Some(player.last_controls()),
+            Self::NearStaticTurbopropReplay { player, .. } => Some(player.last_controls()),
         }
     }
     pub fn queue_parking_toggle(&mut self) {
@@ -464,6 +608,10 @@ impl FlightSession {
             ..
         }
         | Self::TurbopropLive {
+            pending_parking_toggle,
+            ..
+        }
+        | Self::NearStaticTurbopropLive {
             pending_parking_toggle,
             ..
         } = self
@@ -479,6 +627,11 @@ impl FlightSession {
                 ..
             }
             | Self::TurbopropLive {
+                parking_brake,
+                pending_parking_toggle,
+                ..
+            }
+            | Self::NearStaticTurbopropLive {
                 parking_brake,
                 pending_parking_toggle,
                 ..
@@ -614,7 +767,80 @@ impl FlightSession {
                     *fault = Some(format!("TURBOPROP RENDER STOPPED: {error}"));
                 }
             }
+            Self::NearStaticTurbopropLive {
+                simulation,
+                recorder,
+                parking_brake,
+                pending_parking_toggle,
+                last_controls,
+                recording_error,
+                fault,
+            } => {
+                if fault.is_some() || simulation.terminal().is_some() {
+                    return;
+                }
+                let mut pilot = (
+                    *controls,
+                    *parking_brake,
+                    *pending_parking_toggle,
+                    *last_controls,
+                );
+                let report =
+                    simulation.advance_with_controller(dt, &mut pilot, |pilot, fixed_dt, _| {
+                        pilot.0.update_from_sample(fixed_dt, sample);
+                        if pilot.2 {
+                            pilot.1 = !pilot.1;
+                            pilot.2 = false;
+                        }
+                        let input = pilot.0.to_control_inputs();
+                        pilot.3 =
+                            input.with_brakes(input.brakes().max(if pilot.1 { 1.0 } else { 0.0 }));
+                        pilot.3
+                    });
+                *controls = pilot.0;
+                *parking_brake = pilot.1;
+                *pending_parking_toggle = pilot.2;
+                *last_controls = pilot.3;
+                if recording_allowed
+                    && recording_error.is_none()
+                    && report.attempted_steps() > 0
+                    && let Err(error) = recorder.record(&report)
+                {
+                    *recording_error = Some(format!(
+                        "RECORDING STOPPED: {error}; F9 saves the last valid prefix"
+                    ));
+                }
+                if let Err(error) = validate_model_state(&simulation.state().rigid_body) {
+                    *fault = Some(format!("TURBOPROP RENDER STOPPED: {error}"));
+                }
+            }
             Self::TurbopropReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                let result = if let Some(target) = pending_seek.take() {
+                    *fault = None;
+                    player.seek_to(target)
+                } else {
+                    if fault.is_some() {
+                        return;
+                    }
+                    if player.seeking() {
+                        player.continue_seek()
+                    } else {
+                        player.advance(dt)
+                    }
+                };
+                if let Err(error) = result {
+                    *fault = Some(format!("TURBOPROP REPLAY STOPPED: {error}"));
+                }
+                if let Err(error) = validate_model_state(&player.simulation().state().rigid_body) {
+                    *fault = Some(format!("TURBOPROP REPLAY RENDER STOPPED: {error}"));
+                }
+            }
+            Self::NearStaticTurbopropReplay {
                 player,
                 fault,
                 pending_seek,
@@ -661,6 +887,12 @@ impl FlightSession {
             Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
                 self.turboprop().unwrap().config().airframe().geometry()
             }
+            Self::NearStaticTurbopropLive { .. } | Self::NearStaticTurbopropReplay { .. } => self
+                .near_static_turboprop()
+                .unwrap()
+                .config()
+                .airframe()
+                .geometry(),
             Self::Legacy(_) => unreachable!(),
         };
         vec![
@@ -728,6 +960,9 @@ pub(super) fn guidance_for(
         crate::aircraft_profile::SelectedAircraftProfile::Turboprop(_) => {
             crate::turboprop_session::guidance()
         }
+        crate::aircraft_profile::SelectedAircraftProfile::NearStaticTurboprop(_) => {
+            crate::near_static_turboprop_session::guidance()
+        }
         crate::aircraft_profile::SelectedAircraftProfile::Legacy(_) => {
             flightsim_ui::FlightGuidance::default()
         }
@@ -756,11 +991,13 @@ pub(super) fn resolve_jet_sources(
     let recording = match flightsim_sim::replay_v4::ModelReplayFile::read_from(
         &mut std::io::BufReader::new(file),
     )
-    .map_err(|e| e.to_string())?
+    .map_err(|error| crate::replay_policy::read_error(&error))?
     {
         flightsim_sim::replay_v4::ModelReplayFile::V4(recording) => recording,
-        flightsim_sim::replay_v4::ModelReplayFile::Existing(_) => {
-            return Err("profile-v2 jet requires a matching replay-v4 recording".into());
+        flightsim_sim::replay_v4::ModelReplayFile::Existing(recording) => {
+            return Err(crate::replay_policy::profile_requirement(
+                recording.format_version(),
+            ));
         }
     };
     let environment = recording.conditions().environment;

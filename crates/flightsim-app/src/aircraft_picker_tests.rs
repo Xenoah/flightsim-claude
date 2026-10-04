@@ -164,6 +164,12 @@ fn recorder_bytes(app: &App) -> Vec<u8> {
         FlightSession::TurbopropReplay { player, .. } => {
             player.recording().write_to(&mut bytes).unwrap()
         }
+        FlightSession::NearStaticTurbopropLive { recorder, .. } => {
+            recorder.export().write_to(&mut bytes).unwrap()
+        }
+        FlightSession::NearStaticTurbopropReplay { player, .. } => {
+            player.recording().write_to(&mut bytes).unwrap()
+        }
     }
     bytes
 }

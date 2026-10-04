@@ -188,6 +188,24 @@ NEAR_STATIC_FOUNDATION_PATHS = {
     'tools/qualification/build_cedar_near_static_rows.py',
 }
 REPLAY_CONTRACT_PATHS |= NEAR_STATIC_FOUNDATION_PATHS
+# Exact independently reviewed profile-4 app ownership and read-only presentation.
+# This source binding admits no Cedar preset, commercial aircraft or native result.
+NEAR_STATIC_APP_PATHS = {
+    "crates/flightsim-app/src/aircraft_picker_runtime.rs",
+    "crates/flightsim-app/src/aircraft_picker_tests.rs",
+    "crates/flightsim-app/src/aircraft_profile.rs",
+    "crates/flightsim-app/src/distribution.rs",
+    "crates/flightsim-app/src/flight_session.rs",
+    "crates/flightsim-app/src/main.rs",
+    "crates/flightsim-app/src/near_static_turboprop_session.rs",
+    "crates/flightsim-app/src/nearstatic_lifecycle_tests.rs",
+    "crates/flightsim-app/src/nearstatic_runtime_tests.rs",
+    "crates/flightsim-app/src/replay_policy.rs",
+    "crates/flightsim-app/src/turboprop_session.rs",
+    "crates/flightsim-sim/src/near_static_turboprop_simulation/mod.rs",
+    "crates/flightsim-sim/src/near_static_turboprop_simulation/presentation.rs",
+}
+REPLAY_CONTRACT_PATHS |= NEAR_STATIC_APP_PATHS
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {

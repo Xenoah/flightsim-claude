@@ -1,4 +1,4 @@
-//! Explicit opt-in running-turboprop app construction, replay admission and help.
+//! Explicit profile-4/law-2 app construction, replay-v6 admission and help.
 //! The profile owns authored running engine values; replay owns all 16 recorded
 //! state scalars. Neither path guesses trim, warms the engine or moves a rotor.
 use crate::flight_session::{ascii_notice, validate_model_sources, validate_model_state};
@@ -6,8 +6,12 @@ use crate::{FlightSession, StartCondition, Startup};
 use flightsim_core::{Geodetic, Meters, Radians};
 use flightsim_fdm::{ControlInputs, RigidBodyState, turboprop::TurbopropState};
 use flightsim_sim::{
-    replay_v5::{TurbopropRecorder, TurbopropRecording, TurbopropReplayPlayer},
-    turboprop_simulation::{TurbopropEnvironment, TurbopropSimulation, TurbopropTerrain},
+    near_static_turboprop_simulation::{
+        NearStaticTurbopropEnvironment, NearStaticTurbopropSimulation, NearStaticTurbopropTerrain,
+    },
+    replay_v6::{
+        NearStaticTurbopropRecorder, NearStaticTurbopropRecording, NearStaticTurbopropReplayPlayer,
+    },
 };
 
 pub(super) fn prepare(
@@ -19,18 +23,18 @@ pub(super) fn prepare(
     validate_model_sources(startup)?;
     let profile = startup
         .aircraft
-        .turboprop()
-        .ok_or("turboprop profile required")?;
+        .near_static_turboprop()
+        .ok_or("near-static turboprop profile required")?;
     let config = profile.configuration().clone();
     let engine = profile.running_start();
     let mut conditions = crate::environment_conditions(startup, clock);
     conditions.time_rate = clock.rate.get();
-    let environment = TurbopropEnvironment {
+    let environment = NearStaticTurbopropEnvironment {
         conditions,
         terrain: if startup.world.global_terrain {
-            TurbopropTerrain::BundledGlobal
+            NearStaticTurbopropTerrain::BundledGlobal
         } else {
-            TurbopropTerrain::Flat {
+            NearStaticTurbopropTerrain::Flat {
                 elevation: Meters::ZERO,
             }
         },
@@ -40,11 +44,15 @@ pub(super) fn prepare(
     let input = crate::world_runtime::initial_controls(startup).to_control_inputs();
     let input = input.with_brakes(input.brakes().max(if parking_brake { 1.0 } else { 0.0 }));
     let complete = match start {
-        StartCondition::Parked { position, heading } => {
-            *TurbopropSimulation::parked(config.clone(), position, heading, environment, engine)
-                .map_err(|error| error.to_string())?
-                .state()
-        }
+        StartCondition::Parked { position, heading } => *NearStaticTurbopropSimulation::parked(
+            config.clone(),
+            position,
+            heading,
+            environment,
+            engine,
+        )
+        .map_err(|error| error.to_string())?
+        .state(),
         StartCondition::InFlight(rigid_body) => TurbopropState {
             rigid_body,
             turbine_fraction: engine.turbine_fraction(),
@@ -55,11 +63,12 @@ pub(super) fn prepare(
     // Evaluate the actual body, engine, controls and environment at zero duration.
     // The supported-start constructor preserves every authored state bit.
     let simulation =
-        TurbopropSimulation::from_supported_state(config, complete, environment, input)
+        NearStaticTurbopropSimulation::from_supported_state(config, complete, environment, input)
             .map_err(|error| error.to_string())?;
     validate_model_state(&simulation.state().rigid_body)?;
-    let recorder = TurbopropRecorder::new(&simulation).map_err(|error| error.to_string())?;
-    Ok(FlightSession::TurbopropLive {
+    let recorder =
+        NearStaticTurbopropRecorder::new(&simulation).map_err(|error| error.to_string())?;
+    Ok(FlightSession::NearStaticTurbopropLive {
         simulation,
         recorder,
         parking_brake,
@@ -73,7 +82,7 @@ pub(super) fn prepare(
 pub(super) fn resolve_sources(
     startup: &mut Startup,
     diagnostics: &mut crate::StartupDiagnostics,
-) -> Result<Option<TurbopropReplayPlayer>, String> {
+) -> Result<Option<NearStaticTurbopropReplayPlayer>, String> {
     crate::distribution::validate_profile_start(&startup.aircraft)?;
     validate_model_sources(startup)?;
     let Some(path) = startup.replay.as_ref() else {
@@ -89,24 +98,24 @@ pub(super) fn resolve_sources(
     }
     let file =
         std::fs::File::open(path).map_err(|e| format!("cannot open {}: {e}", path.display()))?;
-    let recording =
-        TurbopropRecording::read_from(&mut std::io::BufReader::new(file)).map_err(|error| {
+    let recording = NearStaticTurbopropRecording::read_from(&mut std::io::BufReader::new(file))
+        .map_err(|error| {
             format!(
-                "profile-v3 turboprop requires matching replay v5: {}",
+                "profile-v4 turboprop requires matching replay v6: {}",
                 crate::replay_policy::read_error(&error)
             )
         })?;
     let environment = recording.conditions().environment;
-    if let TurbopropTerrain::Flat { elevation } = environment.terrain
+    if let NearStaticTurbopropTerrain::Flat { elevation } = environment.terrain
         && (startup.world.global_terrain || elevation != Meters::ZERO)
     {
         return Err("flat turboprop replay requires explicit --global-terrain off and recorded flat elevation zero".into());
     }
     validate_model_state(&recording.conditions().initial_state.rigid_body)?;
-    let player = TurbopropReplayPlayer::new(
+    let player = NearStaticTurbopropReplayPlayer::new(
         startup
             .aircraft
-            .turboprop()
+            .near_static_turboprop()
             .unwrap()
             .configuration()
             .clone(),
@@ -139,7 +148,7 @@ pub(super) fn resolve_sources(
 pub(super) fn prepare_startup(
     startup: &Startup,
     clock: &flightsim_render::TimeOfDay,
-    player: Option<TurbopropReplayPlayer>,
+    player: Option<NearStaticTurbopropReplayPlayer>,
 ) -> Result<(FlightSession, StartCondition), String> {
     crate::distribution::validate_profile_start(&startup.aircraft)?;
     if let Some(player) = player {
@@ -157,7 +166,7 @@ pub(super) fn prepare_startup(
         }
         let state = player.simulation().state().rigid_body;
         return Ok((
-            FlightSession::replay_turboprop(player),
+            FlightSession::replay_near_static_turboprop(player),
             StartCondition::InFlight(state),
         ));
     }
@@ -204,9 +213,9 @@ pub(super) fn prepare_startup(
 }
 
 pub(super) fn save_recording(
-    recording: &flightsim_sim::replay_v5::TurbopropRecording,
+    recording: &flightsim_sim::replay_v6::NearStaticTurbopropRecording,
 ) -> Result<std::path::PathBuf, String> {
-    // Empty initial state and terminal-at-zero are both meaningful v5 snapshots.
+    // Empty initial state and terminal-at-zero are both meaningful v6 snapshots.
     let (path, file) =
         crate::create_replay_file(std::path::Path::new(".")).map_err(|e| e.to_string())?;
     let mut writer = std::io::BufWriter::new(file);
@@ -217,13 +226,13 @@ pub(super) fn save_recording(
 
 pub(super) fn guidance() -> flightsim_ui::FlightGuidance {
     flightsim_ui::FlightGuidance { tutorial_enabled: false, compact_live_help: Some("W/S pitch; A/D roll; Q/E yaw\nPageUp/Down power; F/G flaps\n[/] pitch trim; J/L roll; U/O yaw\nShift fine; K reset roll/yaw\nSpace/B brakes; C view; M map\nR restart; F9 save replay\nEsc pause / complete controls".into()), live_help: Some(
-        "RUNNING TURBOPROP CONTROLS\nW/S pitch  A/D roll  Q/E yaw\nPageUp/= up  PageDown/- down (power)\n[ / ] elevator trim  F/G flaps\nJ/L roll trim  U/O yaw trim  K reset both\nShift + trim: fine (0.002/s); normal 0.01/s\nSpace service brake  B parking brake\nC camera  Esc pause  R restart\nF9 save replay  M new flight / weather\n\n0% power is running idle, not shutdown.\nTurbine response x is modeled, not N1.\nShaft speed and blade pitch evolve physically.\nNo automatic roll/yaw trim or attitude hold.\nExperimental numerical model; no landing grading.\nModel rotor is static; audio is synthetic.".into()) }
+        "NEAR-STATIC TURBOPROP (LAW 2) CONTROLS\nW/S pitch  A/D roll  Q/E yaw\nPageUp/= up  PageDown/- down (power)\n[ / ] elevator trim  F/G flaps\nJ/L roll trim  U/O yaw trim  K reset both\nShift + trim: fine (0.002/s); normal 0.01/s\nSpace service brake  B parking brake\nC camera  Esc pause  R restart\nF9 save replay  M new flight / weather\n\n0% power is running idle, not shutdown.\nTurbine response x is modeled, not N1.\nShaft speed and blade pitch evolve physically.\nNo automatic roll/yaw trim or attitude hold.\nBounded near-static approximation; no parking guarantee.\nExperimental numerical model; no landing grading.\nModel rotor is static; audio is synthetic.".into()) }
 }
 
 pub(super) fn notice(session: &FlightSession, startup: Option<&Startup>) -> String {
     let simulation = session
-        .turboprop()
-        .expect("turboprop notice requires its family");
+        .near_static_turboprop()
+        .expect("near-static turboprop notice requires its family");
     let state = simulation.state();
     let input = session
         .last_controls()
@@ -240,7 +249,7 @@ pub(super) fn notice(session: &FlightSession, startup: Option<&Startup>) -> Stri
         },
     );
     let recording_note = match session {
-        FlightSession::TurbopropLive {
+        FlightSession::NearStaticTurbopropLive {
             recording_error: Some(error),
             ..
         } => format!(" | {error}"),
@@ -252,7 +261,7 @@ pub(super) fn notice(session: &FlightSession, startup: Option<&Startup>) -> Stri
         ""
     };
     ascii_notice(&format!(
-        "{} | power {:.0}% | modeled turbine x {:.3} | shaft {:.2} rad/s | blade {:.2} deg | {brake} | EXPERIMENTAL; static rotor / synthetic audio{manual}{recording_note}",
+        "{} | power {:.0}% | modeled turbine x {:.3} | shaft {:.2} rad/s | blade {:.2} deg | {brake} | EXPERIMENTAL LAW 2; static rotor / synthetic audio{manual}{recording_note}",
         simulation.config().airframe().name(),
         input.throttle() * 100.0,
         state.turbine_fraction.get(),

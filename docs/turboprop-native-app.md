@@ -7,6 +7,10 @@ entry, coefficient tuning, commercial distribution allowance, or rights gate is
 introduced here. Numerical fixtures exercise software boundaries; they are not
 real-aircraft performance or handling data.
 
+Explicit profile-v4 near-static law-2 sessions use a separate full-state v6 path;
+see [near-static app admission](near-static-turboprop-native-app.md). This page
+describes the unchanged profile-v3/law-1/v5 interpretation.
+
 Commercial-staging rejects new profile-v3 live and replay startup before source
 reads or model/session preparation. Its existing v1/v2 inspection exceptions
 and the pure v3/v5 library APIs remain available; the bundled aircraft and picker

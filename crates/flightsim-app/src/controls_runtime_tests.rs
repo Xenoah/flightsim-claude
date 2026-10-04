@@ -527,6 +527,72 @@ fn low_speed_arbitrary_alpha_does_not_trigger_stall_tone() {
 }
 
 #[test]
+fn hud_distinguishes_live_trim_from_unrecorded_replay_trim_in_the_same_update() {
+    for id in ["light-single", "swift-sport"] {
+        let mut app = control_app(id);
+        tick(
+            &mut app,
+            Duration::from_secs_f64(1.0 / 60.0),
+            PilotKeys {
+                pitch_up: true,
+                ..default()
+            },
+        );
+        let recording = app
+            .world()
+            .resource::<FlightRecorder>()
+            .0
+            .recording()
+            .clone();
+        let recorded_elevator = recording.frames().first().unwrap().controls.elevator();
+        assert_ne!(recorded_elevator, 0.0);
+        assert_ne!(recorded_elevator, -0.12);
+        app.init_resource::<StallWarningStatus>()
+            .init_resource::<flightsim_audio::AircraftSound>()
+            .init_resource::<ViewMode>()
+            .init_resource::<SunDirection>()
+            .init_resource::<HudState>()
+            .init_resource::<flightsim_ui::HudSmoothing>()
+            .add_systems(Update, flightsim_ui::update_hud);
+        let text = app
+            .world_mut()
+            .spawn((Text::default(), flightsim_ui::HudText))
+            .id();
+        configure_flight_presentation(&mut app);
+
+        for replay in [false, true, false, true] {
+            app.world_mut()
+                .resource_mut::<PilotControls>()
+                .trim
+                .set(-0.12);
+            if replay {
+                app.insert_resource(ReplayPlayback::new(flightsim_sim::ReplayFile::V3(
+                    recording.clone(),
+                )));
+            } else {
+                app.world_mut().remove_resource::<ReplayPlayback>();
+            }
+            tick(&mut app, Duration::ZERO, PilotKeys::default());
+            assert_eq!(
+                app.world().resource::<HudState>().trim,
+                (!replay).then_some(-0.12)
+            );
+            let shown = app.world().get::<Text>(text).unwrap();
+            assert_eq!(
+                shown.lines().find(|line| line.starts_with("TRM")),
+                Some(if replay {
+                    "TRM    N/A"
+                } else {
+                    "TRM  -0.12  nose down"
+                }),
+                "{id} replay={replay}: {shown:?}",
+            );
+            assert_eq!(app.world().resource::<PilotControls>().trim.value(), -0.12);
+        }
+    }
+}
+
+#[test]
 fn warning_transition_reaches_audio_bridge_and_rendered_text_in_same_update() {
     let mut app = control_app("light-single");
     let bridge = std::sync::Arc::new(flightsim_audio::SharedSound::default());

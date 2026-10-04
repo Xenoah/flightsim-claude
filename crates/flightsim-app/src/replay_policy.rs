@@ -11,6 +11,33 @@ pub(crate) const LEGACY_NOTICE: &str =
 pub(crate) const MANUAL_CLOUD_NOTICE: &str = "F9 OFF: manual clouds";
 pub(crate) const MANUAL_CLOUD_DIAGNOSTIC: &str = "Recording and F9 saving are disabled because manual cloud weather cannot yet be saved. Restart without --cloud-cover/--cloud-base/--cloud-top/--cloud-visibility to record a flight.";
 
+/// Codec version limits describe one selected reader, not the whole app.
+/// This formats the existing rejection without probing or changing dispatch.
+pub(crate) fn read_error(error: &flightsim_sim::replay::ReplayError) -> String {
+    if let flightsim_sim::replay::ReplayError::UnsupportedVersion { found, .. } = error {
+        return profile_requirement(*found);
+    }
+    error.to_string()
+}
+
+pub(crate) fn profile_requirement(version: u16) -> String {
+    let family = match version {
+        1..=3 => "legacy aircraft",
+        4 => "profile-v2 jet aircraft",
+        5 => "profile-v3 law-1 turboprop aircraft",
+        6 => "profile-v4 law-2 near-static turboprop aircraft",
+        _ => return format!("replay format version {version} is not supported by this app"),
+    };
+    let development = if cfg!(feature = "commercial-staging") && matches!(version, 5 | 6) {
+        "; this experimental family requires a development build and is unavailable in commercial-staging"
+    } else {
+        ""
+    };
+    format!(
+        "replay v{version} requires its matching {family}; select the exact profile with --aircraft FILE{development}"
+    )
+}
+
 /// Explicit opt-in permits only these independently pinned revision-2 baselines.
 /// Matching the selected configuration does NOT prove the original recording
 /// used that configuration: its missing yaw coefficient remains unknown.
@@ -87,6 +114,47 @@ mod tests {
     use flightsim_sim::{
         CurrentConditions, CurrentRecorder, EnvironmentConditions, Recorder, replay::Conditions,
     };
+
+    #[test]
+    fn wrong_family_headers_name_the_matching_profile_without_claiming_a_build_limit() {
+        for (version, expected) in [(5_u16, "profile-v3 law-1"), (6, "profile-v4 law-2")] {
+            let path = std::env::temp_dir().join(format!(
+                "flightsim-family-diagnostic-{}-{version}.fsreplay",
+                std::process::id()
+            ));
+            let mut header = b"FSREPLAY".to_vec();
+            header.extend(version.to_le_bytes());
+            std::fs::write(&path, header).unwrap();
+            let mut startup = crate::Startup {
+                replay: Some(path.clone()),
+                ..Default::default()
+            };
+            let before = format!("{:?}", startup.aircraft);
+            let old_wind = startup.wind;
+            let mut diagnostics = crate::StartupDiagnostics::default();
+            assert!(crate::resolve_replay(&mut startup, &mut diagnostics).is_none());
+            std::fs::remove_file(path).unwrap();
+            let message = diagnostics.0.join("; ");
+            assert!(message.contains(expected), "{message}");
+            assert!(message.contains("--aircraft FILE"), "{message}");
+            assert!(!message.contains("this build reads"), "{message}");
+            assert_eq!(format!("{:?}", startup.aircraft), before);
+            assert_eq!(startup.wind, old_wind);
+            if cfg!(feature = "commercial-staging") {
+                assert!(message.contains("requires a development build"));
+            }
+        }
+        for version in [0, 7, u16::MAX] {
+            let message = read_error(&flightsim_sim::replay::ReplayError::UnsupportedVersion {
+                found: version,
+                expected: 3,
+            });
+            assert!(message.contains("not supported by this app"));
+            assert!(!message.contains("--aircraft FILE"));
+        }
+        let original = flightsim_sim::replay::ReplayError::InvalidName;
+        assert_eq!(read_error(&original), original.to_string());
+    }
 
     fn legacy(config: &AircraftConfig, version: u16) -> ReplayFile {
         let recording = Recorder::new(Conditions::default().with_aircraft(config)).finish();

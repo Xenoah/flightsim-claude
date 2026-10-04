@@ -51,11 +51,14 @@ pub(super) fn aircraft_listing() -> &'static str {
     }
 }
 
-/// The new third family is development-only. Existing v1/v2 inspection rules
-/// and pure profile-v3/replay-v5 library APIs retain their meanings.
+/// Both explicit turboprop laws are development-only. Existing v1/v2 inspection
+/// rules and the pure versioned profile/replay library APIs retain their meanings.
 pub(super) fn validate_profile_start(
     profile: &crate::aircraft_profile::SelectedAircraftProfile,
 ) -> Result<(), String> {
+    if cfg!(feature = "commercial-staging") && profile.is_near_static_turboprop() {
+        return Err("commercial-staging does not support profile-v4 near-static turboprop live/replay startup; use a development build for this experimental family".into());
+    }
     if cfg!(feature = "commercial-staging") && profile.is_turboprop() {
         return Err("commercial-staging does not support profile-v3 turboprop live/replay startup; use a development build for this experimental family".into());
     }

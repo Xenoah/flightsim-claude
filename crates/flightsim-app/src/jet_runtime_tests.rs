@@ -1109,7 +1109,7 @@ fn jet_presentation_systems_publish_recorded_controls_cockpit_and_no_landing_gra
     let hud = app.world().resource::<HudState>();
     assert_eq!(hud.throttle, input.throttle());
     assert_eq!(hud.flaps, input.flaps());
-    assert_eq!(hud.trim, 0.0);
+    assert_eq!(hud.trim, None);
     let status = app.world().resource::<flightsim_ui::ReplayStatus>();
     assert!(status.active && status.finished);
     assert!(status.notice.as_ref().unwrap().contains("recorded brake"));

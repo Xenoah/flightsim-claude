@@ -1,6 +1,8 @@
 //! Transactional complete-state host for explicit near-static turboprop law 2.
 //! Existing turboprop and jet hosts are separate, unchanged contracts.
 mod parked;
+mod presentation;
+pub use presentation::NearStaticTurbopropPresentationSnapshot;
 
 use crate::{
     FlightLog, GroundPlane, GroundSampler, Touchdown,

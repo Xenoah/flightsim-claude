@@ -247,7 +247,7 @@ fn v5_presentation_uses_recorded_controls_mutes_completion_and_has_no_legacy_gra
     let hud = app.world().resource::<HudState>();
     assert_eq!(hud.throttle, 0.4);
     assert_eq!(hud.flaps, 0.1);
-    assert_eq!(hud.trim, 0.0);
+    assert_eq!(hud.trim, None);
     assert_eq!(
         app.world().get::<Visibility>(exterior),
         Some(&Visibility::Inherited)

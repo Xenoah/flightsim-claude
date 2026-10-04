@@ -1,0 +1,166 @@
+{
+  "status": "automated local qualification passed; independent review and native v6 acceptance remain separate",
+  "app_source_commit": "3b2d95f79ca61ce9fc45250a412c5040b70da397",
+  "pure_foundation_commit": "93bad37f27403ee566a59290bc25fe6dc4bec48e",
+  "base_app_commit": "7f5663c064d31b0361530777a058e763ac7f0e85",
+  "commands": [
+    {
+      "command": "cargo test --offline -j2 -p flightsim-sim --all-targets",
+      "exit_code": 0,
+      "log": "logs/08-sim-all.log",
+      "log_bytes": 49191,
+      "log_sha256": "18978bf2260bdf89d8d690f0f324823a32e0eb189f3c83c75b39011088d6bb0b",
+      "passed": 513,
+      "failed": 0,
+      "ignored": 0,
+      "test_targets": 55
+    },
+    {
+      "command": "cargo test --offline -j2 -p flightsim-app --all-targets",
+      "exit_code": 0,
+      "log": "logs/09-app-final.log",
+      "log_bytes": 52558,
+      "log_sha256": "ae851f230b75d38f5bbd85243d8dddad203ad3a90e3c4689e2b7ecf5a6ab8e69",
+      "passed": 363,
+      "failed": 0,
+      "ignored": 1,
+      "test_targets": 2
+    },
+    {
+      "command": "cargo test --offline -j2 -p flightsim-app --features commercial-staging --all-targets",
+      "exit_code": 0,
+      "log": "logs/10-app-commercial-final.log",
+      "log_bytes": 47769,
+      "log_sha256": "04d1067d9d8fc639073325dd441fd7e3aa82135f4d75dc43786a718d683619fe",
+      "passed": 323,
+      "failed": 0,
+      "ignored": 1,
+      "test_targets": 2
+    },
+    {
+      "command": "cargo test --offline -j2 -p flightsim-app --features region-downloads --all-targets",
+      "exit_code": 0,
+      "log": "logs/11-app-region-downloads-final.log",
+      "log_bytes": 53821,
+      "log_sha256": "7dad8eb1344690443b3d0ead7885a8d6890370e65b4acc05c350dc20bf2f0be3",
+      "passed": 374,
+      "failed": 0,
+      "ignored": 1,
+      "test_targets": 2
+    },
+    {
+      "command": "cargo clippy --offline -j2 --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "logs/12-clippy-workspace.log",
+      "log_bytes": 1914,
+      "log_sha256": "5fae9a777010e0150b16237b44696306c04c41e1b9b29a04762037c0feb7b567"
+    },
+    {
+      "command": "cargo clippy --offline -j2 -p flightsim-app --features commercial-staging,region-downloads --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "logs/13-clippy-features.log",
+      "log_bytes": 1526,
+      "log_sha256": "67586ba2399479f1b7695a98ae3190476c5137f5fb44ae2032d21bb93be0d4ca"
+    },
+    {
+      "command": "RUSTDOCFLAGS=\"-D warnings\" cargo doc --offline -j2 --workspace --no-deps --document-private-items --features flightsim-app/region-downloads",
+      "exit_code": 0,
+      "log": "logs/14-rustdoc.log",
+      "log_bytes": 3506,
+      "log_sha256": "e02a7028953b090a2ca861e7000874c7f4d2ef13cf749e42b943e2155d1d7a95"
+    },
+    {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "log": "logs/15-format.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "bash scripts/check-architecture.sh",
+      "exit_code": 0,
+      "log": "logs/16-architecture.log",
+      "log_bytes": 27,
+      "log_sha256": "277c025522371f3d487608a83a0c4c1b5e0f054c744b7a9453f3b0caca3a4513"
+    }
+  ],
+  "source_sha256": {
+    "crates/flightsim-app/src/aircraft_picker_runtime.rs": "cb13ffa27691a1a40731ae1323b4b0add1198d66858ef5afad783deaeeba61bb",
+    "crates/flightsim-app/src/aircraft_picker_tests.rs": "c14a8b6bd7abd57c51b39ebd9a92dc958e8cbbdb6eaa4f1cf7b1453a8e22a1ca",
+    "crates/flightsim-app/src/aircraft_profile.rs": "728c6e1fbcb4578a79e91a8a10eaedca9935f484ad4703199d7b05c9c70d922e",
+    "crates/flightsim-app/src/distribution.rs": "9ff2482986e408e99aafed01b4ca64a5d08694f13df4081324cc3fcdc852f701",
+    "crates/flightsim-app/src/flight_session.rs": "6d7a6289ecd7947575f2af52e023a221e463bf29e8f02298e7ea804af5b19c68",
+    "crates/flightsim-app/src/main.rs": "70bb24bd6a95bd36ab2e6c9cb18485e3abc308c4b20bbe6d0cd212ee8aa7f40a",
+    "crates/flightsim-app/src/near_static_turboprop_session.rs": "492a5de374b69b50ff5a7c2db91cf824f5e8ff8fd5cbae1225ab873a726853dd",
+    "crates/flightsim-app/src/nearstatic_lifecycle_tests.rs": "4a5c5c9345a405d061e13847f00ea68b71a5fa01ea6d3f02076dd9bae5750809",
+    "crates/flightsim-app/src/nearstatic_runtime_tests.rs": "223375b2cdbc0e7db01f1240a4930f68e754eb9ef5b2d3a42ee71da493a8ad40",
+    "crates/flightsim-app/src/replay_policy.rs": "f6c40374194a2d51a0e7ee317c5227ef285edcc0e44ad4a479732d54aa26ce35",
+    "crates/flightsim-app/src/turboprop_session.rs": "197512d12fb1cd814944fb36e55b6a14c69ddd8f2350a602e69d0c2cde616557",
+    "crates/flightsim-sim/src/near_static_turboprop_simulation/mod.rs": "bd5be1f7a4469c6cd853f0e9ea990f05a8675d26c267d9196b7f3e82cf38c36c",
+    "crates/flightsim-sim/src/near_static_turboprop_simulation/presentation.rs": "47ac4f5e0f6900c58006344c910947e4ad9621ddffc41f8f553d274d78bca2b4"
+  },
+  "protected_existing_file_count": 2017,
+  "protected_differences": [],
+  "existing_fixture_count": 93,
+  "fixture_differences": [],
+  "sole_existing_pure_source_edit": "near_static_turboprop_simulation/mod.rs: read-only presentation module and export",
+  "native_candidate": {
+    "profile_file": "/workspace/scratch/193080ebc0b3/flightsim-qa/nearstatic-app-session/cedar-v4-native/cedar-utility-turboprop-law2-v4.json",
+    "profile_sha256": "89ccf5ba39fd909927b11ec3b9047b57b9bdf4f4d20915f419373902843fb6b4",
+    "original_profile_sha256": "a4b13ac7c59830967666bb874e25416587a5fbf9945cbad248afa5bc7c9344e1",
+    "original_negative_rows_sha256": "2467ad7537216ae1470caa73e94eeba44f737686ef251fb5ac046a1cf6ca1fd4",
+    "forward_canonical_length": 4835,
+    "forward_identity_fnv1a64": "f83d082e814871c0",
+    "law2_identity_fnv1a64": "3b9ca42bba4c6eaa",
+    "law2_identity_canonical_length": 5390,
+    "law2_identity_canonical_sha256": "6828da741412dedbd598db15ac88535afa35fa4d418fbd330454bbac7f44d81c",
+    "retained_numeric_words_equal": 609,
+    "forward_propeller_source_tokens_copied_exactly": true,
+    "all_retained_tree_fields_equal": true,
+    "preserved_fields": [
+      "id",
+      "airframe",
+      "turbine",
+      "forward_propeller",
+      "governor",
+      "aero",
+      "envelope",
+      "running_start",
+      "controls",
+      "model",
+      "camera_eye_m",
+      "engine_sound"
+    ],
+    "only_changes": [
+      "version 3->4",
+      "dynamics revision 1->2",
+      "propeller schema2 wrapper with unchanged original forward component, accepted negative rows and fixed domain semantics"
+    ],
+    "schema_validation": "passed",
+    "rust_profile_identity_validation": "passed exact production loaders, complete canonical forward/new identity equality and retained engine/model/control/camera/audio metadata",
+    "limits": [
+      "QA-only external explicit profile; no preset or asset registration",
+      "No stationary parking claim: observed braked idle creep approximately 0.20062 m / 10 s",
+      "Only fixed J[-0.01,0), adverse/transverse induced-speed ratios <=0.10, conservative static power floor",
+      "Native v6 and remaining flight/wind qualification still pending"
+    ],
+    "rust_validation_rlib_sha256": "a3146a0ca2cdda0b4d849ca518ac8fb97815232c8d71ddac3ce723badfbd5ca7"
+  },
+  "initial_red_runs": [
+    {
+      "log": "logs/01-app-focused.log",
+      "reason": "Test imports missing and existing exhaustive recorder helper needed new typed enum arms; fixed without changing runtime behavior"
+    },
+    {
+      "log": "logs/02-app-focused.log",
+      "reason": "Invalid test assumption: huge steady wind is canceled by deliberate wind-relative spawn velocity. Replaced with a nonfinite input witness, then also added a finite 150 m/s metadata candidate rejected by unchanged Mach 0.3 envelope. No production physics fix or bound change."
+    }
+  ],
+  "limits": [
+    "One pre-existing optional regional scenery integration test ignored in each app configuration",
+    "No native app v6, physical controller, speaker, flight/wind qualification or stationary-parking acceptance",
+    "No old golden, source-pin manifest, distribution allowance, asset registration or picker preset changed",
+    "Strict rebinding, combined branch CI, native acceptance and publication belong to the integration owner",
+    "Original Cedar braked idle creep remains approximately 0.20062 m/10 s; law2 remains fixed J[-0.01,0), induced-speed ratios <=0.10 and conservative static floor"
+  ]
+}

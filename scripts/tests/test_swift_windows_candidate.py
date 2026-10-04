@@ -861,6 +861,155 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
                     candidate.validate_evidence(evidence)
 
+    def test_near_static_app_rejects_admission_owner_clock_and_presentation_drift(self):
+        repo, _ = self.source_fixture()
+        # These committed semantic mutations exercise the source gate only.
+        # No modified Rust is executed or credited as runtime qualification.
+        mutations = (
+            ("crates/flightsim-app/src/aircraft_profile.rs",
+             b'4 => AircraftProfileV4::from_bytes(bytes)',
+             b'4 => AircraftProfileV4::from_bytes(&[])'),
+            ("crates/flightsim-app/src/distribution.rs",
+             b'cfg!(feature = "commercial-staging") && profile.is_near_static_turboprop()',
+             b'false && profile.is_near_static_turboprop()'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b') -> Result<FlightSession, String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<FlightSession, String> {'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b') -> Result<Option<NearStaticTurbopropReplayPlayer>, String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<Option<NearStaticTurbopropReplayPlayer>, String> {'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b') -> Result<(FlightSession, StartCondition), String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<(FlightSession, StartCondition), String> {'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b'turbine_fraction: engine.turbine_fraction(),',
+             b'turbine_fraction: flightsim_fdm::turboprop::TurbineFraction::new(1.0).unwrap(),'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b'NearStaticTurbopropRecording::read_from(&mut std::io::BufReader::new(file))',
+             b'TurbopropRecording::read_from(&mut std::io::BufReader::new(file))'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b'if startup.weather.was_given || startup.weather.seed_was_given || startup.clouds_were_given {',
+             b'if false {'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b'(startup.world.global_terrain || elevation != Meters::ZERO)', b'false'),
+            ("crates/flightsim-app/src/near_static_turboprop_session.rs",
+             b'candidate.weather.selection = environment.weather;',
+             b'candidate.weather.selection = startup.weather.selection;'),
+            ("crates/flightsim-app/src/flight_session.rs",
+             b'crate::near_static_turboprop_session::prepare(startup, clock, start)',
+             b'crate::turboprop_session::prepare(startup, clock, start)'),
+            ("crates/flightsim-app/src/flight_session.rs",
+             b'player: NearStaticTurbopropReplayPlayer,',
+             b'player: TurbopropReplayPlayer,'),
+            ("crates/flightsim-app/src/main.rs",
+             b'near_static_turboprop_session::save_recording(&recorder.export())',
+             b'near_static_turboprop_session::save_recording(&recorder.finish())'),
+            ("crates/flightsim-app/src/replay_policy.rs",
+             b'6 => "profile-v4 law-2 near-static turboprop aircraft",',
+             b'6 => "profile-v3 law-1 turboprop aircraft",'),
+            ("crates/flightsim-sim/src/near_static_turboprop_simulation/mod.rs",
+             b'pub use presentation::NearStaticTurbopropPresentationSnapshot;', b''),
+            ("crates/flightsim-sim/src/near_static_turboprop_simulation/presentation.rs",
+             b'let environment = self.environment_at(self.state(), self.committed.ground, self.elapsed());',
+             b'let environment = self.environment_at(self.state(), self.committed.ground, flightsim_core::Seconds::ZERO);'),
+            ("crates/flightsim-sim/src/near_static_turboprop_simulation/presentation.rs",
+             b'                    .is_ok()\n', b'                    .is_err()\n'),
+            ("crates/flightsim-app/src/nearstatic_runtime_tests.rs",
+             b'assert_eq!(record.conditions().identity.schema, 4);',
+             b'assert!(record.conditions().identity.schema > 0);'),
+            ("crates/flightsim-app/src/nearstatic_lifecycle_tests.rs",
+             b'assert_eq!(record_bytes(session), self.record);',
+             b'assert!(!record_bytes(session).is_empty());'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_near_static_app_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        self.assertEqual(len(candidate.NEAR_STATIC_APP_PATHS), 13)
+        for relative in candidate.NEAR_STATIC_APP_PATHS:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
+    def test_replay_trim_source_rejects_fabricated_values_and_weakened_witnesses(self):
+        repo, _ = self.source_fixture()
+        # Mutations are committed only to disposable source-gate fixtures. They
+        # are never compiled, executed or credited as behavioral qualification.
+        mutations = (
+            ("crates/flightsim-app/src/main.rs",
+             b'let playback_active = playback.is_some() || simulation.0.is_replay();',
+             b'let playback_active = playback.is_some();'),
+            ("crates/flightsim-app/src/main.rs",
+             b'trim: (!playback_active).then(|| controls.trim.value()),',
+             b'trim: Some(controls.trim.value()),'),
+            ("crates/flightsim-app/src/main.rs",
+             b'trim: (!playback_active).then(|| controls.trim.value()),',
+             b'trim: (!playback_active).then_some(0.0),'),
+            ("crates/flightsim-ui/src/lib.rs",
+             b'|| "  N/A".to_owned(),', b'|| " 0.00".to_owned(),'),
+            ("crates/flightsim-ui/src/lib.rs",
+             b'let hint = if trim > 0.02 {', b'let hint = if false {'),
+            ("crates/flightsim-app/src/controls_runtime_tests.rs",
+             b'(!replay).then_some(-0.12)', b'Some(-0.12)'),
+            ("crates/flightsim-app/src/jet_runtime_tests.rs",
+             b'assert_eq!(hud.trim, None);', b'assert_eq!(hud.trim, Some(0.0));'),
+            ("crates/flightsim-app/src/turboprop_lifecycle_tests.rs",
+             b'assert_eq!(hud.trim, None);', b'assert_eq!(hud.trim, Some(0.0));'),
+            ("crates/flightsim-app/src/nearstatic_runtime_tests.rs",
+             b'assert_eq!(hud.trim, None);', b'assert_eq!(hud.trim, Some(0.0));'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
         self.checkout_source_fixture(repo, "crlf")

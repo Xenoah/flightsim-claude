@@ -179,9 +179,9 @@ pub struct Radians(pub f64);
 - An explicit pure-FDM `turboprop::near_static` API adds authored law 2 with
   stored negative J rows and fixed adverse/transverse induced-velocity limits.
   It retains the complete law-1 forward model and all 16 physical state scalars.
-  It does not widen profile v3, identity schema 3, replay v5 or app support.
+  It does not widen profile v3, identity schema 3 or replay v5.
   See [ADR-0020](docs/adr/0020-near-static-turboprop-law.md). Independent pure-law
-  review is complete; full aircraft and host qualification precede adoption.
+  review is complete; aircraft/preset qualification remains separate from explicit app admission.
 - [Profile v4](docs/aircraft-profile-v4.md) explicitly selects near-static law 2
   through a concrete original-token loader. Propeller wrapper schema 2 retains
   the complete schema-1 forward component, two stored negative rows and required
@@ -196,6 +196,14 @@ pub struct Radians(pub f64);
   changing that old format. See [ADR-0023](docs/adr/0023-near-static-full-state-replay-v6.md).
   Schema validation, physical construction and pointwise runtime admission are
   distinct. See [ADR-0022](docs/adr/0022-near-static-profile-and-identity.md).
+- Explicit external profile-v4 app selection owns a typed near-static live
+  simulation/v6 recorder or one complete-state v6 player. Its read-only
+  presentation uses the committed clock and separate law-2 support check.
+  Candidate source/weather/control/model/audio commits reuse generation-checked
+  transactions; failed/canceled starts retain the active flight and trims.
+  Profile-v3/law-1/v5 interpretation remains separate. No near-static/Cedar
+  preset or commercial staging admission follows. See
+  [ADR-0024](docs/adr/0024-near-static-app-sessions.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を

@@ -255,6 +255,13 @@ If later models require those, update the recording/state contract deliberately.
 
 ## Application policy and remaining gates
 
+The HUD shows `TRM N/A` during playback of every supported replay version.
+Recordings preserve effective elevator input, which combines stick and pilot
+trim; they do not preserve the separate trim setting. Neither a zero value,
+the current local trim nor recorded elevator is evidence of recorded trim.
+Live flight continues to show the pilot's trim value and nose-up/down hint.
+This presentation rule does not change recorded controls or replay physics.
+
 New live app flights, restart and world-map Start use `CurrentRecorder` with the
 complete selected aircraft identity and the validated initial weather selection.
 `WeatherSelection::Legacy` (W=0) remains the default; an authored selection retains

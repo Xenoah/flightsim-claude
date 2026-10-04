@@ -170,6 +170,11 @@ alpha.20 の実績を 2 機種へ広げない。実 GPU の代替ではない。
 
 ## M4 — 拡張
 
+- [x] Explicit external profile4/law2 typed app sessions and complete-state v6
+  replay, with old profile3/law1/v5 retained. Native acceptance, Cedar flight/wind
+  qualification and preset release remain separate gates
+  ([scope](near-static-turboprop-native-app.md), [ADR-0024](adr/0024-near-static-app-sessions.md))
+
 - [x] 地図の新規飛行で Launch / Swift / Meadow / Kestrel を選択し、準備済み scene と
   session/記録/操作/視点/案内/合成音源を一括交換する transaction。取消・読込失敗・
   地域非互換は旧飛行を保持する。[限定 native 検証](qa/aircraft-picker-native-2026-10-04.md)済み。

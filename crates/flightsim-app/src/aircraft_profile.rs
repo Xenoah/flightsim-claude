@@ -5,6 +5,7 @@ use flightsim_input::{AxisState, ElevatorTrim, PilotControls, RampAxis};
 use flightsim_render::{ModelAxis, ModelFit};
 use flightsim_sim::aircraft_profile::{AircraftProfileV2, EngineSound};
 use flightsim_sim::aircraft_profile_v3::AircraftProfileV3;
+use flightsim_sim::aircraft_profile_v4::AircraftProfileV4;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::{Component, Path};
@@ -22,6 +23,7 @@ pub(super) enum SelectedAircraftProfile {
     Legacy(AircraftProfile),
     Jet(AircraftProfileV2),
     Turboprop(AircraftProfileV3),
+    NearStaticTurboprop(AircraftProfileV4),
 }
 
 impl From<AircraftProfile> for SelectedAircraftProfile {
@@ -76,6 +78,9 @@ impl SelectedAircraftProfile {
             3 => AircraftProfileV3::from_bytes(bytes)
                 .map(Self::Turboprop)
                 .map_err(|error| error.to_string()),
+            4 => AircraftProfileV4::from_bytes(bytes)
+                .map(Self::NearStaticTurboprop)
+                .map_err(|error| error.to_string()),
             version => Err(format!("unsupported aircraft profile version {version}")),
         }
     }
@@ -85,6 +90,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => &profile.id,
             Self::Jet(profile) => profile.id(),
             Self::Turboprop(profile) => profile.id(),
+            Self::NearStaticTurboprop(profile) => profile.id(),
         }
     }
 
@@ -93,6 +99,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => &profile.dynamics.name,
             Self::Jet(profile) => profile.configuration().airframe().name(),
             Self::Turboprop(profile) => profile.configuration().airframe().name(),
+            Self::NearStaticTurboprop(profile) => profile.configuration().airframe().name(),
         }
     }
 
@@ -101,13 +108,14 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => &profile.model.path,
             Self::Jet(profile) => &profile.model().path,
             Self::Turboprop(profile) => &profile.model().path,
+            Self::NearStaticTurboprop(profile) => &profile.model().path,
         }
     }
 
     pub fn model_fit(&self) -> ModelFit {
         match self {
             Self::Legacy(profile) => profile.model_fit(),
-            Self::Jet(_) | Self::Turboprop(_) => {
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => {
                 let model = self.bounded_model().expect("bounded profile");
                 ModelFit::new(
                     ModelAxis::parse(&model.forward).expect("validated axis"),
@@ -122,7 +130,7 @@ impl SelectedAircraftProfile {
     pub fn pilot_controls(&self, approach: bool) -> PilotControls {
         match self {
             Self::Legacy(profile) => profile.pilot_controls(approach),
-            Self::Jet(_) | Self::Turboprop(_) => {
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => {
                 let controls = self.bounded_controls().expect("bounded profile");
                 let mut result = PilotControls::default();
                 result.aileron =
@@ -173,6 +181,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => profile.camera_eye_m.map(Meters),
             Self::Jet(profile) => profile.camera_eye(),
             Self::Turboprop(profile) => profile.camera_eye(),
+            Self::NearStaticTurboprop(profile) => profile.camera_eye(),
         }
     }
 
@@ -182,7 +191,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => {
                 EngineKind::parse(&profile.engine_sound).expect("validated engine sound")
             }
-            Self::Jet(_) | Self::Turboprop(_) => {
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => {
                 match self.bounded_sound().expect("bounded profile") {
                     EngineSound::Piston => EngineKind::Piston(EngineSpec::default()),
                     EngineSound::Turbine => {
@@ -203,6 +212,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(_) => None,
             Self::Jet(profile) => Some(profile.model()),
             Self::Turboprop(profile) => Some(profile.model()),
+            Self::NearStaticTurboprop(profile) => Some(profile.model()),
         }
     }
 
@@ -211,6 +221,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(_) => None,
             Self::Jet(profile) => Some(profile.controls()),
             Self::Turboprop(profile) => Some(profile.controls()),
+            Self::NearStaticTurboprop(profile) => Some(profile.controls()),
         }
     }
 
@@ -219,6 +230,7 @@ impl SelectedAircraftProfile {
             Self::Legacy(_) => None,
             Self::Jet(profile) => Some(profile.engine_sound()),
             Self::Turboprop(profile) => Some(profile.engine_sound()),
+            Self::NearStaticTurboprop(profile) => Some(profile.engine_sound()),
         }
     }
 
@@ -227,11 +239,14 @@ impl SelectedAircraftProfile {
     }
 
     pub fn uses_bounded_model(&self) -> bool {
-        matches!(self, Self::Jet(_) | Self::Turboprop(_))
+        matches!(
+            self,
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_)
+        )
     }
 
     pub fn is_turboprop(&self) -> bool {
-        matches!(self, Self::Turboprop(_))
+        matches!(self, Self::Turboprop(_) | Self::NearStaticTurboprop(_))
     }
 
     pub fn is_jet(&self) -> bool {
@@ -241,21 +256,34 @@ impl SelectedAircraftProfile {
     pub fn legacy(&self) -> Option<&AircraftProfile> {
         match self {
             Self::Legacy(profile) => Some(profile),
-            Self::Jet(_) | Self::Turboprop(_) => None,
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => None,
         }
     }
 
     pub fn jet(&self) -> Option<&AircraftProfileV2> {
         match self {
-            Self::Legacy(_) | Self::Turboprop(_) => None,
+            Self::Legacy(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => None,
             Self::Jet(profile) => Some(profile),
         }
     }
 
     pub fn turboprop(&self) -> Option<&AircraftProfileV3> {
-        match self {
-            Self::Legacy(_) | Self::Jet(_) => None,
-            Self::Turboprop(profile) => Some(profile),
+        if let Self::Turboprop(profile) = self {
+            Some(profile)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_near_static_turboprop(&self) -> bool {
+        matches!(self, Self::NearStaticTurboprop(_))
+    }
+
+    pub fn near_static_turboprop(&self) -> Option<&AircraftProfileV4> {
+        if let Self::NearStaticTurboprop(profile) = self {
+            Some(profile)
+        } else {
+            None
         }
     }
 
@@ -277,7 +305,7 @@ impl SelectedAircraftProfile {
     ) -> RigidBodyState {
         match self {
             Self::Legacy(profile) => profile.approach_state(runway, distance, glideslope),
-            Self::Jet(_) | Self::Turboprop(_) => {
+            Self::Jet(_) | Self::Turboprop(_) | Self::NearStaticTurboprop(_) => {
                 let controls = self.bounded_controls().expect("bounded profile");
                 let state = flightsim_sim::approach_state(
                     runway,
@@ -662,6 +690,69 @@ mod selection_tests {
         );
         assert!(SelectedAircraftProfile::builtin("numerical-turboprop-fixture").is_err());
         assert!(SelectedAircraftProfile::builtin("cedar-turboprop").is_err());
+    }
+
+    #[test]
+    fn profile4_selects_only_explicit_law2_and_preserves_original_numeric_tokens() {
+        const JSON: &str = include_str!(
+            "../../../docs/examples/aircraft-profiles-v4/numerical-near-static-turboprop.json"
+        );
+        for json in [JSON.to_owned(), JSON.replace('\n', "\r\n")] {
+            let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+            assert!(selected.is_near_static_turboprop());
+            assert!(selected.is_turboprop());
+            assert!(selected.uses_bounded_model());
+            assert!(selected.turboprop().is_none());
+            assert!(selected.jet().is_none());
+            assert!(selected.legacy().is_none());
+            let profile = selected.near_static_turboprop().unwrap();
+            let independently_loaded = AircraftProfileV4::from_bytes(json.as_bytes()).unwrap();
+            assert_eq!(flightsim_sim::near_static_turboprop_identity::canonical_near_static_turboprop_bytes(profile.configuration()), flightsim_sim::near_static_turboprop_identity::canonical_near_static_turboprop_bytes(independently_loaded.configuration()));
+            assert_eq!(
+                profile.running_start().turbine_fraction().get().to_bits(),
+                (-0.0_f64).to_bits()
+            );
+            let aero = profile.configuration().aero().definition();
+            assert_eq!(
+                aero.knots[0].aero.pitch_rate_q.to_bits(),
+                0xc03e_6666_6666_6667
+            );
+            assert_eq!(
+                aero.knots[0].aero.yaw_rate_p.to_bits(),
+                (-0.0_f64).to_bits()
+            );
+            assert_eq!(selected.model_fit().forward, ModelAxis::NegativeX);
+            assert_eq!(selected.camera_eye(), independently_loaded.camera_eye());
+            for approach in [false, true] {
+                let controls = selected.pilot_controls(approach);
+                assert_eq!(controls.aileron_trim.value().to_bits(), 0.0_f64.to_bits());
+                assert_eq!(controls.rudder_trim.value().to_bits(), 0.0_f64.to_bits());
+            }
+        }
+        for (old, new) in [
+            ("\"version\": 4", "\"version\": 3"),
+            ("\"version\": 4", "\"version\": 4.0"),
+            ("\"revision\": 2", "\"revision\": 1"),
+            ("\"version\": 4", "\"version\": 4, \"version\": 4"),
+            (
+                "\"turbine_fraction\": -0.0",
+                "\"turbine_fraction\": 1e-9999",
+            ),
+        ] {
+            assert!(JSON.contains(old));
+            assert!(
+                SelectedAircraftProfile::from_bytes(JSON.replacen(old, new, 1).as_bytes()).is_err(),
+                "{new}"
+            );
+        }
+        let old = SelectedAircraftProfile::from_bytes(TURBOPROP_JSON.as_bytes()).unwrap();
+        assert!(!old.is_near_static_turboprop());
+        assert!(old.turboprop().is_some());
+        assert!(old.near_static_turboprop().is_none());
+        assert!(SelectedAircraftProfile::builtin("cedar-turboprop").is_err());
+        assert!(
+            SelectedAircraftProfile::builtin("numerical-near-static-turboprop-fixture").is_err()
+        );
     }
 
     #[test]

@@ -70,6 +70,7 @@ mod distance_runtime;
 mod distribution;
 mod flight_session;
 mod graphics_runtime;
+mod near_static_turboprop_session;
 mod turboprop_session;
 use flight_session::{FlightSession, PreparedJetSession};
 mod conditions_runtime;
@@ -87,6 +88,8 @@ use replay_runtime::ReplayPlayback;
 mod controls_runtime_tests;
 #[cfg(test)]
 mod jet_runtime_tests;
+#[cfg(test)]
+mod nearstatic_runtime_tests;
 #[cfg(test)]
 mod replay_migration_tests;
 #[cfg(test)]
@@ -604,17 +607,26 @@ fn main() -> bevy::app::AppExit {
         std::process::exit(2);
     }
     let replay_requested = startup.replay.is_some();
-    let (recording, jet_player, turboprop_player) = if startup.aircraft.is_jet() {
+    let (recording, jet_player, turboprop_player, near_static_player) = if startup.aircraft.is_jet()
+    {
         match flight_session::resolve_jet_sources(&mut startup, &mut diagnostics) {
-            Ok(player) => (None, player, None),
+            Ok(player) => (None, player, None, None),
             Err(error) => {
                 eprintln!("cannot start jet: {error}");
                 return bevy::app::AppExit::error();
             }
         }
+    } else if startup.aircraft.is_near_static_turboprop() {
+        match near_static_turboprop_session::resolve_sources(&mut startup, &mut diagnostics) {
+            Ok(player) => (None, None, None, player),
+            Err(error) => {
+                eprintln!("cannot start near-static turboprop: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
     } else if startup.aircraft.is_turboprop() {
         match turboprop_session::resolve_sources(&mut startup, &mut diagnostics) {
-            Ok(player) => (None, None, player),
+            Ok(player) => (None, None, player, None),
             Err(error) => {
                 eprintln!("cannot start turboprop: {error}");
                 return bevy::app::AppExit::error();
@@ -625,9 +637,14 @@ fn main() -> bevy::app::AppExit {
             resolve_flight_sources(&mut startup, &mut diagnostics),
             None,
             None,
+            None,
         )
     };
-    if replay_requested && recording.is_none() && jet_player.is_none() && turboprop_player.is_none()
+    if replay_requested
+        && recording.is_none()
+        && jet_player.is_none()
+        && turboprop_player.is_none()
+        && near_static_player.is_none()
     {
         eprintln!("cannot start replay: {}", diagnostics.0.join("; "));
         std::process::exit(2);
@@ -683,6 +700,16 @@ fn main() -> bevy::app::AppExit {
                         .conditions
                         .start_epoch
                 })
+            })
+            .or_else(|| {
+                near_static_player.as_ref().map(|player| {
+                    player
+                        .recording()
+                        .conditions()
+                        .environment
+                        .conditions
+                        .start_epoch
+                })
             });
         if let Some(epoch) = bounded_epoch.filter(|epoch| *epoch > 0.0) {
             clock.utc = flightsim_render::JulianDate(epoch);
@@ -721,6 +748,7 @@ fn main() -> bevy::app::AppExit {
     if recording.is_none()
         && jet_player.is_none()
         && turboprop_player.is_none()
+        && near_static_player.is_none()
         && let Err(error) = weather_runtime::resolve_departure(&mut startup)
     {
         eprintln!("{error}");
@@ -737,6 +765,14 @@ fn main() -> bevy::app::AppExit {
             Ok(session) => Some(session),
             Err(error) => {
                 eprintln!("cannot prepare jet flight: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
+    } else if startup.aircraft.is_near_static_turboprop() {
+        match near_static_turboprop_session::prepare_startup(&startup, &clock, near_static_player) {
+            Ok(session) => Some(session),
+            Err(error) => {
+                eprintln!("cannot prepare near-static turboprop flight: {error}");
                 return bevy::app::AppExit::error();
             }
         }
@@ -990,7 +1026,7 @@ fn application_help() -> &'static str {
 --cloud-cover 0..1 --cloud-base M --cloud-top M --cloud-visibility M\n\
 --engine turbine|piston                        Sound override\n\
 --model ASSET.glb --model-forward AXIS --model-up AXIS | --no-model\n\
---replay FILE.fsreplay                          Replay matching aircraft (legacy v3 / jet v4 / turboprop v5)\n\
+--replay FILE.fsreplay                          Replay matching aircraft (legacy v3 / jet v4 / turboprop v5 / near-static v6)\n\
 --legacy-replay-compatibility                   Assume supported v1/v2 baseline; yaw_rate_p unknown\n\
 --input-config FILE.json --input-diagnostics    Load mappings/show values\n\
 --native-controllers                           Opt-in native HOTAS channels\n\
@@ -1072,15 +1108,15 @@ fn resolve_replay(
     ) {
         Ok(flightsim_sim::replay_v4::ModelReplayFile::Existing(recording)) => recording,
         Ok(flightsim_sim::replay_v4::ModelReplayFile::V4(_)) => {
-            diagnostics
-                .0
-                .push("replay v4 requires its matching profile-v2 jet aircraft".into());
+            diagnostics.0.push(replay_policy::profile_requirement(4));
             return None;
         }
         Err(error) => {
-            diagnostics
-                .0
-                .push(format!("could not read `{}`: {error}", path.display()));
+            diagnostics.0.push(format!(
+                "could not read `{}`: {}",
+                path.display(),
+                replay_policy::read_error(&error)
+            ));
             startup.replay = None;
             return None;
         }
@@ -2400,6 +2436,9 @@ fn adjust_time_rate(
         }
         | FlightSession::TurbopropLive {
             recording_error, ..
+        }
+        | FlightSession::NearStaticTurbopropLive {
+            recording_error, ..
         } = &mut simulation.0
         && recording_error.is_none()
     {
@@ -2431,9 +2470,16 @@ fn sync_replay_clock(
                 fault,
                 "TURBOPROP",
             )),
+            FlightSession::NearStaticTurbopropReplay { player, fault, .. } => Some((
+                player.recording().conditions().environment.conditions,
+                player.simulation().elapsed(),
+                fault,
+                "NEAR-STATIC TURBOPROP",
+            )),
             FlightSession::Legacy(_)
             | FlightSession::JetLive { .. }
-            | FlightSession::TurbopropLive { .. } => None,
+            | FlightSession::TurbopropLive { .. }
+            | FlightSession::NearStaticTurbopropLive { .. } => None,
         };
         if let Some((conditions, elapsed, fault, family)) = replay {
             clock.rate = flightsim_render::TimeRate::PAUSED;
@@ -2754,7 +2800,49 @@ fn control_replay(
                     }
                 }
             }
+            FlightSession::NearStaticTurbopropLive { recorder, .. } => {
+                if keyboard.just_pressed(KeyCode::F9) {
+                    if startup.as_deref().is_some_and(|s| s.clouds_were_given) {
+                        warn!("{}", replay_policy::MANUAL_CLOUD_DIAGNOSTIC);
+                        return;
+                    }
+                    match near_static_turboprop_session::save_recording(&recorder.export()) {
+                        Ok(path) => info!("saved turboprop replay to {}", path.display()),
+                        Err(error) => error!("cannot save turboprop replay: {error}"),
+                    }
+                }
+            }
             FlightSession::TurbopropReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                if keyboard.just_pressed(KeyCode::F5) && fault.is_none() && !player.finished() {
+                    player.set_paused(!player.paused());
+                }
+                if keyboard.just_pressed(KeyCode::F6) {
+                    player.set_speed(player.speed() / 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F7) {
+                    player.set_speed(player.speed() * 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F8) {
+                    *pending_seek = Some(
+                        pending_seek
+                            .or(player.seek_target())
+                            .unwrap_or(player.cursor())
+                            .saturating_sub(1200),
+                    );
+                    if let Some(mut reset) = scenery_reset {
+                        reset.request();
+                    }
+                    rig.reset();
+                    *landing = default();
+                    commands.remove_resource::<flightsim_ui::LandingReport>();
+                }
+            }
+            FlightSession::NearStaticTurbopropReplay {
                 player,
                 fault,
                 pending_seek,
@@ -3003,6 +3091,41 @@ impl StallWarningStatus {
         }
     }
 
+    fn update_near_static_turboprop(
+        &mut self,
+        simulation: &flightsim_sim::near_static_turboprop_simulation::NearStaticTurbopropSimulation,
+        flaps: f64,
+        angle: Radians,
+        valid: bool,
+    ) {
+        let presentation = simulation.presentation();
+        let peak = presentation.aero_coefficients.as_ref().and_then(|aero| {
+            flightsim_fdm::aero::positive_stall_peak_angle(
+                aero,
+                simulation.config().airframe().geometry(),
+                flaps,
+            )
+        });
+        self.reference = None;
+        self.unavailable = peak.is_none();
+        let Some(peak) = peak else {
+            self.active = false;
+            return;
+        };
+        if !valid || !angle.is_finite() {
+            self.active = false;
+            return;
+        }
+        let fraction = angle.get().abs() / peak.get();
+        if self.active {
+            if fraction < STALL_WARNING_RELEASE {
+                self.active = false;
+            }
+        } else if fraction >= STALL_WARNING_FRACTION {
+            self.active = true;
+        }
+    }
+
     fn update(
         &mut self,
         config: &flightsim_fdm::AircraftConfig,
@@ -3108,6 +3231,10 @@ fn publish_sound(
         let failed = jet.terminal().is_some()
             || matches!(&simulation.0, FlightSession::JetReplay { player, .. } if player.faulted());
         warning.update_jet(jet, flaps, angle, valid && !failed);
+    } else if let Some(turboprop) = simulation.0.near_static_turboprop() {
+        let failed = turboprop.terminal().is_some()
+            || matches!(&simulation.0, FlightSession::NearStaticTurbopropReplay { player, .. } if player.faulted());
+        warning.update_near_static_turboprop(turboprop, flaps, angle, valid && !failed);
     } else if let Some(turboprop) = simulation.0.turboprop() {
         let failed = turboprop.terminal().is_some()
             || matches!(&simulation.0, FlightSession::TurbopropReplay { player, .. } if player.faulted());
@@ -3193,7 +3320,9 @@ fn publish_replay_status(
     if let Some(simulation) = simulation
         && simulation.0.uses_bounded_model()
     {
-        let notice = Some(if simulation.0.is_turboprop() {
+        let notice = Some(if simulation.0.is_near_static_turboprop() {
+            near_static_turboprop_session::notice(&simulation.0, startup.as_deref())
+        } else if simulation.0.is_turboprop() {
             turboprop_session::notice(&simulation.0, startup.as_deref())
         } else {
             flight_session::jet_notice(&simulation.0, startup.as_deref())
@@ -3216,6 +3345,22 @@ fn publish_replay_status(
                 notice,
             },
             FlightSession::TurbopropReplay {
+                player,
+                fault,
+                total,
+                ..
+            } => flightsim_ui::ReplayStatus {
+                active: true,
+                paused: player.paused(),
+                speed: player.speed(),
+                elapsed: player.simulation().elapsed(),
+                total: *total,
+                seeking: player.seeking(),
+                fault: fault.clone(),
+                finished: player.finished(),
+                notice,
+            },
+            FlightSession::NearStaticTurbopropReplay {
                 player,
                 fault,
                 total,
@@ -4697,13 +4842,9 @@ fn publish_hud(
         roll: interpolated.attitude.roll,
         throttle: shown.0,
         flaps: shown.1,
-        // **再生中も手元のトリムを映さない。** 記録側の実効舵に
-        // トリムが含まれているので、ここで足すと二重になる。
-        trim: if playback_active {
-            0.0
-        } else {
-            controls.trim.value()
-        },
+        // Replay stores effective elevator, not separate stick and trim settings.
+        // Neither zero, local pilot trim nor the recorded elevator identifies it.
+        trim: (!playback_active).then(|| controls.trim.value()),
         // 脚の長さぶん余裕を見る。重心の対地高度なので接地時でも 1 m 前後ある。
         on_ground: simulation.0.on_ground(),
         terrain_available: ground.from_terrain,

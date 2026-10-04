@@ -123,7 +123,9 @@ pub struct HudState {
     ///
     /// キーを離しても保持する。姿勢・高度を固定する自動操縦ではなく、
     /// 過渡応答や出力・速度・姿勢にも手放し時の動きは左右される。
-    pub trim: f64,
+    /// `None` when the separate pilot trim setting is unavailable, as in replay:
+    /// recorded effective elevator combines stick input and trim.
+    pub trim: Option<f64>,
     pub on_ground: bool,
     pub terrain_available: bool,
     pub view_mode: &'static str,
@@ -695,13 +697,19 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
 
     // トリムが中立から離れているときだけ向きを添える。**符号だけでは
     // どちらが機首上げか分からない。**
-    let trim_hint = if state.trim > 0.02 {
-        "  nose up"
-    } else if state.trim < -0.02 {
-        "  nose down"
-    } else {
-        ""
-    };
+    let trim = state.trim.map_or_else(
+        || "  N/A".to_owned(),
+        |trim| {
+            let hint = if trim > 0.02 {
+                "  nose up"
+            } else if trim < -0.02 {
+                "  nose down"
+            } else {
+                ""
+            };
+            format!("{trim:>5.2}{hint}")
+        },
+    );
 
     let warning = if state.stall_warning_unavailable {
         "  STALL WARN N/A"
@@ -721,7 +729,7 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
          BNK  {:>5.1} deg\n\
          THR  {:>5.0} % set\n\
          FLP  {:>5.0} %\n\
-         TRM  {:>5.2}{trim_hint}
+         TRM  {trim}
 \
          WND  {}\n\
          VIEW {}{terrain}\n\
@@ -739,7 +747,6 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         values.roll_degrees,
         state.throttle * 100.0,
         state.flaps * 100.0,
-        state.trim,
         format_wind(state.wind_from, state.wind_speed),
         state.view_mode,
         state.water_quality,
@@ -844,7 +851,7 @@ mod tests {
             roll: Radians(-0.1),
             throttle: 0.75,
             flaps: 0.0,
-            trim: 0.0,
+            trim: Some(0.0),
             on_ground: false,
             terrain_available: true,
             view_mode: "COCKPIT",
@@ -1289,7 +1296,7 @@ mod tests {
             state.airspeed = Knots(100.0).to_meters_per_second();
             state.equivalent_airspeed = Knots(75.0).to_meters_per_second();
             state.throttle = 1.0;
-            state.trim = trim;
+            state.trim = Some(trim);
             let mut smoothing = HudSmoothing::default();
             for warning in [false, true, false, true] {
                 state.stall_warning = warning;
@@ -1303,6 +1310,27 @@ mod tests {
                 );
                 assert_eq!(text.contains("STALL WARN"), warning);
             }
+        }
+    }
+
+    #[test]
+    fn unavailable_trim_has_no_numeric_value_or_direction_and_live_trim_returns() {
+        let mut state = cruising();
+        let mut smoothing = HudSmoothing::default();
+        for (trim, expected) in [
+            (Some(0.09), "TRM   0.09  nose up"),
+            (None, "TRM    N/A"),
+            (Some(0.0), "TRM   0.00"),
+            (None, "TRM    N/A"),
+            (Some(-0.08), "TRM  -0.08  nose down"),
+        ] {
+            state.trim = trim;
+            let text = format_hud(smoothing.update(Seconds(0.2), &state), &state);
+            assert_eq!(
+                text.lines().find(|line| line.starts_with("TRM")),
+                Some(expected)
+            );
+            assert!(text.is_ascii());
         }
     }
 

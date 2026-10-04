@@ -406,3 +406,7 @@ fn fail(world: &mut World, pending: &mut PendingFlight, error: String) {
 #[cfg(test)]
 #[path = "aircraft_picker_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "nearstatic_lifecycle_tests.rs"]
+pub(crate) mod nearstatic_lifecycle_tests;

@@ -468,7 +468,7 @@ mod tests {
             roll: Radians(0.0),
             throttle,
             flaps: 0.0,
-            trim: 0.0,
+            trim: Some(0.0),
             on_ground,
             terrain_available: true,
             view_mode: "CHASE",
@@ -804,7 +804,7 @@ mod tests {
             let mut high = hud(true, 1.0, 55.0, 0.0, 0.0);
             high.altitude = Meters(4000.0);
             high.airspeed = Knots(80.0).to_meters_per_second();
-            high.trim = trim;
+            high.trim = Some(trim);
             assert_eq!(
                 progress.update(&high),
                 TutorialStage::Accelerate,
@@ -829,7 +829,7 @@ mod tests {
         for trim in [0.09, 0.08] {
             let mut progress = TutorialProgress::new();
             let mut state = hud(true, 1.0, 65.0, 0.0, 0.0);
-            state.trim = trim;
+            state.trim = Some(trim);
             assert_eq!(progress.update(&state), TutorialStage::Accelerate);
             state.equivalent_airspeed = Knots(75.0).to_meters_per_second();
             assert_eq!(progress.update(&state), TutorialStage::Rotate);
@@ -938,7 +938,7 @@ mod tests {
     fn slow_climb_gets_airspeed_advice_without_adding_trim() {
         for trim in [0.09, 0.08] {
             let mut state = hud(false, 1.0, 65.0, 100.0, 200.0);
-            state.trim = trim;
+            state.trim = Some(trim);
             assert!(tutorial_prompt(TutorialStage::Climb, &state).starts_with("BUILD AIRSPEED"));
             assert!(
                 tutorial_prompt(TutorialStage::RecoverClimb, &state).starts_with("BUILD AIRSPEED")
