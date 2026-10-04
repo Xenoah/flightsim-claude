@@ -1,0 +1,289 @@
+{
+  "version": 3,
+  "id": "numerical-turboprop-fixture",
+  "dynamics": {
+    "kind": "running_turboprop_table",
+    "revision": 1,
+    "airframe": {
+      "name": "Numerical turboprop fixture (original synthetic data)",
+      "mass_kg": 1043.0,
+      "inertia_kg_m2": [
+        1285.0,
+        1825.0,
+        2667.0,
+        12.5
+      ],
+      "wing_area_m2": 16.17,
+      "wing_span_m": 11.0,
+      "mean_chord_m": 1.49,
+      "landing_gear": [
+        {
+          "contact_m": [
+            1.6,
+            0,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        },
+        {
+          "contact_m": [
+            -0.8,
+            -1.3,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        },
+        {
+          "contact_m": [
+            -0.8,
+            1.3,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        }
+      ],
+      "rolling_friction": 0.015,
+      "braking_friction": 0.7,
+      "lateral_friction": 0.8,
+      "friction_transition_mps": 0.25
+    },
+    "aero": {
+      "schema": 1,
+      "knots": [
+        {
+          "mach": 0.0,
+          "aero": {
+            "lift_zero": 0.31,
+            "lift_alpha": 5.143,
+            "lift_flaps": 0.65,
+            "stall_angle_rad": 0.2792526803190927,
+            "stall_blend_rate": 50.0,
+            "drag_min": 0.031,
+            "oswald_efficiency": 0.75,
+            "drag_flaps": 0.06,
+            "side_beta": -0.31,
+            "side_rudder": 0.07835299999999999,
+            "roll_beta": -0.089,
+            "roll_rate_p": -0.47,
+            "roll_rate_r": 0.096,
+            "roll_aileron": 0.06212199999999999,
+            "roll_rudder": 0.0061592999999999995,
+            "pitch_zero": 0.015,
+            "pitch_alpha": -0.89,
+            "pitch_rate_q": -30.400000000000002,
+            "pitch_elevator": 0.55808,
+            "pitch_flaps": -0.12,
+            "yaw_beta": 0.065,
+            "yaw_rate_p": -0.0,
+            "yaw_rate_r": -0.099,
+            "yaw_aileron": -0.0018497,
+            "yaw_rudder": 0.027528299999999995
+          }
+        },
+        {
+          "mach": 0.9,
+          "aero": {
+            "lift_zero": 0.31,
+            "lift_alpha": 5.143,
+            "lift_flaps": 0.65,
+            "stall_angle_rad": 0.2792526803190927,
+            "stall_blend_rate": 50.0,
+            "drag_min": 0.031,
+            "oswald_efficiency": 0.75,
+            "drag_flaps": 0.06,
+            "side_beta": -0.31,
+            "side_rudder": 0.07835299999999999,
+            "roll_beta": -0.089,
+            "roll_rate_p": -0.47,
+            "roll_rate_r": 0.096,
+            "roll_aileron": 0.06212199999999999,
+            "roll_rudder": 0.0061592999999999995,
+            "pitch_zero": 0.015,
+            "pitch_alpha": -0.89,
+            "pitch_rate_q": -30.400000000000002,
+            "pitch_elevator": 0.55808,
+            "pitch_flaps": -0.12,
+            "yaw_beta": 0.065,
+            "yaw_rate_p": -0.0,
+            "yaw_rate_r": -0.099,
+            "yaw_aileron": -0.0018497,
+            "yaw_rudder": 0.027528299999999995
+          }
+        }
+      ]
+    },
+    "envelope": {
+      "pressure_ratio": [
+        0.55,
+        1.1
+      ],
+      "temperature_ratio": [
+        0.85,
+        1.1
+      ],
+      "mach": [
+        0.0,
+        0.3
+      ],
+      "relative_shaft_rad_s": [
+        120.0,
+        240.0
+      ],
+      "absolute_spin_rad_s": [
+        110.0,
+        250.0
+      ],
+      "maximum_helical_tip_mach": 0.8,
+      "maximum_crossflow_tip_ratio": 0.1
+    },
+    "turbine": {
+      "schema": 1,
+      "pressure_ratios": [
+        0.5,
+        0.9,
+        1.2
+      ],
+      "temperature_ratios": [
+        0.75,
+        1.25
+      ],
+      "cells": [
+        {
+          "idle_w": 8000,
+          "maximum_w": 120000
+        },
+        {
+          "idle_w": 7000,
+          "maximum_w": 110000
+        },
+        {
+          "idle_w": 13000,
+          "maximum_w": 240000
+        },
+        {
+          "idle_w": 11000,
+          "maximum_w": 220000
+        },
+        {
+          "idle_w": 18000,
+          "maximum_w": 330000
+        },
+        {
+          "idle_w": 16000,
+          "maximum_w": 300000
+        }
+      ],
+      "rise_seconds": 1.2,
+      "fall_seconds": 1.8,
+      "output_torque_limit_nm": 2400
+    },
+    "propeller": {
+      "schema": 1,
+      "convention": "isolated_axial_propeller",
+      "diameter_m": 2.0,
+      "rotor_axial_inertia_kg_m2": 18.0,
+      "rotation_sense": 1,
+      "advance_ratio": [
+        0.0,
+        0.7,
+        2.0
+      ],
+      "blade_pitch_rad": [
+        0.12,
+        0.35,
+        0.7
+      ],
+      "cells": [
+        {
+          "ct": 0.05,
+          "cp": 0.08
+        },
+        {
+          "ct": 0.07,
+          "cp": 0.1
+        },
+        {
+          "ct": 0.09,
+          "cp": 0.12
+        },
+        {
+          "ct": 0.05,
+          "cp": 0.1
+        },
+        {
+          "ct": 0.07,
+          "cp": 0.14
+        },
+        {
+          "ct": 0.09,
+          "cp": 0.18
+        },
+        {
+          "ct": 0.05,
+          "cp": 0.14
+        },
+        {
+          "ct": 0.07,
+          "cp": 0.2
+        },
+        {
+          "ct": 0.09,
+          "cp": 0.26
+        }
+      ]
+    },
+    "governor": {
+      "schema": 1,
+      "reference_rad_s": 180.0,
+      "gain": 0.01,
+      "fine_rate_rad_s": 0.05,
+      "coarse_rate_rad_s": 0.08,
+      "minimum_pitch_rad": 0.15,
+      "maximum_pitch_rad": 0.65
+    },
+    "running_start": {
+      "turbine_fraction": -0.0,
+      "shaft_rad_s": 180.0,
+      "blade_pitch_rad": 0.3
+    }
+  },
+  "model": {
+    "path": "aircraft/unprovided_numerical_turboprop_fixture.glb",
+    "forward": "-x",
+    "up": "+y",
+    "length_m": 8.3
+  },
+  "controls": {
+    "surface_rate": 2.5,
+    "elevator_rate": 0.25,
+    "elevator_centering_rate": 5.0,
+    "centering_rate": 1.8,
+    "throttle_rate": 0.25,
+    "flap_rate": 0.25,
+    "default_trim": 0.09,
+    "trim_rate": 0.12,
+    "approach_speed_mps": 35.0,
+    "approach_throttle": 0.39155148,
+    "approach_flaps": 1.0,
+    "approach_pitch_rad": -0.07269918,
+    "approach_trim": 0.15570889
+  },
+  "camera_eye_m": [
+    0.6,
+    -0.25,
+    -0.9
+  ],
+  "engine_sound": "turbine"
+}

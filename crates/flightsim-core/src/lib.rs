@@ -33,6 +33,7 @@ pub use geodetic::{Ecef, Geodetic, wgs84};
 pub use origin::FloatingOrigin;
 pub use render_frame::RenderFrame;
 pub use units::{
-    Degrees, Feet, FeetPerMinute, Kelvin, Kilograms, KilogramsPerCubicMeter, Knots, Meters,
-    MetersPerSecond, NauticalMiles, Newtons, Pascals, Radians, Seconds, SquareMeters,
+    Degrees, Feet, FeetPerMinute, Kelvin, KilogramSquareMeters, Kilograms, KilogramsPerCubicMeter,
+    Knots, Meters, MetersPerSecond, NauticalMiles, NewtonMeters, Newtons, Pascals, Radians,
+    RadiansPerSecond, RadiansPerSecondSquared, Seconds, SquareMeters, Watts,
 };

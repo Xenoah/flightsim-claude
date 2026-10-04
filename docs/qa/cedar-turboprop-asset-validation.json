@@ -1,0 +1,187 @@
+{
+  "asset": "Cedar Utility Turboprop (experimental)",
+  "status": "visual asset contract PASS; no aircraft profile or flight qualification",
+  "source_base_commit": "b38f41e94b6231037c54c538a5b99c33b19ca7dc",
+  "glb_bytes": 97404,
+  "mesh_count": 44,
+  "primitive_count": 44,
+  "material_count": 8,
+  "exported_vertices": 2422,
+  "triangles": 4380,
+  "gltf_bounds_m": {
+    "min": [
+      -6.300000190734863,
+      -1.600000023841858,
+      -5.699999809265137
+    ],
+    "max": [
+      6.300000190734863,
+      2.6500000953674316,
+      3.9000000953674316
+    ],
+    "extents": [
+      12.600000381469727,
+      4.2500001192092896,
+      9.599999904632568
+    ]
+  },
+  "proposed_adapter": {
+    "forward": "+z",
+    "up": "+y",
+    "length_m": 9.6,
+    "measured_scale": 1.0000000099341075
+  },
+  "proposed_cg_body_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "wheel_contacts": [
+    {
+      "mesh": "Nose tyre",
+      "actual_body_contact_m": [
+        2.0,
+        -0.0,
+        1.600000023841858
+      ],
+      "proposal_body_m": [
+        2.0,
+        0.0,
+        1.6
+      ]
+    },
+    {
+      "mesh": "Port main tyre",
+      "actual_body_contact_m": [
+        -0.9999999701976776,
+        -1.5499999523162842,
+        1.600000023841858
+      ],
+      "proposal_body_m": [
+        -1.0,
+        -1.55,
+        1.6
+      ]
+    },
+    {
+      "mesh": "Starboard main tyre",
+      "actual_body_contact_m": [
+        -0.9999999701976776,
+        1.5499999523162842,
+        1.600000023841858
+      ],
+      "proposal_body_m": [
+        -1.0,
+        1.55,
+        1.6
+      ]
+    }
+  ],
+  "proposed_camera_eye_body_m": [
+    0.65,
+    -0.28,
+    -1.0
+  ],
+  "proposed_camera_eye_gltf_m": [
+    0.28,
+    1.0,
+    0.65
+  ],
+  "proposed_eye_and_cg_inside_fuselage": true,
+  "asset_to_body_mapping": "(glTF.z, -glTF.x, -glTF.y)",
+  "stable_propeller_assembly_node": "Cedar propeller assembly",
+  "propeller_assembly_pivot_body_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "propeller_assembly_axis_gltf": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "design_propeller_disk_diameter_m": 2.4,
+  "level_uncompressed_all_phase_design_disk_clearance_m": 0.4,
+  "measured_contact_plane_clearance_m": 0.40000002384185795,
+  "suspension_sag_pitch_and_uneven_ground_clearance_qualified": false,
+  "static_reference_pitch_only": true,
+  "rotor_measurements": [
+    {
+      "blade": 1,
+      "measured_pitch_at_075_radius_deg": 20.000044980926315,
+      "measured_outer_radius_m": 1.198154270097461
+    },
+    {
+      "blade": 2,
+      "measured_pitch_at_075_radius_deg": 20.000044980926315,
+      "measured_outer_radius_m": 1.198154270097461
+    },
+    {
+      "blade": 3,
+      "measured_pitch_at_075_radius_deg": 20.000044980926315,
+      "measured_outer_radius_m": 1.198154270097461
+    },
+    {
+      "blade": 4,
+      "measured_pitch_at_075_radius_deg": 20.000044980926315,
+      "measured_outer_radius_m": 1.198154270097461
+    }
+  ],
+  "navigation_lenses": [
+    {
+      "mesh": "Port navigation lens",
+      "gltf_x_m": 6.275000095367432,
+      "rgba": [
+        0.6499999761581421,
+        0.012000000104308128,
+        0.017999999225139618,
+        1
+      ]
+    },
+    {
+      "mesh": "Starboard navigation lens",
+      "gltf_x_m": -6.275000095367432,
+      "rgba": [
+        0.014999999664723873,
+        0.47999998927116394,
+        0.10000000149011612,
+        1
+      ]
+    }
+  ],
+  "external_resources": 0,
+  "camera_light_animation_skin_count": 0,
+  "preview_sha256": {
+    "cedar-turboprop-three-quarter.jpg": "95e459e9b151fb84c6246ffa32d06965c39adc2b89baab0b431501275f342ecc",
+    "cedar-turboprop-starboard.jpg": "ace6be491a7255f7e7e662f4686cffc566f1bf50cd124a17348199ea5acf65bc",
+    "cedar-turboprop-front.jpg": "ce0dce909c3c78f7686ea323aaa97ecc0db9a194e4f954cd2b314cb2131010ea"
+  },
+  "unchanged_baseline_sha256": {
+    "assets/aircraft/.gitattributes": "b2b276e35044f3217231b6d4874589137762a45efad7d42c92cf967fe396740f",
+    "assets/aircraft/kestrel_jet_trainer.blend": "f098deb4a7e66e4c46a74383d4c0bf6708f9f0c6638ff3c6b7788765c3707c3c",
+    "assets/aircraft/kestrel_jet_trainer.glb": "5a9d8747084f7ad6ff93dbadc80d87acbef42c6882030c0b88ca3aded16bef21",
+    "assets/aircraft/kestrel_jet_trainer.json": "fab72bf40f23a70f22c3ee11b33aa36ae8b736fcfed7f4df11c2d053db749e1f",
+    "assets/aircraft/light_single.glb": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+    "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+    "assets/aircraft/meadow_trainer.blend": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+    "assets/aircraft/meadow_trainer.glb": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+    "assets/aircraft/meadow_trainer.json": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+    "assets/aircraft/swift_sport.blend": "29a25578733be83d25ccff12c117b29124b57b5e69e8356bd8189d128e514e77",
+    "assets/aircraft/swift_sport.glb": "9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1",
+    "assets/aircraft/swift_sport.json": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+    "tools/blender/build_kestrel_jet_profile.py": "82f6a51a9dabfd071c5fbcdf5aecd4f9cebea56acaa9bd9701deac753edfcff9",
+    "tools/blender/build_kestrel_jet_trainer.py": "3fba71d2b695c58c68c3e559f6a92518cbfadfe8376c9f7738f3c1c7c247e6a2",
+    "tools/blender/build_meadow_trainer.py": "3b7ed8696b0e2d4a656645ceca9b5acddfd3242047cee698f98605eb68d49a1d",
+    "tools/blender/build_swift_sport.py": "007b52fabcd342eaf7a63813315e98541b5e4411e6b72a46cb014fa9a19fffdf",
+    "tools/blender/validate_kestrel_jet_trainer.py": "7100a4442324fa46010915e66d269f8e17be94946676fcb4921f044989b08523",
+    "tools/blender/validate_meadow_trainer.py": "85dc707800b808d66c1bd24a65f6ca4cf56cf6394a317487fa943271379c6bd1",
+    "docs/release/asset-rights-manifest.json": "bd6c47141551072924154207fc125053f5c4fc63779225344a13951a9f55dcf8",
+    "LICENSE-MIT": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+    "LICENSE-APACHE": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9"
+  },
+  "sha256": {
+    "cedar_turboprop_experimental.glb": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c",
+    "cedar_turboprop_experimental.blend": "5d3f7f0f8e3f99e83d52fd37e6c17c0266fe6f806c75f826fc94f007234cc335",
+    "build_cedar_turboprop.py": "11ccb00ff1790120e7b82b4383a1b916086e095f36e6441e9549e33d81bbd463"
+  }
+}

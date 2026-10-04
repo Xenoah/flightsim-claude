@@ -102,7 +102,8 @@ pub struct ModelFit {
 impl Default for ModelFit {
     fn default() -> Self {
         Self {
-            // glTF の慣習は Y-up・-Z 前方。
+            // 既存モデル用の -Z 前方を維持する。glTF の規約は +Y 上・+Z 前方。
+            // 新しいモデルは authored axes を明示し、旧モデルを暗黙に回転させない。
             forward: ModelAxis::NegativeZ,
             up: ModelAxis::PositiveY,
             target_length: Meters(8.3),
@@ -137,7 +138,7 @@ impl ModelFit {
     pub fn rotation(&self) -> Quat {
         let forward = self.forward.to_vec3();
         let up = self.up.to_vec3();
-        // 右手系では 前 × 上 = 右（glTF の -Z 前方・+Y 上で +X が右になる）。
+        // 右手系では 前 × 上 = 右（既定の -Z 前方・+Y 上で +X が右になる）。
         let right = forward.cross(up);
 
         // モデル基底を機体基底へ写す。基底は正規直交なので逆行列 = 転置。

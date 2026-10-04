@@ -318,6 +318,49 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_turboprop_review_rejects_export_and_existing_dispatch_drift(self):
+        repo, _ = self.source_fixture()
+        # These are independent source-admission mutations, not execution of
+        # changed Rust. Public foundation exports do not enable profile v3 or
+        # schema-3 identities in the unchanged app and replay-v4 dispatcher.
+        mutations = (
+            ("crates/flightsim-fdm/src/lib.rs", b'pub mod turboprop;\n', b''),
+            ("crates/flightsim-sim/src/lib.rs", b'pub mod aircraft_profile_v3;\n', b''),
+            ("crates/flightsim-sim/src/lib.rs", b'pub mod turboprop_identity;\n', b''),
+            ("crates/flightsim-app/src/aircraft_profile.rs",
+             b'2 => AircraftProfileV2::from_bytes(bytes)',
+             b'2 | 3 => AircraftProfileV2::from_bytes(bytes)'),
+            ("crates/flightsim-sim/src/replay_v4.rs",
+             b'            self.identity.supported(),\n',
+             b'            self.identity.supported() || self.identity.supported_turboprop(),\n'),
+            ("crates/flightsim-sim/src/replay_v4.rs",
+             b'            identity.supported(),\n',
+             b'            identity.supported() || identity.supported_turboprop(),\n'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_turboprop_review_cannot_restore_the_prior_additive_fdm_guard(self):
+        repo, _ = self.source_fixture()
+        path = repo / candidate.REPLAY_CONTRACT_PATH
+        contract = json.loads(path.read_text(encoding="utf-8"))
+        # The former jet-only root is historical evidence, not an alternative
+        # accepted root after the exact one-line turboprop export was reviewed.
+        contract["source_sha256"]["crates/flightsim-fdm/src/lib.rs"] = (
+            "4d51cf4b5d62ce0f6bcc031df445225ac07c2bad0ed590c4b422ad6cca579462"
+        )
+        candidate.write_json(path, contract)
+        with self.assertRaisesRegex(ValueError, "frozen reviewed FDM module input changed"):
+            candidate.load_replay_contract(repo)
+
     def test_native_dispatch_review_rejects_model_routing_and_legacy_adapter_drift(self):
         repo, _ = self.source_fixture()
         mutations = (

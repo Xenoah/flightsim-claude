@@ -67,7 +67,7 @@ impl<'de> Deserialize<'de> for ExactF64 {
 /// trusted, and the first excess element is rejected before deserializing it.
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
-pub(super) struct BoundedVec<T, const MAX: usize>(pub Vec<T>);
+pub(crate) struct BoundedVec<T, const MAX: usize>(pub Vec<T>);
 
 impl<'de, T: Deserialize<'de>, const MAX: usize> Deserialize<'de> for BoundedVec<T, MAX> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -106,7 +106,7 @@ impl<'de, T: Deserialize<'de>, const MAX: usize> Deserialize<'de> for BoundedVec
 
 /// Supplement serde_json's recursion guard for RawValue's iterative subtree
 /// scanner. This performs no allocations; grammar remains the JSON parser's job.
-pub(super) fn check_depth(json: &str) -> Result<(), super::ProfileError> {
+pub(crate) fn check_depth(json: &str) -> Result<(), super::ProfileError> {
     let mut depth = 0_usize;
     let mut quoted = false;
     let mut escaped = false;

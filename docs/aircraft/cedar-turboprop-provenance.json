@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "asset": "Cedar Utility Turboprop (experimental)",
+  "authored_date": "2026-10-04",
+  "base_commit": "b38f41e94b6231037c54c538a5b99c33b19ca7dc",
+  "status": "isolated original visual asset; not a qualified aircraft profile",
+  "authoring_application": "Blender 4.3.2",
+  "license": "MIT OR Apache-2.0",
+  "license_files": [
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "provenance": "Original procedural geometry/materials authored for this project; shared utilities adapted from tools/blender/build_meadow_trainer.py under the same repository license.",
+  "third_party_asset_inputs": [],
+  "downloaded_textures": [],
+  "manufacturer_marks": [],
+  "real_aircraft_or_certified_data_claims": false,
+  "paid_services_used": false,
+  "runtime_profile_created": false,
+  "release_allowlists_changed": false,
+  "artifacts": [
+    {
+      "path": "assets/aircraft/experimental/cedar_turboprop_experimental.glb",
+      "bytes": 97404,
+      "sha256": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c"
+    },
+    {
+      "path": "assets/aircraft/experimental/cedar_turboprop_experimental.blend",
+      "bytes": 139975,
+      "sha256": "5d3f7f0f8e3f99e83d52fd37e6c17c0266fe6f806c75f826fc94f007234cc335"
+    },
+    {
+      "path": "tools/blender/audit_cedar_blender.py",
+      "bytes": 3619,
+      "sha256": "cc3a3d77b5f44ac5e4374bac417e6a8ac94798473af2e1d913bb12da8302cd93"
+    },
+    {
+      "path": "tools/blender/build_cedar_turboprop.py",
+      "bytes": 20716,
+      "sha256": "11ccb00ff1790120e7b82b4383a1b916086e095f36e6441e9549e33d81bbd463"
+    },
+    {
+      "path": "tools/blender/validate_cedar_turboprop.py",
+      "bytes": 16660,
+      "sha256": "6e89c9617c40ec92099b082ec90fabac02c5e2b069f409386af57878dec53999"
+    },
+    {
+      "path": "docs/qa/images/cedar-turboprop-front.jpg",
+      "bytes": 154731,
+      "sha256": "ce0dce909c3c78f7686ea323aaa97ecc0db9a194e4f954cd2b314cb2131010ea"
+    },
+    {
+      "path": "docs/qa/images/cedar-turboprop-starboard.jpg",
+      "bytes": 182505,
+      "sha256": "ace6be491a7255f7e7e662f4686cffc566f1bf50cd124a17348199ea5acf65bc"
+    },
+    {
+      "path": "docs/qa/images/cedar-turboprop-three-quarter.jpg",
+      "bytes": 208359,
+      "sha256": "95e459e9b151fb84c6246ffa32d06965c39adc2b89baab0b431501275f342ecc"
+    }
+  ],
+  "clearance_revision": {
+    "contact_plane_body_down_m": 1.6,
+    "level_uncompressed_propeller_disk_clearance_m": 0.4,
+    "scope": "Three original struts extended; three tyres and hubs lowered 0.25 m. Fuselage, CG and propeller unchanged.",
+    "qualification": "Visual design targets only; suspension sag/travel, braking pitch and uneven-ground clearance require future physical-profile tests."
+  }
+}

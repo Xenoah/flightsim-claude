@@ -1,0 +1,81 @@
+{
+  "status": "gear-only geometric delta PASS",
+  "previous_visual_commit": "9f732bd24da9218d88a1ccd1c83e60124440dadf",
+  "unchanged_meshes": 35,
+  "changed_meshes": [
+    "Nose fixed gear leg",
+    "Nose tyre",
+    "Nose axle and hub",
+    "Port main fixed gear leg",
+    "Port main tyre",
+    "Port main axle and hub",
+    "Starboard main fixed gear leg",
+    "Starboard main tyre",
+    "Starboard main axle and hub"
+  ],
+  "wheel_and_hub_translations": [
+    {
+      "mesh": "Nose tyre",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    },
+    {
+      "mesh": "Nose axle and hub",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    },
+    {
+      "mesh": "Port main tyre",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    },
+    {
+      "mesh": "Port main axle and hub",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    },
+    {
+      "mesh": "Starboard main tyre",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    },
+    {
+      "mesh": "Starboard main axle and hub",
+      "gltf_translation_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "maximum_vertex_translation_error_m": 5.960464477539063e-08
+    }
+  ],
+  "unchanged_materials": 8,
+  "fuselage_cg_propeller_and_other_meshes_exactly_preserved": true,
+  "previous_sha256": "c43d77620ce598a48511f7a6c275b1cabad0cbb6bc806f252ddd9c30a29ffa7a",
+  "corrected_sha256": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c",
+  "previous_proposed_contact_plane_body_down_m": 1.35,
+  "corrected_proposed_contact_plane_body_down_m": 1.6,
+  "previous_nominal_disk_clearance_m": 0.15,
+  "corrected_level_uncompressed_nominal_disk_clearance_m": 0.4,
+  "clearance_limit": "Visual proposal only: actual suspension compression, pitch/braking, touchdown and sloped/uneven-ground clearance need physical-profile qualification."
+}

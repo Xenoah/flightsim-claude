@@ -397,6 +397,32 @@ define_unit!(
 );
 
 define_unit!(
+    /// Shaft power, in watts.
+    Watts,
+    "W"
+);
+define_unit!(
+    /// Torque, in newton metres.
+    NewtonMeters,
+    "N m"
+);
+define_unit!(
+    /// Moment of inertia, in kilogram square metres.
+    KilogramSquareMeters,
+    "kg m^2"
+);
+define_unit!(
+    /// Angular velocity, in radians per second (not RPM).
+    RadiansPerSecond,
+    "rad/s"
+);
+define_unit!(
+    /// Angular acceleration, in radians per second squared.
+    RadiansPerSecondSquared,
+    "rad/s^2"
+);
+
+define_unit!(
     /// 秒。**時間の内部標準。**
     ///
     /// シミュレーション内の経過時間を表す。壁時計時間ではない（ADR-0004）。

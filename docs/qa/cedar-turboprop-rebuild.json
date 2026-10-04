@@ -1,0 +1,14 @@
+{
+  "status": "separate Blender process rebuild byte-identical",
+  "blender_version": "4.3.2",
+  "generator": "tools/blender/build_cedar_turboprop.py",
+  "generator_sha256": "11ccb00ff1790120e7b82b4383a1b916086e095f36e6441e9549e33d81bbd463",
+  "source_asset": "assets/aircraft/experimental/cedar_turboprop_experimental.glb",
+  "source_asset_sha256": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c",
+  "rebuilt_asset_sha256": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c",
+  "bytes": 97404,
+  "rebuild_exit_code": 0,
+  "cmp_exit_code": 0,
+  "command": "blender --background --disable-autoexec --threads 2 --python-exit-code 1 --python tools/blender/build_cedar_turboprop.py -- /tmp/cedar-rebuild/assets /tmp/cedar-rebuild/previews --no-render",
+  "limits": "GLB determinism established for Blender 4.3.2 on this executor; .blend container byte identity is not required."
+}

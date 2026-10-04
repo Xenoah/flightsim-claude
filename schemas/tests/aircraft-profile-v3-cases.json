@@ -1,0 +1,1106 @@
+{
+  "base": "docs/examples/aircraft-profiles-v3/numerical-turboprop.json",
+  "cases": [
+    {
+      "name": "valid numerical fixture",
+      "schema_valid": true,
+      "runtime_valid": true
+    },
+    {
+      "name": "missing version",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/version"
+      ]
+    },
+    {
+      "name": "missing id",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/id"
+      ]
+    },
+    {
+      "name": "missing dynamics",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics"
+      ]
+    },
+    {
+      "name": "missing model",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/model"
+      ]
+    },
+    {
+      "name": "missing controls",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/controls"
+      ]
+    },
+    {
+      "name": "missing camera_eye_m",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/camera_eye_m"
+      ]
+    },
+    {
+      "name": "missing engine_sound",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/engine_sound"
+      ]
+    },
+    {
+      "name": "missing dynamics airframe",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/airframe"
+      ]
+    },
+    {
+      "name": "missing dynamics turbine",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/turbine"
+      ]
+    },
+    {
+      "name": "missing dynamics propeller",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/propeller"
+      ]
+    },
+    {
+      "name": "missing dynamics governor",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/governor"
+      ]
+    },
+    {
+      "name": "missing dynamics aero",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/aero"
+      ]
+    },
+    {
+      "name": "missing dynamics envelope",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/envelope"
+      ]
+    },
+    {
+      "name": "missing dynamics running_start",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "remove": [
+        "/dynamics/running_start"
+      ]
+    },
+    {
+      "name": "unknown field ",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/turbine",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/propeller",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/governor",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/envelope",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/running_start",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/airframe",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/airframe/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/turbine/cells/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/cells/0/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/propeller/cells/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/0/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /dynamics/aero/knots/0/aero",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/aero/knots/0/aero/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /model",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/model/surprise": 0
+      }
+    },
+    {
+      "name": "unknown field /controls",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/controls/surprise": 0
+      }
+    },
+    {
+      "name": "wrong tag /version",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/version": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/kind",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/kind": "dry_jet_table"
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/revision",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/revision": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/turbine/schema",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/schema": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/propeller/schema",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/schema": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/governor/schema",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/schema": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/aero/schema",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/aero/schema": 2
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/propeller/convention",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/convention": "effective_installed_thrust"
+      }
+    },
+    {
+      "name": "wrong tag /dynamics/propeller/rotation_sense",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/rotation_sense": 0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/turbine/schema",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/schema": 1.0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/propeller/schema",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/schema": 1.0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/governor/schema",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/schema": 1.0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/aero/schema",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/aero/schema": 1.0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/revision",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/revision": 1.0
+      }
+    },
+    {
+      "name": "float integer token /version",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/version": 3.0
+      }
+    },
+    {
+      "name": "float integer token /dynamics/propeller/rotation_sense",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/rotation_sense": 1.0
+      }
+    },
+    {
+      "name": "range /id",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/id": "Bad_Name"
+      }
+    },
+    {
+      "name": "range /id",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/id": "abc\n"
+      }
+    },
+    {
+      "name": "range /model/path",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/model/path": "../secret.glb"
+      }
+    },
+    {
+      "name": "range /model/up",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/model/up": "+x"
+      }
+    },
+    {
+      "name": "range /engine_sound",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/engine_sound": "rocket"
+      }
+    },
+    {
+      "name": "range /controls/surface_rate",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/controls/surface_rate": 0
+      }
+    },
+    {
+      "name": "range /camera_eye_m/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/camera_eye_m/0": 11
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/pressure_ratios/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/pressure_ratios/0": 0.09
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/temperature_ratios/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/temperature_ratios/0": 0.24
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/cells/0/idle_w",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/cells/0/idle_w": -1
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/cells/0/maximum_w",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/cells/0/maximum_w": 5000001
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/rise_seconds",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/rise_seconds": 0.09
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/fall_seconds",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/fall_seconds": 31
+      }
+    },
+    {
+      "name": "range /dynamics/turbine/output_torque_limit_nm",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/output_torque_limit_nm": 0
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/diameter_m",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/diameter_m": 0.49
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/rotor_axial_inertia_kg_m2",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/rotor_axial_inertia_kg_m2": 1001
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/cells/0/ct",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/0/ct": 2.1
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/cells/0/cp",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/0/cp": -2.1
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/advance_ratio/2",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/advance_ratio/2": 4.1
+      }
+    },
+    {
+      "name": "range /dynamics/propeller/blade_pitch_rad/2",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/blade_pitch_rad/2": 1.6
+      }
+    },
+    {
+      "name": "range /dynamics/governor/gain",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/gain": 0
+      }
+    },
+    {
+      "name": "range /dynamics/governor/fine_rate_rad_s",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/fine_rate_rad_s": 0
+      }
+    },
+    {
+      "name": "range /dynamics/governor/coarse_rate_rad_s",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/coarse_rate_rad_s": 1.1
+      }
+    },
+    {
+      "name": "range /dynamics/governor/reference_rad_s",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/reference_rad_s": 1001
+      }
+    },
+    {
+      "name": "range /dynamics/envelope/relative_shaft_rad_s/0",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/relative_shaft_rad_s/0": 19.9
+      }
+    },
+    {
+      "name": "range /dynamics/envelope/absolute_spin_rad_s/1",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/absolute_spin_rad_s/1": 1001
+      }
+    },
+    {
+      "name": "range /dynamics/envelope/maximum_helical_tip_mach",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/maximum_helical_tip_mach": 0
+      }
+    },
+    {
+      "name": "range /dynamics/envelope/maximum_crossflow_tip_ratio",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/maximum_crossflow_tip_ratio": 0.11
+      }
+    },
+    {
+      "name": "range /dynamics/running_start/turbine_fraction",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/turbine_fraction": 1.1
+      }
+    },
+    {
+      "name": "range /dynamics/running_start/shaft_rad_s",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/shaft_rad_s": 19
+      }
+    },
+    {
+      "name": "range /dynamics/running_start/blade_pitch_rad",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/blade_pitch_rad": -0.1
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/turbine/pressure_ratios [0.5, 0.5, 1.2]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/pressure_ratios": [
+          0.5,
+          0.5,
+          1.2
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/turbine/temperature_ratios [1.25, 0.75]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/temperature_ratios": [
+          1.25,
+          0.75
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/turbine/cells/0/idle_w 120001",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/cells/0/idle_w": 120001
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/turbine/cells []",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/turbine/cells": []
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/propeller/advance_ratio [0.1, 0.7, 2]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/advance_ratio": [
+          0.1,
+          0.7,
+          2
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/propeller/blade_pitch_rad [0.12, 0.12, 0.7]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/blade_pitch_rad": [
+          0.12,
+          0.12,
+          0.7
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/propeller/cells/0/cp 0",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/0/cp": 0
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/propeller/cells/0/cp 0.001",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/0/cp": 0.001
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/propeller/cells/1/cp 0.07",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/cells/1/cp": 0.07
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/governor/minimum_pitch_rad 0.66",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/minimum_pitch_rad": 0.66
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/governor/minimum_pitch_rad 0.1",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/minimum_pitch_rad": 0.1
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/governor/reference_rad_s 300",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/governor/reference_rad_s": 300
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/envelope/pressure_ratio [0.4, 1.1]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/pressure_ratio": [
+          0.4,
+          1.1
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/envelope/temperature_ratio [0.85, 1.5]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/temperature_ratio": [
+          0.85,
+          1.5
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/envelope/mach [0, 0.94]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/mach": [
+          0,
+          0.94
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/envelope/relative_shaft_rad_s [240, 120]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/relative_shaft_rad_s": [
+          240,
+          120
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/envelope/absolute_spin_rad_s [110, 110.0000000001]",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/envelope/absolute_spin_rad_s": [
+          110,
+          110.0000000001
+        ]
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/running_start/shaft_rad_s 100",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/shaft_rad_s": 100
+      }
+    },
+    {
+      "name": "physical coupling /dynamics/running_start/blade_pitch_rad 0.1",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/running_start/blade_pitch_rad": 0.1
+      }
+    },
+    {
+      "name": "reduced tensor determinant under assertion threshold",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/airframe/inertia_kg_m2": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "/dynamics/propeller/rotor_axial_inertia_kg_m2": 0.9999999999999999
+      }
+    },
+    {
+      "name": "rotor subtraction invalid XZ block",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/airframe/inertia_kg_m2": [
+          10,
+          12,
+          15,
+          10
+        ],
+        "/dynamics/propeller/rotor_axial_inertia_kg_m2": 4
+      }
+    },
+    {
+      "name": "continuous weaker inequality fails only in interior",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/advance_ratio": [
+          0,
+          2
+        ],
+        "/dynamics/propeller/blade_pitch_rad": [
+          0.12,
+          0.7
+        ],
+        "/dynamics/propeller/cells": [
+          {
+            "ct": 0.2,
+            "cp": 0.08
+          },
+          {
+            "ct": 0.2,
+            "cp": 0.08
+          },
+          {
+            "ct": 0,
+            "cp": 0.08
+          },
+          {
+            "ct": 0,
+            "cp": 0.08
+          }
+        ]
+      }
+    },
+    {
+      "name": "nodal admission does not certify interior disk bound",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "set": {
+        "/dynamics/propeller/advance_ratio": [
+          0,
+          2
+        ],
+        "/dynamics/propeller/blade_pitch_rad": [
+          0.12,
+          0.7
+        ],
+        "/dynamics/propeller/cells": [
+          {
+            "ct": 0.2,
+            "cp": 0.1
+          },
+          {
+            "ct": 0.2,
+            "cp": 0.1
+          },
+          {
+            "ct": 0,
+            "cp": 0.1
+          },
+          {
+            "ct": 0,
+            "cp": 0.1
+          }
+        ]
+      }
+    },
+    {
+      "name": "negative rotation sense",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "set": {
+        "/dynamics/propeller/rotation_sense": -1
+      }
+    },
+    {
+      "name": "positive subnormal upper limit is structural only",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "set": {
+        "/dynamics/envelope/maximum_helical_tip_mach": 5e-324
+      }
+    },
+    {
+      "name": "metadata aliases",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "set": {
+        "/model/forward": " X ",
+        "/model/up": "\u2003Y\u2003",
+        "/engine_sound": " TuRbOfAn "
+      }
+    },
+    {
+      "name": "initial state may differ without equilibrium",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "set": {
+        "/dynamics/running_start/turbine_fraction": 0.8,
+        "/dynamics/running_start/shaft_rad_s": 125,
+        "/dynamics/running_start/blade_pitch_rad": 0.6
+      }
+    },
+    {
+      "name": "excess array /dynamics/turbine/pressure_ratios",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/turbine/pressure_ratios",
+          "count": 17,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/turbine/temperature_ratios",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/turbine/temperature_ratios",
+          "count": 17,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/turbine/cells",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/turbine/cells",
+          "count": 257,
+          "value": {
+            "idle_w": 0,
+            "maximum_w": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/propeller/advance_ratio",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/propeller/advance_ratio",
+          "count": 33,
+          "value": 0
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/propeller/blade_pitch_rad",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/propeller/blade_pitch_rad",
+          "count": 33,
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/propeller/cells",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/propeller/cells",
+          "count": 1025,
+          "value": {
+            "ct": 0,
+            "cp": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/aero/knots",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/aero/knots",
+          "count": 33,
+          "value": {
+            "mach": 0,
+            "aero": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "excess array /dynamics/airframe/landing_gear",
+      "schema_valid": false,
+      "runtime_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/airframe/landing_gear",
+          "count": 4,
+          "value": {}
+        }
+      ]
+    },
+    {
+      "name": "duplicate outer",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"version\":3",
+        "\"version\":3,\"version\":3"
+      ]
+    },
+    {
+      "name": "duplicate initial",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"turbine_fraction\":-0.0",
+        "\"turbine_fraction\":0,\"turbine_fraction\":0"
+      ]
+    },
+    {
+      "name": "duplicate optional null",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"elevator_rate\":0.25",
+        "\"elevator_rate\":null,\"elevator_rate\":0.25"
+      ]
+    },
+    {
+      "name": "duplicate governor",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"gain\":0.01",
+        "\"gain\":0.01,\"gain\":0.01"
+      ]
+    },
+    {
+      "name": "number token at limit",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "raw_replace": [
+        "\"turbine_fraction\":-0.0",
+        "\"turbine_fraction\":0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "name": "number token over limit",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"turbine_fraction\":-0.0",
+        "\"turbine_fraction\":0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "name": "nonzero underflow",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "raw_replace": [
+        "\"turbine_fraction\":-0.0",
+        "\"turbine_fraction\":1e-400"
+      ]
+    },
+    {
+      "name": "exact byte budget",
+      "schema_valid": true,
+      "runtime_valid": true,
+      "pad_to_bytes": 1048576
+    },
+    {
+      "name": "excess byte budget",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "pad_to_bytes": 1048577
+    },
+    {
+      "name": "reassociated reduced determinant must reject without panic",
+      "schema_valid": true,
+      "runtime_valid": false,
+      "set": {
+        "/dynamics/propeller/rotor_axial_inertia_kg_m2": 0.9999999999999999
+      },
+      "raw_replace": [
+        "\"inertia_kg_m2\":[1285.0,1825.0,2667.0,12.5]",
+        "\"inertia_kg_m2\":[1,5.763158480729852,6.247241073718394,2.5594038453272185e-08]"
+      ]
+    }
+  ]
+}

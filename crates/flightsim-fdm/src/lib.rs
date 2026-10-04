@@ -46,6 +46,7 @@ pub mod gravity;
 mod landing_gear;
 pub mod state;
 pub mod subsonic;
+pub mod turboprop;
 pub mod turbulence;
 
 pub use aero::{AeroAngles, AeroCoefficientSet, aero_angles};

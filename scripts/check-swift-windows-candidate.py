@@ -40,9 +40,9 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
-# The reviewed additive jet export changes this whole file, but no legacy FDM
+# The reviewed additive jet/turboprop exports change this file, but no legacy FDM
 # body. Keep a literal full-file guard; the historical lib hash above never moves.
-REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "4d51cf4b5d62ce0f6bcc031df445225ac07c2bad0ed590c4b422ad6cca579462"
+REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "2328631f895921e4152de6f8107c4d6f07ba764b6f6225189a4b826c6f9f013c"
 # Whole files, not selected functions or text-normalized projections. Adding a
 # helper or changing any reviewed implementation requires a boundary review.
 REPLAY_CONTRACT_PATHS = {
@@ -195,8 +195,8 @@ def validate_replay_contract(contract):
             "reviewed replay source boundary changed")
     require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in pins.values()),
             "invalid reviewed replay source digest")
-    # These physical inputs never migrated. The FDM module root only gained an
-    # additive export and retains its own strict reviewed whole-file guard.
+    # These physical inputs never migrated. The FDM module root only gained
+    # additive exports and retains its own strict reviewed whole-file guard.
     for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs"):
         require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
     require(pins["crates/flightsim-fdm/src/lib.rs"] == REVIEWED_ADDITIVE_FDM_LIB_SHA256,

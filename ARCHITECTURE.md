@@ -155,6 +155,15 @@ pub struct Radians(pub f64);
   visual-rate change also closes recording because v4 stores one initial rate.
   New flight/restart starts a new recorder; formats and old physics remain
   unchanged. See [native jet integration and limits](docs/jet-native-app.md).
+- The additive running-turboprop foundation owns 16 physical scalars: rigid body,
+  turbine response, relative shaft rate and blade pitch. Its separate FDM law
+  commits only after every bounded substep and endpoint succeeds; no hidden
+  governor history is permitted. [Exact profile v3](docs/aircraft-profile-v3.md)
+  and schema-3 identity preserve that model's full immutable configuration.
+  This foundation does not select a new app aircraft or reuse replay v1–v4 for
+  engine state. A complete host/replay integration and authored flight checks
+  are required before exposing a turboprop preset. See
+  [ADR-0018](docs/adr/0018-bounded-running-turboprop.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を

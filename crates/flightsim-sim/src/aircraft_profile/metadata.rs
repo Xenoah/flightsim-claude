@@ -42,7 +42,7 @@ pub enum EngineSound {
 }
 
 impl EngineSound {
-    pub(super) fn parse(value: &str) -> Result<Self, ProfileError> {
+    pub(crate) fn parse(value: &str) -> Result<Self, ProfileError> {
         match value.trim().to_ascii_lowercase().as_str() {
             "piston" | "prop" | "propeller" => Ok(Self::Piston),
             "turbine" | "jet" | "turbofan" | "fighter" => Ok(Self::Turbine),
@@ -53,7 +53,7 @@ impl EngineSound {
     }
 }
 
-pub(super) fn range(name: &str, value: ExactF64, min: f64, max: f64) -> Result<(), ProfileError> {
+pub(crate) fn range(name: &str, value: ExactF64, min: f64, max: f64) -> Result<(), ProfileError> {
     if !(min..=max).contains(&value.get()) {
         return Err(ProfileError(format!("{name} must be {min}..={max}")));
     }
@@ -61,7 +61,7 @@ pub(super) fn range(name: &str, value: ExactF64, min: f64, max: f64) -> Result<(
 }
 
 impl ModelDefinition {
-    pub(super) fn validate(&self) -> Result<(), ProfileError> {
+    pub(crate) fn validate(&self) -> Result<(), ProfileError> {
         let path = Path::new(&self.path);
         if self.path.is_empty()
             || self.path.len() > 256
@@ -92,7 +92,7 @@ impl ModelDefinition {
 }
 
 impl ControlDefinition {
-    pub(super) fn validate(&self) -> Result<(), ProfileError> {
+    pub(crate) fn validate(&self) -> Result<(), ProfileError> {
         for value in [
             self.surface_rate,
             self.elevator_rate.unwrap_or(self.surface_rate),

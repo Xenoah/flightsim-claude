@@ -35,7 +35,7 @@ pub(super) struct DynamicsWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct AirframeWire {
+pub(crate) struct AirframeWire {
     pub name: String,
     pub mass_kg: ExactF64,
     pub inertia_kg_m2: [ExactF64; 4],
@@ -77,7 +77,7 @@ impl AirframeWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct GearWire {
+pub(crate) struct GearWire {
     pub contact_m: [ExactF64; 3],
     pub spring_n_per_m: ExactF64,
     pub damping_ns_per_m: ExactF64,
@@ -147,7 +147,7 @@ pub(super) struct ThrustCellWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct ScheduleWire {
+pub(crate) struct ScheduleWire {
     pub schema: u16,
     pub knots: BoundedVec<AeroKnotWire, 32>,
 }
@@ -170,14 +170,14 @@ impl ScheduleWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct AeroKnotWire {
+pub(crate) struct AeroKnotWire {
     pub mach: ExactF64,
     pub aero: AeroWire,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct AeroWire {
+pub(crate) struct AeroWire {
     pub lift_zero: ExactF64,
     pub lift_alpha: ExactF64,
     pub lift_flaps: ExactF64,

@@ -1,0 +1,17 @@
+{
+  "blender_version": "4.3.2",
+  "status": "source hygiene and GLB import PASS",
+  "source_meshes": 44,
+  "source_polygons": 1913,
+  "imported_meshes": 44,
+  "imported_materials": 8,
+  "source_import_vertex_error_bound_m": 3e-05,
+  "maximum_world_vertex_distance_m": 0.0,
+  "source_embedded_scripts_external_resources_linked_libraries": 0,
+  "imported_cameras_lights_images_scripts": 0,
+  "studio_camera_and_lights_excluded_from_glb": true,
+  "sha256": {
+    "cedar_turboprop_experimental.blend": "5d3f7f0f8e3f99e83d52fd37e6c17c0266fe6f806c75f826fc94f007234cc335",
+    "cedar_turboprop_experimental.glb": "e109f5e7bd580a925c1217244828899ee008e62af9644c071c16cfaa19e33f3c"
+  }
+}

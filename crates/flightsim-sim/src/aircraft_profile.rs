@@ -5,9 +5,9 @@
 //! Legacy app profile v1 and its 128 KiB/default-f64 decoder remain unchanged.
 //! Runtime configuration is immutable; the only construction paths validate the
 //! entire profile, component endpoints and envelope containment before returning.
-mod exact;
-mod metadata;
-mod wire;
+pub(crate) mod exact;
+pub(crate) mod metadata;
+pub(crate) mod wire;
 
 pub use exact::{ExactF64, MAX_NUMBER_BYTES};
 pub use metadata::{ControlDefinition, EngineSound, ModelDefinition};
@@ -25,7 +25,7 @@ pub const MAX_PROFILE_BYTES: usize = 1024 * 1024;
 /// Preflight depth cap, including subtrees mistakenly supplied as numeric values.
 pub const MAX_JSON_DEPTH: usize = 128;
 
-/// A syntax, resource, metadata or physical-domain rejection of a v2 profile.
+/// A syntax, resource, metadata or physical-domain rejection of an exact profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileError(pub String);
 impl std::fmt::Display for ProfileError {
