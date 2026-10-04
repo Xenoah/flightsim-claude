@@ -25,6 +25,7 @@ use glam::Affine2;
 use std::error::Error;
 use std::fmt;
 
+use crate::cloud_volume::CloudQuality;
 use crate::{RenderOrigin, SunDirection, SunLighting, TimeOfDay};
 
 /// 雲模様 1 周のおおよその大きさ。
@@ -115,6 +116,10 @@ impl CloudLayer {
         if self.visibility.get() <= 0.0 {
             return Err(CloudLayerError::NonPositiveVisibility(self.visibility));
         }
+        let extinction = -0.05_f64.ln() / self.visibility.get();
+        if !extinction.is_finite() || extinction > f64::from(f32::MAX) {
+            return Err(CloudLayerError::UnrenderableVisibility(self.visibility));
+        }
         Ok(())
     }
 
@@ -150,6 +155,7 @@ pub enum CloudLayerError {
     TopNotAboveBase { base: Meters, top: Meters },
     NonFiniteVisibility,
     NonPositiveVisibility(Meters),
+    UnrenderableVisibility(Meters),
 }
 
 impl fmt::Display for CloudLayerError {
@@ -173,6 +179,12 @@ impl fmt::Display for CloudLayerError {
             Self::NonFiniteVisibility => write!(formatter, "cloud visibility must be finite"),
             Self::NonPositiveVisibility(value) => {
                 write!(formatter, "cloud visibility must be positive, got {value}")
+            }
+            Self::UnrenderableVisibility(value) => {
+                write!(
+                    formatter,
+                    "cloud visibility {value} produces non-finite render extinction"
+                )
             }
         }
     }
@@ -208,12 +220,15 @@ pub(crate) struct CloudVisuals {
     material: Option<Handle<StandardMaterial>>,
     texture: Option<Handle<Image>>,
     initialised: bool,
+    disabled: bool,
+    calibration: Option<(u64, f32, f32)>,
 }
 
-/// 周期的な雲マスク。`u` と `v` は 1.0 で一周する場の座標。
+/// Legacy uncalibrated periodic mask; `u` and `v` repeat every 1.0.
 ///
-/// 返り値は 0 から 1。同じ引数なら同じビットを返す。`cover` が増えても、同じ
-/// 地点のマスクは減らない。
+/// This pure compatibility helper treats `cover` as a noise threshold control,
+/// not a measured covered area. The Light renderer calibrates its actual image
+/// and camera fog together from the complete finite tile distribution.
 #[must_use]
 pub fn cloud_mask(seed: u64, u: f64, v: f64, cover: f32) -> f32 {
     if !u.is_finite() || !v.is_finite() || !cover.is_finite() || cover <= 0.0 {
@@ -223,6 +238,10 @@ pub fn cloud_mask(seed: u64, u: f64, v: f64, cover: f32) -> f32 {
         return 1.0;
     }
 
+    cloud_mask_with_threshold(seed, u, v, 1.0 - cover)
+}
+
+fn cloud_mask_with_threshold(seed: u64, u: f64, v: f64, threshold: f32) -> f32 {
     let noise = fractal_noise(seed, u, v);
     if !noise.is_finite() {
         return 0.0;
@@ -232,7 +251,6 @@ pub fn cloud_mask(seed: u64, u: f64, v: f64, cover: f32) -> f32 {
         reason = "正規化した -1..=1 の noise を描画用の f32 へ変換する"
     )]
     let noise = noise.mul_add(0.5, 0.5) as f32;
-    let threshold = 1.0 - cover;
     smoothstep_f32(threshold - MASK_SOFTNESS, threshold + MASK_SOFTNESS, noise)
 }
 
@@ -292,12 +310,16 @@ pub fn fog_extinction(visibility: Meters) -> f32 {
     if !visibility.is_finite() || visibility <= 0.0 {
         return 0.0;
     }
+    let extinction = -0.05_f64.ln() / visibility;
+    if !extinction.is_finite() || extinction > f64::from(f32::MAX) {
+        return 0.0;
+    }
     #[allow(
         clippy::cast_possible_truncation,
         reason = "視程から得る小さな描画係数で、f32 の精度で十分"
     )]
     {
-        (-0.05_f64.ln() / visibility) as f32
+        extinction as f32
     }
 }
 
@@ -326,6 +348,16 @@ pub fn cloud_distance_fog(
     }
 }
 
+/// Keep the PBR fog specialization stable while clouds contribute no fog.
+pub(crate) fn inactive_cloud_distance_fog() -> DistanceFog {
+    DistanceFog {
+        color: Color::NONE,
+        directional_light_color: Color::NONE,
+        directional_light_exponent: 8.0,
+        falloff: FogFalloff::Exponential { density: 0.0 },
+    }
+}
+
 /// 雲面を必要に応じて作り直す。
 ///
 /// `MinimalPlugins` を使う純関数テストでは asset resource が無いため、optional と
@@ -333,12 +365,14 @@ pub fn cloud_distance_fog(
 pub(crate) fn sync_cloud_visuals(
     mut commands: Commands,
     layer: Res<CloudLayer>,
+    quality: Res<CloudQuality>,
     mut visuals: ResMut<CloudVisuals>,
     meshes: Option<ResMut<Assets<Mesh>>>,
     materials: Option<ResMut<Assets<StandardMaterial>>>,
     images: Option<ResMut<Assets<Image>>>,
 ) {
-    if visuals.initialised && !layer.is_changed() {
+    let disabled = *quality == CloudQuality::Off;
+    if visuals.initialised && !layer.is_changed() && visuals.disabled == disabled {
         return;
     }
 
@@ -346,8 +380,9 @@ pub(crate) fn sync_cloud_visuals(
     else {
         // 快晴なら作る物が無いので、asset resource の無い最小 App でも完了扱いに
         // できる。曇天なら resource が現れるまで次フレームに再試行する。
-        if layer.is_clear() {
+        if layer.is_clear() || *quality == CloudQuality::Off {
             visuals.initialised = true;
+            visuals.disabled = disabled;
         }
         return;
     };
@@ -360,12 +395,15 @@ pub(crate) fn sync_cloud_visuals(
         &mut images,
     );
     visuals.initialised = true;
+    visuals.disabled = disabled;
 
-    if layer.is_clear() {
+    if layer.is_clear() || *quality == CloudQuality::Off {
         return;
     }
 
-    let texture = images.add(cloud_mask_image(*layer));
+    let (image, threshold) = cloud_mask_image(*layer);
+    visuals.calibration = Some((layer.seed, layer.cover, threshold));
+    let texture = images.add(image);
     let repeats = cloud_texture_repeats();
     let material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.92, 0.94, 0.98),
@@ -462,25 +500,57 @@ pub(crate) fn update_cloud_visuals(
 pub(crate) fn update_cloud_distance_fog(
     mut commands: Commands,
     layer: Res<CloudLayer>,
+    quality: Res<CloudQuality>,
     clock: Res<TimeOfDay>,
     origin: Option<Res<RenderOrigin>>,
     lighting: Res<SunLighting>,
     sun: Res<SunDirection>,
-    mut owned_fog: Query<(&Transform, &mut DistanceFog), (With<Camera3d>, With<CloudDistanceFog>)>,
-    cameras_without_fog: Query<(Entity, &Transform), (With<Camera3d>, Without<CloudDistanceFog>)>,
+    visuals: Res<CloudVisuals>,
+    mut owned_fog: Query<
+        (Entity, &Transform, &mut DistanceFog),
+        (With<Camera3d>, With<CloudDistanceFog>),
+    >,
+    cameras_without_fog: Query<(Entity, &Transform), (With<Camera3d>, Without<DistanceFog>)>,
 ) {
+    if *quality == CloudQuality::Off {
+        for (_, _, mut fog) in &mut owned_fog {
+            *fog = inactive_cloud_distance_fog();
+        }
+        for (camera, _) in &cameras_without_fog {
+            commands
+                .entity(camera)
+                .insert((CloudDistanceFog, inactive_cloud_distance_fog()));
+        }
+        return;
+    }
     let Some(origin) = origin else {
         return;
     };
 
-    for (transform, mut current) in &mut owned_fog {
-        let local_density = camera_geodetic(&origin, transform)
-            .map_or(0.0, |position| cloud_density_at(*layer, *clock, position));
+    let density_at = |position| {
+        let Some((seed, cover, threshold)) = visuals.calibration else {
+            return cloud_density_at(*layer, *clock, position);
+        };
+        if seed != layer.seed || cover.to_bits() != layer.cover.to_bits() || layer.is_clear() {
+            return cloud_density_at(*layer, *clock, position);
+        }
+        let Some((u, v)) = cloud_field_coordinates(*clock, position) else {
+            return 0.0;
+        };
+        let mask = if cover >= 1.0 {
+            1.0
+        } else {
+            cloud_mask_with_threshold(seed, u, v, threshold)
+        };
+        mask * vertical_cloud_density(position.altitude, layer.base, layer.top)
+    };
+
+    for (_, transform, mut current) in &mut owned_fog {
+        let local_density = camera_geodetic(&origin, transform).map_or(0.0, density_at);
         *current = cloud_distance_fog(*layer, local_density, &lighting, sun.elevation);
     }
     for (camera, transform) in &cameras_without_fog {
-        let local_density = camera_geodetic(&origin, transform)
-            .map_or(0.0, |position| cloud_density_at(*layer, *clock, position));
+        let local_density = camera_geodetic(&origin, transform).map_or(0.0, density_at);
         let fog = cloud_distance_fog(*layer, local_density, &lighting, sun.elevation);
         commands.entity(camera).insert((CloudDistanceFog, fog));
     }
@@ -493,6 +563,7 @@ fn clear_cloud_visuals(
     materials: &mut Assets<StandardMaterial>,
     images: &mut Assets<Image>,
 ) {
+    visuals.calibration = None;
     for entity in visuals.entities.drain(..) {
         commands.entity(entity).despawn();
     }
@@ -507,22 +578,69 @@ fn clear_cloud_visuals(
     }
 }
 
-fn cloud_mask_image(layer: CloudLayer) -> Image {
+fn cloud_mask_image(layer: CloudLayer) -> (Image, f32) {
     let pixel_count = CLOUD_TEXTURE_SIZE as usize * CLOUD_TEXTURE_SIZE as usize;
     let mut data = Vec::with_capacity(pixel_count * 4);
+    // Reuse the final RGBA buffer for temporary f32 noise bits. Only a bounded
+    // 16 KiB histogram is additional CPU storage; no additional Light texture.
+    // The histogram resolves the noise quantile for each actual seed, avoiding
+    // the large area bias of applying `1-cover` to a nonuniform fBm field.
+    const BINS: usize = 4096;
+    let mut histogram = [0_u32; BINS];
     for y in 0..CLOUD_TEXTURE_SIZE {
         for x in 0..CLOUD_TEXTURE_SIZE {
             let u = f64::from(x) / f64::from(CLOUD_TEXTURE_SIZE);
             let v = f64::from(y) / f64::from(CLOUD_TEXTURE_SIZE);
-            let mask = cloud_mask(layer.seed, u, v, layer.cover);
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "normalized finite noise for image storage"
+            )]
+            let noise = fractal_noise(layer.seed, u, v).mul_add(0.5, 0.5) as f32;
             #[allow(
                 clippy::cast_possible_truncation,
                 clippy::cast_sign_loss,
-                reason = "0..=1 のマスクを 8 bit alpha へ量子化する"
+                reason = "finite noise in [0,1], bounded histogram"
             )]
-            let alpha = (mask * 255.0).round() as u8;
-            data.extend_from_slice(&[255, 255, 255, alpha]);
+            let bin = ((noise * 4096.0) as usize).min(BINS - 1);
+            histogram[bin] += 1;
+            data.extend_from_slice(&noise.to_ne_bytes());
         }
+    }
+    let target =
+        f64::from(CLOUD_TEXTURE_SIZE * CLOUD_TEXTURE_SIZE) * (1.0 - f64::from(layer.cover));
+    let mut before = 0_u32;
+    let mut threshold = 1.0;
+    for (bin, count) in histogram.into_iter().enumerate() {
+        if count > 0 && f64::from(before + count) >= target {
+            let within = ((target - f64::from(before)) / f64::from(count)).clamp(0.0, 1.0);
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_precision_loss,
+                reason = "bounded 4096-bin quantile in [0,1]"
+            )]
+            {
+                threshold = ((bin as f64 + within) / 4096.0) as f32;
+            }
+            break;
+        }
+        before += count;
+    }
+    for pixel in data.chunks_exact_mut(4) {
+        let noise = f32::from_ne_bytes(pixel.try_into().expect("exact four-byte chunk"));
+        let mask = if layer.cover >= 1.0 {
+            1.0
+        } else if layer.cover <= 0.0 {
+            0.0
+        } else {
+            smoothstep_f32(threshold - MASK_SOFTNESS, threshold + MASK_SOFTNESS, noise)
+        };
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "0..=1 のマスクを 8 bit alpha へ量子化する"
+        )]
+        let alpha = (mask * 255.0).round() as u8;
+        pixel.copy_from_slice(&[255, 255, 255, alpha]);
     }
 
     let mut image = Image::new(
@@ -543,7 +661,7 @@ fn cloud_mask_image(layer: CloudLayer) -> Image {
         min_filter: ImageFilterMode::Linear,
         ..default()
     });
-    image
+    (image, threshold)
 }
 
 fn cloud_texture_repeats() -> f32 {
@@ -789,6 +907,133 @@ mod tests {
     }
 
     #[test]
+    fn light_tile_calibration_preserves_requested_area_for_each_seed() {
+        for seed in [1, 7, 42, 2026] {
+            for cover in [0.0, 0.1, 0.2, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0] {
+                let mut selected = layer(cover);
+                selected.seed = seed;
+                let (image, threshold) = cloud_mask_image(selected);
+                let data = image.data.expect("CPU image bytes are retained");
+                assert_eq!(data.len(), 256 * 256 * 4);
+                let covered = data.chunks_exact(4).filter(|pixel| pixel[3] >= 128).count();
+                #[allow(
+                    clippy::cast_precision_loss,
+                    reason = "exact bounded 256 squared pixel count"
+                )]
+                let area = covered as f64 / 65_536.0;
+                assert!(
+                    (area - f64::from(cover)).abs() < 0.001,
+                    "seed={seed} cover={cover} tile area={area} threshold={threshold}"
+                );
+                assert!(threshold.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn light_and_upper_requests_reuse_fallback_assets_and_off_releases_them() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<Assets<Mesh>>()
+            .init_resource::<Assets<StandardMaterial>>()
+            .init_resource::<Assets<Image>>()
+            .add_plugins(crate::FlightsimRenderPlugin)
+            .insert_resource(RenderOrigin::new(Geodetic::from_degrees(35.0, 139.0, 0.0)))
+            .insert_resource(layer(0.6));
+        let camera = app
+            .world_mut()
+            .spawn((Camera3d::default(), Transform::default()))
+            .id();
+        app.update();
+        let original = app.world().resource::<CloudVisuals>().texture.clone();
+        assert!(original.is_some());
+        for quality in [CloudQuality::High, CloudQuality::Ultra, CloudQuality::Light] {
+            app.insert_resource(quality);
+            app.update();
+            assert_eq!(app.world().resource::<CloudVisuals>().texture, original);
+            assert_eq!(app.world().resource::<Assets<Image>>().len(), 1);
+            assert_eq!(app.world().resource::<Assets<Mesh>>().len(), 1);
+        }
+        app.insert_resource(CloudQuality::Off);
+        app.update();
+        assert_eq!(app.world().resource::<Assets<Image>>().len(), 0);
+        assert_eq!(app.world().resource::<Assets<Mesh>>().len(), 0);
+        assert_eq!(app.world().resource::<Assets<StandardMaterial>>().len(), 0);
+        assert!(app.world().entity(camera).contains::<CloudDistanceFog>());
+        let fog = app.world().entity(camera).get::<DistanceFog>().unwrap();
+        assert_eq!(fog.color, Color::NONE);
+        let FogFalloff::Exponential { density } = fog.falloff else {
+            panic!("expected stable fog specialization")
+        };
+        assert_eq!(density.to_bits(), 0.0_f32.to_bits());
+    }
+
+    #[test]
+    fn starting_off_keeps_the_same_fog_specialization_when_enabling_clouds() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(crate::FlightsimRenderPlugin)
+            .insert_resource(RenderOrigin::new(Geodetic::from_degrees(35.0, 139.0, 0.0)))
+            .insert_resource(CloudQuality::Off)
+            .insert_resource(layer(1.0));
+        let camera = app
+            .world_mut()
+            .spawn((Camera3d::default(), Transform::from_xyz(0.0, 1500.0, 0.0)))
+            .id();
+        app.update();
+        assert_eq!(
+            app.world()
+                .entity(camera)
+                .get::<DistanceFog>()
+                .unwrap()
+                .color,
+            Color::NONE
+        );
+        app.insert_resource(CloudQuality::Light);
+        app.update();
+        assert!(app.world().entity(camera).contains::<CloudDistanceFog>());
+        assert!(
+            app.world()
+                .entity(camera)
+                .get::<DistanceFog>()
+                .unwrap()
+                .color
+                .alpha()
+                > 0.99
+        );
+    }
+
+    #[test]
+    fn weather_does_not_replace_or_remove_an_unrelated_camera_fog() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(crate::FlightsimRenderPlugin)
+            .insert_resource(RenderOrigin::new(Geodetic::from_degrees(35.0, 139.0, 0.0)))
+            .insert_resource(layer(1.0));
+        let original = DistanceFog {
+            color: Color::srgb(0.1, 0.2, 0.3),
+            ..default()
+        };
+        let camera = app
+            .world_mut()
+            .spawn((Camera3d::default(), Transform::default(), original.clone()))
+            .id();
+        for quality in [CloudQuality::Light, CloudQuality::Off, CloudQuality::High] {
+            app.insert_resource(quality);
+            app.update();
+            assert!(!app.world().entity(camera).contains::<CloudDistanceFog>());
+            assert_eq!(
+                app.world()
+                    .entity(camera)
+                    .get::<DistanceFog>()
+                    .unwrap()
+                    .color,
+                original.color
+            );
+        }
+    }
+
+    #[test]
     fn cloud_uv_uses_render_frames_negative_z_as_north() {
         let repeats = cloud_texture_repeats();
         let transform = cloud_uv_transform(0.25, 0.75);
@@ -883,5 +1128,27 @@ mod tests {
             vertical_cloud_density(Meters(f64::INFINITY), Meters(0.0), Meters(1.0)).to_bits(),
             0.0_f32.to_bits()
         );
+    }
+
+    #[test]
+    fn subnormal_visibility_cannot_poison_the_light_fallback() {
+        for visibility in [f64::MIN_POSITIVE, f64::from_bits(1), 1e-100] {
+            assert!(
+                CloudLayer::try_new(0.5, Meters(1000.0), Meters(2000.0), Meters(visibility), 1)
+                    .is_err()
+            );
+            assert_eq!(
+                fog_extinction(Meters(visibility)).to_bits(),
+                0.0_f32.to_bits()
+            );
+            let mut invalid = layer(0.5);
+            invalid.visibility = Meters(visibility);
+            assert!(invalid.is_clear());
+            let fog = cloud_distance_fog(invalid, 0.0, &SunLighting::default(), Radians::ZERO);
+            let FogFalloff::Exponential { density } = fog.falloff else {
+                panic!("expected exponential fog")
+            };
+            assert!((density * 0.0).is_finite());
+        }
     }
 }

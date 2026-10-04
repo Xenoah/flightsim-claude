@@ -6,6 +6,11 @@ forecast. Its numerical temperature, precipitation and cloud fields come from
 using the **1991–2020 long-term monthly means**. This is a reanalysis (a numerical
 model constrained by observations), not a collection of airport observations.
 
+NOAA classifies the cloud and precipitation variables as **Category C**:
+the reanalysis model generates them from its atmospheric state; cloud observations
+are not directly assimilated into these variables. They are not measured airport
+cloud fractions. See [NOAA's variable classification](https://www.cpc.ncep.noaa.gov/products/precip/atlas_2/cont_data.html).
+
 ## Data that are real, and behavior that is modeled
 
 The baked atlas retains all 12 months, all 192 source longitudes, and the exact
@@ -32,6 +37,14 @@ coverage uses real reanalysis means, but the renderer's individual clouds,
 layer heights, visibility and terrain color are simulator representations.
 There is no implicit climate-derived wind override; explicit wind/turbulence
 settings continue to control those physical inputs.
+
+The [cloud quality settings](../cloud-quality.md) retain a single explicitly
+modeled layer. Its height uses a fixed departure reference, so the whole layer
+does not follow hills under the aircraft. Light keeps its periodic 2D placement
+with calibrated covered area; High/Ultra share an Earth-space procedural field.
+Their individual shapes can differ, while their nominal total-cloud fraction
+and layer settings remain the same. Neither path supplies missing humidity,
+dew point, vertical stability or observed cloud-type information.
 
 ## Vertical coordinates and atmosphere integration
 

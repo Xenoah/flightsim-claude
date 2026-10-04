@@ -56,6 +56,8 @@ use flightsim_world::{MeshOptions, TerrainMesh};
 pub mod aircraft;
 pub mod apron;
 pub mod biome;
+pub mod cloud_field;
+pub mod cloud_volume;
 pub mod cockpit;
 pub mod daylight;
 pub mod graphics_quality;
@@ -84,6 +86,7 @@ pub mod terrain_stitching;
 pub mod weather;
 
 pub use aircraft::{AircraftPart, placeholder_extents, placeholder_parts};
+pub use cloud_volume::{CloudQuality, CloudVolumeCamera, CloudVolumeDiagnostics};
 pub use daylight::{
     SunIlluminancePolicy, SunLight, SunLighting, TimeOfDay, TimeRate, direct_normal_illuminance,
 };
@@ -185,61 +188,64 @@ pub struct FlightsimRenderPlugin;
 
 impl Plugin for FlightsimRenderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(graphics_quality::GraphicsQualityPlugin)
-            .init_resource::<CameraWorldPosition>()
-            .init_resource::<SunDirection>()
-            .init_resource::<TimeOfDay>()
-            .init_resource::<SunLighting>()
-            .init_resource::<CloudLayer>()
-            .init_resource::<weather::CloudVisuals>()
-            // `LightPlugin` も同じことをする。**どちらが先でも同じ値**になるよう
-            // `init_resource` で入れること（`insert_resource` だと上書きし合う）。
-            .init_resource::<bevy::light::GlobalAmbientLight>()
-            .init_resource::<TerrainTiles>()
-            .init_resource::<TerrainRenderConfig>()
-            // **背景は黒でなければならない。**
-            //
-            // 大気散乱は「散乱光 + 背景 × 透過率」を書く。bevy の既定の背景は
-            // sRGB (43, 44, 47) の暗い灰色で、これが透過率ごしに空へ滲む。
-            // 実測すると、太陽をどこへ動かしても、照度を 0 にしてさえ、
-            // 空の平均画素が (40.3, 35.3, 27.9) から動かなかった。
-            // **夜が来ない原因がこれだった。** 散乱の計算ではなく背景の色。
-            //
-            // `init_resource` では駄目。`CameraPlugin` が既定値を先に入れるので、
-            // ここは上書きする必要がある。
-            .insert_resource(ClearColor(Color::BLACK))
-            .configure_sets(
-                Update,
-                (
-                    RenderSet::Rebase,
-                    RenderSet::Transforms,
-                    RenderSet::Sun,
-                    RenderSet::Weather,
-                    RenderSet::Terrain,
-                )
-                    .chain(),
+        app.add_plugins((
+            graphics_quality::GraphicsQualityPlugin,
+            cloud_volume::CloudVolumePlugin,
+        ))
+        .init_resource::<CameraWorldPosition>()
+        .init_resource::<SunDirection>()
+        .init_resource::<TimeOfDay>()
+        .init_resource::<SunLighting>()
+        .init_resource::<CloudLayer>()
+        .init_resource::<weather::CloudVisuals>()
+        // `LightPlugin` も同じことをする。**どちらが先でも同じ値**になるよう
+        // `init_resource` で入れること（`insert_resource` だと上書きし合う）。
+        .init_resource::<bevy::light::GlobalAmbientLight>()
+        .init_resource::<TerrainTiles>()
+        .init_resource::<TerrainRenderConfig>()
+        // **背景は黒でなければならない。**
+        //
+        // 大気散乱は「散乱光 + 背景 × 透過率」を書く。bevy の既定の背景は
+        // sRGB (43, 44, 47) の暗い灰色で、これが透過率ごしに空へ滲む。
+        // 実測すると、太陽をどこへ動かしても、照度を 0 にしてさえ、
+        // 空の平均画素が (40.3, 35.3, 27.9) から動かなかった。
+        // **夜が来ない原因がこれだった。** 散乱の計算ではなく背景の色。
+        //
+        // `init_resource` では駄目。`CameraPlugin` が既定値を先に入れるので、
+        // ここは上書きする必要がある。
+        .insert_resource(ClearColor(Color::BLACK))
+        .configure_sets(
+            Update,
+            (
+                RenderSet::Rebase,
+                RenderSet::Transforms,
+                RenderSet::Sun,
+                RenderSet::Weather,
+                RenderSet::Terrain,
             )
-            .add_systems(
-                Update,
+                .chain(),
+        )
+        .add_systems(
+            Update,
+            (
+                rebase_render_origin.in_set(RenderSet::Rebase),
+                apply_world_positions.in_set(RenderSet::Transforms),
                 (
-                    rebase_render_origin.in_set(RenderSet::Rebase),
-                    apply_world_positions.in_set(RenderSet::Transforms),
-                    (
-                        daylight::advance_time_of_day,
-                        daylight::update_sun_direction,
-                        daylight::apply_sun_light,
-                    )
-                        .chain()
-                        .in_set(RenderSet::Sun),
-                    (
-                        weather::sync_cloud_visuals,
-                        weather::update_cloud_visuals,
-                        weather::update_cloud_distance_fog,
-                    )
-                        .chain()
-                        .in_set(RenderSet::Weather),
-                ),
-            );
+                    daylight::advance_time_of_day,
+                    daylight::update_sun_direction,
+                    daylight::apply_sun_light,
+                )
+                    .chain()
+                    .in_set(RenderSet::Sun),
+                (
+                    weather::sync_cloud_visuals,
+                    weather::update_cloud_visuals,
+                    weather::update_cloud_distance_fog,
+                )
+                    .chain()
+                    .in_set(RenderSet::Weather),
+            ),
+        );
     }
 }
 

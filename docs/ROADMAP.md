@@ -164,8 +164,8 @@ alpha.20 の実績を 2 機種へ広げない。実 GPU の代替ではない。
 - [x] 機体 profile の versioned JSON、Light Single / オリジナル Swift Sport の選択、
   FDM・model・視点・音・入力 rate 切替と invalid load 拒否（[Issue #10](../../../issues/10)）。
   両機の離陸・30 秒無操縦進入を数値検査。実機性能認証ではない
-- [ ] 高品質な雲のボリュームレンダリング（[Issue #11](../../../issues/11) では
-  決定論的な簡易雲層まで実装済み）
+- [x] 独立した雲の品質段階、面積校正、一層の bounded volume（[雲設定](cloud-quality.md)）。検証・配布成功とは別
+- [ ] 観測/予報に基づく多層雲・対流/前線の診断・地表の雲影（[Issue #11](../../../issues/11)）
 - [ ] METAR 取り込み（現状の天候は CLI で手動設定）
 - [x] リプレイ（[Issue #12](../../../issues/12)。操縦入力を記録して物理を回し直す。
   一時停止・速度変更・frame-zero から bounded 再実行する後退シーク、drift stop。

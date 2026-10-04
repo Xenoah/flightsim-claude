@@ -60,6 +60,7 @@ use std::path::PathBuf;
 
 mod aircraft_profile;
 mod airport_drape_runtime;
+mod cloud_runtime;
 mod distribution;
 mod graphics_runtime;
 mod render_metrics;
@@ -270,6 +271,7 @@ struct Startup {
     scenery_error: Option<String>,
     surface_detail: bool,
     graphics_quality: flightsim_render::graphics_quality::GraphicsQuality,
+    cloud_quality: flightsim_render::cloud_volume::CloudQuality,
     graphics_error: Option<String>,
     render_stats: bool,
     start: Geodetic,
@@ -384,6 +386,7 @@ impl Default for Startup {
             scenery_error: None,
             surface_detail: true,
             graphics_quality: default(),
+            cloud_quality: default(),
             graphics_error: None,
             render_stats: false,
             start: runway.takeoff_start(),
@@ -676,6 +679,7 @@ fn main() -> bevy::app::AppExit {
             enabled: startup.surface_detail,
         })
         .insert_resource(startup.graphics_quality)
+        .insert_resource(startup.cloud_quality)
         .insert_resource(
             flightsim_render::graphics_quality::GraphicsQualityDiagnostics {
                 enabled: startup.render_stats,
@@ -766,6 +770,7 @@ fn main() -> bevy::app::AppExit {
         );
 
     graphics_runtime::configure(&mut app);
+    cloud_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
     configure_live_input_scheduling(&mut app);
@@ -805,6 +810,7 @@ fn application_help() -> &'static str {
 --scenery FILE.fsscenery                        Offline regional surface scenery\n\
 --surface-detail on|off                        Procedural terrain material detail\n\
 --graphics-quality light|high|ultra             Visual preset (default light)\n\
+--cloud-quality off|light|high|ultra            Cloud preset (default light)\n\
 --render-stats                                 Bounded CPU/wall-frame diagnostics\n\
 --wind FROM_DEG/KNOTS --turbulence calm|light|moderate|severe\n\
 --time HH:MM --time-rate N                      Local mean solar time\n\
@@ -823,7 +829,7 @@ fn application_help() -> &'static str {
 --screenshot-delay SECONDS                     Finite delay in 0..600\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
 [ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
-F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
+F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
 }
 
 /// Recorded location must drive airport lookup, while airport selection must not
@@ -1148,6 +1154,16 @@ fn parse_arguments_from(
                     startup.graphics_quality = quality;
                 } else {
                     startup.graphics_error = Some("--graphics-quality expects light, high or ultra".into());
+                }
+            }
+            "--cloud-quality" => {
+                if let Some(quality) = next_argument_value(&mut arguments)
+                    .as_deref()
+                    .and_then(flightsim_render::cloud_volume::CloudQuality::parse)
+                {
+                    startup.cloud_quality = quality;
+                } else {
+                    startup.graphics_error = Some("--cloud-quality expects off, light, high or ultra".into());
                 }
             }
             "--surface-detail" => match next_argument_value(&mut arguments).as_deref() {
@@ -2389,6 +2405,8 @@ struct StallWarningStatus {
 /// specify which writer or reader runs first in Bevy's schedule.
 fn configure_flight_presentation(app: &mut App) {
     app.init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
+        .init_resource::<flightsim_render::cloud_volume::CloudQuality>()
+        .init_resource::<flightsim_render::cloud_volume::CloudVolumeDiagnostics>()
         .add_systems(
             Update,
             (
@@ -3413,6 +3431,7 @@ fn setup(
         Camera3d::default(),
         world_runtime::FlightCamera,
         flightsim_render::graphics_quality::GraphicsQualityCamera,
+        flightsim_render::cloud_volume::CloudVolumeCamera,
         // Keep HUD roots on this camera when the dedicated map camera exists.
         IsDefaultUiCamera,
         Projection::Perspective(perspective()),
@@ -3895,13 +3914,20 @@ fn publish_input_diagnostics(
     }
 }
 
+#[allow(
+    clippy::type_complexity,
+    reason = "Bevy read-only presentation resources grouped to keep the HUD system boundary explicit"
+)]
 fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
     playback: Option<Res<ReplayPlayback>>,
-    (mode, quality): (
+    (mode, quality, cloud_quality, cloud_status, startup): (
         Res<ViewMode>,
         Res<flightsim_render::graphics_quality::GraphicsQuality>,
+        Res<flightsim_render::cloud_volume::CloudQuality>,
+        Res<flightsim_render::cloud_volume::CloudVolumeDiagnostics>,
+        Option<Res<Startup>>,
     ),
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
@@ -3952,6 +3978,10 @@ fn publish_hud(
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
         graphics_quality: quality.name(),
+        cloud_quality: cloud_runtime::quality_label(*cloud_quality, &cloud_status),
+        cloud_source: startup
+            .as_deref()
+            .map_or("MODEL", cloud_runtime::source_label),
         wind_from: simulation.0.wind().from,
         wind_speed: simulation.0.wind().speed,
         // 計器の照明に使う。ui は render に依存できないので app が渡す。

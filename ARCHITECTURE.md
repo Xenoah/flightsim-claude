@@ -321,14 +321,19 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 | `flightsim-net` | 決定論的な合成交通、補間、bounded UDP の作成・参加・退出・再接続 |
 | `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習、2 機体 profile、難易度、同一 build replay、windowed/offscreen capture CLI |
 
-雲場は固定 seed の周期的な 2D value/fBm noise を緯度・経度と `TimeOfDay` から
-サンプルするため、同じ設定なら同じ結果になる。雲底・雲頂は alpha mask 付きの
-PBR 平面で表し、カメラが層内に入ったときだけ distance fog で視程を制限する。
-`ClearColor` は変更しない。`--cloud-cover`、`--cloud-base`、`--cloud-top`、
-`--cloud-visibility` で設定する。通常の新規飛行では月別気候の地域雲量と
-近似 AGL 層を使用し、これらの明示設定があれば手動雲層を優先する。
-`--cloud-cover 0` は快晴を指定する。旧 v1 replay と気候無効時の既定は
-従来の雲量 0 を保つ。月別平均は現在の観測天気を表さない。
+雲描画は独立した Off / Light / High / Ultra 設定を持つ（F3、Shift+F3 で Light）。
+Light は従来の 2 枚の PBR 平面・256² マスク・雲中 fog を保ち、マスクの雲量を
+seed ごとに面積校正する。High/Ultra は同じ Earth-space 密度場と単一の曲面層を使い、
+予算内の ray integration と不透明物体の深度に沿う HDR 合成を行う。
+描画側の同一フレームの readiness gate が平面・影・fog と volume を切り替える。
+詳細と予算は [ADR-0013](docs/adr/0013-bounded-cloud-quality.md) に固定した。
+
+雲量は現在地の NOAA 月平均再解析値を周辺の一層へ適用する。雲底は出発地の粗い
+モデル地表高 + geoid + 1,500 m、厚さは 1,200 m の描画近似で、直下の山に追随しない。
+湿度・露点・鉛直安定度は未入力で、観測した雲種や現在の天気を表さない。
+Light の位置近似は上位と異なるが、公称雲量・層高・視程は品質で変更しない。
+従来の手動雲量・楕円体基準の雲底/雲頂・視程指定を優先し、物理には戻さない。
+旧 v1 replay と気候無効時の雲量 0 も保つ。[操作と科学的限定](docs/cloud-quality.md)。
 
 CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
 `.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに
@@ -343,7 +348,7 @@ Light Single cockpit と Swift Sport chase を個別に起動して 2 枚を検�
 
 ### 今後の範囲
 
-- OSM の空港建物、衛星地表画像、METAR、高品質なボリューム雲、推力線オフセット
+- OSM の空港建物、衛星地表画像、METAR、観測/予報に基づく多層雲・地表の雲影、推力線オフセット
 - 実 ADS-B 交通、Internet 向け認証・暗号化・NAT 越え・マッチメイキング・衝突の権威制御
 - 写実的な機種別コックピット。現在は共通の手続き的内装を機体 profile の視点へ合わせる
 

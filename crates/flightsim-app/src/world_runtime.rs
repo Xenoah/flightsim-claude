@@ -714,6 +714,7 @@ fn publish_world_map(
 fn sync_climate_clouds(
     simulation: Res<FlightSimulation>,
     startup: Res<Startup>,
+    runtime: Res<WorldRuntime>,
     time: Res<Time>,
     mut layer: ResMut<CloudLayer>,
     mut elapsed: Local<f64>,
@@ -729,25 +730,58 @@ fn sync_climate_clouds(
     let Some(climate) = simulation.0.climate_sample() else {
         return;
     };
-    let ground = simulation.0.ground().elevation.get();
+    let reference = runtime
+        .climate
+        .sample(startup.start, startup.world.climate_date);
+    let next = modeled_climate_cloud_layer(climate, reference);
+    // Equal assignments would unnecessarily regenerate the Light mask and
+    // invalidate render settings every two seconds while the aircraft is still.
+    if *layer != next {
+        *layer = next;
+    }
+}
+
+fn modeled_climate_cloud_layer(
+    climate: flightsim_world::climate::ClimateSample,
+    reference: flightsim_world::climate::ClimateSample,
+) -> CloudLayer {
     #[allow(
         clippy::cast_possible_truncation,
         reason = "validated climatological cloud fraction in [0,1]"
     )]
     let cover = climate.cloud_cover as f32;
-    // Layer geometry is a deliberately simple weather visualization; the
-    // monthly cloud amount is reanalysis. No live forecast is being fetched.
-    let base = (ground + 1500.0).max(100.0);
-    if let Ok(next) =
-        CloudLayer::try_new(cover, Meters(base), Meters(base + 1200.0), Meters(300.0), 1)
-    {
-        *layer = next;
-    }
+    // This is one explicitly modeled layer, not a diagnosed cloud base. Use
+    // the departure's fixed coarse model surface and geoid reference. Sampling
+    // the aircraft's changing local DEM here made the entire deck follow hills.
+    // Monthly temperature/precipitation do not supply humidity or stability.
+    let base =
+        (reference.model_surface_elevation.get() + reference.geoid_undulation.get() + 1500.0)
+            .max(100.0);
+    CloudLayer::try_new(cover, Meters(base), Meters(base + 1200.0), Meters(300.0), 1)
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn modeled_cloud_height_uses_fixed_departure_reference_not_current_hills() {
+        let atlas = GlobalClimate::bundled().unwrap();
+        let date = ClimateDate::from_month(6).unwrap();
+        let reference = atlas.sample(Geodetic::from_degrees(47.0674, 9.5034, 0.0), date);
+        let mut moved = reference;
+        moved.model_surface_elevation = Meters(reference.model_surface_elevation.get() + 3000.0);
+        moved.geoid_undulation = Meters(reference.geoid_undulation.get() + 20.0);
+        moved.cloud_cover = 0.2;
+        let before = modeled_climate_cloud_layer(reference, reference);
+        let after = modeled_climate_cloud_layer(moved, reference);
+        assert_eq!(before.base, after.base);
+        assert_eq!(before.top, after.top);
+        assert_eq!(after.cover.to_bits(), 0.2_f32.to_bits());
+        assert!((after.top.get() - after.base.get() - 1200.0).abs() < 1e-9);
+        assert!(before.base.get() > reference.model_surface_elevation.get());
+    }
 
     fn map_camera_app(headless: bool, flight_active: bool) -> (App, Entity, Entity, Entity) {
         let mut app = App::new();

@@ -77,6 +77,8 @@ pub fn pause_text() -> String {
         "",
         "Esc ... resume",
         "R ..... restart this flight",
+        "F3 .... cloud quality",
+        "Shift+F3 ... restore LIGHT clouds",
         "F4 .... graphics quality",
         "Shift+F4 ... restore LIGHT",
     ]

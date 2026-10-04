@@ -100,6 +100,9 @@ pub struct HudState {
     pub view_mode: &'static str,
     /// Display-only label supplied by app; UI does not depend on the renderer.
     pub graphics_quality: &'static str,
+    /// Requested cloud rendering tier and provenance, supplied by app.
+    pub cloud_quality: &'static str,
+    pub cloud_source: &'static str,
     /// 風がどちら**から**吹くか（真方位）。航空の慣習に合わせる。
     pub wind_from: Radians,
     /// 風速。0 なら `calm` と表示する。
@@ -585,7 +588,9 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
 \
          WND  {}\n\
          VIEW {}{terrain}\n\
-         GFX  {} [F4]",
+         GFX  {} [F4]\n\
+         CLD  {} [F3]\n\
+         {}",
         values.airspeed.get(),
         values.altitude.get(),
         values.agl.get(),
@@ -599,6 +604,8 @@ pub fn format_hud(values: DisplayedValues, state: &HudState) -> String {
         format_wind(state.wind_from, state.wind_speed),
         state.view_mode,
         state.graphics_quality,
+        state.cloud_quality,
+        state.cloud_source,
     )
 }
 
@@ -683,6 +690,8 @@ mod tests {
             terrain_available: true,
             view_mode: "COCKPIT",
             graphics_quality: "LIGHT",
+            cloud_quality: "LIGHT",
+            cloud_source: "MONTHLY MODEL",
             wind_from: Radians(0.0),
             wind_speed: MetersPerSecond(0.0),
             log: FlightSummary::default(),
@@ -1088,7 +1097,8 @@ mod tests {
             let text = format_hud(smoothing.update(Seconds(0.2), &state), &state);
             assert_eq!(text.contains("STALL WARN N/A"), !available);
             assert!(text.contains("\nVIEW COCKPIT\n"));
-            assert!(text.ends_with("GFX  LIGHT [F4]"));
+            assert!(text.contains("GFX  LIGHT [F4]"));
+            assert!(text.ends_with("CLD  LIGHT [F3]\nMONTHLY MODEL"));
         }
     }
 
