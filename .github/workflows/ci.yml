@@ -16,6 +16,36 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  content_download_smoke:
+    name: public synthetic download (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: content-download
+      - name: Build production download example
+        run: cargo build -j 2 --locked -p flightsim-content --features downloads --example download_region
+      - name: Download pinned synthetic package and verify offline reuse
+        shell: bash
+        run: |
+          # Explicit live-network gate, separate from ordinary offline unit tests.
+          # This is a tiny authored constant-height fixture, not real geography.
+          binary="target/debug/examples/download_region"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            binary="$binary.exe"
+          fi
+          url="https://raw.githubusercontent.com/Xenoah/flightsim-claude/8b4df0e1b7e744218176b1d19233a1463f304b47/crates/flightsim-app/tests/fixtures/region-synthetic.zip"
+          sha="d3b86a557404bd687baa7549ca274759cde7e68d5718ea94cb414116d72b9e73"
+          "$binary" "$url" "$sha" "$RUNNER_TEMP/region-download-cache" "$RUNNER_TEMP/region-online-store" online
+          "$binary" "$url" "$sha" "$RUNNER_TEMP/region-download-cache" "$RUNNER_TEMP/region-offline-store" offline
+
   world_source_tools:
     name: world source-tool boundaries
     runs-on: ubuntu-latest
@@ -25,9 +55,10 @@ jobs:
       - name: Test offline world-data output safety
         run: |
           python3 -m venv "$RUNNER_TEMP/flightsim-source-tools"
-          "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m pip install numpy==2.3.5
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m pip install numpy==2.3.5 jsonschema==4.26.0
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts/tests -v
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts -p 'test_pack_global_terrain.py' -v
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" schemas/tests/test_aircraft_profile_schema.py
           # These boundary tests fetch no geospatial source data and require no HDF5.
 
   # 純 Rust 側（core / fdm / world / sim / tilegen）。
@@ -49,6 +80,7 @@ jobs:
       HEADLESS: >-
         -p flightsim-core -p flightsim-fdm -p flightsim-world
         -p flightsim-sim -p flightsim-tilegen -p flightsim-assetgen -p flightsim-net -p flightsim-content
+        --features flightsim-content/downloads
 
     steps:
       - uses: actions/checkout@v4
@@ -156,7 +188,7 @@ jobs:
 
       # 壊れたドキュメントリンクは、設計意図が読まれなくなる原因になる。
       - name: Build docs
-        run: cargo doc --workspace --no-deps --document-private-items
+        run: cargo doc --workspace --features flightsim-content/downloads --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: -D warnings
 

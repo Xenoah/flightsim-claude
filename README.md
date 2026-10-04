@@ -185,6 +185,10 @@ cargo bench --workspace                           # 性能測定（criterion）
 
 ### 機体・入力・交通・撮影の入口
 
+カスタム機体 JSON の公開仕様・単位・既定値・モデル軸・制約は
+[Aircraft profile v1 authoring guide](docs/aircraft-profiles.md) と
+[JSON Schema](schemas/aircraft-profile-v1.schema.json) を参照してください。
+
 ```bash
 cargo run -p flightsim-app -- --help
 cargo run -p flightsim-app -- --list-aircraft

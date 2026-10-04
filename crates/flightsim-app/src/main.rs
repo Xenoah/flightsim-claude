@@ -59,6 +59,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 mod aircraft_profile;
+#[cfg(test)]
+#[path = "aircraft_profile/schema_contract.rs"]
+mod aircraft_profile_schema_contract;
 mod airport_drape_runtime;
 mod cloud_runtime;
 mod distance_runtime;

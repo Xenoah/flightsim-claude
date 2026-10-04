@@ -24,7 +24,11 @@ CRATES=(flightsim-core flightsim-fdm flightsim-world flightsim-tilegen flightsim
 # --edges normal で dev-dependencies と build-dependencies を除外する
 # （テスト専用の依存は設計上の問題ではない）。
 deps_of() {
-    cargo tree --package "$1" --edges normal --prefix none 2>/dev/null \
+    local extra=()
+    if [[ "$1" == "flightsim-content" ]]; then
+        extra=(--features downloads)
+    fi
+    cargo tree --package "$1" "${extra[@]}" --edges normal --prefix none 2>/dev/null \
         | awk '{print $1}' \
         | sort -u
 }
@@ -40,7 +44,11 @@ deps_of() {
 # 実際にこの穴を踏んで気付いたため、検査を足してある。
 # --------------------------------------------------------------------------
 for crate in "${CRATES[@]}"; do
-    if ! output=$(cargo tree --package "$crate" --edges normal --prefix none 2>&1); then
+    extra=()
+    if [[ "$crate" == "flightsim-content" ]]; then
+        extra=(--features downloads)
+    fi
+    if ! output=$(cargo tree --package "$crate" "${extra[@]}" --edges normal --prefix none 2>&1); then
         echo "FAIL: could not resolve the dependency tree for $crate"
         echo "      Every architecture check would pass vacuously in this state, so this is fatal."
         echo "      cargo tree said:"
@@ -109,7 +117,8 @@ for crate in flightsim-core flightsim-fdm flightsim-world; do
 done
 
 # Local packages sit above world/core. They validate data and never depend on
-# simulation, Bevy layers, networking or offline raw-data decoders.
+# simulation, Bevy layers, traffic networking or offline raw-data decoders.
+# Include optional prepared-package HTTP acquisition in the checked content graph.
 if deps_of flightsim-content | grep -qE '^flightsim-(fdm|sim|tilegen|render|input|ui|audio|app|net)$'; then
     fail "flightsim-content depends on an unrelated runtime/tool layer" "content may depend on world/core only; app owns activation."
 fi

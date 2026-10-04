@@ -2,7 +2,9 @@
 
 `flightsim-content` is the pure Rust boundary for **prepared, data-only regional
 terrain packages**. It validates local ZIP files, stages them, and installs
-immutable versions. It does not download GitHub repositories, convert raw DEMs,
+immutable versions. An optional [download foundation](content-downloads.md) can acquire
+explicit hash-pinned prepared GitHub ZIPs; it is not enabled in the current app.
+It does not download/convert arbitrary GitHub repositories, convert raw DEMs,
 execute MOD scripts, or activate a region. A GitHub release ZIP is compatible only
 if its author deliberately produced this schema. Ordinary repository archives,
 GeoTIFF, HGT, OSM PBF, airport databases, scenery databases, nested archives and

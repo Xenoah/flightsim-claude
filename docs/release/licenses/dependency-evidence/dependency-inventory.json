@@ -3,8 +3,8 @@
   "kind": "cargo-dependency-notices",
   "target": "x86_64-pc-windows-msvc",
   "root_package": "flightsim-app",
-  "cargo_lock_sha256": "248614f277be7edc40b8b602235b6c4d072dc02b39fcd51f61a7bac80bca4486",
-  "metadata_sha256": "665f41a89c5cafae48b9195532beec1f05703b61828dd261c668aec41193ab86",
+  "cargo_lock_sha256": "665fc4221e9df86fac3d26a33c75ad3ea2d58cc2d42bdcde70c8d45444533db3",
+  "metadata_sha256": "371f99c4b70b7943edcf33dbdaad7073a86436ea41980cdb8c84e99104d04a9a",
   "asset_manifest_sha256": "8a71d5e970fa3fe2cd4949b60962a5dde3fef9a2d10b691b3139218c0c8b1e4d",
   "supplement_manifest_sha256": "2f9ea61d636ba36059b24d5a3923c4ac03048410024a06e5239100b507255332",
   "scope": "Conservative normal/build dependency closure of target-filtered Cargo metadata; excludes dev-only edges, not proof of final linkage or exhaustive nested-source licensing",
@@ -4290,7 +4290,9 @@
       "source_path_in_repository": null,
       "repository": null,
       "license_expression": "MIT OR Apache-2.0",
-      "features": [],
+      "features": [
+        "default"
+      ],
       "notices": [
         {
           "path": "licenses/flightsim-content-0.6.0-alpha.21/LICENSE-MIT",

@@ -48,6 +48,14 @@ The local terrain package edge adds `flightsim-content`, `rawzip`, `fs2`,
 previously collected notice bytes remain identical; new notice files were copied
 from the exact locked package sources. No existing unresolved record was removed.
 
+The later opt-in download foundation updates the lockfile and gives
+`flightsim-content` an explicit empty `default` feature. Recollection still finds
+the same 359-package default-application closure, identical notice bytes and
+the same unresolved records. The application's default does not enable
+`flightsim-content/downloads`. This inventory does not cover distributing the
+standalone download example or a future application build with that feature;
+those require their own exact target/feature collection and review.
+
 ## Review still required
 
 Retain declared license expressions exactly. `OR` permits selecting an offered

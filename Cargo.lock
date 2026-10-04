@@ -2457,11 +2457,14 @@ dependencies = [
  "flightsim-core",
  "flightsim-world",
  "fs2",
+ "httparse",
  "rawzip",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "ureq",
+ "url",
 ]
 
 [[package]]

@@ -2,8 +2,11 @@
 //!
 //! Importing installs immutable versioned data; it never changes a live flight.
 //! The app must activate at most one validated package in its new-flight transaction
-//! and retain the existing global fallback. No package code or network request runs.
+//! and retain the existing global fallback. No package code runs. Network acquisition
+//! is an explicit opt-in through the `downloads` feature and never activates terrain.
 mod archive;
+#[cfg(feature = "downloads")]
+pub mod download;
 mod install;
 mod manifest;
 

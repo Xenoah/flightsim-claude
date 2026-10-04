@@ -1,0 +1,769 @@
+{
+  "base": "docs/examples/aircraft-profiles/required-only.json",
+  "cases": [
+    {
+      "name": "required-fields-only",
+      "runtime_valid": true,
+      "schema_valid": true
+    },
+    {
+      "name": "explicit-null-pitch-defaults",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/elevator_rate": null,
+        "/controls/elevator_centering_rate": null
+      }
+    },
+    {
+      "name": "pitch-rate-boundaries",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/elevator_rate": 0.01,
+        "/controls/elevator_centering_rate": 0
+      }
+    },
+    {
+      "name": "rate-upper-boundaries",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/surface_rate": 10,
+        "/controls/centering_rate": 10,
+        "/controls/elevator_rate": 10,
+        "/controls/elevator_centering_rate": 10
+      }
+    },
+    {
+      "name": "trim-and-pitch-boundaries",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/default_trim": -1,
+        "/controls/approach_trim": 1,
+        "/controls/approach_pitch_rad": -0.7853981633974483,
+        "/camera_eye_m": [
+          -10,
+          0,
+          10
+        ]
+      }
+    },
+    {
+      "name": "inertia-nonzero-cross-term",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/inertia_kg_m2": [
+          10,
+          10,
+          10,
+          5
+        ]
+      }
+    },
+    {
+      "name": "id-ascii-boundary",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "name-ascii-boundary",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "name": "path-ascii-byte-boundary",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/model/path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.glb"
+      }
+    },
+    {
+      "name": "axis-case-whitespace-and-unsigned",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/model/forward": " Z ",
+        "/model/up": "\tY\n"
+      }
+    },
+    {
+      "name": "sound-alias-prop",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": "prop"
+      }
+    },
+    {
+      "name": "sound-alias-propeller",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": "propeller"
+      }
+    },
+    {
+      "name": "sound-alias-jet",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": "jet"
+      }
+    },
+    {
+      "name": "sound-alias-turbofan",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": "turbofan"
+      }
+    },
+    {
+      "name": "sound-alias-fighter",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": "fighter"
+      }
+    },
+    {
+      "name": "sound-alias-turbine",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/engine_sound": " TURBINE　"
+      }
+    },
+    {
+      "name": "legacy-normalized-path-components",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/model/path": "aircraft//./example.glb"
+      }
+    },
+    {
+      "name": "zero-flap-contribution",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/aero/lift_flaps": 0,
+        "/dynamics/aero/drag_flaps": 0
+      }
+    },
+    {
+      "name": "unknown-root",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/license": "example"
+      }
+    },
+    {
+      "name": "unknown-model",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/scale": 2
+      }
+    },
+    {
+      "name": "unknown-controls",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/pitch_rate": 2
+      }
+    },
+    {
+      "name": "unknown-dynamics-unit",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/mass_lb": 2000
+      }
+    },
+    {
+      "name": "unknown-aero",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/cl": 0.3
+      }
+    },
+    {
+      "name": "unknown-gear",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/landing_gear/0/retractable": true
+      }
+    },
+    {
+      "name": "unknown-schema-in-instance",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/$schema": "aircraft-profile-v1.schema.json"
+      }
+    },
+    {
+      "name": "unsupported-version",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/version": 2
+      }
+    },
+    {
+      "name": "noninteger-version",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/version": 1.5
+      }
+    },
+    {
+      "name": "string-version",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/version": "1"
+      }
+    },
+    {
+      "name": "uppercase-id",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/id": "Example"
+      }
+    },
+    {
+      "name": "empty-id",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/id": ""
+      }
+    },
+    {
+      "name": "id-over-byte-cap",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "id-trailing-newline",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/id": "example\n"
+      }
+    },
+    {
+      "name": "blank-name",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/name": "  "
+      }
+    },
+    {
+      "name": "nonascii-name",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/name": "機体"
+      }
+    },
+    {
+      "name": "control-in-name",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/name": "Example\n"
+      }
+    },
+    {
+      "name": "name-over-byte-cap",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "name": "mass-below-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/mass_kg": 99
+      }
+    },
+    {
+      "name": "negative-diagonal-inertia",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/inertia_kg_m2": [
+          -1,
+          10,
+          10,
+          0
+        ]
+      }
+    },
+    {
+      "name": "short-inertia",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/inertia_kg_m2": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "name": "too-many-gear-contacts",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/landing_gear": []
+      }
+    },
+    {
+      "name": "short-contact-vector",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/landing_gear/0/contact_m": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "spring-below-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/landing_gear/0/spring_n_per_m": 0
+      }
+    },
+    {
+      "name": "reversed-elevator-authority",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/pitch_elevator": -0.5
+      }
+    },
+    {
+      "name": "zero-pitch-damping",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/pitch_rate_q": 0
+      }
+    },
+    {
+      "name": "zero-yaw-stability",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/yaw_beta": 0
+      }
+    },
+    {
+      "name": "negative-flap-drag",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/drag_flaps": -0.001
+      }
+    },
+    {
+      "name": "degrees-in-stall-angle",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/stall_angle_rad": 16
+      }
+    },
+    {
+      "name": "parallel-model-axes",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/forward": "+z",
+        "/model/up": "-z"
+      }
+    },
+    {
+      "name": "parallel-alias-model-axes",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/forward": " X ",
+        "/model/up": "-X"
+      }
+    },
+    {
+      "name": "unknown-model-axis",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/up": "north"
+      }
+    },
+    {
+      "name": "axis-bom-is-not-whitespace",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/up": "﻿+y"
+      }
+    },
+    {
+      "name": "model-length-over-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/length_m": 101
+      }
+    },
+    {
+      "name": "camera-over-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/camera_eye_m": [
+          10.01,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "extra-camera-component",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/camera_eye_m": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "unknown-engine-sound",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/engine_sound": "rocket"
+      }
+    },
+    {
+      "name": "zero-pitch-rate",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/elevator_rate": 0
+      }
+    },
+    {
+      "name": "negative-pitch-centering",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/elevator_centering_rate": -0.01
+      }
+    },
+    {
+      "name": "pitch-over-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/approach_pitch_rad": 0.79
+      }
+    },
+    {
+      "name": "trim-over-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/approach_trim": 1.01
+      }
+    },
+    {
+      "name": "speed-below-domain",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/approach_speed_mps": 9
+      }
+    },
+    {
+      "name": "null-required-rate",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/surface_rate": null
+      }
+    },
+    {
+      "name": "string-rate",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/surface_rate": "2"
+      }
+    },
+    {
+      "name": "invalid-path-62",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "/aircraft/example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-63",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "../example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-64",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aircraft/../example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-65",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "./aircraft/example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-66",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "C:/example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-67",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aircraft\\example.glb"
+      }
+    },
+    {
+      "name": "invalid-path-68",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aircraft/example.GLb"
+      }
+    },
+    {
+      "name": "invalid-path-69",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aircraft/example.gltf"
+      }
+    },
+    {
+      "name": "invalid-path-70",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aircraft/example.glb\n"
+      }
+    },
+    {
+      "name": "invalid-path-71",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.glb"
+      }
+    },
+    {
+      "name": "missing-/version",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/version"
+      ]
+    },
+    {
+      "name": "missing-/model/path",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/model/path"
+      ]
+    },
+    {
+      "name": "missing-/controls/approach_trim",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/controls/approach_trim"
+      ]
+    },
+    {
+      "name": "missing-/controls/approach_pitch_rad",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/controls/approach_pitch_rad"
+      ]
+    },
+    {
+      "name": "missing-/dynamics/aero/pitch_alpha",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/dynamics/aero/pitch_alpha"
+      ]
+    },
+    {
+      "name": "indefinite-inertia-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/inertia_kg_m2": [
+          10,
+          10,
+          10,
+          20
+        ]
+      }
+    },
+    {
+      "name": "near-singular-inertia-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/inertia_kg_m2": [
+          10,
+          10,
+          10,
+          9.999999999
+        ]
+      }
+    },
+    {
+      "name": "multibyte-path-runtime-byte-limit",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/model/path": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé.glb"
+      }
+    },
+    {
+      "name": "integer-token-spelling-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"version\":1",
+        "\"version\":1.0"
+      ]
+    },
+    {
+      "name": "duplicate-key-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"version\":1",
+        "\"version\":1,\"version\":1"
+      ]
+    },
+    {
+      "name": "profile-at-128-kib",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "pad_to_bytes": 131072
+    },
+    {
+      "name": "profile-over-128-kib-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "pad_to_bytes": 131073
+    },
+    {
+      "name": "integer-exponent-runtime-only",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"version\":1",
+        "\"version\":1e0"
+      ]
+    },
+    {
+      "name": "floating-point-overflow",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "raw_replace": [
+        "\"mass_kg\":900",
+        "\"mass_kg\":1e309"
+      ]
+    },
+    {
+      "name": "nan-is-not-json",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "raw_replace": [
+        "\"mass_kg\":900",
+        "\"mass_kg\":NaN"
+      ]
+    },
+    {
+      "name": "infinity-is-not-json",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "raw_replace": [
+        "\"mass_kg\":900",
+        "\"mass_kg\":Infinity"
+      ]
+    },
+    {
+      "name": "malformed-json",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "raw_replace": [
+        "\"version\":1",
+        "\"version\":"
+      ]
+    }
+  ]
+}

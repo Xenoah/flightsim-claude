@@ -84,5 +84,32 @@
       "upstream_repository": "https://github.com/paholg/typenum",
       "review_status": "not_reviewed"
     }
-  ]
+  ],
+  "optional_download_dependencies": {
+    "feature": "flightsim-content/downloads",
+    "direct_dependencies": [
+      {
+        "name": "ureq",
+        "version": "3.3.0",
+        "registry_checksum": "dea7109cdcd5864d4eeb1b58a1648dc9bf520360d7af16ec26d0a9354bafcfc0",
+        "declared_license": "MIT OR Apache-2.0",
+        "review_status": "not_reviewed"
+      },
+      {
+        "name": "url",
+        "version": "2.5.8",
+        "registry_checksum": "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed",
+        "declared_license": "MIT OR Apache-2.0",
+        "review_status": "not_reviewed"
+      },
+      {
+        "name": "httparse",
+        "version": "1.10.1",
+        "registry_checksum": "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87",
+        "declared_license": "MIT OR Apache-2.0",
+        "review_status": "not_reviewed"
+      }
+    ],
+    "scope": "Existing locked dependencies; no new registry package versions. This optional feature is not enabled by the current application. If integrated, regenerate the complete target/feature-specific application inventory, including TLS, trust roots and URL/Unicode transitive dependencies. Not distribution or legal approval."
+  }
 }

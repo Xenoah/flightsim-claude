@@ -91,6 +91,12 @@ alpha.21 は未公開。staging の component merge とリリースを同じ完�
 
 ## M3 — シミュレータとして成立する（現在）
 
+2026-10-04 の地域取得基盤: [prepared GitHub ZIP の opt-in API](content-downloads.md)
+は hash pin・検証済み offline cache・進捗/キャンセル・明示 retry まで実装。
+アプリの map download UI、実地域カタログとその権利証拠、raw DEM adapter は未実装。
+既存の local ZIP 選択・new-flight activation と配布審査ゲートはそのまま維持する。
+
+
 - [x] 空港データ（OSM `aeroway=*`）
   - [x] `aeroway=runway` 中心線のオフライン変換、実行時 DB、最寄り選択
     （[Issue #21](../../../issues/21)）

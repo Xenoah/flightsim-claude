@@ -49,7 +49,7 @@ ECEF のスナップショットと通信状態を app が描画・UI に結線�
 | `flightsim-core` | WGS84 測地系、ECEF/ENU/NED 変換、単位型、シミュレーション時刻 | ✗ | architect |
 | `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、着陸装置、積分器 | ✗ | simulation |
 | `flightsim-world` | タイル分割、DEM、LOD 選択、ストリーミング、地形高度クエリ | ✗ | world |
-| `flightsim-content` | Data-only local package validation, immutable installation and hash-checked regional tile sources | ✗ | architect/world |
+| `flightsim-content` | Data-only package validation, immutable installation, hash-checked regional sources and opt-in prepared GitHub acquisition | ✗ | architect/world |
 | `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |
@@ -164,9 +164,15 @@ pub struct Radians(pub f64);
 `flightsim-content` sits above `world`/`core`, with no simulation, Bevy or raw-data
 converter dependency. It accepts prepared local ZIP packages containing declared,
 size/SHA-256-verified FSDM and inert license/provenance text. It never executes
-package code, downloads repositories, or activates a region. Strict portable paths,
+package code, converts repositories, or activates a region. Strict portable paths,
 file/count/inflation limits and runtime-reader validation precede an atomic,
 non-overwriting version install. See [package format and lifecycle](docs/content-packages.md).
+
+An opt-in `downloads` feature adds explicit public GitHub prepared ZIP acquisition
+with mandatory archive SHA-256, bounded HTTPS/redirect/address policy, a separately
+locked verified offline cache and the same strict staging API. Default content and
+the current app remain offline; this is not an area catalog or map download UI.
+World/sim/FDM and `flightsim-net` remain independent. See [ADR-0015](docs/adr/0015-public-prepared-package-downloads.md).
 
 App may activate one fully inspected immutable package only when creating a new
 flight; import/selection/cancel never mutate a current flight. The package TileSource

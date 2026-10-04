@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "id": "schema-example",
+  "dynamics": {
+    "name": "Schema Example (fictional)",
+    "mass_kg": 900,
+    "inertia_kg_m2": [
+      1000,
+      1500,
+      2100,
+      0
+    ],
+    "wing_area_m2": 14,
+    "wing_span_m": 10,
+    "mean_chord_m": 1.4,
+    "aero": {
+      "lift_zero": 0.3,
+      "lift_alpha": 5,
+      "lift_flaps": 0.6,
+      "stall_angle_rad": 0.28,
+      "stall_blend_rate": 40,
+      "drag_min": 0.03,
+      "oswald_efficiency": 0.8,
+      "drag_flaps": 0.06,
+      "side_beta": -0.3,
+      "side_rudder": 0.08,
+      "roll_beta": -0.09,
+      "roll_rate_p": -0.45,
+      "roll_rate_r": 0.1,
+      "roll_aileron": 0.07,
+      "roll_rudder": 0.006,
+      "pitch_zero": 0.015,
+      "pitch_alpha": -0.9,
+      "pitch_rate_q": -12,
+      "pitch_elevator": 0.55,
+      "pitch_flaps": -0.12,
+      "yaw_beta": 0.065,
+      "yaw_rate_p": -0.03,
+      "yaw_rate_r": -0.1,
+      "yaw_aileron": -0.002,
+      "yaw_rudder": 0.028
+    },
+    "max_shaft_power_w": 120000,
+    "propeller_efficiency": 0.8,
+    "static_thrust_n": 2400,
+    "landing_gear": [
+      {
+        "contact_m": [
+          1.5,
+          0,
+          1
+        ],
+        "spring_n_per_m": 110000,
+        "damping_ns_per_m": 12000,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      },
+      {
+        "contact_m": [
+          -0.75,
+          -1.25,
+          1
+        ],
+        "spring_n_per_m": 110000,
+        "damping_ns_per_m": 12000,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      },
+      {
+        "contact_m": [
+          -0.75,
+          1.25,
+          1
+        ],
+        "spring_n_per_m": 110000,
+        "damping_ns_per_m": 12000,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      }
+    ],
+    "rolling_friction": 0.015,
+    "braking_friction": 0.7,
+    "lateral_friction": 0.8,
+    "friction_transition_mps": 0.25
+  },
+  "model": {
+    "path": "aircraft/schema_example.glb",
+    "forward": "+z",
+    "up": "+y",
+    "length_m": 8
+  },
+  "controls": {
+    "surface_rate": 2,
+    "centering_rate": 1.5,
+    "throttle_rate": 0.25,
+    "flap_rate": 0.25,
+    "default_trim": 0.08,
+    "trim_rate": 0.12,
+    "approach_speed_mps": 35,
+    "approach_pitch_rad": 0,
+    "approach_trim": 0.1,
+    "approach_throttle": 0.4,
+    "approach_flaps": 1,
+    "elevator_rate": 2,
+    "elevator_centering_rate": 1.5
+  },
+  "camera_eye_m": [
+    0.5,
+    -0.25,
+    -0.8
+  ],
+  "engine_sound": "piston"
+}
