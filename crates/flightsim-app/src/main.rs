@@ -847,6 +847,8 @@ fn application_help() -> &'static str {
 --import-region FILE.zip                       Install prepared local package, then exit\n\
 --list-regions [--region-store DIR]              List installed local versions, then exit\n\
 --region ID@VERSION [--region-store DIR]          Select pending region on map; Start applies\n\
+--region-catalog FILE.json                     Opt-in downloads catalog (region-downloads feature)\n\
+--region-cache DIR [--region-offline]           Catalog cache override / verified-cache-only mode\n\
 --world-map --map-layer terrain|climate         Initial world map view\n\
 --map-credits                                 Open world data credits\n\
 --fly METRES                                   Airborne AGL start\n\
@@ -1092,17 +1094,23 @@ fn parse_arguments_from(
             startup.clouds_were_given = true;
         }
         match flag.as_str() {
-            "--import-region" | "--region" | "--region-store" => {
+            "--import-region" | "--region" | "--region-store" | "--region-catalog" | "--region-cache" => {
                 if let Some(value) = next_argument_value(&mut arguments) {
                     let duplicate = match flag.as_str() {
                         "--import-region" => startup.regions.import.replace(PathBuf::from(value)).is_some(),
                         "--region-store" => startup.regions.store.replace(PathBuf::from(value)).is_some(),
+                        "--region-catalog" => startup.regions.catalog.replace(PathBuf::from(value)).is_some(),
+                        "--region-cache" => startup.regions.cache.replace(PathBuf::from(value)).is_some(),
                         _ => startup.regions.select.replace(value).is_some(),
                     };
                     if duplicate { startup.regions.error = Some(format!("{flag} may only be specified once")); }
                 } else { startup.regions.error = Some(format!("{flag} needs a value")); }
             },
             "--list-regions" => startup.regions.list = true,
+            "--region-offline" => {
+                if startup.regions.offline { startup.regions.error = Some("--region-offline may only be specified once".into()); }
+                startup.regions.offline = true;
+            },
             "--world-map" => startup.world.map_open = true,
             "--map-credits" => {
                 startup.world.map_open = true;

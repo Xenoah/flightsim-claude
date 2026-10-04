@@ -242,6 +242,25 @@ def inspect(root):
             "authorization_sha256": receipt_hash, "blockers": blockers}, plan
 
 
+def verify_distribution_info(executable, version):
+    """The existing two-aircraft recipe is offline, regardless of notice inventory."""
+    info = staging.read_distribution_info(executable)
+    expected = {
+        "schema_version": 1, "package": "flightsim-app", "package_version": version,
+        "profile": "development", "region_downloads": False,
+        "default_aircraft": "light-single", "default_model": "aircraft/light_single.glb",
+        "bundled_aircraft": ["light-single", "swift-sport"],
+        "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc",
+        "release_authorized": False,
+    }
+    if (not isinstance(info, dict) or any(info.get(key) != value for key, value in expected.items())
+            or type(info.get("schema_version")) is not int
+            or info.get("region_downloads") is not False
+            or info.get("release_authorized") is not False):
+        raise ValueError("executable is not the expected offline default Windows release build")
+    return info
+
+
 def verify_bundle(bundle, plan, executable):
     if bundle.is_symlink() or not bundle.is_dir():
         raise ValueError("bundle must be a regular directory")
@@ -274,9 +293,16 @@ def main(argv=None):
     parser.add_argument("--inventory-file", type=Path, help="write the exact copy plan ONLY if authorized")
     parser.add_argument("--bundle", type=Path, help="verify a staged or freshly extracted bundle")
     parser.add_argument("--executable", type=Path, help="exact just-built executable for bundle verification")
+    parser.add_argument("--verify-built-executable", type=Path,
+                        help="execute --distribution-info on the trusted freshly built binary after authorization; never use for an untrusted archive")
     args = parser.parse_args(argv)
     try:
         result, plan = inspect(args.repo)
+        if args.verify_built_executable is not None:
+            if not result["authorized"]:
+                raise ValueError("built executable identity verification requires authorization")
+            info = verify_distribution_info(args.verify_built_executable, plan["version"])
+            result["built_executable"] = {"sha256": readiness.digest(args.verify_built_executable), "distribution": info}
         if args.bundle is not None:
             if not result["authorized"] or args.executable is None:
                 raise ValueError("bundle verification requires authorization and the built executable")

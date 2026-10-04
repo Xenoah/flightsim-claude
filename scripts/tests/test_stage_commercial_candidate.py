@@ -46,6 +46,7 @@ class CommercialCandidateTests(unittest.TestCase):
         self.info = {
             "schema_version": 1, "package": "flightsim-app", "package_version": "0.6.0-alpha.21",
             "profile": "commercial-staging", "default_aircraft": "swift-sport",
+            "region_downloads": False,
             "default_model": "aircraft/swift_sport.glb", "bundled_aircraft": ["swift-sport"],
             "release_authorized": False, "target_os": "linux", "target_arch": "x86_64", "target_env": "gnu",
         }
@@ -98,6 +99,18 @@ class CommercialCandidateTests(unittest.TestCase):
 
     def test_development_executable_is_rejected(self):
         self.info["profile"] = "development"
+        with self.assertRaisesRegex(ValueError, "commercial-staging build"):
+            self.assemble()
+        self.assertFalse(self.output.exists())
+
+    def test_network_enabled_missing_or_invalid_feature_identity_refuses_candidate(self):
+        for value in (True, None, 0, 0.0, "false", [], {}):
+            with self.subTest(region_downloads=value):
+                self.info["region_downloads"] = value
+                with self.assertRaisesRegex(ValueError, "commercial-staging build"):
+                    self.assemble()
+                self.assertFalse(self.output.exists())
+        del self.info["region_downloads"]
         with self.assertRaisesRegex(ValueError, "commercial-staging build"):
             self.assemble()
         self.assertFalse(self.output.exists())

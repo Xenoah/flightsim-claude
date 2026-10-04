@@ -13,6 +13,8 @@ license.workspace = true
 # This feature is not a legal clearance or a Steam release switch.
 default = []
 commercial-staging = []
+# Explicit map acquisition; default and commercial candidate stay offline.
+region-downloads = ["flightsim-content/downloads"]
 
 [dependencies]
 flightsim-core.workspace = true

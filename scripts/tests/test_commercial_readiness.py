@@ -54,7 +54,7 @@ class StagingChecks(unittest.TestCase):
             path = self.bundle / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.repo / relative, path)
-        write_json(self.bundle / "distribution-info.json", {"schema_version": 1, "profile": "commercial-staging", "default_aircraft": "swift-sport", "bundled_aircraft": ["swift-sport"], "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc"})
+        write_json(self.bundle / "distribution-info.json", {"schema_version": 1, "profile": "commercial-staging", "region_downloads": False, "default_aircraft": "swift-sport", "bundled_aircraft": ["swift-sport"], "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc"})
         self.inventory_path = self.bundle / "third-party/dependency-inventory.json"
         notice = self.bundle / "third-party/licenses/example/LICENSE"
         notice.parent.mkdir(parents=True)
@@ -80,6 +80,49 @@ class StagingChecks(unittest.TestCase):
 
     def test_collection_without_review_stays_blocked(self):
         self.assertIn("DEPENDENCY_REVIEW_REQUIRED", self.codes(review=False))
+
+    def test_offline_and_network_binary_inventory_combinations(self):
+        path = self.bundle / "distribution-info.json"
+        info = json.loads(path.read_text())
+        for binary_network in (False, True):
+            for inventory_network in (False, True):
+                with self.subTest(binary=binary_network, inventory=inventory_network):
+                    info["region_downloads"] = binary_network
+                    write_json(path, info)
+                    features = ["default", "commercial-staging"]
+                    if inventory_network:
+                        features.append("region-downloads")
+                    self.inventory["packages"][1]["features"] = features
+                    write_json(self.inventory_path, self.inventory)
+                    self.refresh_review()
+                    codes = self.codes()
+                    self.assertEqual("DISTRIBUTION_FEATURE_UNVERIFIED" in codes, binary_network)
+                    self.assertEqual("DEPENDENCY_FEATURE_MISMATCH" in codes, inventory_network)
+                    self.assertEqual(not codes, not binary_network and not inventory_network)
+
+    def test_missing_or_invalid_feature_identity_stays_blocked(self):
+        path = self.bundle / "distribution-info.json"
+        info = json.loads(path.read_text())
+        for value in (None, 0, 0.0, "false", [], {}):
+            with self.subTest(value=value):
+                write_json(path, {**info, "region_downloads": value})
+                self.assertIn("DISTRIBUTION_FEATURE_UNVERIFIED", self.codes())
+        del info["region_downloads"]
+        write_json(path, info)
+        self.assertIn("DISTRIBUTION_FEATURE_UNVERIFIED", self.codes())
+        path.unlink()
+        self.assertIn("DISTRIBUTION_IDENTITY_MISSING", self.codes())
+
+    def test_invalid_identity_document_fails_closed(self):
+        path = self.bundle / "distribution-info.json"
+        for value in (None, [], False, 0, "not an object"):
+            with self.subTest(value=value):
+                write_json(path, value)
+                with self.assertRaisesRegex(ValueError, "JSON object"):
+                    self.result()
+        path.write_text("invalid JSON")
+        with self.assertRaises(ValueError):
+            self.result()
 
     def test_release_only_assets_are_neither_required_nor_allowed_in_commercial_candidate(self):
         release_only = ["assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"]

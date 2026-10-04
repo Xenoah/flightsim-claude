@@ -40,6 +40,7 @@ def safe_path(root: Path, relative: str) -> Path:
 def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = None,
           dependency_review: Path | None = None) -> dict:
     blockers = []
+    info = None
     warnings = ["Engineering evidence only; no blanket legality, trademark clearance, Steam approval or publishing authorization is implied"]
 
     def block(code: str, message: str, category: str = "integrity") -> None:
@@ -98,8 +99,12 @@ def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = N
             block("DISTRIBUTION_IDENTITY_MISSING", "Stage must record actual executable --distribution-info output")
         else:
             info = json.loads(info_path.read_text())
+            if not isinstance(info, dict):
+                raise ValueError("distribution identity must be a JSON object")
             if info.get("schema_version") != 1 or info.get("profile") != "commercial-staging" or info.get("default_aircraft") != "swift-sport" or info.get("bundled_aircraft") != ["swift-sport"]:
                 block("DISTRIBUTION_PROFILE_UNVERIFIED", "Executable identity does not report the Swift-only commercial-staging profile")
+            if info.get("region_downloads") is not False:
+                block("DISTRIBUTION_FEATURE_UNVERIFIED", "The current offline candidate requires explicit region_downloads=false in executable identity")
             warnings.append("distribution-info.json is an attestation captured by the stager; this checker does not execute or independently authenticate the binary")
 
     if dependency_inventory is None:
@@ -124,8 +129,11 @@ def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = N
         if not packages or len({p["id"] for p in packages}) != len(packages):
             block("DEPENDENCY_PACKAGES_INVALID", "Dependency inventory has an empty/duplicate package list")
         app_packages = [p for p in packages if p.get("name") == "flightsim-app"]
-        if bundle is not None and (len(app_packages) != 1 or "commercial-staging" not in app_packages[0].get("features", [])):
-            block("DEPENDENCY_FEATURE_MISMATCH", "Capture metadata with the commercial-staging feature used to build this executable")
+        if bundle is not None:
+            features = app_packages[0].get("features") if len(app_packages) == 1 else None
+            if (not isinstance(features, list) or "commercial-staging" not in features
+                    or "region-downloads" in features):
+                block("DEPENDENCY_FEATURE_MISMATCH", "Capture metadata for the offline commercial-staging build, without region-downloads")
         embedded_by_id = {p["id"]: p for p in inventory.get("embedded_assets", [])}
         manifest_unresolved = []
         for expected in manifest.get("dependency_assets", []):
@@ -192,8 +200,7 @@ def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = N
         for item in unresolved:
             if item["id"] not in resolved_ids:
                 block("DEPENDENCY_UNRESOLVED", f"{item['id']}: {item['reason']}", "review")
-        if bundle is not None and (bundle / "distribution-info.json").is_file():
-            info = json.loads((bundle / "distribution-info.json").read_text())
+        if info is not None:
             target = inventory.get("target", "")
             os_name = info.get("target_os", info.get("os"))
             arch = info.get("target_arch", info.get("arch"))

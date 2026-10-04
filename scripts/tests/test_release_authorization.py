@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "check-release-authorization.py"
@@ -295,6 +296,31 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         self.authorize_fixture()
         self.assertTrue({"DEPENDENCY_TARGET_MISMATCH", "DEPENDENCY_BUILD_MISMATCH"} <= self.codes())
 
+    def test_optional_network_inventory_cannot_authorize_default_recipe(self):
+        self.inventory["packages"][0]["features"] = ["default", "region-downloads"]
+        self.refresh_evidence()
+        self.authorize_fixture()
+        self.assertIn("DEPENDENCY_BUILD_MISMATCH", self.codes())
+
+    def test_explicit_built_binary_check_requires_authorization_before_execution(self):
+        with patch.object(gate, "verify_distribution_info") as verify, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(gate.main(["--repo", str(self.repo), "--allow-blocked",
+                                        "--verify-built-executable", str(self.root / "untrusted.exe")]), 1)
+            verify.assert_not_called()
+
+    def test_explicit_built_binary_check_reports_hash_bound_identity(self):
+        self.authorize_fixture()
+        executable = self.root / "flightsim-app.exe"
+        executable.write_bytes(b"synthetic executable never run")
+        info = default_distribution_info()
+        output = io.StringIO()
+        with patch.object(gate.staging, "read_distribution_info", return_value=info) as read, contextlib.redirect_stdout(output):
+            status = gate.main(["--repo", str(self.repo), "--verify-built-executable", str(executable)])
+        self.assertEqual(status, 0)
+        read.assert_called_once_with(executable)
+        self.assertEqual(json.loads(output.getvalue())["built_executable"],
+                         {"sha256": gate.readiness.digest(executable), "distribution": info})
+
     def test_exact_upstream_crlf_notice_bytes_survive_git_commit(self):
         self.git("config", "core.autocrlf", "true")
         contents = b"Synthetic upstream notice\r\nCopyright fixture\r\n"
@@ -379,11 +405,13 @@ class ReleaseAuthorizationTests(unittest.TestCase):
 
     def test_exact_staged_and_extracted_payload_can_be_verified(self):
         bundle, plan, executable = self.make_bundle()
-        gate.verify_bundle(bundle, plan, executable)
+        with patch.object(gate.subprocess, "run", side_effect=AssertionError("archive verification must not execute a binary")):
+            gate.verify_bundle(bundle, plan, executable)
         archive = shutil.make_archive(str(self.root / "bundle"), "zip", bundle)
         extracted = self.root / "extracted"
         shutil.unpack_archive(archive, extracted)
-        gate.verify_bundle(extracted, plan, executable)
+        with patch.object(gate.subprocess, "run", side_effect=AssertionError("archive verification must not execute a binary")):
+            gate.verify_bundle(extracted, plan, executable)
 
     def test_extra_changed_or_missing_bundle_file_is_rejected(self):
         bundle, plan, executable = self.make_bundle()
@@ -408,6 +436,64 @@ class ReleaseAuthorizationTests(unittest.TestCase):
         (bundle / executable.name).symlink_to(executable)
         with self.assertRaisesRegex(ValueError, "symlink"):
             gate.verify_bundle(bundle, plan, executable)
+
+
+def default_distribution_info():
+    return {
+        "schema_version": 1, "package": "flightsim-app", "package_version": "1.2.3",
+        "profile": "development", "region_downloads": False,
+        "default_aircraft": "light-single", "default_model": "aircraft/light_single.glb",
+        "bundled_aircraft": ["light-single", "swift-sport"], "release_authorized": False,
+        "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc",
+    }
+
+
+class BuiltExecutableIdentityTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.executable = Path(temporary.name) / "flightsim-app.exe"
+        self.executable.write_bytes(b"synthetic executable never run")
+
+    def verify(self, info):
+        result = subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b"")
+        with patch.object(gate.staging.subprocess, "run", return_value=result) as run:
+            actual = gate.verify_distribution_info(self.executable, "1.2.3")
+        run.assert_called_once_with([str(self.executable.resolve()), "--distribution-info"],
+                                    capture_output=True, check=True, timeout=30)
+        return actual
+
+    def test_default_offline_windows_identity_passes(self):
+        info = default_distribution_info()
+        self.assertEqual(self.verify(info), info)
+
+    def test_optional_network_missing_or_invalid_feature_identity_fails(self):
+        info = default_distribution_info()
+        for value in (True, None, 0, 0.0, "false", [], {}):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "offline default Windows"):
+                self.verify({**info, "region_downloads": value})
+        del info["region_downloads"]
+        with self.assertRaisesRegex(ValueError, "offline default Windows"):
+            self.verify(info)
+
+    def test_other_profile_version_platform_or_invalid_document_fails(self):
+        info = default_distribution_info()
+        for key, value in (("profile", "commercial-staging"), ("package_version", "1.2.4"),
+                           ("target_env", "gnu"), ("schema_version", True), ("release_authorized", 0)):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "offline default Windows"):
+                self.verify({**info, key: value})
+        for value in (None, [], False, 0, "not an object"):
+            with self.subTest(document=value), self.assertRaisesRegex(ValueError, "offline default Windows"):
+                self.verify(value)
+
+    def test_failed_invalid_or_oversized_handshake_fails_closed(self):
+        for output in (b"invalid JSON", b" " * (gate.staging.MAX_METADATA_BYTES + 1)):
+            result = subprocess.CompletedProcess([], 0, output, b"")
+            with patch.object(gate.staging.subprocess, "run", return_value=result), self.assertRaises(ValueError):
+                gate.verify_distribution_info(self.executable, "1.2.3")
+        for error in (subprocess.TimeoutExpired("fixture", 30), subprocess.CalledProcessError(2, "fixture")):
+            with patch.object(gate.staging.subprocess, "run", side_effect=error), self.assertRaisesRegex(ValueError, "cannot verify"):
+                gate.verify_distribution_info(self.executable, "1.2.3")
 
 
 class RepositoryAssetPolicyTests(unittest.TestCase):

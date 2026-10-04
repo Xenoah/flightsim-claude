@@ -156,6 +156,14 @@ def validate_inventory(inventory, metadata, repo, metadata_path):
             "this recipe requires the supported full LUT bundle; do not hide its open reviews")
 
 
+def validate_distribution(info, staged):
+    require(isinstance(info, dict) and isinstance(staged, dict), "distribution identity must be an object")
+    # Equality alone would accept JSON 0 as false, including in the attestation.
+    require(info.get("region_downloads") is False and staged.get("region_downloads") is False,
+            "this offline candidate requires explicit region_downloads=false")
+    require(info == staged, "extracted distribution identity changed")
+
+
 def validate_readiness(report, returncode):
     require(returncode in (0, 2), "readiness checker failed unexpectedly")
     require(report.get("schema_version") == 1, "invalid readiness schema")
@@ -539,7 +547,7 @@ def run_candidate(repo, expected, work, evidence):
         second, _ = run([app, "--distribution-info"], cwd=unrelated, timeout=30, runtime=True)
         require(first.stdout == second.stdout, "distribution metadata is not deterministic")
         info = json.loads(first.stdout)
-        require(info == json.loads((bundle / "distribution-info.json").read_text(encoding="utf-8")), "extracted distribution identity changed")
+        validate_distribution(info, json.loads((bundle / "distribution-info.json").read_text(encoding="utf-8")))
         report["distribution"] = info
         check_default_capture(run, repo, app, unrelated, work, evidence, report)
         result, log = run([app, "--aircraft", "light-single"], cwd=unrelated, timeout=30, accepted=(2,),

@@ -62,6 +62,23 @@ class CandidateAcceptanceTests(unittest.TestCase):
             blob = subprocess.check_output(["git", "show", "HEAD:" + relative], cwd=ROOT)
             self.assertEqual(candidate.hashlib.sha256(blob).hexdigest(), expected, relative)
 
+    def test_extracted_and_staged_identity_require_literal_offline_false(self):
+        info = {"profile": "commercial-staging", "region_downloads": False}
+        candidate.validate_distribution(info, dict(info))
+        for value in (True, None, 0, 0.0, "false", [], {}):
+            changed = {**info, "region_downloads": value}
+            for actual, staged in ((changed, info), (info, changed), (changed, changed)):
+                with self.subTest(actual=actual, staged=staged), self.assertRaisesRegex(ValueError, "region_downloads=false"):
+                    candidate.validate_distribution(actual, staged)
+        missing = {"profile": "commercial-staging"}
+        with self.assertRaisesRegex(ValueError, "region_downloads=false"):
+            candidate.validate_distribution(missing, missing)
+        with self.assertRaisesRegex(ValueError, "identity changed"):
+            candidate.validate_distribution(info, {**info, "profile": "development"})
+        for value in (None, []):
+            with self.assertRaisesRegex(ValueError, "must be an object"):
+                candidate.validate_distribution(value, value)
+
     def source_fixture(self):
         repo = self.root / "source"
         repo.mkdir()
@@ -261,9 +278,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
                            ("asset_manifest_sha256", "old"), ("review_status", "reviewed")):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 candidate.validate_inventory({**inventory, key: value}, metadata, repo, metadata_path)
-        inventory["packages"][0]["features"] = ["default"]
-        with self.assertRaisesRegex(ValueError, "candidate app features"):
-            candidate.validate_inventory(inventory, metadata, repo, metadata_path)
+        for features in (["default"], ["default", "commercial-staging", "region-downloads"]):
+            inventory["packages"][0]["features"] = features
+            with self.subTest(features=features), self.assertRaisesRegex(ValueError, "candidate app features"):
+                candidate.validate_inventory(inventory, metadata, repo, metadata_path)
         inventory["packages"][0]["features"] = ["default", "commercial-staging"]
         metadata["resolve"]["nodes"][0]["features"] = []
         with self.assertRaisesRegex(ValueError, "full LUT bundle"):

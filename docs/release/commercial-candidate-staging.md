@@ -28,6 +28,14 @@ only the application distribution policy:
   starting the engine. This identifies the compiled feature, default profile,
   model, package version and platform. It does not attest source provenance
 
+The JSON includes the compile-time boolean `region_downloads`: `false` for this
+offline recipe and `true` when `region-downloads` is compiled in, independently
+of the development/commercial profile. Staging and readiness require the actual
+JSON boolean `false`; missing, null, numeric or string values fail closed. The
+candidate's dependency inventory must also exclude `region-downloads`. An
+optional-network executable or inventory cannot substitute for this recipe,
+even if the other half still claims the ordinary Swift-only feature set.
+
 The existing release workflow is deliberately not switched to this feature.
 Historical source files, including the Meshy model, are not deleted or relicensed.
 

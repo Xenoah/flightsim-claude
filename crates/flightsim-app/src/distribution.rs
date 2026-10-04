@@ -17,6 +17,7 @@ pub(super) fn info() -> serde_json::Value {
         } else {
             "development"
         },
+        "region_downloads": cfg!(feature = "region-downloads"),
         "default_aircraft": DEFAULT_AIRCRAFT,
         "default_model": super::BUNDLED_MODEL,
         "bundled_aircraft": if cfg!(feature = "commercial-staging") {
@@ -105,6 +106,10 @@ mod tests {
         assert!(diagnostics.0.is_empty());
         let metadata = info();
         assert_eq!(metadata["schema_version"], 1);
+        assert_eq!(
+            metadata["region_downloads"].as_bool(),
+            Some(cfg!(feature = "region-downloads"))
+        );
         assert_eq!(metadata["default_aircraft"], startup.aircraft.id);
         assert_eq!(metadata["default_model"], startup.model.unwrap());
         assert_eq!(metadata["release_authorized"], false);

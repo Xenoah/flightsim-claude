@@ -59,6 +59,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("--bundle $staging --executable $executable", build)
         self.assertIn("--bundle $packageRoot --executable $builtExecutable", build)
 
+    def test_offline_identity_runs_only_on_trusted_build_before_packaging(self):
+        build = jobs()["build_windows"]
+        handshake = "--verify-built-executable target/x86_64-pc-windows-msvc/release/flightsim-app.exe"
+        self.assertLess(build.index("cargo build"), build.index(handshake))
+        self.assertLess(build.index(handshake), build.index("Assemble and verify the release bundle"))
+        self.assertIn("if ($LASTEXITCODE -ne 0) { throw 'built executable does not match the offline release recipe' }", build)
+        self.assertNotIn("--verify-built-executable", jobs()["authorize"])
+        self.assertNotIn("--verify-built-executable", jobs()["publish"])
+        self.assertNotIn("--features", build.split("- name: Build the Windows application", 1)[1].split("- name:", 1)[0])
+
     def test_artifact_paths_are_explicit_and_exclude_raw_qa(self):
         build = jobs()["build_windows"]
         paths = re.findall(r"^          path: \|\n((?:            .+\n)+)", build, re.MULTILINE)

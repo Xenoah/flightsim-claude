@@ -79,7 +79,9 @@ directory. `BEVY_ASSET_ROOT` and `CARGO_MANIFEST_DIR` deliberately point at the
 checkout containing the excluded developer model, to expose asset-search leaks:
 
 1. Two `--distribution-info` runs must be byte-identical and match staged
-   Swift-only MSVC identity
+   Swift-only MSVC identity. Both the executable and staged metadata must report
+   the literal boolean `region_downloads: false`; the optional network feature
+   and its separate inventory are outside this unchanged offline recipe
 2. No aircraft argument, `--view chase --screenshot ... --screenshot-delay 5
    --exit-after-screenshot`, must exit 0, identify Swift Sport, load the model
    from the extracted adjacent assets, fit 7.12 m at scale 1.0000, and produce a

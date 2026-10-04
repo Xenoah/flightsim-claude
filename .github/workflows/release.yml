@@ -137,6 +137,14 @@ jobs:
         shell: pwsh
         run: cargo build --locked --release --target x86_64-pc-windows-msvc -p flightsim-app
 
+      - name: Verify the trusted freshly built offline application identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python scripts/check-release-authorization.py `
+            --verify-built-executable target/x86_64-pc-windows-msvc/release/flightsim-app.exe
+          if ($LASTEXITCODE -ne 0) { throw 'built executable does not match the offline release recipe' }
+
       - name: Assemble and verify the release bundle
         shell: pwsh
         env:

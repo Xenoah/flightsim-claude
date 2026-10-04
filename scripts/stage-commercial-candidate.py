@@ -70,7 +70,8 @@ def safe_file(root, relative):
     return current
 
 
-def distribution_info(executable):
+def read_distribution_info(executable):
+    """Read the binary's handshake; callers must validate their own build recipe."""
     if executable.is_symlink() or not executable.is_file():
         raise ValueError("executable must be an existing regular file, not a symlink")
     try:
@@ -83,10 +84,16 @@ def distribution_info(executable):
         info = json.loads(result.stdout)
     except (OSError, subprocess.SubprocessError, UnicodeError, json.JSONDecodeError) as error:
         raise ValueError(f"cannot verify executable distribution identity: {error}") from error
+    return info
+
+
+def distribution_info(executable):
+    info = read_distribution_info(executable)
     expected = {
         "schema_version": 1,
         "package": "flightsim-app",
         "profile": "commercial-staging",
+        "region_downloads": False,
         "default_aircraft": "swift-sport",
         "default_model": "aircraft/swift_sport.glb",
         "bundled_aircraft": ["swift-sport"],
@@ -94,8 +101,9 @@ def distribution_info(executable):
     }
     if (not isinstance(info, dict) or any(info.get(k) != v for k, v in expected.items())
             or type(info.get("schema_version")) is not int
+            or info.get("region_downloads") is not False
             or info.get("release_authorized") is not False):
-        raise ValueError("executable is not the expected commercial-staging build")
+        raise ValueError("executable is not the expected offline commercial-staging build")
     if (info.get("target_os"), info.get("target_arch"), info.get("target_env")) not in (
         ("windows", "x86_64", "msvc"), ("windows", "x86_64", "gnu"),
         ("linux", "x86_64", "gnu"),

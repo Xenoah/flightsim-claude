@@ -170,14 +170,31 @@ non-overwriting version install. See [package format and lifecycle](docs/content
 
 An opt-in `downloads` feature adds explicit public GitHub prepared ZIP acquisition
 with mandatory archive SHA-256, bounded HTTPS/redirect/address policy, a separately
-locked verified offline cache and the same strict staging API. Default content and
-the current app remain offline; this is not an area catalog or map download UI.
-World/sim/FDM and `flightsim-net` remain independent. See [ADR-0015](docs/adr/0015-public-prepared-package-downloads.md).
+locked verified offline cache and the same strict staging API. The app's separate
+opt-in `region-downloads` feature enables map Regions **Installed / Downloads**
+views using `--region-catalog FILE.json` and optional `--region-cache DIR` /
+`--region-offline`. The local schema-v1 catalog is bounded to 256 KiB and 64 records;
+each has canonical ID/version, title, geographic bounds, an allowed prepared GitHub
+ZIP URL, mandatory archive hash and inert declared provenance. No real-area catalog
+or reviewed terrain source is shipped. Row preview centers the map but cannot
+start acquisition; Download/Retry (F) and Cached only (C) are explicit operations.
+
+App serializes download, local import, refresh and inspection on one worker, and
+checks the staged manifest's ID/version/title/bounds against the selected catalog
+record **before commit**. Refresh clears a changed catalog selection; workers use
+the selected snapshot. Cancellation invalidates late UI results, not a completed
+cache publication or atomic install. No automatic request, retry, installed
+selection or activation occurs. A user must choose Installed and then Start.
+Hashes provide integrity, not trust/rights, and declared bounds do not establish
+complete tile coverage. Default content/app and existing commercial-candidate
+feature sets retain the offline regional-content dependency graph. World/sim/FDM
+and `flightsim-net` remain independent. See [catalog and download lifecycle](docs/content-downloads.md)
+and [ADR-0015](docs/adr/0015-public-prepared-package-downloads.md).
 
 App may activate one fully inspected immutable package only when creating a new
 flight; import/selection/cancel never mutate a current flight. The package TileSource
 retains global fallback through the existing world composition and verifies declared
-hashes at runtime reads. Legacy replay v1/v2 cannot represent regional identity and
+hashes at runtime reads. Supported replay formats cannot represent regional identity and
 must be explicitly blocked for package-backed flights. Their bytes are unchanged;
 a future format must record and verify package ID, version and exact manifest hash.
 

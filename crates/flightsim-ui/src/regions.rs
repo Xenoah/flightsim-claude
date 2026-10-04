@@ -29,8 +29,13 @@ pub struct RegionsState {
     pub visible: bool,
     pub busy: bool,
     pub operations_enabled: bool,
+    /// App opt-in and catalog availability. False keeps acquisition inert.
+    pub downloads_enabled: bool,
+    pub downloads_visible: bool,
     pub selected: Option<String>,
     pub active: Option<String>,
+    /// Preview candidate only; independent of installed and active selection.
+    pub download_selected: Option<String>,
     pub store: String,
     pub status: String,
     pub error: String,
@@ -39,7 +44,11 @@ pub struct RegionsState {
     /// App-supplied package metadata, rendered as inert paginated source/license
     /// text. Listing metadata does not establish full payload inspection.
     pub credits: String,
+    /// App-supplied source URL, pinned archive hash and declared provenance
+    /// for the preview candidate. Displaying it never starts acquisition.
+    pub download_credits: String,
     installed: Vec<RegionSummary>,
+    downloads: Vec<RegionSummary>,
     page: usize,
     credits_page: usize,
 }
@@ -50,14 +59,19 @@ impl Default for RegionsState {
             visible: false,
             busy: false,
             operations_enabled: true,
+            downloads_enabled: false,
+            downloads_visible: false,
             selected: None,
             active: None,
+            download_selected: None,
             store: String::new(),
             status: "Refresh to list installed packages".into(),
             error: String::new(),
             progress: None,
             credits: String::new(),
+            download_credits: String::new(),
             installed: Vec::new(),
+            downloads: Vec::new(),
             page: 0,
             credits_page: 0,
         }
@@ -68,21 +82,65 @@ impl RegionsState {
     /// Retain at most 256 metadata rows, with bounded ASCII display names.
     /// Invalid selectors are discarded rather than silently rewritten.
     pub fn set_installed(&mut self, installed: impl IntoIterator<Item = RegionSummary>) {
-        self.installed = installed
-            .into_iter()
-            .take(MAX_REGIONS)
-            .filter(|region| valid_selector(&region.key))
-            .map(|region| RegionSummary {
-                key: region.key,
-                name: bounded_ascii(&region.name, 80, 1),
-            })
-            .collect();
+        self.installed = bounded_regions(installed);
         self.page = self.page.min(self.page_count() - 1);
     }
 
     #[must_use]
     pub fn installed(&self) -> &[RegionSummary] {
         &self.installed
+    }
+
+    /// Set bounded catalog metadata without selecting or acquiring a package.
+    pub fn set_downloads(&mut self, downloads: impl IntoIterator<Item = RegionSummary>) {
+        self.downloads = bounded_regions(downloads);
+        if !self.download_candidate_available() {
+            self.download_selected = None;
+            self.download_credits.clear();
+        }
+        self.page = self.page.min(self.page_count() - 1);
+    }
+
+    #[must_use]
+    pub fn downloads(&self) -> &[RegionSummary] {
+        &self.downloads
+    }
+
+    /// Return to installed packages after acquisition; this does not select one.
+    pub fn show_installed(&mut self) {
+        self.downloads_visible = false;
+        self.page = 0;
+        self.credits_page = 0;
+    }
+
+    fn viewing_downloads(&self) -> bool {
+        self.downloads_enabled && self.downloads_visible
+    }
+
+    fn visible_regions(&self) -> &[RegionSummary] {
+        if self.viewing_downloads() {
+            &self.downloads
+        } else {
+            &self.installed
+        }
+    }
+
+    fn visible_credits(&self) -> &str {
+        if self.viewing_downloads() {
+            if self.download_credits.trim().is_empty() {
+                "Select a download to inspect its source, archive SHA-256 and declared provenance. Then choose Download / Retry or Cached only."
+            } else {
+                &self.download_credits
+            }
+        } else {
+            &self.credits
+        }
+    }
+
+    fn download_candidate_available(&self) -> bool {
+        self.download_selected
+            .as_ref()
+            .is_some_and(|selected| self.downloads.iter().any(|region| &region.key == selected))
     }
 
     pub(super) fn show(&mut self) {
@@ -101,14 +159,14 @@ impl RegionsState {
     }
 
     fn page_count(&self) -> usize {
-        self.installed.len().div_ceil(ROWS_PER_PAGE).max(1)
+        self.visible_regions().len().div_ceil(ROWS_PER_PAGE).max(1)
     }
 
     fn row(&self, row: usize) -> Option<&RegionSummary> {
         if row >= ROWS_PER_PAGE {
             return None;
         }
-        self.installed
+        self.visible_regions()
             .get(self.page.min(self.page_count() - 1) * ROWS_PER_PAGE + row)
     }
 
@@ -122,6 +180,13 @@ impl RegionsState {
             return;
         }
         match button {
+            RegionsButton::ToggleDownloads => {
+                if self.downloads_enabled {
+                    self.downloads_visible = !self.downloads_visible;
+                    self.page = 0;
+                    self.credits_page = 0;
+                }
+            }
             RegionsButton::PreviousPage => self.page = self.page.saturating_sub(1),
             RegionsButton::NextPage => self.page = (self.page + 1).min(self.page_count() - 1),
             RegionsButton::PreviousCredits => {
@@ -129,27 +194,52 @@ impl RegionsState {
             }
             RegionsButton::NextCredits => {
                 self.credits_page =
-                    (self.credits_page + 1).min(credit_pages(&self.credits).len() - 1);
+                    (self.credits_page + 1).min(credit_pages(self.visible_credits()).len() - 1);
             }
             _ if self.busy || !self.operations_enabled || actions.pending.is_some() => {}
             RegionsButton::Refresh => actions.pending = Some(RegionAction::Refresh),
-            RegionsButton::Base => {
+            RegionsButton::Base if !self.viewing_downloads() => {
                 actions.pending = Some(RegionAction::Select(None));
                 self.credits_page = 0;
             }
             RegionsButton::Row(index) => {
                 if let Some(region) = self.row(index) {
-                    actions.pending = Some(RegionAction::Select(Some(region.key.clone())));
+                    actions.pending = Some(if self.viewing_downloads() {
+                        RegionAction::SelectDownload(region.key.clone())
+                    } else {
+                        RegionAction::Select(Some(region.key.clone()))
+                    });
                     self.credits_page = 0;
                 }
             }
-            RegionsButton::Close | RegionsButton::Cancel => {}
+            RegionsButton::Download | RegionsButton::CachedOnly
+                if self.viewing_downloads() && self.download_candidate_available() =>
+            {
+                actions.pending = Some(RegionAction::Download {
+                    offline: button == RegionsButton::CachedOnly,
+                });
+            }
+            RegionsButton::Close
+            | RegionsButton::Cancel
+            | RegionsButton::Base
+            | RegionsButton::Download
+            | RegionsButton::CachedOnly => {}
         }
     }
 
     pub(super) fn button_disabled(&self, button: RegionsButton) -> bool {
         match button {
-            RegionsButton::Refresh | RegionsButton::Base => self.busy || !self.operations_enabled,
+            RegionsButton::Refresh => self.busy || !self.operations_enabled,
+            RegionsButton::Base => {
+                self.busy || !self.operations_enabled || self.viewing_downloads()
+            }
+            RegionsButton::ToggleDownloads => !self.downloads_enabled,
+            RegionsButton::Download | RegionsButton::CachedOnly => {
+                self.busy
+                    || !self.operations_enabled
+                    || !self.viewing_downloads()
+                    || !self.download_candidate_available()
+            }
             RegionsButton::Row(index) => {
                 self.busy || !self.operations_enabled || self.row(index).is_none()
             }
@@ -158,7 +248,7 @@ impl RegionsState {
             RegionsButton::NextPage => self.page >= self.page_count() - 1,
             RegionsButton::PreviousCredits => self.credits_page == 0,
             RegionsButton::NextCredits => {
-                self.credits_page >= credit_pages(&self.credits).len() - 1
+                self.credits_page >= credit_pages(self.visible_credits()).len() - 1
             }
             RegionsButton::Close => false,
         }
@@ -166,13 +256,31 @@ impl RegionsState {
 
     pub(super) fn button_selected(&self, button: RegionsButton) -> bool {
         match button {
-            RegionsButton::Base => self.selected.is_none(),
-            RegionsButton::Row(index) => self
-                .row(index)
-                .is_some_and(|region| self.selected.as_deref() == Some(region.key.as_str())),
+            RegionsButton::Base => !self.viewing_downloads() && self.selected.is_none(),
+            RegionsButton::ToggleDownloads => self.viewing_downloads(),
+            RegionsButton::Row(index) => self.row(index).is_some_and(|region| {
+                let selected = if self.viewing_downloads() {
+                    &self.download_selected
+                } else {
+                    &self.selected
+                };
+                selected.as_deref() == Some(region.key.as_str())
+            }),
             _ => false,
         }
     }
+}
+
+fn bounded_regions(regions: impl IntoIterator<Item = RegionSummary>) -> Vec<RegionSummary> {
+    regions
+        .into_iter()
+        .take(MAX_REGIONS)
+        .filter(|region| valid_selector(&region.key))
+        .map(|region| RegionSummary {
+            key: region.key,
+            name: bounded_ascii(&region.name, 80, 1),
+        })
+        .collect()
 }
 
 fn valid_selector(selector: &str) -> bool {
@@ -202,6 +310,12 @@ pub enum RegionAction {
     Refresh,
     /// `None` chooses the app's baseline/global source for the next flight.
     Select(Option<String>),
+    /// Preview catalog metadata; never changes next-flight or active selection.
+    SelectDownload(String),
+    /// Explicitly acquire the app-owned preview candidate; no implicit retries.
+    Download {
+        offline: bool,
+    },
     Cancel,
 }
 
@@ -214,6 +328,9 @@ pub enum RegionsButton {
     Refresh,
     Cancel,
     Base,
+    ToggleDownloads,
+    Download,
+    CachedOnly,
     Row(usize),
     PreviousPage,
     NextPage,
@@ -223,6 +340,9 @@ pub enum RegionsButton {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionsText {
+    ListTitle,
+    CreditsTitle,
+    Help,
     Status,
     Selection,
     Store,
@@ -236,8 +356,9 @@ pub enum RegionsText {
 // selection, so a simultaneous page/row press never selects a different page's
 // package accidentally. All actions use the same busy and single-slot gates as
 // the visible buttons. Numeric shortcuts use the labelled top-row keys only.
-const KEYBOARD_BUTTONS: [(KeyCode, RegionsButton); 12] = [
+const KEYBOARD_BUTTONS: [(KeyCode, RegionsButton); 15] = [
     (KeyCode::KeyX, RegionsButton::Cancel),
+    (KeyCode::KeyD, RegionsButton::ToggleDownloads),
     (KeyCode::PageUp, RegionsButton::PreviousPage),
     (KeyCode::PageDown, RegionsButton::NextPage),
     (KeyCode::ArrowLeft, RegionsButton::PreviousCredits),
@@ -249,6 +370,8 @@ const KEYBOARD_BUTTONS: [(KeyCode, RegionsButton); 12] = [
     (KeyCode::Digit3, RegionsButton::Row(2)),
     (KeyCode::Digit4, RegionsButton::Row(3)),
     (KeyCode::Digit5, RegionsButton::Row(4)),
+    (KeyCode::KeyF, RegionsButton::Download),
+    (KeyCode::KeyC, RegionsButton::CachedOnly),
 ];
 
 pub(super) fn shortcuts_allowed(
@@ -333,12 +456,13 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                 align_items: AlignItems::Center, column_gap: px(8.0),
                 ..default()
             }).with_children(|header| {
-                header.spawn((Text::new("LOCAL REGIONS"), TextFont { font_size: 22.0, ..default() }, TextColor(TEXT), Node { flex_grow: 1.0, ..default() }));
+                header.spawn((Text::new("REGION PACKAGES"), TextFont { font_size: 22.0, ..default() }, TextColor(TEXT), Node { flex_grow: 1.0, ..default() }));
+                spawn_region_button(header, "Installed / Downloads [D]", RegionsButton::ToggleDownloads, px(210.0));
                 spawn_region_button(header, "Refresh [R]", RegionsButton::Refresh, px(95.0));
                 spawn_region_button(header, "Cancel [X]", RegionsButton::Cancel, px(135.0));
                 spawn_region_button(header, "Return [Esc]", RegionsButton::Close, px(120.0));
             });
-            panel.spawn((Text::new("Drop a prepared region ZIP here; raw DEMs/repository ZIPs unsupported. CLI: --import-region PATH.zip\nKeyboard: 0 base | 1-5 rows | PgUp/PgDn packages | Left/Right credits | R refresh | X cancel"), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
+            spawn_region_text(panel, RegionsText::Help, 12.0, MUTED);
             spawn_region_text(panel, RegionsText::Status, 13.0, ACCENT);
             spawn_region_text(panel, RegionsText::Selection, 12.0, TEXT);
             panel.spawn(Node {
@@ -350,8 +474,15 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                     flex_direction: FlexDirection::Column, row_gap: px(6.0),
                     ..default()
                 }).with_children(|list| {
-                    list.spawn((Text::new("INSTALLED PACKAGES / NEXT FLIGHT"), TextFont { font_size: 13.0, ..default() }, TextColor(ACCENT)));
-                    spawn_region_button(list, "0  Use global / base terrain", RegionsButton::Base, percent(100.0));
+                    spawn_region_text(list, RegionsText::ListTitle, 13.0, ACCENT);
+                    list.spawn(Node {
+                        width: percent(100.0), column_gap: px(6.0), flex_shrink: 0.0,
+                        ..default()
+                    }).with_children(|controls| {
+                        spawn_region_button(controls, "0 Base", RegionsButton::Base, percent(20.0));
+                        spawn_region_button(controls, "Download / Retry [F]", RegionsButton::Download, percent(43.0));
+                        spawn_region_button(controls, "Cached only [C]", RegionsButton::CachedOnly, percent(34.0));
+                    });
                     for row in 0..ROWS_PER_PAGE {
                         list.spawn((
                             Button,
@@ -378,7 +509,7 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                     flex_direction: FlexDirection::Column, row_gap: px(6.0),
                     ..default()
                 }).with_children(|credits| {
-                    credits.spawn((Text::new("SELECTED PACKAGE CREDITS / LICENSE"), TextFont { font_size: 13.0, ..default() }, TextColor(ACCENT)));
+                    spawn_region_text(credits, RegionsText::CreditsTitle, 13.0, ACCENT);
                     credits.spawn(Node {
                         width: percent(100.0), flex_grow: 1.0, min_height: px(0.0),
                         overflow: Overflow::clip(), ..default()
@@ -394,7 +525,7 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                 });
             });
             spawn_region_text(panel, RegionsText::Store, 11.0, MUTED);
-            panel.spawn((Text::new("Selection is pending until START NEW FLIGHT on the map. The current flight stays unchanged.\nRegion-backed flights cannot save or load legacy v1/v2 replays. Esc returns to map; M closes map and cancels pending work."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
+            panel.spawn((Text::new("After import/download: select an INSTALLED package, then START NEW FLIGHT on the map. The current flight stays unchanged.\nRegion flights cannot save/load replays. Esc returns to map; M closes map and cancels work."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
         });
     });
 }
@@ -419,6 +550,28 @@ fn spawn_region_text(
 
 pub(super) fn format_regions_text(kind: RegionsText, state: &RegionsState) -> String {
     match kind {
+        RegionsText::ListTitle => if state.viewing_downloads() {
+            "DOWNLOAD CATALOG / PREVIEW ONLY"
+        } else {
+            "INSTALLED PACKAGES / NEXT FLIGHT"
+        }
+        .into(),
+        RegionsText::CreditsTitle => if state.viewing_downloads() {
+            "DOWNLOAD SOURCE / HASH / PROVENANCE"
+        } else {
+            "SELECTED PACKAGE CREDITS / LICENSE"
+        }
+        .into(),
+        RegionsText::Help => {
+            let first = if state.downloads_enabled {
+                "D switches Installed / Downloads. Preview a row, then F to download/retry or C for cached only."
+            } else {
+                "Downloads disabled: opt-in and a prepared catalog are required. Drop a prepared ZIP here to import."
+            };
+            format!(
+                "{first}\n0 base | 1-5 rows | PgUp/PgDn packages | Left/Right credits | R refresh | X cancel | No raw DEM/repository ZIPs"
+            )
+        }
         RegionsText::Status => {
             let operation = if let Some(progress) = state.progress.filter(|_| state.busy) {
                 format!(
@@ -449,8 +602,12 @@ pub(super) fn format_regions_text(kind: RegionsText, state: &RegionsState) -> St
         RegionsText::Store => format!("Local store: {}", bounded_ascii(&state.store, 110, 1)),
         RegionsText::Row(index) => state.row(index).map_or_else(
             || {
-                if index == 0 && state.installed.is_empty() {
-                    "No installed packages".into()
+                if index == 0 && state.visible_regions().is_empty() {
+                    if state.viewing_downloads() {
+                        "No download catalog entries".into()
+                    } else {
+                        "No installed packages".into()
+                    }
                 } else {
                     "-".into()
                 }
@@ -468,14 +625,14 @@ pub(super) fn format_regions_text(kind: RegionsText, state: &RegionsState) -> St
             "{} / {}  ({} total)",
             state.page.min(state.page_count() - 1) + 1,
             state.page_count(),
-            state.installed.len()
+            state.visible_regions().len()
         ),
         RegionsText::Credits => {
-            let pages = credit_pages(&state.credits);
+            let pages = credit_pages(state.visible_credits());
             pages[state.credits_page.min(pages.len() - 1)].clone()
         }
         RegionsText::CreditsPage => {
-            let count = credit_pages(&state.credits).len();
+            let count = credit_pages(state.visible_credits()).len();
             format!("Page {} / {count}", state.credits_page.min(count - 1) + 1)
         }
     }
@@ -500,7 +657,8 @@ fn credit_pages(text: &str) -> Vec<String> {
         // A notice made entirely of unsupported glyphs must not become a set
         // of empty pages or look like missing attribution. Put the reminder
         // first so long source/notice fields cannot hide it on the last page.
-        let reminder = "Some characters need the original UTF-8 manifest/license files in the installed package.";
+        let reminder =
+            "Some characters need the original UTF-8 catalog or installed manifest/license files.";
         if sanitized.trim().is_empty() {
             sanitized = reminder.to_owned();
         } else {
@@ -508,7 +666,7 @@ fn credit_pages(text: &str) -> Vec<String> {
         }
     }
     if characters.next().is_some() {
-        sanitized.push_str("\nAdditional text exceeds the display limit. Read the installed package's source and license files for complete notices.");
+        sanitized.push_str("\nAdditional text exceeds the display limit. Read the original catalog and installed package's source/license files for complete notices.");
     }
     if sanitized.trim().is_empty() {
         sanitized = "Select an installed package to read its source and license notices. Global data credits are available from the map header.".into();
@@ -658,7 +816,13 @@ mod tests {
                 .flat_map(|page| page.lines())
                 .all(|line| line.len() <= CREDIT_COLUMNS)
         );
-        assert!(pages.last().unwrap().contains("complete notices"));
+        assert!(
+            pages
+                .last()
+                .unwrap()
+                .replace('\n', "")
+                .contains("complete notices")
+        );
         assert_eq!(credit_pages("").len(), 1);
     }
 
@@ -669,10 +833,109 @@ mod tests {
         let notice = pages[0].replace('\n', "");
         assert_eq!(
             notice,
-            "Some characters need the original UTF-8 manifest/license files in the installed package."
+            "Some characters need the original UTF-8 catalog or installed manifest/license files."
         );
         assert!(notice.is_ascii());
         assert!(!notice.contains("Select an installed package"));
         assert!(credit_pages("Source: example\n著作権")[0].starts_with("Some characters need"));
+    }
+
+    #[test]
+    fn catalog_selection_preview_and_explicit_buttons_never_change_installed_selection() {
+        let mut state = RegionsState {
+            downloads_enabled: true,
+            active: Some("active@1.0.0".into()),
+            selected: Some("existing@1.0.0".into()),
+            ..default()
+        };
+        state.set_installed(installed(2));
+        state.set_downloads(installed(6));
+        let mut actions = RegionsActions::default();
+        assert!(state.button_disabled(RegionsButton::Download));
+        state.act(RegionsButton::ToggleDownloads, &mut actions);
+        assert!(actions.pending.is_none());
+        assert!(state.button_disabled(RegionsButton::Base));
+        state.act(RegionsButton::Row(0), &mut actions);
+        assert_eq!(
+            actions.pending.take(),
+            Some(RegionAction::SelectDownload("region-0@1.0.0".into()))
+        );
+        // The application supplies the selected preview only after validation.
+        assert!(state.button_disabled(RegionsButton::Download));
+        state.download_selected = Some("region-0@1.0.0".into());
+        for (button, offline) in [
+            (RegionsButton::Download, false),
+            (RegionsButton::CachedOnly, true),
+        ] {
+            state.act(button, &mut actions);
+            state.act(RegionsButton::Row(1), &mut actions);
+            assert_eq!(
+                actions.pending.take(),
+                Some(RegionAction::Download { offline })
+            );
+        }
+        state.show_installed();
+        assert!(state.button_disabled(RegionsButton::Download));
+        assert_eq!(state.selected.as_deref(), Some("existing@1.0.0"));
+        assert_eq!(state.active.as_deref(), Some("active@1.0.0"));
+        state.set_downloads([]);
+        assert!(state.download_selected.is_none());
+    }
+
+    #[test]
+    fn catalog_download_actions_are_disabled_when_busy_unavailable_or_feature_absent() {
+        for (busy, operations_enabled, downloads_enabled) in [
+            (true, true, true),
+            (false, false, true),
+            (false, true, false),
+        ] {
+            let mut state = RegionsState {
+                busy,
+                operations_enabled,
+                downloads_enabled,
+                downloads_visible: true,
+                ..default()
+            };
+            state.set_downloads(installed(1));
+            state.download_selected = Some("region-0@1.0.0".into());
+            let mut actions = RegionsActions::default();
+            for button in [RegionsButton::Download, RegionsButton::CachedOnly] {
+                assert!(state.button_disabled(button));
+                state.act(button, &mut actions);
+                assert!(actions.pending.is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn catalog_keyboard_keys_are_consumed_and_cancel_wins_over_download() {
+        for (key, button) in [
+            (KeyCode::KeyD, RegionsButton::ToggleDownloads),
+            (KeyCode::KeyF, RegionsButton::Download),
+            (KeyCode::KeyC, RegionsButton::CachedOnly),
+        ] {
+            let mut keys = ButtonInput::default();
+            keys.press(key);
+            assert_eq!(keyboard_button(&keys, None), Some(button));
+            keys.press(KeyCode::ControlLeft);
+            assert!(keyboard_button(&keys, None).is_none());
+            keys.release(KeyCode::ControlLeft);
+            keys.press(KeyCode::KeyX);
+            assert_eq!(keyboard_button(&keys, None), Some(RegionsButton::Cancel));
+            consume_keyboard_shortcuts(&mut keys, None);
+            assert!(keyboard_button(&keys, None).is_none());
+        }
+        let mut state = RegionsState {
+            downloads_enabled: true,
+            downloads_visible: true,
+            ..default()
+        };
+        state.set_downloads(installed(1));
+        state.download_selected = Some("region-0@1.0.0".into());
+        let mut actions = RegionsActions::default();
+        state.act(RegionsButton::Download, &mut actions);
+        state.act(RegionsButton::Cancel, &mut actions);
+        state.act(RegionsButton::CachedOnly, &mut actions);
+        assert_eq!(actions.pending, Some(RegionAction::Cancel));
     }
 }

@@ -3,8 +3,10 @@
 `flightsim-content` is the pure Rust boundary for **prepared, data-only regional
 terrain packages**. It validates local ZIP files, stages them, and installs
 immutable versions. An optional [download foundation](content-downloads.md) can acquire
-explicit hash-pinned prepared GitHub ZIPs; it is not enabled in the current app.
-It does not download/convert arbitrary GitHub repositories, convert raw DEMs,
+explicit hash-pinned prepared GitHub ZIPs. The app keeps regional content offline by
+default; `--features region-downloads` enables explicit acquisition through a
+user-supplied local catalog and the map's Installed / Downloads views.
+The content layer does not download/convert arbitrary GitHub repositories, convert raw DEMs,
 execute MOD scripts, or activate a region. A GitHub release ZIP is compatible only
 if its author deliberately produced this schema. Ordinary repository archives,
 GeoTIFF, HGT, OSM PBF, airport databases, scenery databases, nested archives and
@@ -218,9 +220,9 @@ manifest binds every file hash, different content or provenance changes identity
 Archive timestamps/compression are irrelevant; manifest whitespace is significant.
 This identity does **not** get squeezed into an existing global atlas fingerprint.
 
-Replay v1/v2 bytes remain untouched. `InstalledPackage::require_replay_support()`
-returns `ReplayUnsupported`: the app must block saving and playback of legacy
-replays with package-backed terrain. A future explicitly versioned replay schema
+Existing replay bytes remain untouched by package handling.
+`InstalledPackage::require_replay_support()` returns `ReplayUnsupported`: the app
+must block saving and playback with package-backed terrain. A future explicitly versioned replay schema
 must record regional identity, validate installed payloads against it and fail
 clearly on missing or mismatched data, with dedicated byte-compatibility tests.
 No package-backed deterministic replay support is claimed by this foundation.
@@ -269,13 +271,28 @@ explicit Start. The shortcuts preserve coordinate-editor input and consume their
 opening/closing frames so no stale Enter can start a flight. Arrow and page
 navigation also accept logical keys from NumLock-off keypads/remapped layouts;
 numeric package selection remains on the top-row 0–5 keys. A prepared local `.zip` can be dropped onto the visible map; drops outside
-the map do nothing. There is no network download or repository ZIP conversion.
+the map do nothing. Default builds perform no regional network downloads, and
+repository ZIP conversion is never supported.
 Import, refresh and full installed-package inspection share a single background
 worker. Progress replaces one bounded snapshot, and there is no queued backlog.
 Cancel or map dismissal invalidates any late result; a worker keeps its slot until
 it finishes. Cancellation after the atomic install has already happened cannot
 undo publication: Refresh shows any such installed version. Neither outcome
 changes the running flight.
+
+With the opt-in `region-downloads` feature, launch with `--region-catalog FILE.json`
+and optional `--region-cache DIR` / `--region-offline`. Regions adds **Installed /
+Downloads** (D), **Download / Retry** (F) and **Cached only** (C). Catalog rows only
+preview the declared location, source/hash and provenance. An explicit attempt
+reuses the strict downloader/cache on the same worker; the staged manifest's ID,
+version, title and bounds must match the selected catalog record before immutable
+installation. Completion never selects or activates the downloaded package:
+choose it in Installed, then explicitly Start. Refresh clears a preview whose
+catalog record changed; cancellation cannot undo publication already completed.
+See [catalog, controls and cancellation](content-downloads.md) for the complete
+contract. No real-area catalog is shipped, and catalog bounds do not promise full
+tile coverage. Default and existing commercial-candidate feature sets retain the
+offline regional-content dependency graph.
 
 Only an explicit Start begins a full off-thread inspection of the selected exact
 manifest identity. Changed departure/month, cancellation, dismissal, invalid bytes
@@ -292,7 +309,7 @@ logging still work. Returning to the baseline creates another explicit free flig
 it does not resurrect stale airport geometry. Restarting the application restores
 an explicitly configured airport/scenery session.
 
-For package-backed flights, replay recording, F9 export and v1/v2 playback are
+For package-backed flights, replay recording, F9 export and playback are
 blocked. The map and flight attribution explain this limitation. No regional
 identity is inserted into legacy replay bytes. Region source/provenance/credit and
 license metadata appear as bounded inert paginated text; full original license

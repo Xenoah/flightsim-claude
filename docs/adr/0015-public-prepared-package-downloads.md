@@ -1,6 +1,6 @@
 # ADR-0015: Opt-in public, hash-pinned prepared-package acquisition
 
-Status: implemented foundation; app/map download integration and real-area catalog pending
+Status: implemented foundation and opt-in app/catalog workflow; curated real-area content pending
 Date: 2026-10-04
 
 ## Context
@@ -14,8 +14,9 @@ and HTTPS are not evidence of a dataset's terms or redistribution rights.
 ## Decision
 
 Add an optional `downloads` feature/module to `flightsim-content`, beside its
-existing pure Rust validation/staging layer. The default feature set and current
-app remain offline. Reuse the already resolved ureq 3.3.0 + rustls implementation;
+existing pure Rust validation/staging layer. Default content/app and existing
+commercial-candidate feature sets retain offline regional-content dependencies.
+Reuse the already resolved ureq 3.3.0 + rustls implementation;
 pin ureq exactly because its resolver/transport extension API is unversioned.
 Reuse locked httparse for a bounded plaintext-header guard above TLS: ureq strips
 encoding/length headers before returning when gzip is feature-unified, so the
@@ -35,6 +36,15 @@ reverify snapshots and schema even offline. Cache locking is separate from atomi
 package commit locking. The API returns a ready stage and source identity; the
 caller chooses whether to commit. Only app may later activate a package at a new
 flight, with existing global fallback and replay gates unchanged.
+
+The app's separate `region-downloads` opt-in connects that API to Regions
+Installed / Downloads, using an explicitly supplied local schema-v1 catalog
+(`--region-catalog`, optional `--region-cache` / `--region-offline`). Preview never
+downloads; Download/Retry and Cached only are explicit single-worker operations.
+The app matches staged manifest ID/version/title/bounds to the selected catalog
+snapshot before commit. Refresh clears a preview when its record changes.
+Installation does not select or activate terrain: Installed selection and Start
+remain separate user actions. No request, retry or catalog update runs implicitly.
 
 The full accepted URL grammar, lifecycle, budgets, timeout/cancellation caveats
 and source references are in [content downloads](../content-downloads.md).
@@ -68,7 +78,9 @@ Existing local packages keep the same API and default dependency graph.
 The tradeoffs are deliberate: a caller must obtain a trusted hash, permitted source
 names are narrower than GitHub's complete syntax, proxy-only networks fail, slow
 transfers time out, cancellation is cooperative, and cache repair/cleanup is manual.
-No catalog, user-friendly map download UI, raw-data adapter, multi-package activation
-or regional replay support is delivered here. A real-area package and its actual
-terms still need review before distribution; synthetic fixture results do not
+The bounded local catalog and map download controls supply no curated real-area
+catalog, raw-data adapter, multi-package activation or regional replay support.
+Catalog provenance and coverage remain untrusted claims, and cancellation cannot
+undo a cache publication or atomic install already completed. A real-area package
+and its actual terms still need review before distribution; synthetic fixture results do not
 qualify real terrain, Windows networking, performance or Steam readiness.

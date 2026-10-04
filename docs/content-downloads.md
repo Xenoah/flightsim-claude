@@ -1,12 +1,127 @@
-# Prepared GitHub package downloads (opt-in foundation)
+# Prepared GitHub package downloads (opt-in app and catalog)
 
 `flightsim-content` has an optional `downloads` feature for fetching a prepared
-[data-only schema-v1 ZIP](content-packages.md). The current application does not
-enable it or expose download controls. Its map still imports local ZIPs only.
-This foundation provides a synchronous worker API and a command-line example;
-there is no real-area catalog, repository discovery, implicit update or live
-terrain streaming. [ADR-0015](adr/0015-public-prepared-package-downloads.md) records
-the boundary and tradeoffs.
+[data-only schema-v1 ZIP](content-packages.md). The application's separate opt-in
+`region-downloads` feature connects that same strict downloader/cache to the map's
+**Regions → Installed / Downloads** workflow using an explicitly supplied local
+catalog. Default app builds retain offline local import/selection. Neither the
+default nor the existing `commercial-staging` feature enables HTTPS acquisition;
+an opt-in download build needs dependency/release review for its own feature set.
+
+No curated real-area catalog or real downloadable terrain is shipped by this
+feature. There is no repository discovery, automatic network access, update,
+retry, activation or live terrain streaming. The synchronous content worker API
+and command-line example remain available separately.
+[Optional Windows dependency inventory and limits](release/region-download-dependencies.md)
+are recorded separately from the default application and Swift-only candidate.
+[ADR-0015](adr/0015-public-prepared-package-downloads.md) records the acquisition
+foundation's boundary and tradeoffs.
+
+## Application workflow
+
+```text
+cargo run -p flightsim-app --features region-downloads -- \
+  --region-catalog FILE.json [--region-cache DIR] [--region-offline]
+```
+
+Brackets denote optional arguments, not literal shell syntax. `--region-catalog`
+reads a local file and opens the map's Regions panel; it does not fetch a remote
+index. These flags are rejected in builds without `region-downloads`.
+`--region-cache` and `--region-offline` require `--region-catalog`. Catalog mode
+requires global terrain for fallback and cannot be combined with `--import-region`,
+`--list-regions` or `--replay`; run those operations separately.
+`--region-cache` overrides
+the download cache, separately from `--region-store`, which controls installed
+packages. The default cache is `flightsim-claude/region-download-cache` under the
+same per-user application-data base used for the default region store. An explicit
+store override does not relocate that default cache. Cache and store must be
+separate, non-nested directories owned by the user.
+
+1. Open the world map and **Regions** (G). **Installed / Downloads** (D) switches
+   views. In Downloads, select a row (1–5 on the current page) to center the map on
+   its declared bounds and inspect its source ZIP URL, exact archive SHA-256 and
+   publisher-declared provenance. Previewing does not acquire or select terrain
+   for a flight. PageUp/PageDown change rows; Left/Right page the metadata.
+2. **Download / Retry** (F) explicitly starts one attempt. It revalidates a matching
+   cache entry first and contacts GitHub only on a clean cache miss. **Cached only**
+   (C) uses verified cache without DNS or network access. `--region-offline` forces
+   both buttons to use this cache-only policy; a miss is an error. Failures never
+   retry automatically, repair corrupted cache online or fall back to another URL.
+3. The worker hash-checks and stages the ZIP through the existing strict importer.
+   Before installation, the app compares the staged manifest's **ID, version,
+   title and geographic bounds** with the selected catalog record. Any disagreement
+   rejects installation. Download integrity alone is insufficient to pass this
+   comparison. A verified archive may already be in cache at this point; that is
+   not an installed or activated package.
+4. Successful installation updates the Installed list without selecting the new
+   package. Explicitly choose its **Installed** row, inspect the original source
+   and license notices, return to the map and use **Start new flight**. Start fully
+   reinspects the exact installed manifest identity before activation. Preview,
+   download, install and cancellation never change the current flight.
+
+Refresh (R) rereads the local catalog and installed list; there is no catalog
+watcher or background update. If the selected record is removed or any of its
+source, hash, identity, title, bounds or provenance changes on refresh, its preview
+selection is cleared. Select the revised row again before another attempt. A job
+uses the selected record snapshot, not a live reference to an externally edited
+file. A changed catalog never updates or replaces an installed immutable version.
+Correct a catalog/manifest mismatch and explicitly Refresh before retrying.
+
+Import, refresh, acquisition and installed inspection share one background worker
+with one bounded progress snapshot and no queue. X, closing Regions, or dismissing
+the map requests cancellation and invalidates late UI results. The worker retains
+its slot until it finishes; another action is not queued behind it. Cancellation
+is cooperative and cannot interrupt an in-progress OS filesystem/DNS operation.
+It also cannot roll back a cache publication or atomic installation that has
+already happened. Refresh after the worker finishes to see any completed install;
+it still needs explicit Installed selection and Start. The lower-level timeout,
+cleanup and cache rules below apply unchanged.
+
+## Local catalog schema v1
+
+The catalog must be a regular, non-symlink JSON file of at most **256 KiB**, with
+`schema_version: 1` and a `regions` array of at most **64** entries. An empty array
+is valid. Unknown fields/schema versions, duplicate fields, duplicate ID/version
+selectors and duplicate source URLs are rejected. Each entry requires
+`id`, `version`, `title`, `bounds_degrees`, `url`, `archive_sha256` and `provenance`.
+IDs/versions must be canonical portable package selectors; titles and provenance
+are nonempty text of at most 160 and 8,192 UTF-8 bytes respectively. Control
+characters are rejected except newlines in provenance. The current UI simplifies
+unsupported glyphs and points to the original UTF-8 catalog or installed files;
+source URLs and hashes retain their full ASCII text through pagination.
+
+Bounds require finite `west`/`east` longitudes within −180°…180° and `south`/`north`
+latitudes within −90°…90°, with south less than north. West greater than east
+describes antimeridian crossing. Equal longitudes and the zero-width 180°/−180°
+alias are rejected. These are catalog coverage claims, not proof that every tile
+or LOD in that area exists. The package must independently pass its own bounds
+and payload checks. Catalog provenance is displayed as an inert claim; it is not
+a substitute for the installed manifest's sources and original license text.
+
+The following is **only a structural example**. Its URL, identity, bounds and text
+are placeholders, and its deliberately invalid hash prevents use. Replace them
+only with a real prepared package's exact metadata, independently obtained archive
+hash and actual provenance/rights evidence; no downloadable dataset is asserted.
+
+```json
+{
+  "schema_version": 1,
+  "regions": [{
+    "id": "org.example.region",
+    "version": "1.0.0",
+    "title": "Placeholder package",
+    "bounds_degrees": {"west": 135.0, "south": 30.0, "east": 145.0, "north": 40.0},
+    "url": "https://github.com/OWNER/REPO/releases/download/TAG/ASSET.zip",
+    "archive_sha256": "REPLACE_WITH_ACTUAL_64_LOWERCASE_HEX_DIGITS",
+    "provenance": "REPLACE with the actual package source, datum/conversion and rights evidence"
+  }]
+}
+```
+
+Every record's URL and archive hash must pass the same source contract below.
+A local catalog does not authenticate a publisher. SHA-256 verifies requested
+bytes, not terrain accuracy, source trust, license acceptance or redistribution
+rights. Source/license URLs in the inspected package remain inert metadata.
 
 ## Source contract
 
@@ -110,7 +225,8 @@ network/filesystem calls: cancellation is cooperative, with the stated network
 wait/deadline bounds, not an immediate interrupt or filesystem latency guarantee.
 No queue/backlog, background thread manager, automatic retry or partial-range
 resume is created. Reinvoke explicitly after a recoverable failure or cancellation;
-bytes restart from zero. The app still owns any future single-worker UI integration.
+bytes restart from zero. The opt-in app integration uses the single worker
+described above and performs the catalog/manifest comparison before commit.
 
 The cache key hashes the canonical source URL plus requested archive hash.
 A complete cache entry contains `package.zip` and a strict source receipt binding
@@ -159,11 +275,15 @@ The checked-in `tests/data/download-fixture.zip` is a tiny constant-height test
 fixture generated independently with Python's standard ZIP writer and the FSDM
 binary specification. Its source and license strings are test metadata, not a real
 terrain license review. Adversarial tests and any public synthetic-fixture smoke
-are recorded in [download QA](qa/content-downloads-2026-10-04.md).
+are recorded in [download QA](qa/content-downloads-2026-10-04.md). The opt-in app,
+catalog and lifecycle checks are recorded separately in
+[application download QA](qa/app-region-downloads-2026-10-04.md).
 
 HTTPS and checksums do not grant data use, modification, redistribution, commercial
 use or legal-term acceptance. The schema retains the provider's inert provenance,
 credits and original license text; acquiring or installing bytes does not accept
 new terms. Real geographic packages still require actual source, datum/conversion,
 coverage, attribution and rights evidence. This change supplies none by inference.
-The existing Steam/commercial release gates remain authoritative.
+The existing Steam/commercial release gates remain authoritative. Adding a local
+catalog and map controls does not turn synthetic fixtures into reviewed real-area
+content or approve a download-enabled commercial build.

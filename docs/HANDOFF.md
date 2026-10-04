@@ -32,10 +32,15 @@ Steam へ出荷できるという承認ではない。公開版・PR の状態�
 
 2026-10-04 の追加は [地域 ZIP](content-packages.md)、[描画距離](draw-distance.md)、
 [水面品質](water-quality.md) と [統合 QA](qa/expansion-integration-2026-10-04.md) を参照。
-アプリの地域 ZIP は prepared DEM-only schema v1 のローカル読み込み。
-[GitHub 取得の基盤](content-downloads.md) は opt-in pure Rust API と CLI example まで実装し、
-アプリ接続・実地域カタログ・任意 ZIP/生 DEM の自動変換は未実装。F1 は水面、F2 は局所詳細距離、F3 は雲、F4 は
-グラフィックス。最軽量の既定値と既存の配布審査ゲートを維持している。
+アプリの地域 ZIP は prepared DEM-only schema v1。既定はオフラインのローカル読み込みで、
+[GitHub 取得と地域カタログ](content-downloads.md) は `--features region-downloads` と
+`--region-catalog FILE.json` で明示的に有効化する（任意で `--region-cache DIR` / `--region-offline`）。
+地図の Regions は D で Installed / Downloads を切り替え、行は宣言範囲と出典のプレビュー、
+F は Download / Retry、C は Cached only。取得した manifest の ID・版・題名・範囲をカタログと
+照合してからインストールする。取得後も Installed で選び直して Start が必要で、自動取得・再試行・
+選択・有効化はない。実地域カタログは同梱せず、任意 ZIP/生 DEM の自動変換も行わない。
+F1 は水面、F2 は局所詳細距離、F3 は雲、F4 はグラフィックス。
+最軽量の既定値・既存商用候補のオフライン地域データ依存・配布審査ゲートを維持している。
 
 [Meadow Trainer](aircraft/meadow-trainer.md) は独自制作の高翼機 GLB と外部 JSON。
 Light Single の数値物理・操作・視点をそのまま使い、組み込みの 2 機種や既定機は変更しない。

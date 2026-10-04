@@ -1,4 +1,7 @@
-//! Local prepared terrain imports. One bounded worker; explicit new-flight activation.
+//! Prepared terrain imports and opt-in downloads. One worker; explicit new-flight activation.
+#[cfg(feature = "region-downloads")]
+#[path = "region_downloads.rs"]
+mod downloads;
 use super::*;
 use flightsim_content::{ImportProgress, InstalledPackage, InstalledSummary};
 use flightsim_ui::world_map::{
@@ -10,7 +13,7 @@ use std::sync::{
     mpsc::{self, Receiver, TryRecvError},
 };
 
-pub(super) const REPLAY_NOTICE: &str = "Regional terrain: replay recording/export and playback are unavailable (v1/v2 cannot identify packages).";
+pub(super) const REPLAY_NOTICE: &str = "Regional terrain: replay recording/export and playback are unavailable (replay formats do not identify packages).";
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct Options {
@@ -18,6 +21,9 @@ pub(super) struct Options {
     pub select: Option<String>,
     pub store: Option<PathBuf>,
     pub list: bool,
+    pub catalog: Option<PathBuf>,
+    pub cache: Option<PathBuf>,
+    pub offline: bool,
     pub error: Option<String>,
 }
 
@@ -26,7 +32,28 @@ pub(super) fn validate_options(startup: &mut Startup) {
     let modes = usize::from(options.import.is_some())
         + usize::from(options.select.is_some())
         + usize::from(options.list);
-    let error = if modes > 1 {
+    let download_options = options.catalog.is_some() || options.cache.is_some() || options.offline;
+    let error = if download_options && !cfg!(feature = "region-downloads") {
+        Some("region downloads require a build with --features region-downloads")
+    } else if options.catalog.is_none() && (options.cache.is_some() || options.offline) {
+        Some("--region-cache and --region-offline require --region-catalog FILE.json")
+    } else if options
+        .catalog
+        .as_ref()
+        .is_some_and(|path| path.as_os_str().is_empty())
+        || options
+            .cache
+            .as_ref()
+            .is_some_and(|path| path.as_os_str().is_empty())
+    {
+        Some("--region-catalog and --region-cache need nonempty paths")
+    } else if options.catalog.is_some() && (options.import.is_some() || options.list) {
+        Some("--region-catalog cannot be combined with --import-region or --list-regions")
+    } else if options.catalog.is_some() && startup.replay.is_some() {
+        Some("region downloads cannot be combined with --replay")
+    } else if options.catalog.is_some() && !startup.world.global_terrain {
+        Some("--region-catalog requires --global-terrain on for fallback")
+    } else if modes > 1 {
         Some("--import-region, --region and --list-regions are separate operations")
     } else if options
         .store
@@ -38,7 +65,7 @@ pub(super) fn validate_options(startup: &mut Startup) {
         Some("--region expects a canonical package ID@MAJOR.MINOR.PATCH")
     } else if modes > 0 && startup.replay.is_some() {
         Some(
-            "region operations cannot be combined with --replay; package-backed replay v1/v2 is unsupported",
+            "region operations cannot be combined with --replay; package-backed replay is unsupported",
         )
     } else if options.select.is_some() && startup.tiles.is_some() {
         Some("--region and --tiles cannot be combined; choose one regional source")
@@ -50,7 +77,7 @@ pub(super) fn validate_options(startup: &mut Startup) {
     if let Some(error) = error {
         startup.regions.error = Some(error.into());
     }
-    if startup.regions.select.is_some() {
+    if startup.regions.select.is_some() || startup.regions.catalog.is_some() {
         startup.world.map_open = true;
     }
 }
@@ -148,15 +175,31 @@ pub(super) struct RegionRuntime {
     ready: Option<(WorldMapStart, Arc<InstalledPackage>)>,
     was_map_visible: bool,
     initialized: bool,
+    #[cfg(feature = "region-downloads")]
+    downloads: Option<downloads::DownloadRuntime>,
 }
 struct Worker {
     generation: u64,
     cancel: Arc<AtomicBool>,
-    progress: Arc<Mutex<Option<ImportProgress>>>,
+    progress: Arc<Mutex<Option<Progress>>>,
     receiver: Mutex<Receiver<Result<Outcome, String>>>,
+}
+#[derive(Clone, Copy)]
+enum Progress {
+    Import(ImportProgress),
+    #[cfg(feature = "region-downloads")]
+    Download(flightsim_content::download::DownloadProgress),
 }
 enum Job {
     List,
+    #[cfg(feature = "region-downloads")]
+    RefreshCatalog(PathBuf),
+    #[cfg(feature = "region-downloads")]
+    Download {
+        entry: downloads::Entry,
+        cache: PathBuf,
+        mode: flightsim_content::download::CacheMode,
+    },
     Import(PathBuf),
     Inspect {
         directory: PathBuf,
@@ -166,6 +209,17 @@ enum Job {
 }
 enum Outcome {
     Listed(Vec<InstalledSummary>),
+    #[cfg(feature = "region-downloads")]
+    RefreshedCatalog {
+        installed: Result<Vec<InstalledSummary>, String>,
+        catalog: Result<Vec<downloads::Entry>, String>,
+    },
+    #[cfg(feature = "region-downloads")]
+    Downloaded {
+        installed: Vec<InstalledSummary>,
+        key: String,
+        cache_hit: bool,
+    },
     Imported(Vec<InstalledSummary>),
     Inspected(WorldMapStart, Arc<InstalledPackage>),
 }
@@ -188,7 +242,16 @@ impl RegionRuntime {
             ready: None,
             was_map_visible: false,
             initialized: false,
+            #[cfg(feature = "region-downloads")]
+            downloads: downloads::DownloadRuntime::new(&startup.regions),
         }
+    }
+    fn refresh_job(&self) -> Job {
+        #[cfg(feature = "region-downloads")]
+        if let Some(downloads) = &self.downloads {
+            return Job::RefreshCatalog(downloads.path.clone());
+        }
+        Job::List
     }
     fn start(&mut self, job: Job) -> Result<(), String> {
         if self.pending.is_some() {
@@ -233,11 +296,11 @@ fn run_job(
     job: Job,
     store: &std::path::Path,
     cancel: &AtomicBool,
-    progress: &Mutex<Option<ImportProgress>>,
+    progress: &Mutex<Option<Progress>>,
 ) -> Result<Outcome, String> {
     let report = |next| {
         if let Ok(mut progress) = progress.lock() {
-            *progress = Some(next);
+            *progress = Some(Progress::Import(next));
         }
         !cancel.load(Ordering::Relaxed)
     };
@@ -250,6 +313,17 @@ fn run_job(
     };
     check()?;
     let result = match job {
+        #[cfg(feature = "region-downloads")]
+        Job::RefreshCatalog(path) => Outcome::RefreshedCatalog {
+            // Refresh the catalog even if the independent installed-store listing
+            // fails, so changed or invalid claims cannot leave a stale preview.
+            installed: flightsim_content::list_installed(store).map_err(|e| e.to_string()),
+            catalog: downloads::read_catalog(&path),
+        },
+        #[cfg(feature = "region-downloads")]
+        Job::Download { entry, cache, mode } => {
+            downloads::download(&entry, &cache, store, mode, cancel, progress)?
+        }
         Job::List => {
             Outcome::Listed(flightsim_content::list_installed(store).map_err(|e| e.to_string())?)
         }
@@ -300,6 +374,10 @@ fn update(
 ) {
     let enabled = playback.is_none() && startup.world.global_terrain && runtime.store.is_ok();
     map.regions.operations_enabled = enabled;
+    #[cfg(feature = "region-downloads")]
+    {
+        map.regions.downloads_enabled = runtime.downloads.is_some();
+    }
     map.regions.active = startup
         .active_region
         .as_ref()
@@ -322,10 +400,11 @@ fn update(
     runtime.was_map_visible = map.visible;
     if !runtime.initialized && map.visible {
         runtime.initialized = true;
-        if runtime.initial_selection.is_some() {
+        if runtime.initial_selection.is_some() || startup.regions.catalog.is_some() {
             map.show_regions();
         }
-        if let Err(error) = runtime.start(Job::List) {
+        let job = runtime.refresh_job();
+        if let Err(error) = runtime.start(job) {
             map.regions.error = error;
         }
     }
@@ -336,11 +415,41 @@ fn update(
                 runtime.cancel();
                 actions.start_at = None;
                 map.regions.progress = None;
-                map.regions.status = "Cancelled; current flight unchanged. Refresh installed packages if an import already committed".into();
+                map.regions.status = "Cancelled; current flight unchanged. Refresh installed packages if an install already committed".into();
             }
             RegionAction::Refresh if map.visible && enabled => {
                 map.regions.error.clear();
-                if let Err(error) = runtime.start(Job::List) {
+                let job = runtime.refresh_job();
+                if let Err(error) = runtime.start(job) {
+                    map.regions.error = error;
+                }
+            }
+            #[cfg(feature = "region-downloads")]
+            RegionAction::SelectDownload(key)
+                if map.visible && enabled && runtime.pending.is_none() =>
+            {
+                runtime.ready = None;
+                actions.start_at = None;
+                map.regions.error.clear();
+                if let Some(downloads) = &mut runtime.downloads
+                    && let Err(error) = downloads.select(&key, &mut map)
+                {
+                    map.regions.error = error;
+                }
+            }
+            #[cfg(feature = "region-downloads")]
+            RegionAction::Download { offline }
+                if map.visible && enabled && runtime.pending.is_none() =>
+            {
+                runtime.ready = None;
+                actions.start_at = None;
+                map.regions.error.clear();
+                let job = runtime
+                    .downloads
+                    .as_ref()
+                    .ok_or_else(|| "Region downloads are not configured".to_owned())
+                    .and_then(|downloads| downloads.job(offline));
+                if let Err(error) = job.and_then(|job| runtime.start(job)) {
                     map.regions.error = error;
                 }
             }
@@ -382,14 +491,13 @@ fn update(
             && let Ok(progress) = worker.progress.lock()
             && let Some(p) = *progress
         {
-            map.regions.progress = (p.bytes_total > 0).then(|| {
-                u8::try_from((p.bytes_done.saturating_mul(100) / p.bytes_total).min(100))
-                    .unwrap_or(100)
-            });
-            map.regions.status = format!(
-                "{:?}: {}/{} files, {} / {} bytes",
-                p.phase, p.files_done, p.files_total, p.bytes_done, p.bytes_total
-            );
+            let (percentage, status) = match p {
+                Progress::Import(p) => import_progress_text(p),
+                #[cfg(feature = "region-downloads")]
+                Progress::Download(p) => downloads::progress_text(p),
+            };
+            map.regions.progress = percentage;
+            map.regions.status = status;
         }
         match worker
             .receiver
@@ -411,22 +519,47 @@ fn update(
         if generation == runtime.generation && map.visible {
             match result {
                 Ok(Outcome::Listed(installed)) | Ok(Outcome::Imported(installed)) => {
-                    // Selection remains explicit even after import. CLI selection is a
-                    // one-time pending choice, never an activation request.
-                    runtime.installed = installed;
-                    map.regions
-                        .set_installed(runtime.installed.iter().map(|s| RegionSummary {
-                            key: key(s),
-                            name: s.manifest.title.clone(),
-                        }));
-                    map.regions.status = format!(
-                        "{} installed versions. Select terrain, then return to the map and Start new flight",
-                        runtime.installed.len()
-                    );
-                    if let Some(selected) = runtime.initial_selection.take() {
-                        runtime.selected = Some(selected.clone());
-                        select(&mut runtime, &mut map, Some(selected));
+                    apply_installed_list(&mut runtime, &mut map, installed);
+                }
+                #[cfg(feature = "region-downloads")]
+                Ok(Outcome::RefreshedCatalog { installed, catalog }) => {
+                    let mut errors = Vec::new();
+                    match installed {
+                        Ok(installed) => apply_installed_list(&mut runtime, &mut map, installed),
+                        Err(error) => errors.push(error),
                     }
+                    if let Some(downloads) = &mut runtime.downloads {
+                        match catalog {
+                            Ok(entries) => downloads.set_entries(entries, &mut map),
+                            Err(error) => {
+                                downloads.set_entries(Vec::new(), &mut map);
+                                errors.push(error);
+                            }
+                        }
+                    }
+                    if !errors.is_empty() {
+                        map.regions.error = errors.join("; ");
+                        map.regions.status = "Refresh incomplete; current flight unchanged".into();
+                    }
+                }
+                #[cfg(feature = "region-downloads")]
+                Ok(Outcome::Downloaded {
+                    installed,
+                    key,
+                    cache_hit,
+                }) => {
+                    // Installation is never a next-flight selection or activation.
+                    runtime.installed = installed;
+                    sync_installed_list(&runtime, &mut map);
+                    map.regions.show_installed();
+                    map.regions.status = format!(
+                        "Installed {key} ({}). Select it in Installed, then Start new flight",
+                        if cache_hit {
+                            "verified cache"
+                        } else {
+                            "downloaded"
+                        }
+                    );
                 }
                 Ok(Outcome::Inspected(start, package)) => {
                     if map.selected == start.position && map.preview_month() == start.month {
@@ -446,6 +579,45 @@ fn update(
     }
     map.regions.busy = runtime.pending.is_some();
     map.regions.selected = runtime.selected.clone();
+}
+
+fn percentage(done: u64, total: u64) -> Option<u8> {
+    (total > 0)
+        .then(|| u8::try_from((u128::from(done) * 100 / u128::from(total)).min(100)).unwrap_or(100))
+}
+
+fn import_progress_text(p: ImportProgress) -> (Option<u8>, String) {
+    (
+        percentage(p.bytes_done, p.bytes_total),
+        format!(
+            "{:?}: {}/{} files, {} / {} bytes",
+            p.phase, p.files_done, p.files_total, p.bytes_done, p.bytes_total
+        ),
+    )
+}
+
+fn sync_installed_list(runtime: &RegionRuntime, map: &mut WorldMapState) {
+    map.regions
+        .set_installed(runtime.installed.iter().map(|s| RegionSummary {
+            key: key(s),
+            name: s.manifest.title.clone(),
+        }));
+}
+
+fn apply_installed_list(
+    runtime: &mut RegionRuntime,
+    map: &mut WorldMapState,
+    installed: Vec<InstalledSummary>,
+) {
+    runtime.installed = installed;
+    sync_installed_list(runtime, map);
+    map.regions.status = format!(
+        "{} installed versions. Select terrain, then return to the map and Start new flight",
+        runtime.installed.len()
+    );
+    if let Some(selected) = runtime.initial_selection.take() {
+        select(runtime, map, Some(selected));
+    }
 }
 
 fn select(runtime: &mut RegionRuntime, map: &mut WorldMapState, selected: Option<String>) {
@@ -600,9 +772,9 @@ mod tests {
     use flightsim_world::TileId;
     use std::sync::atomic::AtomicU64;
     const KEY: &str = "org.example.fixture@1.0.0";
-    struct TestDirectory(PathBuf);
+    pub(super) struct TestDirectory(pub(super) PathBuf);
     impl TestDirectory {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let path = std::env::temp_dir().join(format!(
                 "flightsim-region-test-{}-{}",
@@ -621,7 +793,7 @@ mod tests {
             .unwrap();
             path
         }
-        fn store(&self) -> PathBuf {
+        pub(super) fn store(&self) -> PathBuf {
             self.0.join("store")
         }
     }
@@ -639,7 +811,7 @@ mod tests {
             month: 7,
         }
     }
-    fn world(temp: &TestDirectory) -> World {
+    pub(super) fn world(temp: &TestDirectory) -> World {
         let startup = Startup {
             regions: Options {
                 store: Some(temp.store()),
@@ -691,7 +863,7 @@ mod tests {
         });
         world
     }
-    fn await_worker(world: &mut World) {
+    pub(super) fn await_worker(world: &mut World) {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         while world.resource::<RegionRuntime>().pending.is_some() {
             world.run_system_once(update).unwrap();
@@ -896,13 +1068,13 @@ mod tests {
         world.resource_mut::<RegionRuntime>().pending = Some(Worker {
             generation,
             cancel: Arc::new(AtomicBool::new(false)),
-            progress: Arc::new(Mutex::new(Some(ImportProgress {
+            progress: Arc::new(Mutex::new(Some(Progress::Import(ImportProgress {
                 phase: flightsim_content::ImportPhase::Validating,
                 files_done: 1,
                 files_total: 2,
                 bytes_done: 512,
                 bytes_total: 1024,
-            }))),
+            })))),
             receiver: Mutex::new(receiver),
         });
         world.resource_mut::<WorldMapState>().regions.progress = Some(50);
@@ -1433,5 +1605,90 @@ mod tests {
             .unwrap(),
             PathBuf::from("explicit")
         );
+    }
+
+    #[test]
+    fn catalog_cli_is_explicit_feature_gated_and_rejects_incomplete_or_conflicting_options() {
+        for flag in [
+            "--region-catalog",
+            "--region-cache",
+            "--region-offline",
+            "region-downloads feature",
+        ] {
+            assert!(application_help().contains(flag));
+        }
+        for args in [
+            vec!["--region-catalog"],
+            vec!["--region-catalog", ""],
+            vec!["--region-cache", "cache"],
+            vec!["--region-offline"],
+            vec!["--region-catalog", "catalog.json", "--region-cache", ""],
+            vec!["--region-catalog", "catalog.json", "--region-cache"],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--region-catalog",
+                "other.json",
+            ],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--region-cache",
+                "a",
+                "--region-cache",
+                "b",
+            ],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--region-offline",
+                "--region-offline",
+            ],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--replay",
+                "flight.fsreplay",
+            ],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--global-terrain",
+                "off",
+            ],
+            vec![
+                "--region-catalog",
+                "catalog.json",
+                "--import-region",
+                "data.zip",
+            ],
+            vec!["--region-catalog", "catalog.json", "--list-regions"],
+        ] {
+            let (startup, _) = parse_arguments_from(args.into_iter().map(str::to_owned));
+            assert!(startup.regions.error.is_some());
+        }
+        let (startup, _) = parse_arguments_from(
+            [
+                "--region-catalog",
+                "catalog.json",
+                "--region-cache",
+                "cache",
+                "--region-offline",
+            ]
+            .into_iter()
+            .map(str::to_owned),
+        );
+        assert_eq!(
+            startup.regions.error.is_none(),
+            cfg!(feature = "region-downloads")
+        );
+        assert_eq!(
+            startup.regions.catalog.as_deref(),
+            Some(std::path::Path::new("catalog.json"))
+        );
+        assert!(startup.regions.offline);
+        assert!(startup.world.map_open);
+        assert!(startup.active_region.is_none());
+        assert!(!run_cli(&startup.regions).unwrap());
     }
 }

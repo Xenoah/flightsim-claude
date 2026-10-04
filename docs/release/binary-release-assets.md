@@ -39,6 +39,19 @@ integrity and source-manifest bindings are still checked. Untracked inventory or
 review files cannot supply evidence; missing review and publication authorization
 remain blockers, and no copy plan is written while any blocker remains.
 
+The existing default and Swift-only binary recipes remain offline. Distribution
+metadata reports a separate compile-time `region_downloads` boolean; it is not
+implied by the aircraft profile. Immediately after the trusted release build,
+`check-release-authorization.py --verify-built-executable PATH` rechecks release
+authorization, executes the bounded `--distribution-info` handshake, requires
+literal `region_downloads: false` and the exact default Windows MSVC identity and
+version, and reports the binary SHA-256 with that metadata. Use this explicit
+execution mode only for the trusted freshly built application. Generic
+`--bundle` verification remains non-executing and compares staged/extracted bytes
+against the build output and exact allowlisted copy plan. Source/feature-bound
+authorization and unresolved rights checks still apply; these checks do not
+authorize a region-download binary recipe.
+
 Asset-list changes alter the manifest digest. Collect dependency evidence against
 the final manifest, and obtain inventory-bound review/publication decisions only
 after the real outstanding conditions are met. This policy correction is not

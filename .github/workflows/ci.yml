@@ -157,6 +157,14 @@ jobs:
       - name: Test
         run: cargo test ${{ env.RENDER }} --all-targets
 
+      # Optional application networking must be exercised on both target OSes,
+      # while the ordinary offline application tests above remain required.
+      - name: Test optional region catalog application
+        run: cargo test -j 2 -p flightsim-app -p flightsim-content -p flightsim-assetgen --features flightsim-app/region-downloads --all-targets
+
+      - name: Lint optional region catalog application
+        run: cargo clippy -j 2 -p flightsim-app -p flightsim-content -p flightsim-assetgen --features flightsim-app/region-downloads --all-targets -- -D warnings
+
   architecture:
     name: architecture rules
     runs-on: ubuntu-latest
@@ -189,7 +197,7 @@ jobs:
 
       # 壊れたドキュメントリンクは、設計意図が読まれなくなる原因になる。
       - name: Build docs
-        run: cargo doc --workspace --features flightsim-content/downloads --no-deps --document-private-items
+        run: cargo doc --workspace --features flightsim-app/region-downloads --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: -D warnings
 
