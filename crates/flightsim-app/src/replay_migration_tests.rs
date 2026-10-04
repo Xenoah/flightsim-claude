@@ -396,7 +396,10 @@ fn supported_weather_loads_exactly_and_manual_cloud_flags_fail_before_mutation()
         include_bytes!("../../flightsim-sim/tests/fixtures/v3_custom_both.fsreplay").as_slice(),
     ] {
         std::fs::write(&path, fixture).unwrap();
+        // These independently encoded weather fixtures identify Light Single,
+        // regardless of the current distribution's default aircraft.
         let mut startup = Startup {
+            aircraft: aircraft_profile::SelectedAircraftProfile::builtin("light-single").unwrap(),
             replay: Some(path.clone()),
             ..default()
         };

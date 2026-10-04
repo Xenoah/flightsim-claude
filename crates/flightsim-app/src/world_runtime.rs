@@ -15,6 +15,8 @@ use flightsim_world::global::GlobalTerrain;
 
 const LEGACY_MAP_NOTICE: &str =
     "Preview only: global terrain is off\nRestart with --global-terrain on";
+const PREPARING_AIRCRAFT_NOTICE: &str =
+    "Preparing aircraft; close to cancel\nCurrent flight is unchanged";
 
 #[derive(Debug, Clone)]
 pub(super) struct WorldOptions {
@@ -583,6 +585,10 @@ pub(super) fn tower_anchor(terrain: &mut Terrain<BoxedSource>, start: Geodetic) 
 /// An exclusive system keeps the restart transaction independent of Bevy's
 /// deferred Commands and prevents one stale frame of camera/recording state.
 pub(super) fn apply_world_map_start(world: &mut World) {
+    if world.contains_resource::<crate::aircraft_picker_runtime::AircraftPicker>() {
+        crate::aircraft_picker_runtime::apply(world);
+        return;
+    }
     let jet = world.resource::<Startup>().aircraft.is_jet();
     let (request, package) = if jet {
         // A jet start must remain completely retryable until every candidate
@@ -619,18 +625,53 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     if world_map::map_point_from_geodetic(request.position).is_none() {
         return;
     }
-    let Some(date) = ClimateDate::from_month(request.month) else {
-        return;
-    };
     let mut startup = world.resource::<Startup>().clone();
+    apply_pending_weather(world, &mut startup);
+    match prepare_world_map_flight(startup, request, package) {
+        Ok(prepared) => commit_world_map_flight(world, prepared),
+        Err(error) => navigation_error(world, error),
+    }
+}
+
+pub(super) fn apply_pending_weather(world: &World, startup: &mut Startup) {
+    if !startup.clouds_were_given
+        && startup.traffic.host.is_none()
+        && startup.traffic.join.is_none()
+        && let Some(pending) = world.get_resource::<super::weather_runtime::PendingWeather>()
+    {
+        startup.weather.requested = pending.requested;
+    }
+}
+
+/// Fully validated physical state; no active ECS resource has been changed.
+pub(super) struct PreparedWorldFlight {
+    pub startup: Startup,
+    pub simulation: FlightSession,
+    request: world_map::WorldMapStart,
+    recorder: Option<flightsim_sim::CurrentRecorder>,
+    controls: PilotControls,
+    clock: flightsim_render::TimeOfDay,
+    tower: Geodetic,
+    state: flightsim_fdm::RigidBodyState,
+    source_changed: bool,
+}
+
+pub(super) fn prepare_world_map_flight(
+    mut startup: Startup,
+    request: world_map::WorldMapStart,
+    package: Option<std::sync::Arc<flightsim_content::InstalledPackage>>,
+) -> Result<PreparedWorldFlight, String> {
+    if world_map::map_point_from_geodetic(request.position).is_none() {
+        return Err("Invalid new-flight destination".into());
+    }
+    let date = ClimateDate::from_month(request.month)
+        .ok_or_else(|| "Invalid new-flight month".to_owned())?;
+    let jet = startup.aircraft.is_jet();
     // Airport surfaces were draped once from this session's terrain source.
     // Never silently enable a different supporting surface beneath them. The
     // explicitly disabled legacy mode may preview the map, but not relocate.
     if !startup.world.global_terrain && !jet {
-        let mut map = world.resource_mut::<WorldMapState>();
-        map.navigation_enabled = false;
-        map.navigation_note = LEGACY_MAP_NOTICE.into();
-        return;
+        return Err(LEGACY_MAP_NOTICE.into());
     }
     let source_changed = startup.active_region.as_ref().map(|p| p.identity())
         != package.as_ref().map(|p| p.identity());
@@ -653,17 +694,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         64 * 1024 * 1024,
         terrain_levels(&startup),
     );
-    if !startup.clouds_were_given
-        && startup.traffic.host.is_none()
-        && startup.traffic.join.is_none()
-        && let Some(pending) = world.get_resource::<super::weather_runtime::PendingWeather>()
-    {
-        startup.weather.requested = pending.requested;
-    }
-    if let Err(error) = super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain) {
-        navigation_error(world, error);
-        return;
-    }
+    super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain)?;
     let state = airborne_state(&startup, &mut terrain, Meters(1000.0));
     let valid_state = if jet {
         crate::flight_session::validate_jet_state(&state)
@@ -671,8 +702,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         replay_runtime::validate_replay_state(&state).map_err(str::to_owned)
     };
     if let Err(error) = valid_state {
-        navigation_error(world, format!("Cannot start flight: {error}"));
-        return;
+        return Err(format!("Cannot start flight: {error}"));
     }
     let tower = tower_anchor(&mut terrain, startup.start);
     let mut clock = startup_clock(&startup);
@@ -685,8 +715,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         ) {
             Ok(session) => session,
             Err(error) => {
-                navigation_error(world, format!("Cannot start jet flight: {error}"));
-                return;
+                return Err(format!("Cannot start jet flight: {error}"));
             }
         };
         (session, None)
@@ -698,8 +727,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
             GroundSampler::default(),
         );
         if let Err(error) = simulation.set_climate(Some(date)) {
-            navigation_error(world, format!("Cannot start climate: {error}"));
-            return;
+            return Err(format!("Cannot start climate: {error}"));
         }
         simulation.set_wind(startup.wind);
         simulation.set_turbulence(startup.turbulence);
@@ -707,17 +735,52 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         (simulation.into(), Some(recorder))
     };
     let controls = initial_controls(&startup);
+    Ok(PreparedWorldFlight {
+        startup,
+        simulation,
+        request,
+        recorder,
+        controls,
+        clock,
+        tower,
+        state,
+        source_changed,
+    })
+}
+
+/// Infallible commit after session and optional aircraft scene are ready.
+/// Called exclusively, before input, physics and presentation can observe it.
+pub(super) fn commit_world_map_flight(world: &mut World, prepared: PreparedWorldFlight) {
+    let PreparedWorldFlight {
+        startup,
+        simulation,
+        request,
+        recorder,
+        controls,
+        clock,
+        tower,
+        state,
+        source_changed,
+    } = prepared;
+    let jet = startup.aircraft.is_jet();
     let source = make_source(&startup);
-    if jet {
-        world.resource_mut::<WorldMapActions>().start_at.take();
+    world.resource_mut::<WorldMapActions>().start_at = None;
+    if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
+        runtime.last_navigation_error = None;
     }
     if let Some(mut traffic) = world.get_resource_mut::<traffic_runtime::TrafficRuntime>() {
         traffic.restart_synthetic_at(state.geodetic());
     }
     world.insert_resource(FlightSimulation(simulation));
-    if jet && let Some(mut reset) = world.get_resource_mut::<JetHudReset>() {
-        reset.0 = true;
-    }
+    world.insert_resource(JetHudReset(true));
+    world.insert_resource(StallWarningStatus::default());
+    world.insert_resource(flightsim_ui::CrashNotice::default());
+    world.insert_resource(flightsim_ui::ReplayStatus::default());
+    world.insert_resource(if jet {
+        flight_session::jet_guidance()
+    } else {
+        flightsim_ui::FlightGuidance::default()
+    });
     world.insert_resource(StartCondition::InFlight(state));
     if let Some(recorder) = recorder {
         world.insert_resource(FlightRecorder(recorder));
@@ -733,7 +796,11 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     world.insert_resource(flightsim_ui::TutorialVisibility(false));
     world.insert_resource(flightsim_ui::LandingReportState::default());
     world.remove_resource::<flightsim_ui::LandingReport>();
-    world.resource_mut::<CameraRig>().reset();
+    {
+        let mut camera = world.resource_mut::<CameraRig>();
+        camera.eye_offset = startup.aircraft.camera_eye();
+        camera.reset();
+    }
     if let Some(sound) = world.get_resource::<flightsim_audio::SoundBridge>() {
         sound.0.request_reset();
     }
@@ -789,17 +856,30 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     world.insert_resource(startup);
 }
 
-fn navigation_error(world: &mut World, error: String) {
+pub(super) fn clear_navigation_error(world: &mut World) {
+    if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
+        runtime.last_navigation_error = None;
+    }
+}
+
+pub(super) fn navigation_error(world: &mut World, error: String) {
     if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
         runtime.last_navigation_error = Some(error.clone());
     }
-    world.resource_mut::<WorldMapState>().navigation_note = error;
+    let mut map = world.resource_mut::<WorldMapState>();
+    if error == LEGACY_MAP_NOTICE {
+        map.navigation_enabled = false;
+    }
+    map.navigation_note = error;
 }
 
 fn publish_world_map(
     simulation: Res<FlightSimulation>,
     runtime: Res<WorldRuntime>,
-    startup: Res<Startup>,
+    (startup, picker): (
+        Res<Startup>,
+        Option<Res<crate::aircraft_picker_runtime::AircraftPicker>>,
+    ),
     playback: Option<Res<ReplayPlayback>>,
     mut map: ResMut<WorldMapState>,
     mut raster: ResMut<WorldMapRaster>,
@@ -811,14 +891,24 @@ fn publish_world_map(
     }
     map.aircraft = Some(simulation.0.state().geodetic());
     let replay = playback.is_some() || simulation.0.is_replay() || startup.replay.is_some();
+    let target_jet = picker.as_ref().map_or(startup.aircraft.is_jet(), |picker| {
+        picker.target_is_jet(map.aircraft_choice)
+    });
+    let available = picker
+        .as_ref()
+        .is_none_or(|picker| picker.available(map.aircraft_choice));
     map.navigation_enabled =
-        !replay && (startup.world.global_terrain || startup.aircraft.is_jet()) && !map.regions.busy;
+        !replay && available && (startup.world.global_terrain || target_jet) && !map.regions.busy;
     map.navigation_note = if let Some(error) = &runtime.last_navigation_error {
         error.clone()
     } else if replay {
         "Replay preview only\nNew-flight relocation is disabled".into()
-    } else if !startup.world.global_terrain && !startup.aircraft.is_jet() {
+    } else if !available {
+        "Selected aircraft unavailable; see aircraft details".into()
+    } else if !startup.world.global_terrain && !target_jet {
         LEGACY_MAP_NOTICE.into()
+    } else if picker.as_ref().is_some_and(|picker| picker.preparing()) {
+        PREPARING_AIRCRAFT_NOTICE.into()
     } else if map.regions.busy {
         "Inspecting region; current flight unchanged".into()
     } else if map.regions.selected.is_some() || startup.active_region.is_some() {
@@ -927,6 +1017,21 @@ fn modeled_climate_cloud_layer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preparing_notice_retains_cancel_and_unchanged_guarantee_after_ui_bounds() {
+        let mut map = WorldMapState::default();
+        map.navigation_note = PREPARING_AIRCRAFT_NOTICE.into();
+        let rendered = world_map::format_world_map_text(
+            world_map::WorldMapText::Navigation,
+            &map,
+            &WorldMapRaster::default(),
+        );
+        assert_eq!(rendered, PREPARING_AIRCRAFT_NOTICE);
+        assert!(rendered.contains("close to cancel"));
+        assert!(rendered.contains("Current flight is unchanged"));
+        assert_eq!(rendered.lines().count(), 2);
+    }
 
     #[test]
     fn modeled_cloud_height_uses_fixed_departure_reference_not_current_hills() {
@@ -1133,6 +1238,8 @@ mod tests {
         let map_camera = world.resource::<WorldMapView>().map_camera;
         assert!(!world.get::<Camera>(flight).unwrap().is_active);
         world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+            aircraft_choice: 0,
+            generation: 0,
             position: Geodetic::from_degrees(46.58, 8.0, 0.0),
             month: 1,
         });
@@ -1443,6 +1550,8 @@ mod tests {
             pending.requested = Some(WeatherPreset::Rain);
             world.insert_resource(pending);
             let request = world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: Geodetic::from_degrees(0.0, -140.0, 0.0),
                 month: 7,
             };
@@ -1506,6 +1615,8 @@ mod tests {
             world.resource_mut::<Startup>().aircraft =
                 aircraft_profile::SelectedAircraftProfile::Jet(profile);
             world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: Geodetic::from_degrees(0.0, -140.0, 0.0),
                 month: 7,
             });
@@ -1531,6 +1642,8 @@ mod tests {
             pending.requested = Some(flightsim_sim::weather::WeatherPreset::Snow);
             world.insert_resource(pending);
             let request = world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: if outside_domain {
                     Geodetic::from_degrees(30.0, 90.0, 0.0)
                 } else {
@@ -1637,6 +1750,8 @@ mod tests {
             map.navigation_enabled = true; // A forged/stale UI flag cannot bypass the guard.
         }
         world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+            aircraft_choice: 0,
+            generation: 0,
             position: world_map::WORLD_MAP_DESTINATIONS[0].position(),
             month: 7,
         });
@@ -1764,6 +1879,8 @@ mod tests {
             seed_pending_terrain_replacement(&mut world);
             assert!(world.resource::<Assets<Mesh>>().len() >= 4);
             world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: Geodetic::from_degrees(lat, lon, 0.0),
                 month: 7,
             });
@@ -1790,6 +1907,8 @@ mod tests {
             world.resource_mut::<WorldMapState>().visible = true;
             world.insert_resource(flightsim_ui::Paused(true));
             world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: Geodetic::from_degrees(lat, lon, 0.0),
                 month,
             });
@@ -1832,6 +1951,8 @@ mod tests {
             apply_world_map_start(&mut world); // Merely selecting cannot mutate a flight.
             assert_eq!(world.resource::<Startup>().weather.selection, before);
             world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                aircraft_choice: 0,
+                generation: 0,
                 position: Geodetic::from_degrees(lat, lon, 0.0),
                 month: 7,
             });
@@ -1886,6 +2007,8 @@ mod tests {
     fn a_preview_month_does_not_mutate_existing_physics_or_recorder() {
         let mut world = map_jump_world();
         world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+            aircraft_choice: 0,
+            generation: 0,
             position: Geodetic::from_degrees(46.58, 8.0, 0.0),
             month: 1,
         });

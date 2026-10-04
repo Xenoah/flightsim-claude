@@ -80,6 +80,16 @@ Rust の結線検査と Blender 画像は、実画面での手動離着陸・音
 
 ---
 
+[新規飛行の機体選択](aircraft-picker.md) は地図の下に Launch / Swift / Meadow / Kestrel
+を表示する app-owned transaction。選択だけでは飛行を変えず、完全な scene0・依存・
+spawn・fit の準備後に session・記録・操作・内装・視点・案内・合成音源をまとめて交換する。
+取消・再選択・座標編集・月・天候変更は世代を無効化し、新たな Start が必要になる。
+既存 CLI/default と Swift-only 配布境界は維持する。GPU-free の loader/ECS 検査と
+実 native の見た目・手動操縦・音の受け入れは別ゲート。設計は [ADR-0016](adr/0016-transactional-new-flight-aircraft.md)。
+[native 検証](qa/aircraft-picker-native-2026-10-04.md)で Swift→Kestrel→Meadow→Swift、
+取消・地域選択の拒否と復帰・正しい cockpit/HUD・実記録 v3/v4 の厳密再実行を確認した。
+Windows の全 scene capture、音声機器、配布権利の審査は完了していない。
+
 ## 1. 現状を 30 秒で
 
 **M2 のゲームループを実装済み。M3 の実機・主観評価を残しつつ M4 の最小実装も進めた。**

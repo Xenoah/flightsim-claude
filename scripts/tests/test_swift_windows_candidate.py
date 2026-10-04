@@ -221,8 +221,14 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(candidate.git(repo, "status", "--porcelain"), "")
         with self.assertRaisesRegex(ValueError, "reviewed replay checkout differs") as failure:
             candidate.source_inputs(repo, expected)
-        relative = "crates/flightsim-app/src/aircraft_profile.rs"
-        pinned = candidate.load_replay_contract(repo)["source_sha256"][relative]
+        pins = candidate.load_replay_contract(repo)["source_sha256"]
+        profile = "crates/flightsim-app/src/aircraft_profile.rs"
+        self.assertNotEqual(candidate.digest(repo / profile), pins[profile])
+        # Newly extracted helpers can sort before the original profile path.
+        # The first mismatched complete file must retain its exact diagnostic;
+        # all sources are rechecked below after the explicit LF checkout.
+        relative = next(path for path, pinned in pins.items() if candidate.digest(repo / path) != pinned)
+        pinned = pins[relative]
         self.assertIn("expected_sha256=" + pinned, str(failure.exception))
         self.assertIn("canonical_sha256=" + pinned, str(failure.exception))
         self.assertIn("checkout_sha256=" + candidate.digest(repo / relative), str(failure.exception))
@@ -329,9 +335,16 @@ class CandidateAcceptanceTests(unittest.TestCase):
             ("crates/flightsim-sim/src/replay_v4.rs",
              b'recording.conditions.identity == ModelIdentity::for_jet(&config),', b'true,'),
             ("crates/flightsim-ui/src/lib.rs", b'tutorial_enabled: true,', b'tutorial_enabled: false,'),
+            # A committed picker flight now resets both aircraft families. Keep
+            # guarding admission and the actual call: neither restricting it to
+            # jets nor silently skipping a pending reset is acceptable.
             ("crates/flightsim-app/src/main.rs",
-             b'if simulation.0.is_jet()\n        && let Some(mut reset) = jet_hud_reset',
-             b'if true\n        && let Some(mut reset) = jet_hud_reset'),
+             b'if let Some(mut reset) = jet_hud_reset\n        && reset.0',
+             b'if simulation.0.is_jet()\n        && let Some(mut reset) = jet_hud_reset\n        && reset.0'),
+            ("crates/flightsim-app/src/main.rs",
+             b'&& reset.0\n        && let Some(mut smoothing) = smoothing',
+             b'&& false\n        && let Some(mut smoothing) = smoothing'),
+            ("crates/flightsim-app/src/main.rs", b'smoothing.reset(&hud);', b'let _ = &hud;'),
             ("crates/flightsim-app/src/main.rs",
              b'warning.update_jet(jet, flaps, angle, valid && !failed);',
              b'warning.update_jet(jet, flaps, angle, valid && !simulation.0.audio_paused());'),
@@ -342,6 +355,39 @@ class CandidateAcceptanceTests(unittest.TestCase):
             ("crates/flightsim-ui/src/replay.rs",
              b'flex_basis: Val::Px(240.0),\n            flex_grow: 1.0,\n            flex_shrink: 0.0,',
              b'flex_basis: Val::Px(240.0),\n            flex_grow: 1.0,\n            flex_shrink: 1.0,'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_picker_review_rejects_commercial_replay_generation_and_scene_ownership_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'if !cfg!(feature = "commercial-staging") {', b'if true {'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'if cfg!(feature = "commercial-staging") && file != "swift_sport.json" {', b'if false {'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'profile.is_jet() != (file == "kestrel_jet_trainer.json")', b'false'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'actions.generation == self.request.generation', b'true'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'if replay || !map.visible || map.regions.visible {',
+             b'if !map.visible || map.regions.visible {'),
+            ("crates/flightsim-app/src/aircraft_scene.rs",
+             b'if !server.is_loaded_with_dependencies(handle.id()) {', b'if false {'),
+            ("crates/flightsim-app/src/aircraft_scene.rs", b'if !spawned {', b'if false {'),
+            ("crates/flightsim-app/src/aircraft_scene.rs",
+             b'if staged {\n            Visibility::Hidden\n        } else {',
+             b'if staged {\n            Visibility::Inherited\n        } else {'),
+            ("crates/flightsim-audio/src/lib.rs", b'world.despawn(entity);', b'let _ = entity;'),
         )
         for relative, old, new in mutations:
             path = repo / relative

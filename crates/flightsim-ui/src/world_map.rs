@@ -37,9 +37,12 @@ const MAP_ROOT_GAP: f32 = 10.0;
 const MAP_HEADER_HEIGHT: f32 = 36.0;
 const MAP_FOOTER_HEIGHT: f32 = 16.0;
 const MAP_BODY_GAP: f32 = 16.0;
-// The 2:1 raster reserves 35 vertical pixels for the two-line weather choice.
-const MAP_COLUMN_MAX_WIDTH: f32 = 830.0;
+// Keep the 2:1 raster, aircraft picker and weather inside the body at 720p.
+const MAP_COLUMN_MAX_WIDTH: f32 = 740.0;
 const MAP_COLUMN_GAP: f32 = 6.0;
+const MAX_AIRCRAFT_CHOICES: usize = 4;
+const AIRCRAFT_LABEL_COLUMNS: usize = 40;
+const AIRCRAFT_DETAIL_COLUMNS: usize = 56;
 const SIDEBAR_WIDTH: f32 = 308.0;
 const SIDEBAR_PADDING: f32 = 14.0;
 const SIDEBAR_GAP: f32 = 6.0;
@@ -211,12 +214,29 @@ enum CoordinateField {
     Longitude,
 }
 
+/// One app-validated catalog row. Availability is explanatory, not authority to
+/// load a profile or change a flight; the app validates an explicit Start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorldMapAircraftChoice {
+    pub label: String,
+    pub note: String,
+    pub available: bool,
+}
+
 /// Public app-fed state. Descriptions are sanitized and bounded at display time.
 #[derive(Resource, Debug, Clone)]
 pub struct WorldMapState {
     pub visible: bool,
     pub regions: RegionsState,
     pub aircraft: Option<Geodetic>,
+    /// At most the first four rows are exposed by this bounded picker.
+    pub aircraft_choices: Vec<WorldMapAircraftChoice>,
+    /// Pending catalog index; selection alone never changes the active flight.
+    pub aircraft_choice: usize,
+    /// Separate from navigation so a blocked current aircraft can be replaced.
+    pub aircraft_selection_enabled: bool,
+    /// App-owned active-flight name, without a Current/Locked prefix.
+    pub active_aircraft: String,
     pub selected: Geodetic,
     pub selected_name: String,
     /// Preview month, 1 through 12. It is applied only on an explicit start.
@@ -237,6 +257,7 @@ pub struct WorldMapState {
     coordinate_field: Option<CoordinateField>,
     coordinate_draft: String,
     coordinate_error: String,
+    invalidate_start_pending: bool,
 }
 
 impl Default for WorldMapState {
@@ -245,6 +266,10 @@ impl Default for WorldMapState {
             visible: false,
             regions: RegionsState::default(),
             aircraft: None,
+            aircraft_choices: Vec::new(),
+            aircraft_choice: 0,
+            aircraft_selection_enabled: false,
+            active_aircraft: "Current aircraft".to_owned(),
             selected: WORLD_MAP_DESTINATIONS[0].position(),
             selected_name: WORLD_MAP_DESTINATIONS[0].name.to_owned(),
             month: 7,
@@ -260,6 +285,7 @@ impl Default for WorldMapState {
             coordinate_field: None,
             coordinate_draft: String::new(),
             coordinate_error: String::new(),
+            invalidate_start_pending: false,
         }
     }
 }
@@ -268,15 +294,58 @@ impl WorldMapState {
     /// True only on the plain, editable new-flight map.
     #[must_use]
     pub fn new_flight_controls_active(&self) -> bool {
+        self.navigation_enabled && self.new_flight_modal_ready()
+    }
+
+    /// The map can accept a prepared new flight only outside child modals and
+    /// unfinished coordinate edits, independently of target navigation policy.
+    #[must_use]
+    pub fn new_flight_modal_ready(&self) -> bool {
         self.visible
-            && self.navigation_enabled
             && !self.regions.visible
             && !self.credits_visible
             && self.coordinate_field.is_none()
     }
 
+    fn aircraft_controls_active(&self) -> bool {
+        self.aircraft_selection_enabled && self.new_flight_modal_ready()
+    }
+
+    fn aircraft_choice_count(&self) -> usize {
+        self.aircraft_choices.len().min(MAX_AIRCRAFT_CHOICES)
+    }
+
+    fn selected_aircraft(&self) -> Option<&WorldMapAircraftChoice> {
+        self.aircraft_choices
+            .get(self.aircraft_choice)
+            .filter(|_| self.aircraft_choice < MAX_AIRCRAFT_CHOICES)
+    }
+
+    fn shift_aircraft(&mut self, next: bool, actions: &mut WorldMapActions) -> bool {
+        let count = self.aircraft_choice_count();
+        if !self.aircraft_controls_active() || count < 2 {
+            return false;
+        }
+        let current = self.aircraft_choice.min(count - 1);
+        self.aircraft_choice = if next {
+            (current + 1) % count
+        } else {
+            (current + count - 1) % count
+        };
+        actions.invalidate_start();
+        true
+    }
+
+    fn invalidate_pending_start(&mut self, actions: &mut WorldMapActions) {
+        if self.invalidate_start_pending {
+            actions.invalidate_start();
+            self.invalidate_start_pending = false;
+        }
+    }
+
     /// Open regional package selection without applying any flight changes.
     pub fn show_regions(&mut self) {
+        self.invalidate_start_pending = true;
         self.visible = true;
         self.regions.show();
         self.credits_visible = false;
@@ -287,6 +356,7 @@ impl WorldMapState {
     /// Open the first credits page, including from application startup.
     /// Dismiss any unfinished coordinate edit without applying it.
     pub fn show_credits(&mut self) {
+        self.invalidate_start_pending = true;
         self.visible = true;
         self.regions.visible = false;
         self.credits_visible = true;
@@ -300,6 +370,7 @@ impl WorldMapState {
         if map_point_from_geodetic(position).is_none() {
             return false;
         }
+        self.invalidate_start_pending = true;
         self.selected = position;
         self.selected_name = bounded_ascii(name, 30, 1);
         self.coordinate_field = None;
@@ -321,10 +392,12 @@ impl WorldMapState {
         let month = i16::from(self.preview_month()) - 1;
         self.month = u8::try_from((month + i16::from(direction)).rem_euclid(12) + 1)
             .expect("wrapped month is in 1..=12");
+        actions.invalidate_start();
         actions.month_changed = Some(self.month);
     }
 
     fn begin_coordinate(&mut self, field: CoordinateField) {
+        self.invalidate_start_pending = true;
         self.coordinate_field = Some(field);
         self.coordinate_draft = format!(
             "{:.5}",
@@ -353,6 +426,7 @@ impl WorldMapState {
             self.coordinate_error = format!("Enter a number from -{limit:.0} to +{limit:.0}");
             return false;
         };
+        self.invalidate_start_pending = true;
         match field {
             CoordinateField::Latitude => self.selected.latitude = Degrees(value).to_radians(),
             CoordinateField::Longitude => self.selected.longitude = Degrees(value).to_radians(),
@@ -364,10 +438,13 @@ impl WorldMapState {
     }
 
     fn request_start(&self, actions: &mut WorldMapActions) {
+        actions.invalidate_start();
         if self.navigation_enabled && map_point_from_geodetic(self.selected).is_some() {
             actions.start_at = Some(WorldMapStart {
                 position: self.selected,
                 month: self.preview_month(),
+                aircraft_choice: self.aircraft_choice,
+                generation: actions.generation,
             });
         }
     }
@@ -379,6 +456,8 @@ impl WorldMapState {
 pub struct WorldMapActions {
     pub regions: RegionsActions,
     pub start_at: Option<WorldMapStart>,
+    /// App must reject prepared results from any older request generation.
+    pub generation: u64,
     /// A preview notification only. Do not apply it to the current flight.
     pub month_changed: Option<u8>,
     /// Current-frame input ownership, not a persistent UI capability. False on
@@ -387,10 +466,20 @@ pub struct WorldMapActions {
     pub new_flight_shortcuts_available: bool,
 }
 
+impl WorldMapActions {
+    /// Cancel queued and already-consumed work without touching the live flight.
+    pub fn invalidate_start(&mut self) {
+        self.start_at = None;
+        self.generation = self.generation.wrapping_add(1);
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorldMapStart {
     pub position: Geodetic,
     pub month: u8,
+    pub aircraft_choice: usize,
+    pub generation: u64,
 }
 
 /// One fixed-size image, rebuilt by the app only for new layer/month data.
@@ -498,6 +587,8 @@ pub enum WorldMapText {
     CoordinateHint,
     Navigation,
     Weather,
+    AircraftChoice,
+    AircraftDetail,
     Credits,
     CreditsPage,
 }
@@ -517,6 +608,8 @@ pub enum WorldMapButton {
     NextCreditsPage,
     Start,
     Aircraft,
+    PreviousAircraft,
+    NextAircraft,
     PreviousMonth,
     NextMonth,
     Layer(WorldMapLayer),
@@ -611,6 +704,17 @@ pub fn spawn_world_map(
                 map_column.spawn((Text::new("90 S      A  aircraft       +  selected       1-8  destinations"), TextFont { font_size: 13.0, ..default() }, TextColor(MUTED)));
                 spawn_map_text(map_column, WorldMapText::Legend, 13.0, TEXT);
                 spawn_map_text(map_column, WorldMapText::Status, 12.0, MUTED);
+                map_column.spawn(Node {
+                    width: percent(100.0), column_gap: px(6.0), align_items: AlignItems::Center,
+                    ..default()
+                }).with_children(|aircraft| {
+                    spawn_button(aircraft, "< PgUp", WorldMapButton::PreviousAircraft, px(72.0));
+                    aircraft.spawn(Node { flex_grow: 1.0, flex_basis: px(0.0), min_width: px(0.0), ..default() }).with_children(|label| {
+                        spawn_map_text(label, WorldMapText::AircraftChoice, 13.0, ACCENT);
+                    });
+                    spawn_button(aircraft, "PgDn >", WorldMapButton::NextAircraft, px(72.0));
+                });
+                spawn_map_text(map_column, WorldMapText::AircraftDetail, 12.0, TEXT);
                 spawn_map_text(map_column, WorldMapText::Weather, 12.0, TEXT);
             });
             body.spawn((Node {
@@ -813,6 +917,8 @@ pub fn handle_world_map_input(
     canvases: Query<&RelativeCursorPosition, With<WorldMapCanvas>>,
 ) {
     let began_on_plain_map = state.new_flight_controls_active();
+    let began_with_aircraft_controls = state.aircraft_controls_active();
+    state.invalidate_pending_start(&mut actions);
     actions.new_flight_shortcuts_available = false;
     // ButtonInput loses event order and duplicate presses. Keep modifier history
     // from the ordered message stream, including while the editor/map is hidden.
@@ -870,7 +976,13 @@ pub fn handle_world_map_input(
             );
         }
     }
+    // A clicked editor owns the frame before app workers may finish. Commit
+    // also invalidates older snapshots, even if the value was changed back.
+    state.invalidate_pending_start(&mut actions);
     if lost_focus {
+        if state.visible {
+            consume_aircraft_keys(&mut keys, logical_keys.as_deref_mut());
+        }
         return;
     }
     if keys.just_pressed(KeyCode::KeyM) {
@@ -880,7 +992,7 @@ pub fn handle_world_map_input(
         state.credits_visible = false;
         state.coordinate_field = None;
         state.coordinate_error.clear();
-        actions.start_at = None;
+        actions.invalidate_start();
         consume_start_keys(&mut keys);
         keys.clear_just_pressed(KeyCode::KeyM);
         keys.clear_just_pressed(KeyCode::Escape);
@@ -902,6 +1014,7 @@ pub fn handle_world_map_input(
                     && *button == WorldMapButton::Regions(RegionsButton::Close)
             });
         if close {
+            actions.invalidate_start();
             state.regions.dismiss(&mut actions.regions);
             keys.clear_just_pressed(KeyCode::Escape);
             return;
@@ -940,6 +1053,7 @@ pub fn handle_world_map_input(
                 *interaction == Interaction::Pressed && *button == WorldMapButton::CloseCredits
             });
         if close {
+            actions.invalidate_start();
             state.credits_visible = false;
             keys.clear_just_pressed(KeyCode::Escape);
             return;
@@ -972,7 +1086,7 @@ pub fn handle_world_map_input(
         state.regions.dismiss(&mut actions.regions);
         state.coordinate_field = None;
         state.coordinate_error.clear();
-        actions.start_at = None;
+        actions.invalidate_start();
         consume_start_keys(&mut keys);
         // App pause handlers must not also act on the map's close key.
         keys.clear_just_pressed(KeyCode::Escape);
@@ -988,7 +1102,7 @@ pub fn handle_world_map_input(
     {
         regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
         state.show_regions();
-        actions.start_at = None;
+        state.invalidate_pending_start(&mut actions);
         consume_start_keys(&mut keys);
         return;
     }
@@ -996,13 +1110,49 @@ pub fn handle_world_map_input(
         *interaction == Interaction::Pressed && *button == WorldMapButton::OpenCredits
     }) {
         state.show_credits();
-        actions.start_at = None;
+        state.invalidate_pending_start(&mut actions);
+        consume_aircraft_keys(&mut keys, logical_keys.as_deref_mut());
         consume_start_keys(&mut keys);
         return;
     }
+    let aircraft_direction = if began_with_aircraft_controls
+        && state.aircraft_controls_active()
+        && regions::shortcuts_allowed(&keys, logical_keys.as_deref())
+    {
+        if keys.just_pressed(KeyCode::PageUp) {
+            Some(false)
+        } else if keys.just_pressed(KeyCode::PageDown) {
+            Some(true)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    consume_aircraft_keys(&mut keys, logical_keys.as_deref_mut());
     // Even a repeated Enter in the same message batch must never submit a
     // coordinate and then also start a new flight.
     if coordinate_enter {
+        return;
+    }
+    // Choose the preview before considering Start, independent of ECS button
+    // iteration order. A changed selection owns this entire frame.
+    let aircraft_direction = aircraft_direction.or_else(|| {
+        buttons.iter().find_map(|(interaction, button)| {
+            if *interaction != Interaction::Pressed {
+                return None;
+            }
+            match button {
+                WorldMapButton::PreviousAircraft => Some(false),
+                WorldMapButton::NextAircraft => Some(true),
+                _ => None,
+            }
+        })
+    });
+    if let Some(next) = aircraft_direction
+        && state.shift_aircraft(next, &mut actions)
+    {
+        consume_start_keys(&mut keys);
         return;
     }
     // Closing a child modal or committing an editor does not transfer that
@@ -1027,6 +1177,7 @@ pub fn handle_world_map_input(
                 };
                 if let Some(position) = geodetic_from_map_point(point) {
                     state.select(position, "Custom point");
+                    state.invalidate_pending_start(&mut actions);
                 }
             }
         }
@@ -1042,9 +1193,12 @@ pub fn handle_world_map_input(
             | WorldMapButton::OpenCredits
             | WorldMapButton::CloseCredits
             | WorldMapButton::PreviousCreditsPage
-            | WorldMapButton::NextCreditsPage => {} // handled first
+            | WorldMapButton::NextCreditsPage
+            | WorldMapButton::PreviousAircraft
+            | WorldMapButton::NextAircraft => {} // handled first
             WorldMapButton::Start => {
                 if state.commit_coordinate() {
+                    state.invalidate_pending_start(&mut actions);
                     state.request_start(&mut actions);
                 }
             }
@@ -1064,12 +1218,22 @@ pub fn handle_world_map_input(
             // Focus was already established before this frame's keyboard batch.
             WorldMapButton::Latitude | WorldMapButton::Longitude => {}
         }
+        state.invalidate_pending_start(&mut actions);
     }
 }
 
 fn consume_start_keys(keys: &mut ButtonInput<KeyCode>) {
     keys.clear_just_pressed(KeyCode::Enter);
     keys.clear_just_pressed(KeyCode::NumpadEnter);
+}
+
+fn consume_aircraft_keys(keys: &mut ButtonInput<KeyCode>, logical: Option<&mut ButtonInput<Key>>) {
+    keys.clear_just_pressed(KeyCode::PageUp);
+    keys.clear_just_pressed(KeyCode::PageDown);
+    if let Some(logical) = logical {
+        logical.clear_just_pressed(Key::PageUp);
+        logical.clear_just_pressed(Key::PageDown);
+    }
 }
 
 /// Apply one ordered key event. The bool means an editor Enter was handled,
@@ -1238,6 +1402,10 @@ pub fn update_world_map(
                     | (WorldMapButton::Longitude, Some(CoordinateField::Longitude))
             );
         let disabled = (*button == WorldMapButton::Start && !state.navigation_enabled)
+            || (matches!(
+                button,
+                WorldMapButton::PreviousAircraft | WorldMapButton::NextAircraft
+            ) && (!state.aircraft_controls_active() || state.aircraft_choice_count() < 2))
             || matches!(button, WorldMapButton::Regions(button) if state.regions.button_disabled(*button))
             || (*button == WorldMapButton::PreviousCreditsPage && state.credits_page == 0)
             || (*button == WorldMapButton::NextCreditsPage
@@ -1319,6 +1487,45 @@ pub fn format_world_map_text(
         }
         WorldMapText::Navigation => bounded_ascii(&state.navigation_note, 42, 2),
         WorldMapText::Weather => bounded_ascii(&state.weather_note, 72, 2),
+        WorldMapText::AircraftChoice => {
+            if !state.aircraft_selection_enabled {
+                format!(
+                    "AIRCRAFT LOCKED: {}",
+                    bounded_ascii(&state.active_aircraft, AIRCRAFT_LABEL_COLUMNS, 1)
+                )
+            } else if let Some(choice) = state.selected_aircraft() {
+                format!(
+                    "AIRCRAFT {}/{}: {}",
+                    state.aircraft_choice + 1,
+                    state.aircraft_choice_count(),
+                    bounded_ascii(&choice.label, AIRCRAFT_LABEL_COLUMNS, 1)
+                )
+            } else {
+                "AIRCRAFT: no selection available".to_owned()
+            }
+        }
+        WorldMapText::AircraftDetail => {
+            if !state.aircraft_selection_enabled {
+                return "Current flight aircraft is locked\nSelection is unavailable in this session".to_owned();
+            }
+            let current = bounded_ascii(&state.active_aircraft, AIRCRAFT_LABEL_COLUMNS, 1);
+            let note = state.selected_aircraft().map_or_else(
+                || "No catalog entry selected".to_owned(),
+                |choice| {
+                    let prefix = if choice.available {
+                        ""
+                    } else {
+                        "Unavailable: "
+                    };
+                    bounded_ascii(
+                        &format!("{prefix}{}", choice.note),
+                        AIRCRAFT_DETAIL_COLUMNS,
+                        1,
+                    )
+                },
+            );
+            format!("Current: {current} | Applies on Start\n{note}")
+        }
         WorldMapText::Credits => {
             let pages = credit_pages(&state.source_credits);
             pages[state.credits_page.min(pages.len() - 1)].clone()
@@ -1568,6 +1775,9 @@ mod tests {
         let request = actions.start_at.take().unwrap();
         assert_eq!(request.position, state.selected);
         assert_eq!(request.month, 2);
+        assert_eq!(request.aircraft_choice, 0);
+        assert_eq!(request.generation, 1);
+        assert_eq!(actions.generation, 1);
         assert!(actions.start_at.take().is_none());
         let blocked = WorldMapState {
             navigation_enabled: false,
@@ -1575,6 +1785,459 @@ mod tests {
         };
         blocked.request_start(&mut actions);
         assert!(actions.start_at.is_none());
+        assert_eq!(actions.generation, 2);
+    }
+
+    fn aircraft_picker_state() -> WorldMapState {
+        WorldMapState {
+            visible: true,
+            aircraft_selection_enabled: true,
+            active_aircraft: "Active trainer".into(),
+            aircraft: Some(Geodetic::from_degrees(51.0, -1.0, 1200.0)),
+            aircraft_choices: (0..4)
+                .map(|index| WorldMapAircraftChoice {
+                    label: format!("Choice {index}"),
+                    note: if index == 2 {
+                        "Regional terrain is not supported".into()
+                    } else {
+                        "Ready for a new flight".into()
+                    },
+                    available: index != 2,
+                })
+                .collect(),
+            ..default()
+        }
+    }
+
+    #[test]
+    fn aircraft_preview_cycles_are_bounded_and_do_not_change_the_live_flight() {
+        let mut state = aircraft_picker_state();
+        let active = state.active_aircraft.clone();
+        let location = state.aircraft;
+        let selected = state.selected;
+        let mut actions = WorldMapActions::default();
+        state.aircraft_choices.push(WorldMapAircraftChoice {
+            label: "Beyond the bounded catalog".into(),
+            note: String::new(),
+            available: true,
+        });
+        for expected in [1, 2, 3, 0, 1, 2] {
+            state.request_start(&mut actions);
+            let previous = actions.start_at.unwrap();
+            assert!(state.shift_aircraft(true, &mut actions));
+            assert_eq!(state.aircraft_choice, expected);
+            assert!(actions.start_at.is_none());
+            assert!(actions.generation > previous.generation);
+            assert_eq!(state.active_aircraft, active);
+            assert_eq!(state.aircraft, location);
+            assert_eq!(state.selected, selected);
+            assert_eq!(state.month, 7);
+        }
+        let text = format_world_map_text(
+            WorldMapText::AircraftDetail,
+            &state,
+            &WorldMapRaster::default(),
+        );
+        assert!(text.contains("Unavailable: Regional terrain is not supported"));
+        // Unavailable rows remain inspectable; final target validation is app-owned.
+        state.request_start(&mut actions);
+        assert_eq!(actions.start_at.unwrap().aircraft_choice, 2);
+        assert!(state.shift_aircraft(false, &mut actions));
+        assert_eq!(state.aircraft_choice, 1);
+    }
+
+    #[test]
+    fn aircraft_selection_wins_over_enter_and_start_for_legacy_flat_navigation() {
+        for by_keyboard in [false, true] {
+            let mut app = input_app();
+            app.insert_resource(WorldMapState {
+                navigation_enabled: false,
+                ..aircraft_picker_state()
+            });
+            app.world_mut()
+                .spawn((Interaction::Pressed, WorldMapButton::Start));
+            if !by_keyboard {
+                app.world_mut()
+                    .spawn((Interaction::Pressed, WorldMapButton::NextAircraft));
+            }
+            region_keys(
+                &mut app,
+                if by_keyboard {
+                    &[KeyCode::PageDown, KeyCode::Enter]
+                } else {
+                    &[KeyCode::Enter]
+                },
+            );
+            assert_eq!(app.world().resource::<WorldMapState>().aircraft_choice, 1);
+            let actions = app.world().resource::<WorldMapActions>();
+            assert_eq!(actions.generation, 1);
+            assert!(actions.start_at.is_none());
+            assert!(!actions.new_flight_shortcuts_available);
+            assert!(
+                !app.world()
+                    .resource::<ButtonInput<KeyCode>>()
+                    .just_pressed(KeyCode::Enter)
+            );
+        }
+        let mut app = input_app();
+        app.insert_resource(aircraft_picker_state());
+        region_keys(&mut app, &[KeyCode::PageUp, KeyCode::Enter]);
+        assert_eq!(app.world().resource::<WorldMapState>().aircraft_choice, 3);
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        region_keys(&mut app, &[KeyCode::Enter]);
+        let request = app.world().resource::<WorldMapActions>().start_at.unwrap();
+        assert_eq!(request.aircraft_choice, 3);
+        assert_eq!(request.generation, 2);
+    }
+
+    #[test]
+    fn aircraft_picker_respects_coordinate_modal_focus_and_replay_ownership() {
+        for case in 0..7 {
+            let mut app = input_app();
+            app.insert_resource(aircraft_picker_state());
+            match case {
+                0 => app
+                    .world_mut()
+                    .resource_mut::<WorldMapState>()
+                    .show_regions(),
+                1 => app
+                    .world_mut()
+                    .resource_mut::<WorldMapState>()
+                    .show_credits(),
+                2 => app
+                    .world_mut()
+                    .resource_mut::<WorldMapState>()
+                    .begin_coordinate(CoordinateField::Latitude),
+                3 => {
+                    app.world_mut()
+                        .resource_mut::<WorldMapState>()
+                        .aircraft_selection_enabled = false
+                }
+                4 => app.world_mut().resource_mut::<WorldMapState>().visible = false,
+                5 => {
+                    app.world_mut().write_message(KeyboardFocusLost).unwrap();
+                }
+                _ => {
+                    app.world_mut()
+                        .spawn((Interaction::Pressed, WorldMapButton::Latitude));
+                }
+            }
+            app.world_mut()
+                .spawn((Interaction::Pressed, WorldMapButton::NextAircraft));
+            region_keys(&mut app, &[KeyCode::PageDown]);
+            let state = app.world().resource::<WorldMapState>();
+            assert_eq!(state.aircraft_choice, 0, "ownership case {case}");
+            assert_eq!(state.active_aircraft, "Active trainer");
+            assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+            if case != 4 {
+                assert!(
+                    !app.world()
+                        .resource::<ButtonInput<KeyCode>>()
+                        .just_pressed(KeyCode::PageDown)
+                );
+            }
+        }
+        let mut app = input_app();
+        app.insert_resource(aircraft_picker_state());
+        region_keys(&mut app, &[KeyCode::ControlLeft, KeyCode::PageDown]);
+        assert_eq!(app.world().resource::<WorldMapState>().aircraft_choice, 0);
+    }
+
+    #[test]
+    fn aircraft_selection_and_coordinate_enter_never_share_a_frame() {
+        let mut app = input_app();
+        app.insert_resource(aircraft_picker_state());
+        {
+            let mut state = app.world_mut().resource_mut::<WorldMapState>();
+            state.begin_coordinate(CoordinateField::Latitude);
+            state.coordinate_draft = "12".into();
+        }
+        app.world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::NextAircraft));
+        send_keys(
+            &mut app,
+            [key_event(
+                KeyCode::Enter,
+                Key::Enter,
+                None,
+                ButtonState::Pressed,
+            )],
+        );
+        region_keys(&mut app, &[KeyCode::PageDown, KeyCode::Enter]);
+        let state = app.world().resource::<WorldMapState>();
+        near(state.selected.latitude_degrees(), 12.0);
+        assert_eq!(state.aircraft_choice, 0);
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        assert!(
+            !app.world()
+                .resource::<WorldMapActions>()
+                .new_flight_shortcuts_available
+        );
+    }
+
+    #[test]
+    fn map_cancellation_and_child_modal_open_invalidate_consumed_aircraft_requests() {
+        for case in 0..5 {
+            let mut app = input_app();
+            app.insert_resource(aircraft_picker_state());
+            region_keys(&mut app, &[KeyCode::Enter]);
+            let request = app
+                .world_mut()
+                .resource_mut::<WorldMapActions>()
+                .start_at
+                .take()
+                .unwrap();
+            assert_eq!(request.generation, 1);
+            match case {
+                0 => region_keys(&mut app, &[KeyCode::Escape]),
+                1 => region_keys(&mut app, &[KeyCode::KeyM]),
+                2 => region_keys(&mut app, &[KeyCode::KeyG]),
+                3 => {
+                    app.world_mut()
+                        .spawn((Interaction::Pressed, WorldMapButton::OpenCredits));
+                    region_keys(&mut app, &[KeyCode::Enter, KeyCode::PageDown]);
+                }
+                _ => {
+                    app.world_mut()
+                        .resource_mut::<WorldMapState>()
+                        .show_regions();
+                    region_keys(&mut app, &[KeyCode::Enter]);
+                }
+            }
+            let actions = app.world().resource::<WorldMapActions>();
+            assert!(
+                actions.generation > request.generation,
+                "cancel case {case}"
+            );
+            assert!(actions.start_at.is_none());
+            let state = app.world().resource::<WorldMapState>();
+            assert_eq!(state.active_aircraft, "Active trainer");
+            assert_eq!(state.aircraft_choice, 0);
+        }
+    }
+
+    #[test]
+    fn original_aircraft_names_and_launch_labels_are_complete_and_prefixed_once() {
+        for name in [
+            "Swift Sport (generic)",
+            "Meadow Trainer (generic)",
+            "Kestrel Jet Trainer (fictional)",
+        ] {
+            let mut state = aircraft_picker_state();
+            state.active_aircraft = name.into();
+            let launch = format!("Launch: {name}");
+            state.aircraft_choices[0].label = launch.clone();
+            state.aircraft_choices[0].note =
+                "Launch profile with its model and sound choices".into();
+            let raster = WorldMapRaster::default();
+            let choice = format_world_map_text(WorldMapText::AircraftChoice, &state, &raster);
+            assert_eq!(choice, format!("AIRCRAFT 1/4: {launch}"));
+            let detail = format_world_map_text(WorldMapText::AircraftDetail, &state, &raster);
+            assert_eq!(
+                detail,
+                format!(
+                    "Current: {name} | Applies on Start\nLaunch profile with its model and sound choices"
+                )
+            );
+            state.aircraft_selection_enabled = false;
+            assert_eq!(
+                format_world_map_text(WorldMapText::AircraftChoice, &state, &raster),
+                format!("AIRCRAFT LOCKED: {name}"),
+            );
+        }
+    }
+
+    #[test]
+    fn aircraft_labels_notes_and_invalid_external_indices_are_bounded() {
+        let mut state = aircraft_picker_state();
+        state.active_aircraft = "Current\t日本".repeat(100);
+        state.aircraft_choices[0].label = "\t日本W".repeat(100);
+        state.aircraft_choices[0].note = "\t日本W".repeat(100);
+        for enabled in [true, false] {
+            state.aircraft_selection_enabled = enabled;
+            for kind in [WorldMapText::AircraftChoice, WorldMapText::AircraftDetail] {
+                let text = format_world_map_text(kind, &state, &WorldMapRaster::default());
+                assert!(text.is_ascii());
+                assert!(text.lines().count() <= 2);
+                assert!(text.len() < 160);
+                assert!(!text.contains('\t'));
+            }
+        }
+        state.aircraft_selection_enabled = true;
+        state.aircraft_choice = usize::MAX;
+        assert!(
+            format_world_map_text(
+                WorldMapText::AircraftChoice,
+                &state,
+                &WorldMapRaster::default()
+            )
+            .contains("no selection")
+        );
+        state.aircraft_choices.clear();
+        assert!(!state.shift_aircraft(true, &mut WorldMapActions::default()));
+    }
+
+    #[test]
+    fn destination_and_month_away_then_back_cannot_revive_consumed_starts() {
+        for change_month in [false, true] {
+            let mut app = input_app();
+            app.insert_resource(aircraft_picker_state());
+            region_keys(&mut app, &[KeyCode::Enter]);
+            let request = app
+                .world_mut()
+                .resource_mut::<WorldMapActions>()
+                .start_at
+                .take()
+                .unwrap();
+            let button = app
+                .world_mut()
+                .spawn((Interaction::None, WorldMapButton::Start))
+                .id();
+            let choices = if change_month {
+                [WorldMapButton::NextMonth, WorldMapButton::PreviousMonth]
+            } else {
+                [
+                    WorldMapButton::Destination(1),
+                    WorldMapButton::Destination(0),
+                ]
+            };
+            for (index, choice) in choices.into_iter().enumerate() {
+                *app.world_mut().get_mut::<WorldMapButton>(button).unwrap() = choice;
+                *app.world_mut().get_mut::<Interaction>(button).unwrap() = Interaction::Pressed;
+                region_keys(&mut app, &[]);
+                let actions = app.world().resource::<WorldMapActions>();
+                assert_eq!(
+                    actions.generation,
+                    request.generation + u64::try_from(index).unwrap() + 1
+                );
+                assert!(actions.start_at.is_none());
+            }
+            let state = app.world().resource::<WorldMapState>();
+            assert_eq!(state.selected, request.position);
+            assert_eq!(state.month, request.month);
+            assert_eq!(state.active_aircraft, "Active trainer");
+        }
+    }
+
+    #[test]
+    fn external_destination_changes_and_canvas_click_invalidate_consumed_starts() {
+        for external in [true, false] {
+            let mut app = input_app();
+            app.insert_resource(aircraft_picker_state());
+            region_keys(&mut app, &[KeyCode::Enter]);
+            let request = app
+                .world_mut()
+                .resource_mut::<WorldMapActions>()
+                .start_at
+                .take()
+                .unwrap();
+            if external {
+                let mut state = app.world_mut().resource_mut::<WorldMapState>();
+                state.select(WORLD_MAP_DESTINATIONS[1].position(), "Alps");
+                state.select(request.position, "Back again");
+            } else {
+                app.world_mut().spawn((
+                    RelativeCursorPosition {
+                        cursor_over: true,
+                        normalized: Some(Vec2::ZERO),
+                    },
+                    WorldMapCanvas,
+                ));
+                app.world_mut()
+                    .resource_mut::<ButtonInput<MouseButton>>()
+                    .press(MouseButton::Left);
+            }
+            region_keys(&mut app, &[]);
+            let actions = app.world().resource::<WorldMapActions>();
+            assert!(actions.generation > request.generation);
+            assert!(actions.start_at.is_none());
+        }
+    }
+
+    #[test]
+    fn coordinate_focus_and_commit_invalidate_consumed_starts_before_app_work() {
+        let mut app = input_app();
+        app.insert_resource(aircraft_picker_state());
+        region_keys(&mut app, &[KeyCode::Enter]);
+        let request = app
+            .world_mut()
+            .resource_mut::<WorldMapActions>()
+            .start_at
+            .take()
+            .unwrap();
+        app.world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::Latitude));
+        region_keys(&mut app, &[]);
+        assert!(
+            !app.world()
+                .resource::<WorldMapState>()
+                .new_flight_modal_ready()
+        );
+        assert_eq!(
+            app.world().resource::<WorldMapActions>().generation,
+            request.generation + 1
+        );
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .coordinate_draft = "35.55".into();
+        send_keys(
+            &mut app,
+            [key_event(
+                KeyCode::Enter,
+                Key::Enter,
+                None,
+                ButtonState::Pressed,
+            )],
+        );
+        region_keys(&mut app, &[KeyCode::Enter]);
+        let state = app.world().resource::<WorldMapState>();
+        assert!(state.new_flight_modal_ready());
+        assert_eq!(state.selected, request.position);
+        let actions = app.world().resource::<WorldMapActions>();
+        assert_eq!(actions.generation, request.generation + 2);
+        assert!(actions.start_at.is_none());
+    }
+
+    #[test]
+    fn explicit_start_click_commits_coordinate_before_new_generation_snapshot() {
+        let mut app = input_app();
+        app.insert_resource(aircraft_picker_state());
+        {
+            let mut state = app.world_mut().resource_mut::<WorldMapState>();
+            state.begin_coordinate(CoordinateField::Latitude);
+            state.coordinate_draft = "12".into();
+        }
+        app.world_mut()
+            .spawn((Interaction::Pressed, WorldMapButton::Start));
+        region_keys(&mut app, &[]);
+        let actions = app.world().resource::<WorldMapActions>();
+        let request = actions.start_at.unwrap();
+        assert_eq!(request.generation, actions.generation);
+        near(request.position.latitude_degrees(), 12.0);
+        assert!(
+            app.world()
+                .resource::<WorldMapState>()
+                .new_flight_modal_ready()
+        );
+    }
+
+    #[test]
+    fn prepared_flight_modal_gate_is_independent_of_navigation_support() {
+        let mut state = WorldMapState {
+            navigation_enabled: false,
+            ..aircraft_picker_state()
+        };
+        assert!(state.new_flight_modal_ready());
+        assert!(!state.new_flight_controls_active());
+        state.begin_coordinate(CoordinateField::Longitude);
+        assert!(!state.new_flight_modal_ready());
+        state.show_credits();
+        assert!(!state.new_flight_modal_ready());
+        state.show_regions();
+        assert!(!state.new_flight_modal_ready());
+        state.regions.visible = false;
+        state.visible = false;
+        assert!(!state.new_flight_modal_ready());
     }
 
     #[test]
@@ -1910,6 +2573,8 @@ mod tests {
         app.world_mut().resource_mut::<WorldMapActions>().start_at = Some(WorldMapStart {
             position: WORLD_MAP_DESTINATIONS[0].position(),
             month: 7,
+            aircraft_choice: 0,
+            generation: 0,
         });
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
@@ -2127,6 +2792,10 @@ mod tests {
     // manually sized camera avoids GPU/window requirements without substituting
     // estimated character widths or hand-calculated flex sizes.
     fn real_layout_app(state: WorldMapState) -> App {
+        real_layout_app_at_size(state, UVec2::new(1280, 720))
+    }
+
+    fn real_layout_app_at_size(state: WorldMapState, physical_size: UVec2) -> App {
         use bevy::camera::{ComputedCameraValues, RenderTargetInfo, Viewport};
         let mut app = App::new();
         app.add_plugins((
@@ -2153,13 +2822,13 @@ mod tests {
             Camera {
                 computed: ComputedCameraValues {
                     target_info: Some(RenderTargetInfo {
-                        physical_size: UVec2::new(1280, 720),
+                        physical_size,
                         scale_factor: 1.0,
                     }),
                     ..default()
                 },
                 viewport: Some(Viewport {
-                    physical_size: UVec2::new(1280, 720),
+                    physical_size,
                     ..default()
                 }),
                 ..default()
@@ -2262,6 +2931,119 @@ mod tests {
     }
 
     #[test]
+    fn real_font_layout_preserves_complete_original_names_in_live_and_locked_maps() {
+        for size in [
+            UVec2::new(1024, 720),
+            UVec2::new(1180, 812),
+            UVec2::new(1280, 720),
+        ] {
+            for name in [
+                "Swift Sport (generic)",
+                "Meadow Trainer (generic)",
+                "Kestrel Jet Trainer (fictional)",
+            ] {
+                for enabled in [true, false] {
+                    let mut state = aircraft_picker_state();
+                    state.active_aircraft = name.into();
+                    state.aircraft_selection_enabled = enabled;
+                    state.aircraft_choices[0].label = format!("Launch: {name}");
+                    state.aircraft_choices[0].note =
+                        "Launch profile with its model and sound choices".into();
+                    let mut app = real_layout_app_at_size(state, size);
+                    let world = app.world_mut();
+                    let body = world
+                        .query_filtered::<Entity, With<WorldMapBody>>()
+                        .single(world)
+                        .unwrap();
+                    let body_rect = computed_rect(world, body);
+                    for (entity, kind, text) in
+                        world.query::<(Entity, &WorldMapText, &Text)>().iter(world)
+                    {
+                        if !matches!(
+                            kind,
+                            WorldMapText::AircraftChoice | WorldMapText::AircraftDetail
+                        ) {
+                            continue;
+                        }
+                        let rect = computed_rect(world, entity);
+                        assert!(
+                            body_rect.contains(rect.min) && body_rect.contains(rect.max),
+                            "{size:?} {name}: {kind:?} outside body"
+                        );
+                        assert_text_fits(world, entity);
+                        if *kind == WorldMapText::AircraftChoice || enabled {
+                            assert!(
+                                text.as_str().contains(name),
+                                "{size:?}: full name missing from {text:?}"
+                            );
+                            assert!(
+                                !text.as_str().contains("..."),
+                                "{size:?}: original name was abbreviated"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn aircraft_picker_and_weather_fit_below_map_at_narrow_720p_viewports() {
+        for width in [1024, 1280] {
+            let mut state = aircraft_picker_state();
+            state.active_aircraft = "W".repeat(200);
+            state.aircraft_choices[0].label = "W".repeat(200);
+            state.aircraft_choices[0].note = "W".repeat(200);
+            state.weather_note = "Weather: MONTHLY / LEGACY [F12]\nAuthored / monthly model, not live; applies on Start".into();
+            let mut app = real_layout_app_at_size(state, UVec2::new(width, 720));
+            let world = app.world_mut();
+            let body = world
+                .query_filtered::<Entity, With<WorldMapBody>>()
+                .single(world)
+                .unwrap();
+            let canvas = world
+                .query_filtered::<Entity, With<WorldMapCanvas>>()
+                .single(world)
+                .unwrap();
+            let body_rect = computed_rect(world, body);
+            let canvas_rect = computed_rect(world, canvas);
+            for (entity, kind) in world.query::<(Entity, &WorldMapText)>().iter(world) {
+                if !matches!(
+                    kind,
+                    WorldMapText::AircraftChoice
+                        | WorldMapText::AircraftDetail
+                        | WorldMapText::Weather
+                ) {
+                    continue;
+                }
+                let rect = computed_rect(world, entity);
+                assert!(
+                    rect.min.y >= canvas_rect.max.y,
+                    "picker above map at {width}: {kind:?}"
+                );
+                assert!(
+                    body_rect.contains(rect.min) && body_rect.contains(rect.max),
+                    "picker outside body at {width}: {kind:?}, {rect:?}"
+                );
+                assert_text_fits(world, entity);
+            }
+            for (entity, button) in world.query::<(Entity, &WorldMapButton)>().iter(world) {
+                if matches!(
+                    button,
+                    WorldMapButton::PreviousAircraft | WorldMapButton::NextAircraft
+                ) {
+                    let rect = computed_rect(world, entity);
+                    assert!(rect.width() >= 70.0 && rect.height() >= MAP_BUTTON_HEIGHT - 1.0);
+                    assert!(
+                        body_rect.contains(rect.min) && body_rect.contains(rect.max),
+                        "unreachable aircraft button at {width}: {button:?}, {rect:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn real_layout_keeps_full_credits_page_and_controls_inside_panel() {
         let mut state = WorldMapState {
             source_credits: vec!["W".repeat(CREDIT_COLUMNS); CREDIT_LINES_PER_PAGE * 2].join("\n"),
@@ -2339,6 +3121,8 @@ mod tests {
             app.world_mut().resource_mut::<WorldMapActions>().start_at = Some(WorldMapStart {
                 position: WORLD_MAP_DESTINATIONS[0].position(),
                 month: 7,
+                aircraft_choice: 0,
+                generation: 0,
             });
             app.world_mut()
                 .resource_mut::<ButtonInput<KeyCode>>()

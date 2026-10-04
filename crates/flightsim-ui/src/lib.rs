@@ -335,6 +335,11 @@ struct HudBottom;
 #[derive(Component)]
 struct HudBottomPanels;
 
+/// Final UI readers of committed flight state. Hosts order this set after
+/// their exclusive new-flight transaction and state publishers.
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FlightDisplaySystems;
+
 /// HUD のプラグイン。
 #[derive(Debug, Default)]
 pub struct FlightsimUiPlugin;
@@ -359,7 +364,7 @@ impl Plugin for FlightsimUiPlugin {
                 (
                     update_hud,
                     update_flight_log_display,
-                    update_data_attribution_display,
+                    update_data_attribution_display.in_set(FlightDisplaySystems),
                 ),
             )
             // 着陸評価。`LandingReport` 自体は着陸するまで存在しないので、
@@ -377,21 +382,30 @@ impl Plugin for FlightsimUiPlugin {
             // 再生中の表示。app が `ReplayStatus` を埋めなければ出ない。
             .init_resource::<replay::ReplayStatus>()
             .add_systems(Startup, replay::spawn_replay_banner.after(spawn_hud))
-            .add_systems(Update, replay::update_replay_banner)
+            .add_systems(
+                Update,
+                replay::update_replay_banner.in_set(FlightDisplaySystems),
+            )
             // 一時停止。app が `Esc` で `Paused` を切り替える。
             .init_resource::<pause::Paused>()
             .add_systems(Startup, pause::spawn_pause_overlay)
-            .add_systems(Update, pause::update_pause_overlay)
+            .add_systems(
+                Update,
+                pause::update_pause_overlay.in_set(FlightDisplaySystems),
+            )
             // 墜落。app が `CrashNotice` を埋めなければ出ない。
             .init_resource::<crash::CrashNotice>()
             .add_systems(Startup, crash::spawn_crash_overlay)
-            .add_systems(Update, crash::update_crash_overlay)
+            .add_systems(
+                Update,
+                crash::update_crash_overlay.in_set(FlightDisplaySystems),
+            )
             // 計器盤。コックピット視点のときだけ出る。
             .add_systems(Startup, instruments::spawn_instrument_panel)
             .add_systems(
                 Update,
                 (
-                    instruments::update_instrument_visibility,
+                    instruments::update_instrument_visibility.in_set(FlightDisplaySystems),
                     instruments::update_instruments,
                     instruments::update_panel_lighting,
                 ),

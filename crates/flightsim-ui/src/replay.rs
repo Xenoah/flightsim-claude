@@ -179,7 +179,7 @@ fn format_replay_progress(status: &ReplayStatus) -> String {
         1.0
     };
     format!(
-        "{state}  x{speed:.1}  {} / {}   F5 pause   F6/F7 speed   F8 back 10s",
+        "{state}  x{speed:.1}  {} / {}   F5 pause/resume   F6/F7 speed   F8 back 10s",
         clock(status.elapsed),
         clock(status.total)
     )
@@ -265,6 +265,7 @@ mod tests {
         let mut status = status();
         status.paused = true;
         assert!(format_replay_banner(&status).starts_with("PAUSED"));
+        assert!(format_replay_banner(&status).contains("F5 pause/resume"));
     }
 
     #[test]

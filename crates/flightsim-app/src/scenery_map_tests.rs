@@ -150,6 +150,8 @@ fn map_relocation_cancels_pending_ground_swap_and_removes_retained_old_assets() 
     advance(&mut world, false);
     assert!(world.resource::<TerrainTiles>().is_stitching());
     world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+        aircraft_choice: 0,
+        generation: 0,
         position: Geodetic::from_degrees(-33.95, 151.18, 0.0),
         month: 7,
     });
@@ -217,6 +219,8 @@ fn map_relocation_cancels_eight_uploaded_and_eight_queued_scenery_batches() {
         .resource_mut::<scenery_runtime::SceneryRuntime>()
         .queue_ready_test_worker();
     world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+        aircraft_choice: 0,
+        generation: 0,
         position: Geodetic::from_degrees(-33.95, 151.18, 0.0),
         month: 7,
     });

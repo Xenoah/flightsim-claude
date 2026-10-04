@@ -768,6 +768,8 @@ fn jet_map_new_flight_reseeds_displayed_values_in_the_commit_update() {
             > 5000.0
     );
     app.world_mut().resource_mut::<WorldMapActions>().start_at = Some(WorldMapStart {
+        aircraft_choice: 0,
+        generation: 0,
         position: Geodetic::from_degrees(0.0, -140.0, 0.0),
         month: 7,
     });

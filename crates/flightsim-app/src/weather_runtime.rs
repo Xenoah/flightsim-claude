@@ -177,7 +177,7 @@ fn select_pending_weather(
     startup: Res<Startup>,
     mut map: ResMut<WorldMapState>,
     capture: Res<world_runtime::MapCapture>,
-    actions: Res<WorldMapActions>,
+    mut actions: ResMut<WorldMapActions>,
     playback: Option<Res<ReplayPlayback>>,
     simulation: Option<Res<FlightSimulation>>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
@@ -203,6 +203,7 @@ fn select_pending_weather(
     {
         if keys.just_pressed(KeyCode::F12) && actions.new_flight_shortcuts_available {
             pending.requested = next_preset(pending.requested);
+            actions.invalidate_start();
         }
         // A map-owned F12 must never also leave a LAN session or leak on Close.
         keys.clear_just_pressed(KeyCode::F12);

@@ -58,10 +58,12 @@ use flightsim_world::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+mod aircraft_picker_runtime;
 mod aircraft_profile;
 #[cfg(test)]
 #[path = "aircraft_profile/schema_contract.rs"]
 mod aircraft_profile_schema_contract;
+mod aircraft_scene;
 mod airport_drape_runtime;
 mod cloud_runtime;
 mod distance_runtime;
@@ -886,6 +888,7 @@ fn main() -> bevy::app::AppExit {
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
     region_runtime::configure(&mut app);
+    aircraft_picker_runtime::configure(&mut app);
     configure_live_input_scheduling(&mut app);
     configure_flight_presentation(&mut app);
 
@@ -2771,8 +2774,8 @@ struct StallWarningStatus {
     reference: Option<(u64, u64, Option<Radians>)>,
 }
 
-/// Discard display history only when the jet's flight history is reconstructed.
-/// Start pending so the first jet HUD frame also describes the actual start.
+/// Discard display history when a flight is replaced or jet history reconstructed.
+/// Start pending so the first HUD frame also describes the actual start.
 #[derive(Resource)]
 struct JetHudReset(bool);
 
@@ -2786,28 +2789,37 @@ impl Default for JetHudReset {
 /// the audio-thread bridge and all HUD readers. Shared resources alone do not
 /// specify which writer or reader runs first in Bevy's schedule.
 fn configure_flight_presentation(app: &mut App) {
-    app.init_resource::<JetHudReset>()
-        .init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
-        .init_resource::<flightsim_render::cloud_volume::CloudQuality>()
-        .init_resource::<flightsim_render::cloud_volume::CloudVolumeDiagnostics>()
-        .init_resource::<distance_runtime::DrawDistanceSettings>()
-        .init_resource::<flightsim_render::water::WaterQuality>()
-        .init_resource::<flightsim_render::water::WaterDiagnostics>()
-        .add_systems(
-            Update,
-            (
-                publish_sound
-                    .after(advance_simulation)
-                    .before(flightsim_audio::publish_sound),
-                publish_hud
-                    .after(publish_sound)
-                    .before(flightsim_ui::update_hud)
-                    .before(flightsim_ui::update_flight_log_display)
-                    .before(flightsim_ui::update_tutorial_prompt)
-                    .before(flightsim_ui::instruments::update_instruments)
-                    .before(RenderSet::Rebase),
-            ),
-        );
+    app.configure_sets(
+        Update,
+        flightsim_ui::FlightDisplaySystems
+            .after(world_runtime::apply_world_map_start)
+            .after(control_flight)
+            .after(publish_crash)
+            .after(publish_replay_status)
+            .after(publish_hud),
+    )
+    .init_resource::<JetHudReset>()
+    .init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
+    .init_resource::<flightsim_render::cloud_volume::CloudQuality>()
+    .init_resource::<flightsim_render::cloud_volume::CloudVolumeDiagnostics>()
+    .init_resource::<distance_runtime::DrawDistanceSettings>()
+    .init_resource::<flightsim_render::water::WaterQuality>()
+    .init_resource::<flightsim_render::water::WaterDiagnostics>()
+    .add_systems(
+        Update,
+        (
+            publish_sound
+                .after(advance_simulation)
+                .before(flightsim_audio::publish_sound),
+            publish_hud
+                .after(publish_sound)
+                .before(flightsim_ui::update_hud)
+                .before(flightsim_ui::update_flight_log_display)
+                .before(flightsim_ui::update_tutorial_prompt)
+                .before(flightsim_ui::instruments::update_instruments)
+                .before(RenderSet::Rebase),
+        ),
+    );
 }
 
 impl StallWarningStatus {
@@ -3232,7 +3244,6 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     startup: Res<Startup>,
-    camera_rig: Res<CameraRig>,
     playback: Option<Res<ReplayPlayback>>,
     mut prepared_jet: Option<ResMut<PreparedJetSession>>,
     config: Res<TerrainRenderConfig>,
@@ -3839,91 +3850,25 @@ fn setup(
         }
     });
 
-    let parts: Vec<Entity> = match &model {
-        Some((path, found)) => {
-            info!("aircraft model: {}", found.display());
-            vec![
-                commands
-                    .spawn((
-                        SceneRoot(
-                            asset_server.load(GltfAssetLabel::Scene(0).from_asset(path.clone())),
-                        ),
-                        // 回転は今すぐ決まるが、倍率はモデルの寸法が要る。
-                        // 読み込みが終わるまで待つ（`fit_loaded_model`）。
-                        Transform::from_rotation(startup.model_fit.rotation()),
-                        PendingModelFit(startup.model_fit),
-                        ExteriorModel,
-                        Visibility::default(),
-                        Name::new("aircraft model"),
-                    ))
-                    .id(),
-            ]
-        }
-        None => simulation
-            .placeholder_parts()
-            .into_iter()
-            .map(|part| {
-                commands
-                    .spawn((
-                        Mesh3d(meshes.add(part.mesh)),
-                        MeshMaterial3d(materials.add(StandardMaterial {
-                            base_color: part.color,
-                            perceptual_roughness: 0.5,
-                            ..default()
-                        })),
-                        ExteriorModel,
-                        part.transform,
-                        Name::new(part.name),
-                    ))
-                    .id()
-            })
-            .collect(),
-    };
-
-    // コックピット内装。**目の位置を渡す**（重心基準に置くと、目を
-    // 動かしたときに顔が計器盤にめり込む）。
-    let mut parts = parts;
-    let interior = if startup.aircraft.is_jet() {
-        Vec::new()
-    } else {
-        flightsim_render::cockpit::interior_parts(camera_rig.eye_offset)
-    };
-    info!("cockpit: {} interior parts", interior.len());
-    for part in interior {
-        parts.push(
-            commands
-                .spawn((
-                    Mesh3d(meshes.add(part.mesh)),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: part.color,
-                        // 内装は艶を抑える。**光沢があると樹脂に見えない。**
-                        perceptual_roughness: 0.85,
-                        emissive: if part.emissive {
-                            LinearRgba::from(part.color) * 0.6
-                        } else {
-                            LinearRgba::BLACK
-                        },
-                        ..default()
-                    })),
-                    InteriorModel,
-                    part.transform,
-                    Visibility::Hidden,
-                    Name::new(part.name),
-                ))
-                .id(),
-        );
+    let mut aircraft_startup = startup.clone();
+    // Preserve the existing implicit development fallback on initial startup.
+    // Explicit new-flight choices fail visibly instead of adopting a fallback.
+    if let Some((_, path)) = &model {
+        info!("aircraft model: {}", path.display());
     }
-
-    commands
-        .spawn((
-            Aircraft,
-            WorldPosition(simulation.state().position),
-            WorldOrientation(simulation.state().orientation),
-            Transform::default(),
-            Visibility::default(),
-            Name::new("aircraft"),
-        ))
-        .add_children(&parts);
+    aircraft_startup.model = model.map(|(path, _)| path);
+    aircraft_scene::spawn(
+        &mut commands,
+        &asset_server,
+        &aircraft_startup,
+        &simulation,
+        &mut meshes,
+        &mut materials,
+        false,
+    );
+    // The launch choice must retain the scene actually accepted at startup,
+    // including the existing implicit development placeholder fallback.
+    commands.insert_resource(aircraft_startup);
 
     commands.insert_resource(FlightSimulation(simulation));
     commands.insert_resource(start_condition);
@@ -4588,8 +4533,7 @@ fn publish_hud(
             }
         },
     };
-    if simulation.0.is_jet()
-        && let Some(mut reset) = jet_hud_reset
+    if let Some(mut reset) = jet_hud_reset
         && reset.0
         && let Some(mut smoothing) = smoothing
     {

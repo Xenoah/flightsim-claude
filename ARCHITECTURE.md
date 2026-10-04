@@ -223,6 +223,16 @@ world atlas beneath all local DEM levels and an offline monthly climate atlas.
 temperature to the FDM; `render` applies procedural climate-derived surface cues;
 `ui` presents a data-only modal world map; `app` coordinates explicit new flights.
 Neither the map preview nor render LOD mutates physical terrain or climate.
+
+Map aircraft selection is an app-owned staged new-flight transaction
+([ADR-0016](docs/adr/0016-transactional-new-flight-aircraft.md)). It snapshots the
+validated target profile, destination/month, weather and regional selection;
+scene/dependency/spawn/fit readiness precedes an exclusive complete session,
+recorder, controls, aircraft hierarchy, camera/guidance/HUD and synth-source commit.
+Generation invalidation prevents canceled or superseded asynchronous work from
+activating. UI carries bounded choices only; replay remains aircraft-locked.
+Existing CLI defaults, profile/replay schemas and distribution allowlists stay
+unchanged. Native acceptance is separate from GPU-free loader/ECS evidence.
 Replay v2 records enabled data fingerprints and a fixed climate phase, while v1
 preserves legacy terrain/ISA behavior and byte compatibility.
 

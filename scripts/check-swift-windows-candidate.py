@@ -85,6 +85,14 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-ui/src/lib.rs",
     "crates/flightsim-ui/src/tutorial.rs",
     "crates/flightsim-ui/src/top_layout_tests.rs",
+    # The staged picker now owns Swift scene/session replacement. Its scene
+    # builder is shared by initial startup, and audio replacement owns the
+    # actual synthesized source rather than only its display/settings value.
+    "crates/flightsim-app/src/aircraft_picker_runtime.rs",
+    "crates/flightsim-app/src/aircraft_picker_tests.rs",
+    "crates/flightsim-app/src/aircraft_scene.rs",
+    "crates/flightsim-audio/src/lib.rs",
+    "crates/flightsim-audio/src/lifecycle_tests.rs",
 }
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.

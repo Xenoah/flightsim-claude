@@ -167,6 +167,11 @@ alpha.20 の実績を 2 機種へ広げない。実 GPU の代替ではない。
 
 ## M4 — 拡張
 
+- [x] 地図の新規飛行で Launch / Swift / Meadow / Kestrel を選択し、準備済み scene と
+  session/記録/操作/視点/案内/合成音源を一括交換する transaction。取消・読込失敗・
+  地域非互換は旧飛行を保持する。[限定 native 検証](qa/aircraft-picker-native-2026-10-04.md)済み。
+  Windows・音声機器・配布権利は別ゲート
+  （[操作・限定](aircraft-picker.md)、[ADR-0016](adr/0016-transactional-new-flight-aircraft.md)）
 - [x] 機体 profile の versioned JSON、Light Single / オリジナル Swift Sport の選択、
   FDM・model・視点・音・入力 rate 切替と invalid load 拒否（[Issue #10](../../../issues/10)）。
   両機の離陸・30 秒無操縦進入を数値検査。実機性能認証ではない

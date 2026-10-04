@@ -23,16 +23,19 @@ cargo run -p flightsim-app --release -- --map-credits
 - `Ctrl+A`: clear the coordinate entry; `Enter`: apply it
 - Terrain and Climate tabs switch the visual layer
 - Previous/next month changes the preview only
+- PgUp/PgDn or the arrows beneath the map select the next-flight aircraft;
+  see [aircraft choices, readiness and cancellation](aircraft-picker.md)
 - Start new flight places the aircraft 1,000 m above sampled ground
 - The new flight resets the current unsaved recording. Close the map and use `F9`
   first if you want to preserve it
 - `Esc` dismisses data credits first, then the map; it does not also toggle flight
   pause on that same press
 - An already-paused flight remains paused after browsing and closing the map
-- Replay allows map preview but disables relocation
-- Explicit `--global-terrain off` also keeps the map preview-only. Restart with
-  `--global-terrain on` to navigate; the map never changes terrain underneath
-  airport surfaces that were already placed for the legacy source
+- Replay allows map preview but locks the recorded aircraft and disables relocation
+- Explicit `--global-terrain off` keeps legacy-aircraft map starts unavailable.
+  Restart with `--global-terrain on` to navigate in a legacy aircraft. Supported
+  flat-zero jets retain their explicit exception; the map never changes terrain
+  underneath airport surfaces that were already placed for the legacy source
 
 The map's MSL height is the coarse orthometric surface elevation `H`. The flight
 HUD's ALT is WGS84 ellipsoidal height `h`, not a QNH-adjusted barometric altimeter;

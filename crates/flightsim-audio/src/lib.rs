@@ -137,6 +137,16 @@ impl Default for AudioSettings {
 #[derive(Resource, Debug, Clone)]
 pub struct SoundBridge(pub Arc<SharedSound>);
 
+/// このクレートが所有する飛行音源。別の効果音は機体切替で止めない。
+///
+/// プレイヤーや asset が既に外されていても、古い音の thread を消音し、
+/// 残った asset を解放できるよう所有情報を持つ。
+#[derive(Component, Debug)]
+pub struct FlightSoundSource {
+    shared: Arc<SharedSound>,
+    handle: Handle<FlightAudio>,
+}
+
 /// 音を鳴らすプラグイン。
 #[derive(Debug, Default)]
 pub struct FlightAudioPlugin;
@@ -169,7 +179,101 @@ pub fn spawn_sound_source(
     let kind = settings.engine;
     let handle = sources.add(FlightAudio::new(Arc::clone(&bridge.0), kind));
     bridge.0.set_master(settings.master);
+    report_engine(kind);
 
+    commands.spawn((
+        FlightSoundSource {
+            shared: Arc::clone(&bridge.0),
+            handle: handle.clone(),
+        },
+        AudioPlayer(handle),
+        // 終わらない音源なので、繰り返しの設定は要らない。
+        PlaybackSettings::ONCE,
+        Name::new("flight audio"),
+    ));
+}
+
+/// 検証済みの新規飛行を確定するとき、機種を焼き込んだ音源ごと交換する。
+///
+/// 音量・有効設定を保ち、古い音源は thread 側も消音してから停止・破棄する。
+/// 新しい機体の状態を app が publish するまでは無音。通常の一時停止や消音は
+/// [`AircraftSound::muted`] で行い、この関数で音源を作り直さない。
+///
+/// 排他的に呼ぶため、設定の change detection や次フレームの Commands に
+/// 依存しない。音声デバイス・GPU・プラグインを持たない ECS からも呼べる。
+pub fn replace_sound_source(world: &mut World, engine: EngineKind) {
+    world.init_resource::<AudioSettings>();
+    world.init_resource::<Assets<FlightAudio>>();
+
+    if let Some(bridge) = world.get_resource::<SoundBridge>() {
+        silence_retired_source(&bridge.0);
+    }
+    let retired: Vec<_> = world
+        .query::<(Entity, &FlightSoundSource, Option<&mut AudioSink>)>()
+        .iter_mut(world)
+        .map(|(entity, source, sink)| {
+            silence_retired_source(&source.shared);
+            if let Some(mut sink) = sink {
+                sink.mute();
+                sink.stop();
+            }
+            (entity, source.handle.id())
+        })
+        .collect();
+    for (entity, handle) in retired {
+        world.despawn(entity);
+        world.resource_mut::<Assets<FlightAudio>>().remove(handle);
+    }
+
+    let settings = {
+        let mut settings = world.resource_mut::<AudioSettings>();
+        settings.engine = engine;
+        *settings
+    };
+    let sound = AircraftSound {
+        muted: true,
+        ..default()
+    };
+    let shared = Arc::new(SharedSound::default());
+    shared.set(sound.to_flight_sound());
+    shared.set_master(if settings.enabled {
+        settings.master
+    } else {
+        0.0
+    });
+    shared.request_reset();
+    world.insert_resource(sound);
+    world.insert_resource(SoundBridge(Arc::clone(&shared)));
+
+    if !settings.enabled {
+        return;
+    }
+    let handle = world
+        .resource_mut::<Assets<FlightAudio>>()
+        .add(FlightAudio::new(Arc::clone(&shared), engine));
+    world.spawn((
+        FlightSoundSource {
+            shared,
+            handle: handle.clone(),
+        },
+        AudioPlayer(handle),
+        PlaybackSettings::ONCE,
+        Name::new("flight audio"),
+    ));
+    report_engine(engine);
+}
+
+fn silence_retired_source(shared: &SharedSound) {
+    shared.set_master(0.0);
+    shared.set(FlightSound {
+        muted: true,
+        ..default()
+    });
+    // 消音の平滑化を待たず、残っている decoder も次の標本から無音にする。
+    shared.request_reset();
+}
+
+fn report_engine(kind: EngineKind) {
     // 諸元と、そこから出る周波数を出す。**「音が違う」と思ったとき、
     // 諸元が意図どおりかをまず確かめられる。**
     match kind {
@@ -196,13 +300,6 @@ pub fn spawn_sound_source(
             spec.jet_peak_hz(1.0),
         ),
     }
-
-    commands.spawn((
-        AudioPlayer(handle),
-        // 終わらない音源なので、繰り返しの設定は要らない。
-        PlaybackSettings::ONCE,
-        Name::new("flight audio"),
-    ));
 }
 
 /// 機体の状態を音の thread へ渡す。
@@ -231,6 +328,9 @@ pub fn report_playback(sinks: Query<Entity, Added<AudioSink>>) {
         info!("audio: the flight audio stream is playing");
     }
 }
+
+#[cfg(test)]
+mod lifecycle_tests;
 
 #[cfg(test)]
 mod tests {

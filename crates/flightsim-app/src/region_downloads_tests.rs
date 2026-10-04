@@ -375,6 +375,8 @@ fn offline_mode_is_enforced_and_cache_miss_retries_are_explicit() {
     action(&mut world, RegionAction::Select(Some(KEY.into())));
     assert!(world.resource::<Startup>().active_region.is_none());
     let request = WorldMapStart {
+        aircraft_choice: 0,
+        generation: 0,
         position: world.resource::<WorldMapState>().selected,
         month: world.resource::<WorldMapState>().preview_month(),
     };
