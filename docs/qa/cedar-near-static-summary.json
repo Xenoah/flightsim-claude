@@ -1,0 +1,4845 @@
+{
+  "schema": 1,
+  "critical_runs": [
+    {
+      "completed_s": 30.0,
+      "failure": null,
+      "minimum_disk_clearance_m": 0.24117284201302636,
+      "minimum_static_blade_swept_clearance_m": 0.23945790831193495,
+      "maximum_gear_compression_m": 0.11125229950994253,
+      "near_static_braked_seconds_below_0_1mps": 15.84999999999974,
+      "last_braked_10s_peak_speed_mps": 0.020188951343744956,
+      "last_braked_10s_traveled_distance_m": 0.20061697046314286,
+      "stationary_parking_pass": false,
+      "positive_flow_bit_exact_step_count": 3544,
+      "observed_evaluations": 111600,
+      "hz": 120,
+      "negative_stage_evaluations": 1700,
+      "final_speed_mps": 2.698795089716982,
+      "final_shaft_rad_s": 176.8941105416911,
+      "final_pitch_rad": -0.0008096461439237551,
+      "minimum_negative_j": -0.0014900941972617538,
+      "maximum_adverse_ratio": 0.009937717184622415,
+      "maximum_transverse_ratio": 0.00407258286489593,
+      "negative_stage_time_range_s": [
+        4.128472222222222,
+        4.584722222222222
+      ],
+      "milestones": [
+        {
+          "aero_force_body_n": [
+            -354.3701336390242,
+            3.2288382915965903e-13,
+            -3029.3397089929813
+          ],
+          "contact_force_body_n": [
+            2.0463630789890885e-12,
+            2.683642359726528e-14,
+            0.0
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.39999999969072153,
+          "flow": {
+            "absolute_spin_rad_s": 180.0,
+            "absorbed_power_w": 13299.382922946244,
+            "blade_pitch_rad": 0.08,
+            "body_air_velocity_mps": [
+              24.999999999999993,
+              -1.3322676295501878e-15,
+              6.661338147750939e-16
+            ],
+            "hover_velocity_mps": null,
+            "load_torque_nm": 73.8854606830347,
+            "relative_rpm": 1718.8733853924698,
+            "signed_adverse_ratio": null,
+            "signed_j": 0.3636102608321519,
+            "signed_thrust_work_w": -30454.31152202155,
+            "thrust_n": -1218.1724608808624,
+            "transverse_ratio": null
+          },
+          "gear_clearances_m": [
+            3.1478703022003174e-07,
+            2.682209014892578e-07,
+            2.6635825634002686e-07
+          ],
+          "nongravity_force_body_n": [
+            -1572.5425945198845,
+            3.497202527569243e-13,
+            -3029.3397089929813
+          ],
+          "state": {
+            "altitude_m": 1.599999999627471,
+            "angular_velocity_body_rad_s": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "bank_rad": 0.0,
+            "blade_pitch_rad": 0.08,
+            "canonical_state_bits_hex": [
+              "c14e1ddf1df744fc",
+              "414a2e16ce928a94",
+              "414bc135e9de6cf9",
+              "4025a4e9156e34e3",
+              "c022d0a3d6f164eb",
+              "40347a92b598d1af",
+              "3fea963a5e422531",
+              "bfd3e17d1ea9d268",
+              "3fdbae3231bdab1d",
+              "3fc4b2d71d806567",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "4066800000000000",
+              "3fb47ae147ae147b"
+            ],
+            "heading_rad": 0.0,
+            "orientation_xyzw": [
+              0.83083837900009,
+              -0.3106377410361234,
+              0.4325070844412709,
+              0.1617077726412319
+            ],
+            "pitch_rad": 0.0,
+            "position_ecef_m": [
+              -3947454.2341085654,
+              3431469.613847086,
+              3637867.827100393
+            ],
+            "shaft_rad_s": 180.0,
+            "speed_mps": 24.999999999999996,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              10.822090787604287,
+              -9.40749999710757,
+              20.478801107224793
+            ],
+            "vertical_speed_mps": -0.0
+          },
+          "static_blade_swept_clearance_m": 0.39999999969072153,
+          "time_s": 0.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.1416063303316533,
+            -0.004185726017818002,
+            -0.7090695821195462
+          ],
+          "contact_force_body_n": [
+            -13817.324266559468,
+            2.0551682081744893,
+            -20164.509538922965
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2527130152570003,
+          "flow": {
+            "absolute_spin_rad_s": 176.91122869684125,
+            "absorbed_power_w": 25690.500754261706,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.4923033399509376,
+              0.0008767335337031418,
+              -0.01305287783022262
+            ],
+            "hover_velocity_mps": 9.861818038006076,
+            "load_torque_nm": 145.21690309598992,
+            "relative_rpm": 1689.3781893618884,
+            "signed_adverse_ratio": -0.04992014028789306,
+            "signed_j": 0.007285276008765477,
+            "signed_thrust_work_w": 530.5918348351676,
+            "thrust_n": 1077.7741928138162,
+            "transverse_ratio": 0.0013265595442306433
+          },
+          "gear_clearances_m": [
+            -0.10478221718221903,
+            -0.021538988687098026,
+            -0.020857807248830795
+          ],
+          "nongravity_force_body_n": [
+            -12739.691680075983,
+            2.0509824821566713,
+            -20165.218608505085
+          ],
+          "state": {
+            "altitude_m": 1.550318886525929,
+            "angular_velocity_body_rad_s": [
+              -4.159762992158029e-05,
+              0.0018805138330621194,
+              -0.0008035831881001071
+            ],
+            "bank_rad": -0.00021982114287968674,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42adf05e8",
+              "414a2e0d5b6b4ceb",
+              "414bc14a86a40a79",
+              "3fcb7465249b2d70",
+              "bfc7a2cd9cf5ca8d",
+              "3fd9cb2e94408435",
+              "3feacc80b8b7e3f2",
+              "bfd3e810ce433efa",
+              "3fdae9119b7172b6",
+              "3fc4486b8ae9fa9b",
+              "bf05cf23ae4b2993",
+              "3f5ecf725a694e7f",
+              "bf4a54f1c199c6b3",
+              "0000000000000000",
+              "40661d292052123d",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278656843686361,
+            "orientation_xyzw": [
+              0.8374637229709363,
+              -0.3110391630443555,
+              0.42047538928981554,
+              0.15846008570584477
+            ],
+            "pitch_rad": -0.027864887628612084,
+            "position_ecef_m": [
+              -3947432.334931124,
+              3431450.71421205,
+              3637909.0518811313
+            ],
+            "shaft_rad_s": 176.91127029447117,
+            "speed_mps": 0.49247713125401915,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.21448959624681718,
+              -0.18465585865086034,
+              0.40302624204383913
+            ],
+            "vertical_speed_mps": -0.0006681990644784308
+          },
+          "static_blade_swept_clearance_m": 0.25118064475740515,
+          "time_s": 4.0
+        },
+        {
+          "aero_force_body_n": [
+            0.006466780717050754,
+            -0.00028657128228553344,
+            -0.06003545616590258
+          ],
+          "contact_force_body_n": [
+            -6920.387104079288,
+            -11.777006414027808,
+            -19639.204517648457
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2581312719927036,
+          "flow": {
+            "absolute_spin_rad_s": 176.8926310242597,
+            "absorbed_power_w": 26203.5103569662,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.06028471531613441,
+              0.00046691223103156355,
+              0.01933312444902571
+            ],
+            "hover_velocity_mps": 10.058612109218213,
+            "load_torque_nm": 148.1322890910733,
+            "relative_rpm": 1689.1986847724768,
+            "signed_adverse_ratio": -0.005993343282507782,
+            "signed_j": 0.0008922079722611805,
+            "signed_thrust_work_w": 67.59229253592078,
+            "thrust_n": 1121.217744522227,
+            "transverse_ratio": 0.001922607372761122
+          },
+          "gear_clearances_m": [
+            -0.10206480510532856,
+            -0.0241077346727252,
+            -0.023440277203917503
+          ],
+          "nongravity_force_body_n": [
+            -5799.162892776344,
+            -11.777292985310094,
+            -19639.264553104622
+          ],
+          "state": {
+            "altitude_m": 1.5495838085189462,
+            "angular_velocity_body_rad_s": [
+              0.00015840643458448603,
+              0.044343805059539707,
+              5.4881415093248204e-05
+            ],
+            "bank_rad": -0.00021538229953483679,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42971ea59",
+              "414a2e0d5a2f93c3",
+              "414bc14a892b60e9",
+              "3fa3cb61e09c45ab",
+              "bfa157463b9d41ee",
+              "3fa2ed2501ca8870",
+              "3feac9876a9eeeab",
+              "bfd3e56738e01864",
+              "3fdaf51d5566d3ae",
+              "3fc451bb497d6ba3",
+              "3f24c33ce97af8f7",
+              "3fa6b43b3105979e",
+              "3f0cc60f1059c252",
+              "0000000000000000",
+              "40661c8f22bc444d",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.27860412400382,
+            "orientation_xyzw": [
+              0.8371007044256279,
+              -0.3108766608642155,
+              0.4212106069565448,
+              0.15874425018668345
+            ],
+            "pitch_rad": -0.02609990518938282,
+            "position_ecef_m": [
+              -3947432.3237889227,
+              3431450.7045769407,
+              3637909.0716363085
+            ],
+            "shaft_rad_s": 176.89247261782512,
+            "speed_mps": 0.06331062003124256,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.03866105906321179,
+              -0.033868975426802325,
+              0.03696551939835124
+            ],
+            "vertical_speed_mps": -0.020899685655812766
+          },
+          "static_blade_swept_clearance_m": 0.25669594017945296,
+          "time_s": 4.1
+        },
+        {
+          "aero_force_body_n": [
+            0.02281460862363427,
+            7.940935223651116e-05,
+            -0.056458558802501446
+          ],
+          "contact_force_body_n": [
+            -2828.838173984434,
+            -1.5138552759601835,
+            -20756.556571248435
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.27799071843099665,
+          "flow": {
+            "absolute_spin_rad_s": 176.86802873196953,
+            "absorbed_power_w": 26362.699800411116,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              -0.08268650406189537,
+              -8.899120983701242e-05,
+              0.04044128775118654
+            ],
+            "hover_velocity_mps": 10.121857637739579,
+            "load_torque_nm": 149.0529407118674,
+            "relative_rpm": 1688.964148327713,
+            "signed_adverse_ratio": 0.008169103638999708,
+            "signed_j": -0.0012239225086553625,
+            "signed_thrust_work_w": -93.87913156671668,
+            "thrust_n": 1135.36220489432,
+            "transverse_ratio": 0.0039954509449956896
+          },
+          "gear_clearances_m": [
+            -0.09239703975617886,
+            -0.03440860565751791,
+            -0.03379457164555788
+          ],
+          "nongravity_force_body_n": [
+            -1693.4531544814904,
+            -1.513775866607947,
+            -20756.61302980724
+          ],
+          "state": {
+            "altitude_m": 1.5461641745641828,
+            "angular_velocity_body_rad_s": [
+              0.00011671320670380328,
+              0.07939923286717294,
+              0.0014801226895560509
+            ],
+            "bank_rad": -0.00019811291168580808,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429540afe",
+              "414a2e0d5a146f85",
+              "414bc14a88a1a58a",
+              "bf893991d9380ed2",
+              "3f8521035eed1a0c",
+              "bfb733c0e054b301",
+              "3feabde47072173d",
+              "bfd3dd39aa685ca0",
+              "3fdb22f447af6e12",
+              "3fc472ce6d97c229",
+              "3f1e987d9f8b1db4",
+              "3fb45382147df375",
+              "3f584015a2ececfd",
+              "0000000000000000",
+              "40661bc5ef6d0c89",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278688265235137,
+            "orientation_xyzw": [
+              0.8356802173809467,
+              -0.31037751809476255,
+              0.42400843620791406,
+              0.15975361205302477
+            ],
+            "pitch_rad": -0.019433051455891866,
+            "position_ecef_m": [
+              -3947432.322877287,
+              3431450.7037486457,
+              3637909.067433064
+            ],
+            "shaft_rad_s": 176.86791201876284,
+            "speed_mps": 0.09204652969225692,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              -0.01231683677816112,
+              0.010316873869340014,
+              -0.09063344456508206
+            ],
+            "vertical_speed_mps": -0.038826918676579655
+          },
+          "static_blade_swept_clearance_m": 0.27692196787166806,
+          "time_s": 4.2
+        },
+        {
+          "aero_force_body_n": [
+            -0.00026590196253098924,
+            -5.567005453667456e-06,
+            -0.0006507928713479916
+          ],
+          "contact_force_body_n": [
+            -1170.913875366256,
+            4.536977916378612,
+            -20555.191749638565
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3434205543142872,
+          "flow": {
+            "absolute_spin_rad_s": 176.67977366826418,
+            "absorbed_power_w": 26154.901802852582,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.022093835344504726,
+              2.5961062356502033e-05,
+              -0.0010722128101252279
+            ],
+            "hover_velocity_mps": 10.06377923648247,
+            "load_torque_nm": 148.03563112980495,
+            "relative_rpm": 1687.1674454242564,
+            "signed_adverse_ratio": -0.0021953815584916437,
+            "signed_j": 0.00032738057374846616,
+            "signed_thrust_work_w": 24.79745461745843,
+            "thrust_n": 1122.3698480049623,
+            "transverse_ratio": 0.00010657299125027455
+          },
+          "gear_clearances_m": [
+            -0.05337236449122429,
+            -0.04739220533519983,
+            -0.04669799096882343
+          ],
+          "nongravity_force_body_n": [
+            -48.54429326325616,
+            4.536972349373158,
+            -20555.192400431435
+          ],
+          "state": {
+            "altitude_m": 1.5508419321849942,
+            "angular_velocity_body_rad_s": [
+              1.1937574101071146e-05,
+              -0.0009897396328725158,
+              -6.129130171439988e-05
+            ],
+            "bank_rad": -0.00022394081017294723,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42a8e0005",
+              "414a2e0d5b2447e4",
+              "414bc14a875bca64",
+              "3f82605101a379e1",
+              "bf7f9a6a2f77f2f8",
+              "3f9322fb9a742f50",
+              "3fea9ef409f378b0",
+              "bfd3c9917861ad1a",
+              "3fdb99d5b466121a",
+              "3fc4c7cfedc2cb21",
+              "3ee908efb1029559",
+              "bf503744d6b419e5",
+              "bf1011308baa8188",
+              "0000000000000000",
+              "406615c09bac4c5c",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.279142228703006,
+            "orientation_xyzw": [
+              0.8319034761768958,
+              -0.30917774921427255,
+              0.43126433007299314,
+              0.16234778508586437
+            ],
+            "pitch_rad": -0.00210910563338047,
+            "position_ecef_m": [
+              -3947432.3324584984,
+              3431450.712044703,
+              3637909.0574887265
+            ],
+            "shaft_rad_s": 176.67976173069007,
+            "speed_mps": 0.022119852497633014,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008972771513467261,
+              -0.007715620791256532,
+              0.018688136388888055
+            ],
+            "vertical_speed_mps": 0.0010256180141519754
+          },
+          "static_blade_swept_clearance_m": 0.3433045535904528,
+          "time_s": 5.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00023279816905260442,
+            -5.591948839625148e-07,
+            -0.001910376780479381
+          ],
+          "contact_force_body_n": [
+            -1156.5905623287144,
+            4.571449994689141,
+            -20574.343978295852
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3432491494308929,
+          "flow": {
+            "absolute_spin_rad_s": 175.78281973267133,
+            "absorbed_power_w": 25760.71218539007,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02018917712159523,
+              2.857107985559503e-06,
+              -4.4543949954980316e-05
+            ],
+            "hover_velocity_mps": 10.013499655949005,
+            "load_torque_nm": 146.54852063794797,
+            "relative_rpm": 1678.6022827851125,
+            "signed_adverse_ratio": -0.0020161959170389415,
+            "signed_j": 0.00030068434552593817,
+            "signed_thrust_work_w": 22.433868729097455,
+            "thrust_n": 1111.182917163137,
+            "transverse_ratio": 4.457531011641673e-06
+          },
+          "gear_clearances_m": [
+            -0.053399997763335705,
+            -0.04713363666087389,
+            -0.046444619074463844
+          ],
+          "nongravity_force_body_n": [
+            -45.40787796374648,
+            4.571449435494257,
+            -20574.345888672633
+          ],
+          "state": {
+            "altitude_m": 1.551003041677177,
+            "angular_velocity_body_rad_s": [
+              -2.6388753511930445e-07,
+              3.6945644628814557e-06,
+              -3.610087203350564e-05
+            ],
+            "bank_rad": -0.0002222641710770447,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd424e65de6",
+              "414a2e0d564b48ed",
+              "414bc14a92080301",
+              "3f82026fd148aacb",
+              "bf7edcf18b4ca3c3",
+              "3f90ef4c28f7745c",
+              "3fea9f5aedca498b",
+              "bfd3c86de7b21b00",
+              "3fdb98f2b026911f",
+              "3fc4c89f5beb79ae",
+              "be91b58da7352f67",
+              "3ecefe044b12a234",
+              "bf02ed608496ec48",
+              "0000000000000000",
+              "4065f90cdc857c01",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278957350480373,
+            "orientation_xyzw": [
+              0.8319525379504723,
+              -0.3091082346585807,
+              0.4312102050992212,
+              0.16237251270554282
+            ],
+            "pitch_rad": -0.002203640052420884,
+            "position_ecef_m": [
+              -3947432.2882802365,
+              3431450.674172512,
+              3637909.1408694987
+            ],
+            "shaft_rad_s": 175.78281999655886,
+            "speed_mps": 0.020189226462984846,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008793710302673749,
+              -0.007534926921643983,
+              0.01653784751930619
+            ],
+            "vertical_speed_mps": 5.483240921033694e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431279493261017,
+          "time_s": 10.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022968295575195613,
+            -5.689519019599425e-07,
+            -0.0018853721777483646
+          ],
+          "contact_force_body_n": [
+            -1148.7691846082118,
+            4.58703956830439,
+            -20574.34479373517
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34330244760044004,
+          "flow": {
+            "absolute_spin_rad_s": 175.18906259664033,
+            "absorbed_power_w": 25500.629344326753,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.020054136152427772,
+              2.926534802161207e-06,
+              -4.392567165856947e-05
+            ],
+            "hover_velocity_mps": 9.979706433303333,
+            "load_torque_nm": 145.5606244268801,
+            "relative_rpm": 1672.9323191984695,
+            "signed_adverse_ratio": -0.0020094915904044037,
+            "signed_j": 0.0002996854078518864,
+            "signed_thrust_work_w": 22.1336619697519,
+            "thrust_n": 1103.6956068073955,
+            "transverse_ratio": 4.41125736130044e-06
+          },
+          "gear_clearances_m": [
+            -0.05336964689195156,
+            -0.04714973270893097,
+            -0.046458364464342594
+          ],
+          "nongravity_force_body_n": [
+            -45.07380748377203,
+            4.5870389993524885,
+            -20574.346679107348
+          ],
+          "state": {
+            "altitude_m": 1.5510032642632723,
+            "angular_velocity_body_rad_s": [
+              -2.015879139243588e-07,
+              2.4386287946672386e-06,
+              -3.600790995780063e-05
+            ],
+            "bank_rad": -0.00022302231914410542,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd41f4a9114",
+              "414a2e0d517d64f2",
+              "414bc14a9c93e1e4",
+              "3f81e4d059b8187d",
+              "bf7ea54f2c611e27",
+              "3f90d24b2b4b4465",
+              "3fea9f8e51099e8a",
+              "bfd3c72f4c533432",
+              "3fdb98ceec018be3",
+              "3fc4c9fcfded9d31",
+              "be8b0e820b041d18",
+              "3ec474ea5b97aaad",
+              "bf02e0e65d862baf",
+              "0000000000000000",
+              "4065e60ccd6ce8fa",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278777090454291,
+            "orientation_xyzw": [
+              0.8319770415082115,
+              -0.3090322728501774,
+              0.4312016777750484,
+              0.1624141921886149
+            ],
+            "pitch_rad": -0.0021885502254141197,
+            "position_ecef_m": [
+              -3947432.2444630954,
+              3431450.636639231,
+              3637909.2232630122
+            ],
+            "shaft_rad_s": 175.18906279822824,
+            "speed_mps": 0.0200541844723077,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008737209070215574,
+              -0.007481869955945387,
+              0.01642720653291398
+            ],
+            "vertical_speed_mps": 3.67688904167468e-08
+          },
+          "static_blade_swept_clearance_m": 0.34318207743413287,
+          "time_s": 15.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022763835673911042,
+            -5.753303929864142e-07,
+            -0.0018689519850360573
+          ],
+          "contact_force_body_n": [
+            -1143.6064577153663,
+            4.597432123317612,
+            -20574.345430376572
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34333762758116837,
+          "flow": {
+            "absolute_spin_rad_s": 174.7960290655851,
+            "absorbed_power_w": 25329.435486723818,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.019965000825654063,
+              2.972556327955015e-06,
+              -4.352159791168363e-05
+            ],
+            "hover_velocity_mps": 9.957337122437437,
+            "load_torque_nm": 144.90852922762895,
+            "relative_rpm": 1669.1791250474164,
+            "signed_adverse_ratio": -0.0020050542208383993,
+            "signed_j": 0.0002990242410829936,
+            "signed_thrust_work_w": 21.93661112249421,
+            "thrust_n": 1098.7533290911124,
+            "transverse_ratio": 4.380989929753443e-06
+          },
+          "gear_clearances_m": [
+            -0.05334961600601673,
+            -0.047160363756120205,
+            -0.046467430889606476
+          ],
+          "nongravity_force_body_n": [
+            -44.853356262610625,
+            4.5974315479872185,
+            -20574.347299328558
+          ],
+          "state": {
+            "altitude_m": 1.551003411412239,
+            "angular_velocity_body_rad_s": [
+              -1.6022831585593508e-07,
+              1.611830554342617e-06,
+              -3.594616363414207e-05
+            ],
+            "bank_rad": -0.0002235270380720152,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd419b645de",
+              "414a2e0d4cb6b1f6",
+              "414bc14aa710eb9c",
+              "3f81d1ab05107357",
+              "bf7e7fa4abd2c1e0",
+              "3f90bf25fa5c47cd",
+              "3fea9fc3edf1a86d",
+              "bfd3c5f2dc9181ec",
+              "3fdb98a27ca7a3be",
+              "3fc4cb526124631f",
+              "be8581672bca9f76",
+              "3ebb0ac26fbebfa7",
+              "bf02d89cc71e0f80",
+              "0000000000000000",
+              "4065d979124870ec",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278597213094769,
+            "orientation_xyzw": [
+              0.8320026061385427,
+              -0.3089568284977122,
+              0.4311910836536831,
+              0.16245488875645095
+            ],
+            "pitch_rad": -0.0021785902314788363,
+            "position_ecef_m": [
+              -3947432.200875028,
+              3431450.599325414,
+              3637909.305203868
+            ],
+            "shaft_rad_s": 174.7960292258134,
+            "speed_mps": 0.019965048483135305,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.00870069131092925,
+              -0.007445948836150212,
+              0.016354173093595926
+            ],
+            "vertical_speed_mps": 2.6636623871867382e-08
+          },
+          "static_blade_swept_clearance_m": 0.3432178052132217,
+          "time_s": 20.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.09257130130925874,
+            -1.2894326622331099e-05,
+            -0.7776090868510084
+          ],
+          "contact_force_body_n": [
+            -395.05848019792154,
+            4.56570386153427,
+            -20573.353090054414
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3484137056312233,
+          "flow": {
+            "absolute_spin_rad_s": 174.77990841308048,
+            "absorbed_power_w": 24870.83668268695,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.40340902246550603,
+              3.2971295464978567e-06,
+              -0.00038188871640528615
+            ],
+            "hover_velocity_mps": 9.78130991144343,
+            "load_torque_nm": 142.2980301826593,
+            "relative_rpm": 1669.025172455882,
+            "signed_adverse_ratio": -0.041242842330713445,
+            "signed_j": 0.0060425844179134965,
+            "signed_thrust_work_w": 427.7139627908946,
+            "thrust_n": 1060.248876380713,
+            "transverse_ratio": 3.904415184514767e-05
+          },
+          "gear_clearances_m": [
+            -0.050473375245928764,
+            -0.048624604009091854,
+            -0.047930953092873096
+          ],
+          "nongravity_force_body_n": [
+            665.0978248814822,
+            4.565690967207647,
+            -20574.130699141264
+          ],
+          "state": {
+            "altitude_m": 1.550989605486393,
+            "angular_velocity_body_rad_s": [
+              1.0649525868766138e-06,
+              -0.00019225440922672617,
+              -3.0314214955933083e-05
+            ],
+            "bank_rad": -0.00022375819328011788,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd40d23ec33",
+              "414a2e0d41f5702f",
+              "414bc14abeb08c55",
+              "3fc67fddc88bfd20",
+              "bfc33f792b9066ed",
+              "3fd526e0afccf11b",
+              "3fea9d27f0c7551a",
+              "bfd3c44e0cc29513",
+              "3fdba28c33334af0",
+              "3fc4d25a6a5b6772",
+              "3eb1ddefc096cbd5",
+              "bf2932fcccdf3a34",
+              "beffc968fd4b91c1",
+              "0000000000000000",
+              "4065d8f5004143d2",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786382919080985,
+            "orientation_xyzw": [
+              0.83168408419684,
+              -0.3088564991579272,
+              0.43179612159762737,
+              0.16266946976866908
+            ],
+            "pitch_rad": -0.0007318809783543655,
+            "position_ecef_m": [
+              -3947432.1026587724,
+              3431450.51530268,
+              3637909.4897628226
+            ],
+            "shaft_rad_s": 174.7799073481279,
+            "speed_mps": 0.4034092032371572,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.17577717106176127,
+              -0.1503745520320118,
+              0.3304979054262433
+            ],
+            "vertical_speed_mps": 8.664197864444168e-05
+          },
+          "static_blade_swept_clearance_m": 0.34837345218100746,
+          "time_s": 21.0
+        },
+        {
+          "aero_force_body_n": [
+            -1.343969672685797,
+            -3.7717040671450635e-05,
+            -11.31609553327557
+          ],
+          "contact_force_body_n": [
+            -428.007327487098,
+            4.511784825833212,
+            -20563.514977066377
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3481719741606204,
+          "flow": {
+            "absolute_spin_rad_s": 175.3351801639433,
+            "absorbed_power_w": 23766.098145594628,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              1.5374266982791047,
+              2.530615674206649e-06,
+              -0.0012599732342653824
+            ],
+            "hover_velocity_mps": 9.275794267707022,
+            "load_torque_nm": 135.5466605353966,
+            "relative_rpm": 1674.3276344127266,
+            "signed_adverse_ratio": -0.16574609719747016,
+            "signed_j": 0.022955881872604857,
+            "signed_thrust_work_w": 1465.9204862307276,
+            "thrust_n": 953.4896771804363,
+            "transverse_ratio": 0.00013583481254854718
+          },
+          "gear_clearances_m": [
+            -0.050590623170137405,
+            -0.04849461652338505,
+            -0.04780415631830692
+          ],
+          "nongravity_force_body_n": [
+            524.1383800206524,
+            4.511747108792541,
+            -20574.831072599653
+          ],
+          "state": {
+            "altitude_m": 1.5510360170155764,
+            "angular_velocity_body_rad_s": [
+              2.9816334923138996e-07,
+              3.9799817992416594e-07,
+              -2.210963130878831e-05
+            ],
+            "bank_rad": -0.00022272914064429307,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd3303899e8",
+              "414a2e0c85019d62",
+              "414bc14c5dd8af89",
+              "3fe572477f511da1",
+              "bfe2573cf4c1689c",
+              "3ff42661c515d74b",
+              "3fea9d6b3472d3d3",
+              "bfd3c3c90d5b717b",
+              "3fdba1dd9b538733",
+              "3fc4d292a25b49c8",
+              "3e940268471f9e23",
+              "3e9ab58e81b33d2f",
+              "bef72f024b5b8edf",
+              "0000000000000000",
+              "4065eab9cb2039af",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278546421488036,
+            "orientation_xyzw": [
+              0.8317161583314551,
+              -0.3088247900430116,
+              0.43175449532110405,
+              0.16267617156570524
+            ],
+            "pitch_rad": -0.0008137613759388654,
+            "position_ecef_m": [
+              -3947430.3767273314,
+              3431449.039111779,
+              3637912.7331752223
+            ],
+            "shaft_rad_s": 175.33517986577996,
+            "speed_mps": 1.5374272145764636,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.670200108209361,
+              -0.5731491833096416,
+              1.2593705843587084
+            ],
+            "vertical_speed_mps": 8.875022157295298e-06
+          },
+          "static_blade_swept_clearance_m": 0.3481272172898835,
+          "time_s": 25.0
+        },
+        {
+          "aero_force_body_n": [
+            -4.141261746367883,
+            -9.72586198655834e-05,
+            -34.87234166935948
+          ],
+          "contact_force_body_n": [
+            -427.4343927790066,
+            4.416663357803815,
+            -20539.871521399462
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3482420633434269,
+          "flow": {
+            "absolute_spin_rad_s": 176.8941110070329,
+            "absorbed_power_w": 23021.11078593385,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              2.6987941947354535,
+              3.717417520476829e-06,
+              -0.002197891919783257
+            ],
+            "hover_velocity_mps": 8.781062372206687,
+            "load_torque_nm": 130.14062850864823,
+            "relative_rpm": 1689.2143257932576,
+            "signed_adverse_ratio": -0.3073425606538819,
+            "signed_j": 0.0399415596118714,
+            "signed_thrust_work_w": 2306.097522456025,
+            "thrust_n": 854.491804878837,
+            "transverse_ratio": 0.00025029944787497853
+          },
+          "gear_clearances_m": [
+            -0.050526789389550686,
+            -0.04843993950635195,
+            -0.047755857929587364
+          ],
+          "nongravity_force_body_n": [
+            422.9161503534625,
+            4.4165660991839495,
+            -20574.743863068823
+          ],
+          "state": {
+            "altitude_m": 1.5510916244238615,
+            "angular_velocity_body_rad_s": [
+              4.653418110524477e-07,
+              5.322640356932897e-07,
+              -2.1883615664869302e-05
+            ],
+            "bank_rad": -0.00022067169821170268,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd0dba2f4d4",
+              "414a2e0a86ebc263",
+              "414bc150bec8044d",
+              "3ff2d3a0233c8c45",
+              "bff01818ebfb2c9a",
+              "4001af7e3c27b91a",
+              "3fea9d8e0c319928",
+              "bfd3c3068e513ad2",
+              "3fdba1bda3042f5a",
+              "3fc4d356286cdca6",
+              "3e9f3a82edb6c40a",
+              "3ea1dc1cfe19f3d8",
+              "bef6f2569e19d315",
+              "0000000000000000",
+              "40661c9c8db5f24f",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278436410902384,
+            "orientation_xyzw": [
+              0.8317327726515815,
+              -0.3087784185235424,
+              0.4317468730885047,
+              0.16269947980774652
+            ],
+            "pitch_rad": -0.0008096461439237551,
+            "position_ecef_m": [
+              -3947425.7159105334,
+              3431445.0540698036,
+              3637921.4904790283
+            ],
+            "shaft_rad_s": 176.8941105416911,
+            "speed_mps": 2.698795089716982,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              1.1766663910318738,
+              -1.00588314228188,
+              2.210689992868663
+            ],
+            "vertical_speed_mps": 1.2823891926139197e-05
+          },
+          "static_blade_swept_clearance_m": 0.34819753281037624,
+          "time_s": 30.0
+        }
+      ]
+    },
+    {
+      "completed_s": 30.0,
+      "failure": null,
+      "minimum_disk_clearance_m": 0.24117284201302636,
+      "minimum_static_blade_swept_clearance_m": 0.23945790831193495,
+      "maximum_gear_compression_m": 0.11125955730676651,
+      "near_static_braked_seconds_below_0_1mps": 15.845833333332754,
+      "last_braked_10s_peak_speed_mps": 0.020189088886015203,
+      "last_braked_10s_traveled_distance_m": 0.20061743741940272,
+      "stationary_parking_pass": false,
+      "positive_flow_bit_exact_step_count": 7089,
+      "observed_evaluations": 115200,
+      "hz": 240,
+      "negative_stage_evaluations": 1755,
+      "final_speed_mps": 2.698795089716982,
+      "final_shaft_rad_s": 176.8941105416911,
+      "final_pitch_rad": -0.0008096461439237551,
+      "minimum_negative_j": -0.0014900941972617538,
+      "maximum_adverse_ratio": 0.009937717184622415,
+      "maximum_transverse_ratio": 0.00407258286489593,
+      "negative_stage_time_range_s": [
+        4.128472222222222,
+        4.584722222222222
+      ],
+      "milestones": [
+        {
+          "aero_force_body_n": [
+            -354.3701336390242,
+            3.2288382915965903e-13,
+            -3029.3397089929813
+          ],
+          "contact_force_body_n": [
+            2.0463630789890885e-12,
+            2.683642359726528e-14,
+            0.0
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.39999999969072153,
+          "flow": {
+            "absolute_spin_rad_s": 180.0,
+            "absorbed_power_w": 13299.382922946244,
+            "blade_pitch_rad": 0.08,
+            "body_air_velocity_mps": [
+              24.999999999999993,
+              -1.3322676295501878e-15,
+              6.661338147750939e-16
+            ],
+            "hover_velocity_mps": null,
+            "load_torque_nm": 73.8854606830347,
+            "relative_rpm": 1718.8733853924698,
+            "signed_adverse_ratio": null,
+            "signed_j": 0.3636102608321519,
+            "signed_thrust_work_w": -30454.31152202155,
+            "thrust_n": -1218.1724608808624,
+            "transverse_ratio": null
+          },
+          "gear_clearances_m": [
+            3.1478703022003174e-07,
+            2.682209014892578e-07,
+            2.6635825634002686e-07
+          ],
+          "nongravity_force_body_n": [
+            -1572.5425945198845,
+            3.497202527569243e-13,
+            -3029.3397089929813
+          ],
+          "state": {
+            "altitude_m": 1.599999999627471,
+            "angular_velocity_body_rad_s": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "bank_rad": 0.0,
+            "blade_pitch_rad": 0.08,
+            "canonical_state_bits_hex": [
+              "c14e1ddf1df744fc",
+              "414a2e16ce928a94",
+              "414bc135e9de6cf9",
+              "4025a4e9156e34e3",
+              "c022d0a3d6f164eb",
+              "40347a92b598d1af",
+              "3fea963a5e422531",
+              "bfd3e17d1ea9d268",
+              "3fdbae3231bdab1d",
+              "3fc4b2d71d806567",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "4066800000000000",
+              "3fb47ae147ae147b"
+            ],
+            "heading_rad": 0.0,
+            "orientation_xyzw": [
+              0.83083837900009,
+              -0.3106377410361234,
+              0.4325070844412709,
+              0.1617077726412319
+            ],
+            "pitch_rad": 0.0,
+            "position_ecef_m": [
+              -3947454.2341085654,
+              3431469.613847086,
+              3637867.827100393
+            ],
+            "shaft_rad_s": 180.0,
+            "speed_mps": 24.999999999999996,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              10.822090787604287,
+              -9.40749999710757,
+              20.478801107224793
+            ],
+            "vertical_speed_mps": -0.0
+          },
+          "static_blade_swept_clearance_m": 0.39999999969072153,
+          "time_s": 0.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.1416063303316533,
+            -0.004185726017818002,
+            -0.7090695821195462
+          ],
+          "contact_force_body_n": [
+            -13817.324266559468,
+            2.0551682081744893,
+            -20164.509538922965
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2527130152570003,
+          "flow": {
+            "absolute_spin_rad_s": 176.91122869684125,
+            "absorbed_power_w": 25690.500754261706,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.4923033399509376,
+              0.0008767335337031418,
+              -0.01305287783022262
+            ],
+            "hover_velocity_mps": 9.861818038006076,
+            "load_torque_nm": 145.21690309598992,
+            "relative_rpm": 1689.3781893618884,
+            "signed_adverse_ratio": -0.04992014028789306,
+            "signed_j": 0.007285276008765477,
+            "signed_thrust_work_w": 530.5918348351676,
+            "thrust_n": 1077.7741928138162,
+            "transverse_ratio": 0.0013265595442306433
+          },
+          "gear_clearances_m": [
+            -0.10478221718221903,
+            -0.021538988687098026,
+            -0.020857807248830795
+          ],
+          "nongravity_force_body_n": [
+            -12739.691680075983,
+            2.0509824821566713,
+            -20165.218608505085
+          ],
+          "state": {
+            "altitude_m": 1.550318886525929,
+            "angular_velocity_body_rad_s": [
+              -4.159762992158029e-05,
+              0.0018805138330621194,
+              -0.0008035831881001071
+            ],
+            "bank_rad": -0.00021982114287968674,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42adf05e8",
+              "414a2e0d5b6b4ceb",
+              "414bc14a86a40a79",
+              "3fcb7465249b2d70",
+              "bfc7a2cd9cf5ca8d",
+              "3fd9cb2e94408435",
+              "3feacc80b8b7e3f2",
+              "bfd3e810ce433efa",
+              "3fdae9119b7172b6",
+              "3fc4486b8ae9fa9b",
+              "bf05cf23ae4b2993",
+              "3f5ecf725a694e7f",
+              "bf4a54f1c199c6b3",
+              "0000000000000000",
+              "40661d292052123d",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278656843686361,
+            "orientation_xyzw": [
+              0.8374637229709363,
+              -0.3110391630443555,
+              0.42047538928981554,
+              0.15846008570584477
+            ],
+            "pitch_rad": -0.027864887628612084,
+            "position_ecef_m": [
+              -3947432.334931124,
+              3431450.71421205,
+              3637909.0518811313
+            ],
+            "shaft_rad_s": 176.91127029447117,
+            "speed_mps": 0.49247713125401915,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.21448959624681718,
+              -0.18465585865086034,
+              0.40302624204383913
+            ],
+            "vertical_speed_mps": -0.0006681990644784308
+          },
+          "static_blade_swept_clearance_m": 0.25118064475740515,
+          "time_s": 4.0
+        },
+        {
+          "aero_force_body_n": [
+            0.006466780717050754,
+            -0.00028657128228553344,
+            -0.06003545616590258
+          ],
+          "contact_force_body_n": [
+            -6920.387104079288,
+            -11.777006414027808,
+            -19639.204517648457
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2581312719927036,
+          "flow": {
+            "absolute_spin_rad_s": 176.8926310242597,
+            "absorbed_power_w": 26203.5103569662,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.06028471531613441,
+              0.00046691223103156355,
+              0.01933312444902571
+            ],
+            "hover_velocity_mps": 10.058612109218213,
+            "load_torque_nm": 148.1322890910733,
+            "relative_rpm": 1689.1986847724768,
+            "signed_adverse_ratio": -0.005993343282507782,
+            "signed_j": 0.0008922079722611805,
+            "signed_thrust_work_w": 67.59229253592078,
+            "thrust_n": 1121.217744522227,
+            "transverse_ratio": 0.001922607372761122
+          },
+          "gear_clearances_m": [
+            -0.10206480510532856,
+            -0.0241077346727252,
+            -0.023440277203917503
+          ],
+          "nongravity_force_body_n": [
+            -5799.162892776344,
+            -11.777292985310094,
+            -19639.264553104622
+          ],
+          "state": {
+            "altitude_m": 1.5495838085189462,
+            "angular_velocity_body_rad_s": [
+              0.00015840643458448603,
+              0.044343805059539707,
+              5.4881415093248204e-05
+            ],
+            "bank_rad": -0.00021538229953483679,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42971ea59",
+              "414a2e0d5a2f93c3",
+              "414bc14a892b60e9",
+              "3fa3cb61e09c45ab",
+              "bfa157463b9d41ee",
+              "3fa2ed2501ca8870",
+              "3feac9876a9eeeab",
+              "bfd3e56738e01864",
+              "3fdaf51d5566d3ae",
+              "3fc451bb497d6ba3",
+              "3f24c33ce97af8f7",
+              "3fa6b43b3105979e",
+              "3f0cc60f1059c252",
+              "0000000000000000",
+              "40661c8f22bc444d",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.27860412400382,
+            "orientation_xyzw": [
+              0.8371007044256279,
+              -0.3108766608642155,
+              0.4212106069565448,
+              0.15874425018668345
+            ],
+            "pitch_rad": -0.02609990518938282,
+            "position_ecef_m": [
+              -3947432.3237889227,
+              3431450.7045769407,
+              3637909.0716363085
+            ],
+            "shaft_rad_s": 176.89247261782512,
+            "speed_mps": 0.06331062003124256,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.03866105906321179,
+              -0.033868975426802325,
+              0.03696551939835124
+            ],
+            "vertical_speed_mps": -0.020899685655812766
+          },
+          "static_blade_swept_clearance_m": 0.25669594017945296,
+          "time_s": 4.1
+        },
+        {
+          "aero_force_body_n": [
+            0.02281460862363427,
+            7.940935223651116e-05,
+            -0.056458558802501446
+          ],
+          "contact_force_body_n": [
+            -2828.838173984434,
+            -1.5138552759601835,
+            -20756.556571248435
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.27799071843099665,
+          "flow": {
+            "absolute_spin_rad_s": 176.86802873196953,
+            "absorbed_power_w": 26362.699800411116,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              -0.08268650406189537,
+              -8.899120983701242e-05,
+              0.04044128775118654
+            ],
+            "hover_velocity_mps": 10.121857637739579,
+            "load_torque_nm": 149.0529407118674,
+            "relative_rpm": 1688.964148327713,
+            "signed_adverse_ratio": 0.008169103638999708,
+            "signed_j": -0.0012239225086553625,
+            "signed_thrust_work_w": -93.87913156671668,
+            "thrust_n": 1135.36220489432,
+            "transverse_ratio": 0.0039954509449956896
+          },
+          "gear_clearances_m": [
+            -0.09239703975617886,
+            -0.03440860565751791,
+            -0.03379457164555788
+          ],
+          "nongravity_force_body_n": [
+            -1693.4531544814904,
+            -1.513775866607947,
+            -20756.61302980724
+          ],
+          "state": {
+            "altitude_m": 1.5461641745641828,
+            "angular_velocity_body_rad_s": [
+              0.00011671320670380328,
+              0.07939923286717294,
+              0.0014801226895560509
+            ],
+            "bank_rad": -0.00019811291168580808,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429540afe",
+              "414a2e0d5a146f85",
+              "414bc14a88a1a58a",
+              "bf893991d9380ed2",
+              "3f8521035eed1a0c",
+              "bfb733c0e054b301",
+              "3feabde47072173d",
+              "bfd3dd39aa685ca0",
+              "3fdb22f447af6e12",
+              "3fc472ce6d97c229",
+              "3f1e987d9f8b1db4",
+              "3fb45382147df375",
+              "3f584015a2ececfd",
+              "0000000000000000",
+              "40661bc5ef6d0c89",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278688265235137,
+            "orientation_xyzw": [
+              0.8356802173809467,
+              -0.31037751809476255,
+              0.42400843620791406,
+              0.15975361205302477
+            ],
+            "pitch_rad": -0.019433051455891866,
+            "position_ecef_m": [
+              -3947432.322877287,
+              3431450.7037486457,
+              3637909.067433064
+            ],
+            "shaft_rad_s": 176.86791201876284,
+            "speed_mps": 0.09204652969225692,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              -0.01231683677816112,
+              0.010316873869340014,
+              -0.09063344456508206
+            ],
+            "vertical_speed_mps": -0.038826918676579655
+          },
+          "static_blade_swept_clearance_m": 0.27692196787166806,
+          "time_s": 4.2
+        },
+        {
+          "aero_force_body_n": [
+            -0.00026590196253098924,
+            -5.567005453667456e-06,
+            -0.0006507928713479916
+          ],
+          "contact_force_body_n": [
+            -1170.913875366256,
+            4.536977916378612,
+            -20555.191749638565
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3434205543142872,
+          "flow": {
+            "absolute_spin_rad_s": 176.67977366826418,
+            "absorbed_power_w": 26154.901802852582,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.022093835344504726,
+              2.5961062356502033e-05,
+              -0.0010722128101252279
+            ],
+            "hover_velocity_mps": 10.06377923648247,
+            "load_torque_nm": 148.03563112980495,
+            "relative_rpm": 1687.1674454242564,
+            "signed_adverse_ratio": -0.0021953815584916437,
+            "signed_j": 0.00032738057374846616,
+            "signed_thrust_work_w": 24.79745461745843,
+            "thrust_n": 1122.3698480049623,
+            "transverse_ratio": 0.00010657299125027455
+          },
+          "gear_clearances_m": [
+            -0.05337236449122429,
+            -0.04739220533519983,
+            -0.04669799096882343
+          ],
+          "nongravity_force_body_n": [
+            -48.54429326325616,
+            4.536972349373158,
+            -20555.192400431435
+          ],
+          "state": {
+            "altitude_m": 1.5508419321849942,
+            "angular_velocity_body_rad_s": [
+              1.1937574101071146e-05,
+              -0.0009897396328725158,
+              -6.129130171439988e-05
+            ],
+            "bank_rad": -0.00022394081017294723,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42a8e0005",
+              "414a2e0d5b2447e4",
+              "414bc14a875bca64",
+              "3f82605101a379e1",
+              "bf7f9a6a2f77f2f8",
+              "3f9322fb9a742f50",
+              "3fea9ef409f378b0",
+              "bfd3c9917861ad1a",
+              "3fdb99d5b466121a",
+              "3fc4c7cfedc2cb21",
+              "3ee908efb1029559",
+              "bf503744d6b419e5",
+              "bf1011308baa8188",
+              "0000000000000000",
+              "406615c09bac4c5c",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.279142228703006,
+            "orientation_xyzw": [
+              0.8319034761768958,
+              -0.30917774921427255,
+              0.43126433007299314,
+              0.16234778508586437
+            ],
+            "pitch_rad": -0.00210910563338047,
+            "position_ecef_m": [
+              -3947432.3324584984,
+              3431450.712044703,
+              3637909.0574887265
+            ],
+            "shaft_rad_s": 176.67976173069007,
+            "speed_mps": 0.022119852497633014,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008972771513467261,
+              -0.007715620791256532,
+              0.018688136388888055
+            ],
+            "vertical_speed_mps": 0.0010256180141519754
+          },
+          "static_blade_swept_clearance_m": 0.3433045535904528,
+          "time_s": 5.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00023279816905260442,
+            -5.591948839625148e-07,
+            -0.001910376780479381
+          ],
+          "contact_force_body_n": [
+            -1156.5905623287144,
+            4.571449994689141,
+            -20574.343978295852
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3432491494308929,
+          "flow": {
+            "absolute_spin_rad_s": 175.78281973267133,
+            "absorbed_power_w": 25760.71218539007,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02018917712159523,
+              2.857107985559503e-06,
+              -4.4543949954980316e-05
+            ],
+            "hover_velocity_mps": 10.013499655949005,
+            "load_torque_nm": 146.54852063794797,
+            "relative_rpm": 1678.6022827851125,
+            "signed_adverse_ratio": -0.0020161959170389415,
+            "signed_j": 0.00030068434552593817,
+            "signed_thrust_work_w": 22.433868729097455,
+            "thrust_n": 1111.182917163137,
+            "transverse_ratio": 4.457531011641673e-06
+          },
+          "gear_clearances_m": [
+            -0.053399997763335705,
+            -0.04713363666087389,
+            -0.046444619074463844
+          ],
+          "nongravity_force_body_n": [
+            -45.40787796374648,
+            4.571449435494257,
+            -20574.345888672633
+          ],
+          "state": {
+            "altitude_m": 1.551003041677177,
+            "angular_velocity_body_rad_s": [
+              -2.6388753511930445e-07,
+              3.6945644628814557e-06,
+              -3.610087203350564e-05
+            ],
+            "bank_rad": -0.0002222641710770447,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd424e65de6",
+              "414a2e0d564b48ed",
+              "414bc14a92080301",
+              "3f82026fd148aacb",
+              "bf7edcf18b4ca3c3",
+              "3f90ef4c28f7745c",
+              "3fea9f5aedca498b",
+              "bfd3c86de7b21b00",
+              "3fdb98f2b026911f",
+              "3fc4c89f5beb79ae",
+              "be91b58da7352f67",
+              "3ecefe044b12a234",
+              "bf02ed608496ec48",
+              "0000000000000000",
+              "4065f90cdc857c01",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278957350480373,
+            "orientation_xyzw": [
+              0.8319525379504723,
+              -0.3091082346585807,
+              0.4312102050992212,
+              0.16237251270554282
+            ],
+            "pitch_rad": -0.002203640052420884,
+            "position_ecef_m": [
+              -3947432.2882802365,
+              3431450.674172512,
+              3637909.1408694987
+            ],
+            "shaft_rad_s": 175.78281999655886,
+            "speed_mps": 0.020189226462984846,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008793710302673749,
+              -0.007534926921643983,
+              0.01653784751930619
+            ],
+            "vertical_speed_mps": 5.483240921033694e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431279493261017,
+          "time_s": 10.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022968295575195613,
+            -5.689519019599425e-07,
+            -0.0018853721777483646
+          ],
+          "contact_force_body_n": [
+            -1148.7691846082118,
+            4.58703956830439,
+            -20574.34479373517
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34330244760044004,
+          "flow": {
+            "absolute_spin_rad_s": 175.18906259664033,
+            "absorbed_power_w": 25500.629344326753,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.020054136152427772,
+              2.926534802161207e-06,
+              -4.392567165856947e-05
+            ],
+            "hover_velocity_mps": 9.979706433303333,
+            "load_torque_nm": 145.5606244268801,
+            "relative_rpm": 1672.9323191984695,
+            "signed_adverse_ratio": -0.0020094915904044037,
+            "signed_j": 0.0002996854078518864,
+            "signed_thrust_work_w": 22.1336619697519,
+            "thrust_n": 1103.6956068073955,
+            "transverse_ratio": 4.41125736130044e-06
+          },
+          "gear_clearances_m": [
+            -0.05336964689195156,
+            -0.04714973270893097,
+            -0.046458364464342594
+          ],
+          "nongravity_force_body_n": [
+            -45.07380748377203,
+            4.5870389993524885,
+            -20574.346679107348
+          ],
+          "state": {
+            "altitude_m": 1.5510032642632723,
+            "angular_velocity_body_rad_s": [
+              -2.015879139243588e-07,
+              2.4386287946672386e-06,
+              -3.600790995780063e-05
+            ],
+            "bank_rad": -0.00022302231914410542,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd41f4a9114",
+              "414a2e0d517d64f2",
+              "414bc14a9c93e1e4",
+              "3f81e4d059b8187d",
+              "bf7ea54f2c611e27",
+              "3f90d24b2b4b4465",
+              "3fea9f8e51099e8a",
+              "bfd3c72f4c533432",
+              "3fdb98ceec018be3",
+              "3fc4c9fcfded9d31",
+              "be8b0e820b041d18",
+              "3ec474ea5b97aaad",
+              "bf02e0e65d862baf",
+              "0000000000000000",
+              "4065e60ccd6ce8fa",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278777090454291,
+            "orientation_xyzw": [
+              0.8319770415082115,
+              -0.3090322728501774,
+              0.4312016777750484,
+              0.1624141921886149
+            ],
+            "pitch_rad": -0.0021885502254141197,
+            "position_ecef_m": [
+              -3947432.2444630954,
+              3431450.636639231,
+              3637909.2232630122
+            ],
+            "shaft_rad_s": 175.18906279822824,
+            "speed_mps": 0.0200541844723077,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008737209070215574,
+              -0.007481869955945387,
+              0.01642720653291398
+            ],
+            "vertical_speed_mps": 3.67688904167468e-08
+          },
+          "static_blade_swept_clearance_m": 0.34318207743413287,
+          "time_s": 15.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022763835673911042,
+            -5.753303929864142e-07,
+            -0.0018689519850360573
+          ],
+          "contact_force_body_n": [
+            -1143.6064577153663,
+            4.597432123317612,
+            -20574.345430376572
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34333762758116837,
+          "flow": {
+            "absolute_spin_rad_s": 174.7960290655851,
+            "absorbed_power_w": 25329.435486723818,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.019965000825654063,
+              2.972556327955015e-06,
+              -4.352159791168363e-05
+            ],
+            "hover_velocity_mps": 9.957337122437437,
+            "load_torque_nm": 144.90852922762895,
+            "relative_rpm": 1669.1791250474164,
+            "signed_adverse_ratio": -0.0020050542208383993,
+            "signed_j": 0.0002990242410829936,
+            "signed_thrust_work_w": 21.93661112249421,
+            "thrust_n": 1098.7533290911124,
+            "transverse_ratio": 4.380989929753443e-06
+          },
+          "gear_clearances_m": [
+            -0.05334961600601673,
+            -0.047160363756120205,
+            -0.046467430889606476
+          ],
+          "nongravity_force_body_n": [
+            -44.853356262610625,
+            4.5974315479872185,
+            -20574.347299328558
+          ],
+          "state": {
+            "altitude_m": 1.551003411412239,
+            "angular_velocity_body_rad_s": [
+              -1.6022831585593508e-07,
+              1.611830554342617e-06,
+              -3.594616363414207e-05
+            ],
+            "bank_rad": -0.0002235270380720152,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd419b645de",
+              "414a2e0d4cb6b1f6",
+              "414bc14aa710eb9c",
+              "3f81d1ab05107357",
+              "bf7e7fa4abd2c1e0",
+              "3f90bf25fa5c47cd",
+              "3fea9fc3edf1a86d",
+              "bfd3c5f2dc9181ec",
+              "3fdb98a27ca7a3be",
+              "3fc4cb526124631f",
+              "be8581672bca9f76",
+              "3ebb0ac26fbebfa7",
+              "bf02d89cc71e0f80",
+              "0000000000000000",
+              "4065d979124870ec",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278597213094769,
+            "orientation_xyzw": [
+              0.8320026061385427,
+              -0.3089568284977122,
+              0.4311910836536831,
+              0.16245488875645095
+            ],
+            "pitch_rad": -0.0021785902314788363,
+            "position_ecef_m": [
+              -3947432.200875028,
+              3431450.599325414,
+              3637909.305203868
+            ],
+            "shaft_rad_s": 174.7960292258134,
+            "speed_mps": 0.019965048483135305,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.00870069131092925,
+              -0.007445948836150212,
+              0.016354173093595926
+            ],
+            "vertical_speed_mps": 2.6636623871867382e-08
+          },
+          "static_blade_swept_clearance_m": 0.3432178052132217,
+          "time_s": 20.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.09257130130925874,
+            -1.2894326622331099e-05,
+            -0.7776090868510084
+          ],
+          "contact_force_body_n": [
+            -395.05848019792154,
+            4.56570386153427,
+            -20573.353090054414
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3484137056312233,
+          "flow": {
+            "absolute_spin_rad_s": 174.77990841308048,
+            "absorbed_power_w": 24870.83668268695,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.40340902246550603,
+              3.2971295464978567e-06,
+              -0.00038188871640528615
+            ],
+            "hover_velocity_mps": 9.78130991144343,
+            "load_torque_nm": 142.2980301826593,
+            "relative_rpm": 1669.025172455882,
+            "signed_adverse_ratio": -0.041242842330713445,
+            "signed_j": 0.0060425844179134965,
+            "signed_thrust_work_w": 427.7139627908946,
+            "thrust_n": 1060.248876380713,
+            "transverse_ratio": 3.904415184514767e-05
+          },
+          "gear_clearances_m": [
+            -0.050473375245928764,
+            -0.048624604009091854,
+            -0.047930953092873096
+          ],
+          "nongravity_force_body_n": [
+            665.0978248814822,
+            4.565690967207647,
+            -20574.130699141264
+          ],
+          "state": {
+            "altitude_m": 1.550989605486393,
+            "angular_velocity_body_rad_s": [
+              1.0649525868766138e-06,
+              -0.00019225440922672617,
+              -3.0314214955933083e-05
+            ],
+            "bank_rad": -0.00022375819328011788,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd40d23ec33",
+              "414a2e0d41f5702f",
+              "414bc14abeb08c55",
+              "3fc67fddc88bfd20",
+              "bfc33f792b9066ed",
+              "3fd526e0afccf11b",
+              "3fea9d27f0c7551a",
+              "bfd3c44e0cc29513",
+              "3fdba28c33334af0",
+              "3fc4d25a6a5b6772",
+              "3eb1ddefc096cbd5",
+              "bf2932fcccdf3a34",
+              "beffc968fd4b91c1",
+              "0000000000000000",
+              "4065d8f5004143d2",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786382919080985,
+            "orientation_xyzw": [
+              0.83168408419684,
+              -0.3088564991579272,
+              0.43179612159762737,
+              0.16266946976866908
+            ],
+            "pitch_rad": -0.0007318809783543655,
+            "position_ecef_m": [
+              -3947432.1026587724,
+              3431450.51530268,
+              3637909.4897628226
+            ],
+            "shaft_rad_s": 174.7799073481279,
+            "speed_mps": 0.4034092032371572,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.17577717106176127,
+              -0.1503745520320118,
+              0.3304979054262433
+            ],
+            "vertical_speed_mps": 8.664197864444168e-05
+          },
+          "static_blade_swept_clearance_m": 0.34837345218100746,
+          "time_s": 21.0
+        },
+        {
+          "aero_force_body_n": [
+            -1.343969672685797,
+            -3.7717040671450635e-05,
+            -11.31609553327557
+          ],
+          "contact_force_body_n": [
+            -428.007327487098,
+            4.511784825833212,
+            -20563.514977066377
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3481719741606204,
+          "flow": {
+            "absolute_spin_rad_s": 175.3351801639433,
+            "absorbed_power_w": 23766.098145594628,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              1.5374266982791047,
+              2.530615674206649e-06,
+              -0.0012599732342653824
+            ],
+            "hover_velocity_mps": 9.275794267707022,
+            "load_torque_nm": 135.5466605353966,
+            "relative_rpm": 1674.3276344127266,
+            "signed_adverse_ratio": -0.16574609719747016,
+            "signed_j": 0.022955881872604857,
+            "signed_thrust_work_w": 1465.9204862307276,
+            "thrust_n": 953.4896771804363,
+            "transverse_ratio": 0.00013583481254854718
+          },
+          "gear_clearances_m": [
+            -0.050590623170137405,
+            -0.04849461652338505,
+            -0.04780415631830692
+          ],
+          "nongravity_force_body_n": [
+            524.1383800206524,
+            4.511747108792541,
+            -20574.831072599653
+          ],
+          "state": {
+            "altitude_m": 1.5510360170155764,
+            "angular_velocity_body_rad_s": [
+              2.9816334923138996e-07,
+              3.9799817992416594e-07,
+              -2.210963130878831e-05
+            ],
+            "bank_rad": -0.00022272914064429307,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd3303899e8",
+              "414a2e0c85019d62",
+              "414bc14c5dd8af89",
+              "3fe572477f511da1",
+              "bfe2573cf4c1689c",
+              "3ff42661c515d74b",
+              "3fea9d6b3472d3d3",
+              "bfd3c3c90d5b717b",
+              "3fdba1dd9b538733",
+              "3fc4d292a25b49c8",
+              "3e940268471f9e23",
+              "3e9ab58e81b33d2f",
+              "bef72f024b5b8edf",
+              "0000000000000000",
+              "4065eab9cb2039af",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278546421488036,
+            "orientation_xyzw": [
+              0.8317161583314551,
+              -0.3088247900430116,
+              0.43175449532110405,
+              0.16267617156570524
+            ],
+            "pitch_rad": -0.0008137613759388654,
+            "position_ecef_m": [
+              -3947430.3767273314,
+              3431449.039111779,
+              3637912.7331752223
+            ],
+            "shaft_rad_s": 175.33517986577996,
+            "speed_mps": 1.5374272145764636,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.670200108209361,
+              -0.5731491833096416,
+              1.2593705843587084
+            ],
+            "vertical_speed_mps": 8.875022157295298e-06
+          },
+          "static_blade_swept_clearance_m": 0.3481272172898835,
+          "time_s": 25.0
+        },
+        {
+          "aero_force_body_n": [
+            -4.141261746367883,
+            -9.72586198655834e-05,
+            -34.87234166935948
+          ],
+          "contact_force_body_n": [
+            -427.4343927790066,
+            4.416663357803815,
+            -20539.871521399462
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3482420633434269,
+          "flow": {
+            "absolute_spin_rad_s": 176.8941110070329,
+            "absorbed_power_w": 23021.11078593385,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              2.6987941947354535,
+              3.717417520476829e-06,
+              -0.002197891919783257
+            ],
+            "hover_velocity_mps": 8.781062372206687,
+            "load_torque_nm": 130.14062850864823,
+            "relative_rpm": 1689.2143257932576,
+            "signed_adverse_ratio": -0.3073425606538819,
+            "signed_j": 0.0399415596118714,
+            "signed_thrust_work_w": 2306.097522456025,
+            "thrust_n": 854.491804878837,
+            "transverse_ratio": 0.00025029944787497853
+          },
+          "gear_clearances_m": [
+            -0.050526789389550686,
+            -0.04843993950635195,
+            -0.047755857929587364
+          ],
+          "nongravity_force_body_n": [
+            422.9161503534625,
+            4.4165660991839495,
+            -20574.743863068823
+          ],
+          "state": {
+            "altitude_m": 1.5510916244238615,
+            "angular_velocity_body_rad_s": [
+              4.653418110524477e-07,
+              5.322640356932897e-07,
+              -2.1883615664869302e-05
+            ],
+            "bank_rad": -0.00022067169821170268,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd0dba2f4d4",
+              "414a2e0a86ebc263",
+              "414bc150bec8044d",
+              "3ff2d3a0233c8c45",
+              "bff01818ebfb2c9a",
+              "4001af7e3c27b91a",
+              "3fea9d8e0c319928",
+              "bfd3c3068e513ad2",
+              "3fdba1bda3042f5a",
+              "3fc4d356286cdca6",
+              "3e9f3a82edb6c40a",
+              "3ea1dc1cfe19f3d8",
+              "bef6f2569e19d315",
+              "0000000000000000",
+              "40661c9c8db5f24f",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278436410902384,
+            "orientation_xyzw": [
+              0.8317327726515815,
+              -0.3087784185235424,
+              0.4317468730885047,
+              0.16269947980774652
+            ],
+            "pitch_rad": -0.0008096461439237551,
+            "position_ecef_m": [
+              -3947425.7159105334,
+              3431445.0540698036,
+              3637921.4904790283
+            ],
+            "shaft_rad_s": 176.8941105416911,
+            "speed_mps": 2.698795089716982,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              1.1766663910318738,
+              -1.00588314228188,
+              2.210689992868663
+            ],
+            "vertical_speed_mps": 1.2823891926139197e-05
+          },
+          "static_blade_swept_clearance_m": 0.34819753281037624,
+          "time_s": 30.0
+        }
+      ]
+    },
+    {
+      "completed_s": 30.0,
+      "failure": null,
+      "minimum_disk_clearance_m": 0.24117093065260042,
+      "minimum_static_blade_swept_clearance_m": 0.23945644162476953,
+      "maximum_gear_compression_m": 0.11125977337360382,
+      "near_static_braked_seconds_below_0_1mps": 15.845833333332594,
+      "last_braked_10s_peak_speed_mps": 0.020189319954878278,
+      "last_braked_10s_traveled_distance_m": 0.20061876599909378,
+      "stationary_parking_pass": false,
+      "positive_flow_bit_exact_step_count": 14180,
+      "observed_evaluations": 158400,
+      "hz": 480,
+      "negative_stage_evaluations": 2411,
+      "final_speed_mps": 2.6988042569923594,
+      "final_shaft_rad_s": 176.89425878963854,
+      "final_pitch_rad": -0.0008096461189180412,
+      "minimum_negative_j": -0.0014900839874632372,
+      "maximum_adverse_ratio": 0.009937649398392687,
+      "maximum_transverse_ratio": 0.0040724684932680185,
+      "negative_stage_time_range_s": [
+        4.128645833333334,
+        4.584895833333333
+      ],
+      "milestones": [
+        {
+          "aero_force_body_n": [
+            -354.3701336390242,
+            3.2288382915965903e-13,
+            -3029.3397089929813
+          ],
+          "contact_force_body_n": [
+            2.0463630789890885e-12,
+            2.683642359726528e-14,
+            0.0
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.39999999969072153,
+          "flow": {
+            "absolute_spin_rad_s": 180.0,
+            "absorbed_power_w": 13299.382922946244,
+            "blade_pitch_rad": 0.08,
+            "body_air_velocity_mps": [
+              24.999999999999993,
+              -1.3322676295501878e-15,
+              6.661338147750939e-16
+            ],
+            "hover_velocity_mps": null,
+            "load_torque_nm": 73.8854606830347,
+            "relative_rpm": 1718.8733853924698,
+            "signed_adverse_ratio": null,
+            "signed_j": 0.3636102608321519,
+            "signed_thrust_work_w": -30454.31152202155,
+            "thrust_n": -1218.1724608808624,
+            "transverse_ratio": null
+          },
+          "gear_clearances_m": [
+            3.1478703022003174e-07,
+            2.682209014892578e-07,
+            2.6635825634002686e-07
+          ],
+          "nongravity_force_body_n": [
+            -1572.5425945198845,
+            3.497202527569243e-13,
+            -3029.3397089929813
+          ],
+          "state": {
+            "altitude_m": 1.599999999627471,
+            "angular_velocity_body_rad_s": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "bank_rad": 0.0,
+            "blade_pitch_rad": 0.08,
+            "canonical_state_bits_hex": [
+              "c14e1ddf1df744fc",
+              "414a2e16ce928a94",
+              "414bc135e9de6cf9",
+              "4025a4e9156e34e3",
+              "c022d0a3d6f164eb",
+              "40347a92b598d1af",
+              "3fea963a5e422531",
+              "bfd3e17d1ea9d268",
+              "3fdbae3231bdab1d",
+              "3fc4b2d71d806567",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "4066800000000000",
+              "3fb47ae147ae147b"
+            ],
+            "heading_rad": 0.0,
+            "orientation_xyzw": [
+              0.83083837900009,
+              -0.3106377410361234,
+              0.4325070844412709,
+              0.1617077726412319
+            ],
+            "pitch_rad": 0.0,
+            "position_ecef_m": [
+              -3947454.2341085654,
+              3431469.613847086,
+              3637867.827100393
+            ],
+            "shaft_rad_s": 180.0,
+            "speed_mps": 24.999999999999996,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              10.822090787604287,
+              -9.40749999710757,
+              20.478801107224793
+            ],
+            "vertical_speed_mps": -0.0
+          },
+          "static_blade_swept_clearance_m": 0.39999999969072153,
+          "time_s": 0.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.1415708784764809,
+            -0.004185132999180333,
+            -0.7089055810056422
+          ],
+          "contact_force_body_n": [
+            -13817.061558500909,
+            2.054725022898541,
+            -20164.488298221535
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.25271307324661296,
+          "flow": {
+            "absolute_spin_rad_s": 176.91239165182384,
+            "absorbed_power_w": 25691.085950853947,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.49224147678935926,
+              0.0008767195087820007,
+              -0.013050839239132254
+            ],
+            "hover_velocity_mps": 9.861912979320312,
+            "load_torque_nm": 145.21925632782032,
+            "relative_rpm": 1689.3892947230074,
+            "signed_adverse_ratio": -0.04991338676599079,
+            "signed_j": 0.007284312651565182,
+            "signed_thrust_work_w": 530.5353752685452,
+            "thrust_n": 1077.7949447270423,
+            "transverse_ratio": 0.0013263404292715197
+          },
+          "gear_clearances_m": [
+            -0.10478218924254179,
+            -0.02153901942074299,
+            -0.020857839845120907
+          ],
+          "nongravity_force_body_n": [
+            -12739.408184652344,
+            2.050539889899361,
+            -20165.19720380254
+          ],
+          "state": {
+            "altitude_m": 1.5503188762813807,
+            "angular_velocity_body_rad_s": [
+              -4.159334419771765e-05,
+              0.001881458272114207,
+              -0.0008035639463543115
+            ],
+            "bank_rad": -0.00021981994441567192,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42ade7255",
+              "414a2e0d5b6acbba",
+              "414bc14a86a5226f",
+              "3fcb738478975be4",
+              "bfc7a20d50ce9870",
+              "3fd9ca5930727947",
+              "3feacc80b5ebe5b7",
+              "bfd3e810cfbccbde",
+              "3fdae911a52743f8",
+              "3fc4486b8cb7a73b",
+              "bf05ce906caaf78d",
+              "3f5ed3686fd75ab8",
+              "bf4a54c86f56cd24",
+              "0000000000000000",
+              "40661d32a73478f5",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278656851386139,
+            "orientation_xyzw": [
+              0.8374637177614009,
+              -0.3110391644178757,
+              0.4204753983331666,
+              0.15846008654562546
+            ],
+            "pitch_rad": -0.027864868005476235,
+            "position_ecef_m": [
+              -3947432.334913532,
+              3431450.7141966494,
+              3637909.051914505
+            ],
+            "shaft_rad_s": 176.91243324516805,
+            "speed_mps": 0.4924152358667551,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.2144628132652705,
+              -0.1846329350057121,
+              0.40297536593597666
+            ],
+            "vertical_speed_mps": -0.000668503618580063
+          },
+          "static_blade_swept_clearance_m": 0.25118070382587127,
+          "time_s": 4.0
+        },
+        {
+          "aero_force_body_n": [
+            0.006425736888163294,
+            -0.00028641069139368456,
+            -0.059860413907818724
+          ],
+          "contact_force_body_n": [
+            -6919.72748102385,
+            -11.77738763538531,
+            -19639.226734422766
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2581326872130312,
+          "flow": {
+            "absolute_spin_rad_s": 176.8937834101751,
+            "absorbed_power_w": 26204.0547522562,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.06025835468456744,
+              0.00046682508435068586,
+              0.0193378191989375
+            ],
+            "hover_velocity_mps": 10.058689769041843,
+            "load_torque_nm": 148.13440160016904,
+            "relative_rpm": 1689.209688952388,
+            "signed_adverse_ratio": -0.005990676327450493,
+            "signed_j": 0.0008918120276518624,
+            "signed_thrust_work_w": 67.56377980076557,
+            "thrust_n": 1121.2350578511414,
+            "transverse_ratio": 0.0019230589195434722
+          },
+          "gear_clearances_m": [
+            -0.10206410847604275,
+            -0.024108444340527058,
+            -0.023440995253622532
+          ],
+          "nongravity_force_body_n": [
+            -5798.48599743582,
+            -11.777674046076703,
+            -19639.286594836674
+          ],
+          "state": {
+            "altitude_m": 1.5495835840702057,
+            "angular_velocity_body_rad_s": [
+              0.00015843732440136055,
+              0.04435033013968765,
+              5.5069666706185116e-05
+            ],
+            "bank_rad": -0.0002153791909350285,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429716671",
+              "414a2e0d5a2f2003",
+              "414bc14a892c5841",
+              "3fa3ca332e1a0d8c",
+              "bfa15640b4c89ffd",
+              "3fa2ea010f0115ee",
+              "3feac9873428782f",
+              "bfd3e56717d70387",
+              "3fdaf51e2ac68408",
+              "3fc451bbdb56667d",
+              "3f24c44640e7f177",
+              "3fa6b516230894f9",
+              "3f0cdf53570cb244",
+              "0000000000000000",
+              "40661c989366290c",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786041413502165,
+            "orientation_xyzw": [
+              0.8371006029808593,
+              -0.31087663009753225,
+              0.42121080567636726,
+              0.15874431810225423
+            ],
+            "pitch_rad": -0.026099435028918185,
+            "position_ecef_m": [
+              -3947432.3237731983,
+              3431450.7045631423,
+              3637909.071665794
+            ],
+            "shaft_rad_s": 176.89362497285072,
+            "speed_mps": 0.0632869535237817,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.03865203798070657,
+              -0.03386118132431191,
+              0.03694155986935842
+            ],
+            "vertical_speed_mps": -0.02090366281083495
+          },
+          "static_blade_swept_clearance_m": 0.2566973812497992,
+          "time_s": 4.1
+        },
+        {
+          "aero_force_body_n": [
+            0.02281529809816646,
+            7.944180489848108e-05,
+            -0.05645535398798705
+          ],
+          "contact_force_body_n": [
+            -2828.558120295749,
+            -1.5128128701078354,
+            -20756.682694287298
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.27799322615569144,
+          "flow": {
+            "absolute_spin_rad_s": 176.86917130276467,
+            "absorbed_power_w": 26363.217346135458,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              -0.0826926662492323,
+              -8.90226822863327e-05,
+              0.04044021051070842
+            ],
+            "hover_velocity_mps": 10.121925562508938,
+            "load_torque_nm": 149.05490398327754,
+            "relative_rpm": 1688.9750593775243,
+            "signed_adverse_ratio": 0.008169657614902983,
+            "signed_j": -0.0012240058140188734,
+            "signed_thrust_work_w": -93.8873879728584,
+            "thrust_n": 1135.377443144543,
+            "transverse_ratio": 0.003995317713559004
+          },
+          "gear_clearances_m": [
+            -0.09239580575376749,
+            -0.03440987132489681,
+            -0.033795843832194805
+          ],
+          "nongravity_force_body_n": [
+            -1693.1578618531082,
+            -1.512733428302937,
+            -20756.739149641286
+          ],
+          "state": {
+            "altitude_m": 1.546163766644895,
+            "angular_velocity_body_rad_s": [
+              0.00011668153748272645,
+              0.07939987076343903,
+              0.0014802152641294132
+            ],
+            "bank_rad": -0.00019811055822769528,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429538b84",
+              "414a2e0d5a13ffa5",
+              "414bc14a88a291c7",
+              "bf893b519eb1f015",
+              "3f852289dfbc8f4f",
+              "bfb73409f818ab3f",
+              "3feabde40ed3c75c",
+              "bfd3dd39712d5523",
+              "3fdb22f5c15e3f45",
+              "3fc472cf71b749f2",
+              "3f1e965d8cd60e4c",
+              "3fb4538cc83c5019",
+              "3f58407909a16562",
+              "0000000000000000",
+              "40661bcf4ba31378",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278688298528597,
+            "orientation_xyzw": [
+              0.8356800355524956,
+              -0.31037746479462863,
+              0.4240087879525059,
+              0.15975373318231295
+            ],
+            "pitch_rad": -0.01943221713684558,
+            "position_ecef_m": [
+              -3947432.3228620905,
+              3431450.703735309,
+              3637909.0674612257
+            ],
+            "shaft_rad_s": 176.86905462122718,
+            "speed_mps": 0.09205159206985664,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              -0.012320172934998689,
+              0.010319783344648363,
+              -0.09063780123748887
+            ],
+            "vertical_speed_mps": -0.03882579153765643
+          },
+          "static_blade_swept_clearance_m": 0.2769245214752465,
+          "time_s": 4.2
+        },
+        {
+          "aero_force_body_n": [
+            -0.00026591297639693746,
+            -5.5672446271074995e-06,
+            -0.0006509574860780714
+          ],
+          "contact_force_body_n": [
+            -1170.9293695427093,
+            4.536913046846764,
+            -20555.19441774849
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3434204270719219,
+          "flow": {
+            "absolute_spin_rad_s": 176.68084344118586,
+            "absorbed_power_w": 26155.376816421074,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02209403793568464,
+              2.596194508915203e-05,
+              -0.0010721270662015063
+            ],
+            "hover_velocity_mps": 10.063840140196909,
+            "load_torque_nm": 148.0374233391509,
+            "relative_rpm": 1687.1776610013426,
+            "signed_adverse_ratio": -0.0021953884032236176,
+            "signed_j": 0.0003273815934379377,
+            "signed_thrust_work_w": 24.79798214049985,
+            "thrust_n": 1122.3834327019056,
+            "transverse_ratio": 0.00010656383091786217
+          },
+          "gear_clearances_m": [
+            -0.053372432477772236,
+            -0.04739215690642595,
+            -0.04669794626533985
+          ],
+          "nongravity_force_body_n": [
+            -48.54620275378012,
+            4.536907479602137,
+            -20555.195068705976
+          ],
+          "state": {
+            "altitude_m": 1.5508419396355748,
+            "angular_velocity_body_rad_s": [
+              1.1937764930871981e-05,
+              -0.0009897000300680913,
+              -6.129114394522748e-05
+            ],
+            "bank_rad": -0.00022393933800797717,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42a8d7dc3",
+              "414a2e0d5b23d5a5",
+              "414bc14a875cc1f2",
+              "3f826063f1c9e066",
+              "bf7f9a8b4b36b0b7",
+              "3f93230362063a9c",
+              "3fea9ef40cdbd564",
+              "bfd3c991841218f0",
+              "3fdb99d5a527ba72",
+              "3fc4c7cfd6a0a4f8",
+              "3ee90909eb3c9f8e",
+              "bf50371a50c47ce6",
+              "bf10112dd5ca35a0",
+              "0000000000000000",
+              "406615c95f2628f1",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2791422481573615,
+            "orientation_xyzw": [
+              0.831903481592843,
+              -0.3091777601006376,
+              0.43126431587635417,
+              0.16234777431353797
+            ],
+            "pitch_rad": -0.0021091441111163317,
+            "position_ecef_m": [
+              -3947432.3324429705,
+              3431450.7120310836,
+              3637909.0575182373
+            ],
+            "shaft_rad_s": 176.68083150342093,
+            "speed_mps": 0.02212005069551484,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008972912613202943,
+              -0.007715744129580474,
+              0.018688252313547524
+            ],
+            "vertical_speed_mps": 0.0010255309930813708
+          },
+          "static_blade_swept_clearance_m": 0.3433044242318168,
+          "time_s": 5.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.0002328020144292825,
+            -5.591274947698444e-07,
+            -0.0019104033180182113
+          ],
+          "contact_force_body_n": [
+            -1156.5999385102086,
+            4.57141115356205,
+            -20574.344309608092
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3432490836002531,
+          "flow": {
+            "absolute_spin_rad_s": 175.78352782954127,
+            "absorbed_power_w": 25761.023401798113,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02018933944722604,
+              2.856740702588973e-06,
+              -4.4547163167247975e-05
+            ],
+            "hover_velocity_mps": 10.013539956148724,
+            "load_torque_nm": 146.5497007590995,
+            "relative_rpm": 1678.6090446163864,
+            "signed_adverse_ratio": -0.0020162040133298673,
+            "signed_j": 0.0003006855518611757,
+            "signed_thrust_work_w": 22.434229678489874,
+            "thrust_n": 1111.191861285599,
+            "transverse_ratio": 4.457830953263156e-06
+          },
+          "gear_clearances_m": [
+            -0.053400034084916115,
+            -0.04713361896574497,
+            -0.04644460417330265
+          ],
+          "nongravity_force_body_n": [
+            -45.408310026624086,
+            4.571410594434555,
+            -20574.346220011408
+          ],
+          "state": {
+            "altitude_m": 1.551003041677177,
+            "angular_velocity_body_rad_s": [
+              -2.6433274323835103e-07,
+              3.695572697566862e-06,
+              -3.610099245376658e-05
+            ],
+            "bank_rad": -0.0002222632656615773,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd424e5d809",
+              "414a2e0d564ad386",
+              "414bc14a92090145",
+              "3f8202791a02c5b8",
+              "bf7edd017268c329",
+              "3f90ef552df3f6d2",
+              "3fea9f5aee5a3d6f",
+              "bfd3c86df18ee607",
+              "3fdb98f2a9dcf649",
+              "3fc4c89f4c3d7eb9",
+              "be91bd33b2fccdc3",
+              "3ecf002e937d762b",
+              "bf02ed64a7d13e7f",
+              "0000000000000000",
+              "4065f912a98255f5",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278957369515407,
+            "orientation_xyzw": [
+              0.831952538997866,
+              -0.30910824384372443,
+              0.43121019924351295,
+              0.16237250540415518
+            ],
+            "pitch_rad": -0.0022036581856734474,
+            "position_ecef_m": [
+              -3947432.288264279,
+              3431450.6741585163,
+              3637909.1408998095
+            ],
+            "shaft_rad_s": 175.78352809387403,
+            "speed_mps": 0.020189388795256565,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008793779474532623,
+              -0.007534986164089466,
+              0.016537981920001617
+            ],
+            "vertical_speed_mps": 5.732172313026307e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431278824981354,
+          "time_s": 10.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022968528889514273,
+            -5.688604040818365e-07,
+            -0.0018853969513088567
+          ],
+          "contact_force_body_n": [
+            -1148.7753358960822,
+            4.58704276593085,
+            -20574.344120684917
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3433024072368538,
+          "flow": {
+            "absolute_spin_rad_s": 175.18953131294802,
+            "absorbed_power_w": 25500.833961852473,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.020054242993484774,
+              2.92604857394076e-06,
+              -4.3922686334495805e-05
+            ],
+            "hover_velocity_mps": 9.97973310981709,
+            "load_torque_nm": 145.56140296019927,
+            "relative_rpm": 1672.9367951111476,
+            "signed_adverse_ratio": -0.0020094969246980524,
+            "signed_j": 0.0002996862026584839,
+            "signed_thrust_work_w": 22.133898220462978,
+            "thrust_n": 1103.7015073395612,
+            "transverse_ratio": 4.410943853965456e-06
+          },
+          "gear_clearances_m": [
+            -0.05336966924369335,
+            -0.047149717807769775,
+            -0.04645835142582655
+          ],
+          "nongravity_force_body_n": [
+            -45.0740582418099,
+            4.587042197070446,
+            -20574.34600608187
+          ],
+          "state": {
+            "altitude_m": 1.5510032661259174,
+            "angular_velocity_body_rad_s": [
+              -2.0175977265515224e-07,
+              2.439634474303791e-06,
+              -3.6007991038782325e-05
+            ],
+            "bank_rad": -0.0002230217275813611,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd41f4a08d4",
+              "414a2e0d517ced80",
+              "414bc14a9c94e4ad",
+              "3f81e4d6e55f1e84",
+              "bf7ea55a58761905",
+              "3f90d250e8a6e0ce",
+              "3fea9f8e50e80789",
+              "bfd3c72f5584a009",
+              "3fdb98cee8658141",
+              "3fc4c9fcf0cc8afb",
+              "be8b1469ba795b54",
+              "3ec477133c6b287d",
+              "bf02e0e926b84f64",
+              "0000000000000000",
+              "4065e610a4652767",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2787771090348965,
+            "orientation_xyzw": [
+              0.8319770412638131,
+              -0.30903228141187405,
+              0.4312016744134049,
+              0.1624141860748621
+            ],
+            "pitch_rad": -0.0021885621579718667,
+            "position_ecef_m": [
+              -3947432.244446853,
+              3431450.636624992,
+              3637909.223293862
+            ],
+            "shaft_rad_s": 175.1895315147078,
+            "speed_mps": 0.020054291306497676,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008737257838119968,
+              -0.007481911575615512,
+              0.016427292060797787
+            ],
+            "vertical_speed_mps": 3.331033757159041e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431820364142575,
+          "time_s": 15.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022764000130018084,
+            -5.752665121350993e-07,
+            -0.0018689626682182516
+          ],
+          "contact_force_body_n": [
+            -1143.6104866572366,
+            4.597402458821753,
+            -20574.34492433527
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3433375990143508,
+          "flow": {
+            "absolute_spin_rad_s": 174.79633933124714,
+            "absorbed_power_w": 25329.57032714042,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.019965070431423832,
+              2.972215912298848e-06,
+              -4.352337094193836e-05
+            ],
+            "hover_velocity_mps": 9.957354781399074,
+            "load_torque_nm": 144.90904342761843,
+            "relative_rpm": 1669.1820878703275,
+            "signed_adverse_ratio": -0.0020050576553443454,
+            "signed_j": 0.0002990247528244027,
+            "signed_thrust_work_w": 21.936765409911757,
+            "thrust_n": 1098.7572262898004,
+            "transverse_ratio": 4.381157479391755e-06
+          },
+          "gear_clearances_m": [
+            -0.053349630907177925,
+            -0.04716035444289446,
+            -0.046467422507703304
+          ],
+          "nongravity_force_body_n": [
+            -44.853488007437406,
+            4.597401883555241,
+            -20574.346793297937
+          ],
+          "state": {
+            "altitude_m": 1.5510034104809165,
+            "angular_velocity_body_rad_s": [
+              -1.6065596235109987e-07,
+              1.6127481489363771e-06,
+              -3.5946200212177963e-05
+            ],
+            "bank_rad": -0.000223526653887165,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd419b5bc03",
+              "414a2e0d4cb63924",
+              "414bc14aa711f166",
+              "3f81d1aef7f729b9",
+              "bf7e7fab6e778980",
+              "3f90bf29dc62f7b6",
+              "3fea9fc3ed5b0c39",
+              "bfd3c5f2e551a7c5",
+              "3fdb98a27acfba64",
+              "3fc4cb5255b23bf8",
+              "be859018ca16f20d",
+              "3ebb0eb357a97a2a",
+              "bf02d89e08dc7997",
+              "0000000000000000",
+              "4065d97b9cf54796",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.27859723137332,
+            "orientation_xyzw": [
+              0.8320026050427095,
+              -0.3089568366473226,
+              0.43119108193687894,
+              0.1624548834265338
+            ],
+            "pitch_rad": -0.0021785980744607135,
+            "position_ecef_m": [
+              -3947432.2008585944,
+              3431450.599311011,
+              3637909.3052350758
+            ],
+            "shaft_rad_s": 174.7963394919031,
+            "speed_mps": 0.01996511809255331,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008700720732026978,
+              -0.007445974020330204,
+              0.016354230953531355
+            ],
+            "vertical_speed_mps": 2.810134426198263e-08
+          },
+          "static_blade_swept_clearance_m": 0.3432177762150411,
+          "time_s": 20.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.09257201161728879,
+            -1.2893173164972463e-05,
+            -0.7776149986299622
+          ],
+          "contact_force_body_n": [
+            -395.0588719825023,
+            4.56570176474981,
+            -20573.353134269208
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3484137015857891,
+          "flow": {
+            "absolute_spin_rad_s": 174.78019434703054,
+            "absorbed_power_w": 24870.957703917262,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.40341056759917066,
+              3.2968219754875294e-06,
+              -0.00038189171677215084
+            ],
+            "hover_velocity_mps": 9.781325505481137,
+            "load_torque_nm": 142.29848980792033,
+            "relative_rpm": 1669.0279029253343,
+            "signed_adverse_ratio": -0.04124293454635698,
+            "signed_j": 0.00604259767668376,
+            "signed_thrust_work_w": 427.7169648055709,
+            "thrust_n": 1060.2522570270175,
+            "transverse_ratio": 3.904439605988345e-05
+          },
+          "gear_clearances_m": [
+            -0.050473377108573914,
+            -0.04862460307776928,
+            -0.047930953092873096
+          ],
+          "nongravity_force_body_n": [
+            665.1008130328979,
+            4.565688871576645,
+            -20574.13074926784
+          ],
+          "state": {
+            "altitude_m": 1.5509896045550704,
+            "angular_velocity_body_rad_s": [
+              1.0648102558063269e-06,
+              -0.0001922541538822399,
+              -3.0314197104276787e-05
+            ],
+            "bank_rad": -0.00022375783228753123,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd40d235f52",
+              "414a2e0d41f4f4c4",
+              "414bc14abeb197cc",
+              "3fc67fe362a4f240",
+              "bfc33f7e0abd6f24",
+              "3fd526e5ffcac553",
+              "3fea9d27ef58296e",
+              "bfd3c44e1511e71e",
+              "3fdba28c34862e50",
+              "3fc4d25a611b12d5",
+              "3eb1dd5341f45083",
+              "bf2932fa9b5d0f8a",
+              "beffc967c33edb51",
+              "0000000000000000",
+              "4065d8f757e6f63e",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786383105530055,
+            "orientation_xyzw": [
+              0.8316840815253224,
+              -0.308856506897074,
+              0.4317961228304954,
+              0.16266946546070096
+            ],
+            "pitch_rad": -0.0007318817891772703,
+            "position_ecef_m": [
+              -3947432.1026419783,
+              3431450.5152879674,
+              3637909.489794707
+            ],
+            "shaft_rad_s": 174.7801932822203,
+            "speed_mps": 0.40341074837296714,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.17577783886544474,
+              -0.15037513279354997,
+              0.33049917201704665
+            ],
+            "vertical_speed_mps": 8.664352099210793e-05
+          },
+          "static_blade_swept_clearance_m": 0.348373448090978,
+          "time_s": 21.0
+        },
+        {
+          "aero_force_body_n": [
+            -1.3439806557289302,
+            -3.771768226533308e-05,
+            -11.316188093451165
+          ],
+          "contact_force_body_n": [
+            -428.00731979704074,
+            4.511779555494887,
+            -20563.514625896412
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3481719746878371,
+          "flow": {
+            "absolute_spin_rad_s": 175.3353899691507,
+            "absorbed_power_w": 23766.178194561628,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              1.5374329812960876,
+              2.530648379767131e-06,
+              -0.0012599777668948903
+            ],
+            "hover_velocity_mps": 9.275803201331327,
+            "load_torque_nm": 135.5469548888171,
+            "relative_rpm": 1674.3296379046078,
+            "signed_adverse_ratio": -0.1657466149212205,
+            "signed_j": 0.02295594821766184,
+            "signed_thrust_work_w": 1465.9293007252727,
+            "thrust_n": 953.4915138151024,
+            "transverse_ratio": 0.0001358351703815886
+          },
+          "gear_clearances_m": [
+            -0.050590621307492256,
+            -0.04849461559206247,
+            -0.04780415631830692
+          ],
+          "nongravity_force_body_n": [
+            524.1402133623327,
+            4.511741837812622,
+            -20574.83081398986
+          ],
+          "state": {
+            "altitude_m": 1.5510360170155764,
+            "angular_velocity_body_rad_s": [
+              2.9819156953794244e-07,
+              3.979137937387174e-07,
+              -2.2109603671580275e-05
+            ],
+            "bank_rad": -0.0002227288504045737,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd33037d125",
+              "414a2e0c8500edf8",
+              "414bc14c5dda2c47",
+              "3fe5724d33ce68c4",
+              "bfe25741ea2c0298",
+              "3ff426672a9384e8",
+              "3fea9d6b32e72cb0",
+              "bfd3c3c915ac2356",
+              "3fdba1dd9d062689",
+              "3fc4d29299617226",
+              "3e9402e4645d30c2",
+              "3e9ab41b5f4d43e1",
+              "bef72f006528a366",
+              "0000000000000000",
+              "4065eabb831e85f1",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278546440271653,
+            "orientation_xyzw": [
+              0.8317161554527015,
+              -0.308824797787158,
+              0.43175449690225115,
+              0.16267616738595442
+            ],
+            "pitch_rad": -0.00081376134827527,
+            "position_ecef_m": [
+              -3947430.376703399,
+              3431449.039090868,
+              3637912.7332206103
+            ],
+            "shaft_rad_s": 175.33538967095913,
+            "speed_mps": 1.537433497595051,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.6702028285829091,
+              -0.573151547781964,
+              1.2593757308134688
+            ],
+            "vertical_speed_mps": 8.874484446530495e-06
+          },
+          "static_blade_swept_clearance_m": 0.3481272178186217,
+          "time_s": 25.0
+        },
+        {
+          "aero_force_body_n": [
+            -4.1412899032153465,
+            -9.726283492402734e-05,
+            -34.872577714748836
+          ],
+          "contact_force_body_n": [
+            -427.4343852997226,
+            4.41665186409546,
+            -20539.871186684286
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34824206365529853,
+          "flow": {
+            "absolute_spin_rad_s": 176.8942592550034,
+            "absorbed_power_w": 23021.160334520682,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              2.698803362004199,
+              3.717566000538408e-06,
+              -0.0021979037963845427
+            ],
+            "hover_velocity_mps": 8.781066144177805,
+            "load_torque_nm": 130.14079954587072,
+            "relative_rpm": 1689.2157414568758,
+            "signed_adverse_ratio": -0.3073434726139277,
+            "signed_j": 0.03994166181189971,
+            "signed_thrust_work_w": 2306.1073370221266,
+            "thrust_n": 854.4925389857058,
+            "transverse_ratio": 0.00025030069290752537
+          },
+          "gear_clearances_m": [
+            -0.050526789389550686,
+            -0.04843993950635195,
+            -0.047755857929587364
+          ],
+          "nongravity_force_body_n": [
+            422.91686378276785,
+            4.416554601260536,
+            -20574.743764399034
+          ],
+          "state": {
+            "altitude_m": 1.5510916244238615,
+            "angular_velocity_body_rad_s": [
+              4.653648417794189e-07,
+              5.320559266552322e-07,
+              -2.1883604630422583e-05
+            ],
+            "bank_rad": -0.00022067149346199327,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd0dba19bd4",
+              "414a2e0a86ea9596",
+              "414bc150beca91fb",
+              "3ff2d3a44a6f2c17",
+              "bff0181c8ae9344d",
+              "4001af822c66dcf7",
+              "3fea9d8e0aa2edf3",
+              "bfd3c30696b4158a",
+              "3fdba1bda4b4bc6e",
+              "3fc4d3561f787fea",
+              "3e9f3ae83801dd1d",
+              "3ea1da535b20cae6",
+              "bef6f255dbfb182b",
+              "0000000000000000",
+              "40661c9dc49bf50f",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278436429798393,
+            "orientation_xyzw": [
+              0.8317327697508844,
+              -0.3087784263337531,
+              0.43174687466211636,
+              0.1626994756379639
+            ],
+            "pitch_rad": -0.0008096461189180412,
+            "position_ecef_m": [
+              -3947425.7158694062,
+              3431445.0540339453,
+              3637921.490556953
+            ],
+            "shaft_rad_s": 176.89425878963854,
+            "speed_mps": 2.6988042569923594,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              1.1766703517521415,
+              -1.0058865953644898,
+              2.2106975048915234
+            ],
+            "vertical_speed_mps": 1.2828413797461025e-05
+          },
+          "static_blade_swept_clearance_m": 0.34819753312362317,
+          "time_s": 30.0
+        }
+      ]
+    },
+    {
+      "completed_s": 30.0,
+      "failure": null,
+      "minimum_disk_clearance_m": 0.24117047714779738,
+      "minimum_static_blade_swept_clearance_m": 0.23945574541083212,
+      "maximum_gear_compression_m": 0.11126062367111444,
+      "near_static_braked_seconds_below_0_1mps": 15.84687500000587,
+      "last_braked_10s_peak_speed_mps": 0.02018935437055401,
+      "last_braked_10s_traveled_distance_m": 0.2006188828018521,
+      "stationary_parking_pass": false,
+      "positive_flow_bit_exact_step_count": 28361,
+      "observed_evaluations": 172800,
+      "hz": 960,
+      "negative_stage_evaluations": 2630,
+      "final_speed_mps": 2.6988042569923594,
+      "final_shaft_rad_s": 176.89425878963854,
+      "final_pitch_rad": -0.0008096461189180412,
+      "minimum_negative_j": -0.0014900839874632372,
+      "maximum_adverse_ratio": 0.009937649398392687,
+      "maximum_transverse_ratio": 0.0040724684932680185,
+      "negative_stage_time_range_s": [
+        4.128645833333334,
+        4.584895833333333
+      ],
+      "milestones": [
+        {
+          "aero_force_body_n": [
+            -354.3701336390242,
+            3.2288382915965903e-13,
+            -3029.3397089929813
+          ],
+          "contact_force_body_n": [
+            2.0463630789890885e-12,
+            2.683642359726528e-14,
+            0.0
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.39999999969072153,
+          "flow": {
+            "absolute_spin_rad_s": 180.0,
+            "absorbed_power_w": 13299.382922946244,
+            "blade_pitch_rad": 0.08,
+            "body_air_velocity_mps": [
+              24.999999999999993,
+              -1.3322676295501878e-15,
+              6.661338147750939e-16
+            ],
+            "hover_velocity_mps": null,
+            "load_torque_nm": 73.8854606830347,
+            "relative_rpm": 1718.8733853924698,
+            "signed_adverse_ratio": null,
+            "signed_j": 0.3636102608321519,
+            "signed_thrust_work_w": -30454.31152202155,
+            "thrust_n": -1218.1724608808624,
+            "transverse_ratio": null
+          },
+          "gear_clearances_m": [
+            3.1478703022003174e-07,
+            2.682209014892578e-07,
+            2.6635825634002686e-07
+          ],
+          "nongravity_force_body_n": [
+            -1572.5425945198845,
+            3.497202527569243e-13,
+            -3029.3397089929813
+          ],
+          "state": {
+            "altitude_m": 1.599999999627471,
+            "angular_velocity_body_rad_s": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "bank_rad": 0.0,
+            "blade_pitch_rad": 0.08,
+            "canonical_state_bits_hex": [
+              "c14e1ddf1df744fc",
+              "414a2e16ce928a94",
+              "414bc135e9de6cf9",
+              "4025a4e9156e34e3",
+              "c022d0a3d6f164eb",
+              "40347a92b598d1af",
+              "3fea963a5e422531",
+              "bfd3e17d1ea9d268",
+              "3fdbae3231bdab1d",
+              "3fc4b2d71d806567",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "0000000000000000",
+              "4066800000000000",
+              "3fb47ae147ae147b"
+            ],
+            "heading_rad": 0.0,
+            "orientation_xyzw": [
+              0.83083837900009,
+              -0.3106377410361234,
+              0.4325070844412709,
+              0.1617077726412319
+            ],
+            "pitch_rad": 0.0,
+            "position_ecef_m": [
+              -3947454.2341085654,
+              3431469.613847086,
+              3637867.827100393
+            ],
+            "shaft_rad_s": 180.0,
+            "speed_mps": 24.999999999999996,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              10.822090787604287,
+              -9.40749999710757,
+              20.478801107224793
+            ],
+            "vertical_speed_mps": -0.0
+          },
+          "static_blade_swept_clearance_m": 0.39999999969072153,
+          "time_s": 0.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.1415708784764809,
+            -0.004185132999180333,
+            -0.7089055810056422
+          ],
+          "contact_force_body_n": [
+            -13817.061558500909,
+            2.054725022898541,
+            -20164.488298221535
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.25271307324661296,
+          "flow": {
+            "absolute_spin_rad_s": 176.91239165182384,
+            "absorbed_power_w": 25691.085950853947,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.49224147678935926,
+              0.0008767195087820007,
+              -0.013050839239132254
+            ],
+            "hover_velocity_mps": 9.861912979320312,
+            "load_torque_nm": 145.21925632782032,
+            "relative_rpm": 1689.3892947230074,
+            "signed_adverse_ratio": -0.04991338676599079,
+            "signed_j": 0.007284312651565182,
+            "signed_thrust_work_w": 530.5353752685452,
+            "thrust_n": 1077.7949447270423,
+            "transverse_ratio": 0.0013263404292715197
+          },
+          "gear_clearances_m": [
+            -0.10478218924254179,
+            -0.02153901942074299,
+            -0.020857839845120907
+          ],
+          "nongravity_force_body_n": [
+            -12739.408184652344,
+            2.050539889899361,
+            -20165.19720380254
+          ],
+          "state": {
+            "altitude_m": 1.5503188762813807,
+            "angular_velocity_body_rad_s": [
+              -4.159334419771765e-05,
+              0.001881458272114207,
+              -0.0008035639463543115
+            ],
+            "bank_rad": -0.00021981994441567192,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42ade7255",
+              "414a2e0d5b6acbba",
+              "414bc14a86a5226f",
+              "3fcb738478975be4",
+              "bfc7a20d50ce9870",
+              "3fd9ca5930727947",
+              "3feacc80b5ebe5b7",
+              "bfd3e810cfbccbde",
+              "3fdae911a52743f8",
+              "3fc4486b8cb7a73b",
+              "bf05ce906caaf78d",
+              "3f5ed3686fd75ab8",
+              "bf4a54c86f56cd24",
+              "0000000000000000",
+              "40661d32a73478f5",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278656851386139,
+            "orientation_xyzw": [
+              0.8374637177614009,
+              -0.3110391644178757,
+              0.4204753983331666,
+              0.15846008654562546
+            ],
+            "pitch_rad": -0.027864868005476235,
+            "position_ecef_m": [
+              -3947432.334913532,
+              3431450.7141966494,
+              3637909.051914505
+            ],
+            "shaft_rad_s": 176.91243324516805,
+            "speed_mps": 0.4924152358667551,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.2144628132652705,
+              -0.1846329350057121,
+              0.40297536593597666
+            ],
+            "vertical_speed_mps": -0.000668503618580063
+          },
+          "static_blade_swept_clearance_m": 0.25118070382587127,
+          "time_s": 4.0
+        },
+        {
+          "aero_force_body_n": [
+            0.006425736888163294,
+            -0.00028641069139368456,
+            -0.059860413907818724
+          ],
+          "contact_force_body_n": [
+            -6919.72748102385,
+            -11.77738763538531,
+            -19639.226734422766
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.2581326872130312,
+          "flow": {
+            "absolute_spin_rad_s": 176.8937834101751,
+            "absorbed_power_w": 26204.0547522562,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.06025835468456744,
+              0.00046682508435068586,
+              0.0193378191989375
+            ],
+            "hover_velocity_mps": 10.058689769041843,
+            "load_torque_nm": 148.13440160016904,
+            "relative_rpm": 1689.209688952388,
+            "signed_adverse_ratio": -0.005990676327450493,
+            "signed_j": 0.0008918120276518624,
+            "signed_thrust_work_w": 67.56377980076557,
+            "thrust_n": 1121.2350578511414,
+            "transverse_ratio": 0.0019230589195434722
+          },
+          "gear_clearances_m": [
+            -0.10206410847604275,
+            -0.024108444340527058,
+            -0.023440995253622532
+          ],
+          "nongravity_force_body_n": [
+            -5798.48599743582,
+            -11.777674046076703,
+            -19639.286594836674
+          ],
+          "state": {
+            "altitude_m": 1.5495835840702057,
+            "angular_velocity_body_rad_s": [
+              0.00015843732440136055,
+              0.04435033013968765,
+              5.5069666706185116e-05
+            ],
+            "bank_rad": -0.0002153791909350285,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429716671",
+              "414a2e0d5a2f2003",
+              "414bc14a892c5841",
+              "3fa3ca332e1a0d8c",
+              "bfa15640b4c89ffd",
+              "3fa2ea010f0115ee",
+              "3feac9873428782f",
+              "bfd3e56717d70387",
+              "3fdaf51e2ac68408",
+              "3fc451bbdb56667d",
+              "3f24c44640e7f177",
+              "3fa6b516230894f9",
+              "3f0cdf53570cb244",
+              "0000000000000000",
+              "40661c989366290c",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786041413502165,
+            "orientation_xyzw": [
+              0.8371006029808593,
+              -0.31087663009753225,
+              0.42121080567636726,
+              0.15874431810225423
+            ],
+            "pitch_rad": -0.026099435028918185,
+            "position_ecef_m": [
+              -3947432.3237731983,
+              3431450.7045631423,
+              3637909.071665794
+            ],
+            "shaft_rad_s": 176.89362497285072,
+            "speed_mps": 0.0632869535237817,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.03865203798070657,
+              -0.03386118132431191,
+              0.03694155986935842
+            ],
+            "vertical_speed_mps": -0.02090366281083495
+          },
+          "static_blade_swept_clearance_m": 0.2566973812497992,
+          "time_s": 4.1
+        },
+        {
+          "aero_force_body_n": [
+            0.02281529809816646,
+            7.944180489848108e-05,
+            -0.05645535398798705
+          ],
+          "contact_force_body_n": [
+            -2828.558120295749,
+            -1.5128128701078354,
+            -20756.682694287298
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.27799322615569144,
+          "flow": {
+            "absolute_spin_rad_s": 176.86917130276467,
+            "absorbed_power_w": 26363.217346135458,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              -0.0826926662492323,
+              -8.90226822863327e-05,
+              0.04044021051070842
+            ],
+            "hover_velocity_mps": 10.121925562508938,
+            "load_torque_nm": 149.05490398327754,
+            "relative_rpm": 1688.9750593775243,
+            "signed_adverse_ratio": 0.008169657614902983,
+            "signed_j": -0.0012240058140188734,
+            "signed_thrust_work_w": -93.8873879728584,
+            "thrust_n": 1135.377443144543,
+            "transverse_ratio": 0.003995317713559004
+          },
+          "gear_clearances_m": [
+            -0.09239580575376749,
+            -0.03440987132489681,
+            -0.033795843832194805
+          ],
+          "nongravity_force_body_n": [
+            -1693.1578618531082,
+            -1.512733428302937,
+            -20756.739149641286
+          ],
+          "state": {
+            "altitude_m": 1.546163766644895,
+            "angular_velocity_body_rad_s": [
+              0.00011668153748272645,
+              0.07939987076343903,
+              0.0014802152641294132
+            ],
+            "bank_rad": -0.00019811055822769528,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd429538b84",
+              "414a2e0d5a13ffa5",
+              "414bc14a88a291c7",
+              "bf893b519eb1f015",
+              "3f852289dfbc8f4f",
+              "bfb73409f818ab3f",
+              "3feabde40ed3c75c",
+              "bfd3dd39712d5523",
+              "3fdb22f5c15e3f45",
+              "3fc472cf71b749f2",
+              "3f1e965d8cd60e4c",
+              "3fb4538cc83c5019",
+              "3f58407909a16562",
+              "0000000000000000",
+              "40661bcf4ba31378",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278688298528597,
+            "orientation_xyzw": [
+              0.8356800355524956,
+              -0.31037746479462863,
+              0.4240087879525059,
+              0.15975373318231295
+            ],
+            "pitch_rad": -0.01943221713684558,
+            "position_ecef_m": [
+              -3947432.3228620905,
+              3431450.703735309,
+              3637909.0674612257
+            ],
+            "shaft_rad_s": 176.86905462122718,
+            "speed_mps": 0.09205159206985664,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              -0.012320172934998689,
+              0.010319783344648363,
+              -0.09063780123748887
+            ],
+            "vertical_speed_mps": -0.03882579153765643
+          },
+          "static_blade_swept_clearance_m": 0.2769245214752465,
+          "time_s": 4.2
+        },
+        {
+          "aero_force_body_n": [
+            -0.00026591297639693746,
+            -5.5672446271074995e-06,
+            -0.0006509574860780714
+          ],
+          "contact_force_body_n": [
+            -1170.9293695427093,
+            4.536913046846764,
+            -20555.19441774849
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3434204270719219,
+          "flow": {
+            "absolute_spin_rad_s": 176.68084344118586,
+            "absorbed_power_w": 26155.376816421074,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02209403793568464,
+              2.596194508915203e-05,
+              -0.0010721270662015063
+            ],
+            "hover_velocity_mps": 10.063840140196909,
+            "load_torque_nm": 148.0374233391509,
+            "relative_rpm": 1687.1776610013426,
+            "signed_adverse_ratio": -0.0021953884032236176,
+            "signed_j": 0.0003273815934379377,
+            "signed_thrust_work_w": 24.79798214049985,
+            "thrust_n": 1122.3834327019056,
+            "transverse_ratio": 0.00010656383091786217
+          },
+          "gear_clearances_m": [
+            -0.053372432477772236,
+            -0.04739215690642595,
+            -0.04669794626533985
+          ],
+          "nongravity_force_body_n": [
+            -48.54620275378012,
+            4.536907479602137,
+            -20555.195068705976
+          ],
+          "state": {
+            "altitude_m": 1.5508419396355748,
+            "angular_velocity_body_rad_s": [
+              1.1937764930871981e-05,
+              -0.0009897000300680913,
+              -6.129114394522748e-05
+            ],
+            "bank_rad": -0.00022393933800797717,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd42a8d7dc3",
+              "414a2e0d5b23d5a5",
+              "414bc14a875cc1f2",
+              "3f826063f1c9e066",
+              "bf7f9a8b4b36b0b7",
+              "3f93230362063a9c",
+              "3fea9ef40cdbd564",
+              "bfd3c991841218f0",
+              "3fdb99d5a527ba72",
+              "3fc4c7cfd6a0a4f8",
+              "3ee90909eb3c9f8e",
+              "bf50371a50c47ce6",
+              "bf10112dd5ca35a0",
+              "0000000000000000",
+              "406615c95f2628f1",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2791422481573615,
+            "orientation_xyzw": [
+              0.831903481592843,
+              -0.3091777601006376,
+              0.43126431587635417,
+              0.16234777431353797
+            ],
+            "pitch_rad": -0.0021091441111163317,
+            "position_ecef_m": [
+              -3947432.3324429705,
+              3431450.7120310836,
+              3637909.0575182373
+            ],
+            "shaft_rad_s": 176.68083150342093,
+            "speed_mps": 0.02212005069551484,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008972912613202943,
+              -0.007715744129580474,
+              0.018688252313547524
+            ],
+            "vertical_speed_mps": 0.0010255309930813708
+          },
+          "static_blade_swept_clearance_m": 0.3433044242318168,
+          "time_s": 5.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.0002328020144292825,
+            -5.591274947698444e-07,
+            -0.0019104033180182113
+          ],
+          "contact_force_body_n": [
+            -1156.5999385102086,
+            4.57141115356205,
+            -20574.344309608092
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3432490836002531,
+          "flow": {
+            "absolute_spin_rad_s": 175.78352782954127,
+            "absorbed_power_w": 25761.023401798113,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.02018933944722604,
+              2.856740702588973e-06,
+              -4.4547163167247975e-05
+            ],
+            "hover_velocity_mps": 10.013539956148724,
+            "load_torque_nm": 146.5497007590995,
+            "relative_rpm": 1678.6090446163864,
+            "signed_adverse_ratio": -0.0020162040133298673,
+            "signed_j": 0.0003006855518611757,
+            "signed_thrust_work_w": 22.434229678489874,
+            "thrust_n": 1111.191861285599,
+            "transverse_ratio": 4.457830953263156e-06
+          },
+          "gear_clearances_m": [
+            -0.053400034084916115,
+            -0.04713361896574497,
+            -0.04644460417330265
+          ],
+          "nongravity_force_body_n": [
+            -45.408310026624086,
+            4.571410594434555,
+            -20574.346220011408
+          ],
+          "state": {
+            "altitude_m": 1.551003041677177,
+            "angular_velocity_body_rad_s": [
+              -2.6433274323835103e-07,
+              3.695572697566862e-06,
+              -3.610099245376658e-05
+            ],
+            "bank_rad": -0.0002222632656615773,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd424e5d809",
+              "414a2e0d564ad386",
+              "414bc14a92090145",
+              "3f8202791a02c5b8",
+              "bf7edd017268c329",
+              "3f90ef552df3f6d2",
+              "3fea9f5aee5a3d6f",
+              "bfd3c86df18ee607",
+              "3fdb98f2a9dcf649",
+              "3fc4c89f4c3d7eb9",
+              "be91bd33b2fccdc3",
+              "3ecf002e937d762b",
+              "bf02ed64a7d13e7f",
+              "0000000000000000",
+              "4065f912a98255f5",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278957369515407,
+            "orientation_xyzw": [
+              0.831952538997866,
+              -0.30910824384372443,
+              0.43121019924351295,
+              0.16237250540415518
+            ],
+            "pitch_rad": -0.0022036581856734474,
+            "position_ecef_m": [
+              -3947432.288264279,
+              3431450.6741585163,
+              3637909.1408998095
+            ],
+            "shaft_rad_s": 175.78352809387403,
+            "speed_mps": 0.020189388795256565,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008793779474532623,
+              -0.007534986164089466,
+              0.016537981920001617
+            ],
+            "vertical_speed_mps": 5.732172313026307e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431278824981354,
+          "time_s": 10.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022968528889514273,
+            -5.688604040818365e-07,
+            -0.0018853969513088567
+          ],
+          "contact_force_body_n": [
+            -1148.7753358960822,
+            4.58704276593085,
+            -20574.344120684917
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3433024072368538,
+          "flow": {
+            "absolute_spin_rad_s": 175.18953131294802,
+            "absorbed_power_w": 25500.833961852473,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.020054242993484774,
+              2.92604857394076e-06,
+              -4.3922686334495805e-05
+            ],
+            "hover_velocity_mps": 9.97973310981709,
+            "load_torque_nm": 145.56140296019927,
+            "relative_rpm": 1672.9367951111476,
+            "signed_adverse_ratio": -0.0020094969246980524,
+            "signed_j": 0.0002996862026584839,
+            "signed_thrust_work_w": 22.133898220462978,
+            "thrust_n": 1103.7015073395612,
+            "transverse_ratio": 4.410943853965456e-06
+          },
+          "gear_clearances_m": [
+            -0.05336966924369335,
+            -0.047149717807769775,
+            -0.04645835142582655
+          ],
+          "nongravity_force_body_n": [
+            -45.0740582418099,
+            4.587042197070446,
+            -20574.34600608187
+          ],
+          "state": {
+            "altitude_m": 1.5510032661259174,
+            "angular_velocity_body_rad_s": [
+              -2.0175977265515224e-07,
+              2.439634474303791e-06,
+              -3.6007991038782325e-05
+            ],
+            "bank_rad": -0.0002230217275813611,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd41f4a08d4",
+              "414a2e0d517ced80",
+              "414bc14a9c94e4ad",
+              "3f81e4d6e55f1e84",
+              "bf7ea55a58761905",
+              "3f90d250e8a6e0ce",
+              "3fea9f8e50e80789",
+              "bfd3c72f5584a009",
+              "3fdb98cee8658141",
+              "3fc4c9fcf0cc8afb",
+              "be8b1469ba795b54",
+              "3ec477133c6b287d",
+              "bf02e0e926b84f64",
+              "0000000000000000",
+              "4065e610a4652767",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2787771090348965,
+            "orientation_xyzw": [
+              0.8319770412638131,
+              -0.30903228141187405,
+              0.4312016744134049,
+              0.1624141860748621
+            ],
+            "pitch_rad": -0.0021885621579718667,
+            "position_ecef_m": [
+              -3947432.244446853,
+              3431450.636624992,
+              3637909.223293862
+            ],
+            "shaft_rad_s": 175.1895315147078,
+            "speed_mps": 0.020054291306497676,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008737257838119968,
+              -0.007481911575615512,
+              0.016427292060797787
+            ],
+            "vertical_speed_mps": 3.331033757159041e-08
+          },
+          "static_blade_swept_clearance_m": 0.3431820364142575,
+          "time_s": 15.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.00022764000130018084,
+            -5.752665121350993e-07,
+            -0.0018689626682182516
+          ],
+          "contact_force_body_n": [
+            -1143.6104866572366,
+            4.597402458821753,
+            -20574.34492433527
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 1.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3433375990143508,
+          "flow": {
+            "absolute_spin_rad_s": 174.79633933124714,
+            "absorbed_power_w": 25329.57032714042,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.019965070431423832,
+              2.972215912298848e-06,
+              -4.352337094193836e-05
+            ],
+            "hover_velocity_mps": 9.957354781399074,
+            "load_torque_nm": 144.90904342761843,
+            "relative_rpm": 1669.1820878703275,
+            "signed_adverse_ratio": -0.0020050576553443454,
+            "signed_j": 0.0002990247528244027,
+            "signed_thrust_work_w": 21.936765409911757,
+            "thrust_n": 1098.7572262898004,
+            "transverse_ratio": 4.381157479391755e-06
+          },
+          "gear_clearances_m": [
+            -0.053349630907177925,
+            -0.04716035444289446,
+            -0.046467422507703304
+          ],
+          "nongravity_force_body_n": [
+            -44.853488007437406,
+            4.597401883555241,
+            -20574.346793297937
+          ],
+          "state": {
+            "altitude_m": 1.5510034104809165,
+            "angular_velocity_body_rad_s": [
+              -1.6065596235109987e-07,
+              1.6127481489363771e-06,
+              -3.5946200212177963e-05
+            ],
+            "bank_rad": -0.000223526653887165,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd419b5bc03",
+              "414a2e0d4cb63924",
+              "414bc14aa711f166",
+              "3f81d1aef7f729b9",
+              "bf7e7fab6e778980",
+              "3f90bf29dc62f7b6",
+              "3fea9fc3ed5b0c39",
+              "bfd3c5f2e551a7c5",
+              "3fdb98a27acfba64",
+              "3fc4cb5255b23bf8",
+              "be859018ca16f20d",
+              "3ebb0eb357a97a2a",
+              "bf02d89e08dc7997",
+              "0000000000000000",
+              "4065d97b9cf54796",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.27859723137332,
+            "orientation_xyzw": [
+              0.8320026050427095,
+              -0.3089568366473226,
+              0.43119108193687894,
+              0.1624548834265338
+            ],
+            "pitch_rad": -0.0021785980744607135,
+            "position_ecef_m": [
+              -3947432.2008585944,
+              3431450.599311011,
+              3637909.3052350758
+            ],
+            "shaft_rad_s": 174.7963394919031,
+            "speed_mps": 0.01996511809255331,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.008700720732026978,
+              -0.007445974020330204,
+              0.016354230953531355
+            ],
+            "vertical_speed_mps": 2.810134426198263e-08
+          },
+          "static_blade_swept_clearance_m": 0.3432177762150411,
+          "time_s": 20.0
+        },
+        {
+          "aero_force_body_n": [
+            -0.09257201161728879,
+            -1.2893173164972463e-05,
+            -0.7776149986299622
+          ],
+          "contact_force_body_n": [
+            -395.0588719825023,
+            4.56570176474981,
+            -20573.353134269208
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3484137015857891,
+          "flow": {
+            "absolute_spin_rad_s": 174.78019434703054,
+            "absorbed_power_w": 24870.957703917262,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              0.40341056759917066,
+              3.2968219754875294e-06,
+              -0.00038189171677215084
+            ],
+            "hover_velocity_mps": 9.781325505481137,
+            "load_torque_nm": 142.29848980792033,
+            "relative_rpm": 1669.0279029253343,
+            "signed_adverse_ratio": -0.04124293454635698,
+            "signed_j": 0.00604259767668376,
+            "signed_thrust_work_w": 427.7169648055709,
+            "thrust_n": 1060.2522570270175,
+            "transverse_ratio": 3.904439605988345e-05
+          },
+          "gear_clearances_m": [
+            -0.050473377108573914,
+            -0.04862460307776928,
+            -0.047930953092873096
+          ],
+          "nongravity_force_body_n": [
+            665.1008130328979,
+            4.565688871576645,
+            -20574.13074926784
+          ],
+          "state": {
+            "altitude_m": 1.5509896045550704,
+            "angular_velocity_body_rad_s": [
+              1.0648102558063269e-06,
+              -0.0001922541538822399,
+              -3.0314197104276787e-05
+            ],
+            "bank_rad": -0.00022375783228753123,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd40d235f52",
+              "414a2e0d41f4f4c4",
+              "414bc14abeb197cc",
+              "3fc67fe362a4f240",
+              "bfc33f7e0abd6f24",
+              "3fd526e5ffcac553",
+              "3fea9d27ef58296e",
+              "bfd3c44e1511e71e",
+              "3fdba28c34862e50",
+              "3fc4d25a611b12d5",
+              "3eb1dd5341f45083",
+              "bf2932fa9b5d0f8a",
+              "beffc967c33edb51",
+              "0000000000000000",
+              "4065d8f757e6f63e",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.2786383105530055,
+            "orientation_xyzw": [
+              0.8316840815253224,
+              -0.308856506897074,
+              0.4317961228304954,
+              0.16266946546070096
+            ],
+            "pitch_rad": -0.0007318817891772703,
+            "position_ecef_m": [
+              -3947432.1026419783,
+              3431450.5152879674,
+              3637909.489794707
+            ],
+            "shaft_rad_s": 174.7801932822203,
+            "speed_mps": 0.40341074837296714,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.17577783886544474,
+              -0.15037513279354997,
+              0.33049917201704665
+            ],
+            "vertical_speed_mps": 8.664352099210793e-05
+          },
+          "static_blade_swept_clearance_m": 0.348373448090978,
+          "time_s": 21.0
+        },
+        {
+          "aero_force_body_n": [
+            -1.3439806557289302,
+            -3.771768226533308e-05,
+            -11.316188093451165
+          ],
+          "contact_force_body_n": [
+            -428.00731979704074,
+            4.511779555494887,
+            -20563.514625896412
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.3481719746878371,
+          "flow": {
+            "absolute_spin_rad_s": 175.3353899691507,
+            "absorbed_power_w": 23766.178194561628,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              1.5374329812960876,
+              2.530648379767131e-06,
+              -0.0012599777668948903
+            ],
+            "hover_velocity_mps": 9.275803201331327,
+            "load_torque_nm": 135.5469548888171,
+            "relative_rpm": 1674.3296379046078,
+            "signed_adverse_ratio": -0.1657466149212205,
+            "signed_j": 0.02295594821766184,
+            "signed_thrust_work_w": 1465.9293007252727,
+            "thrust_n": 953.4915138151024,
+            "transverse_ratio": 0.0001358351703815886
+          },
+          "gear_clearances_m": [
+            -0.050590621307492256,
+            -0.04849461559206247,
+            -0.04780415631830692
+          ],
+          "nongravity_force_body_n": [
+            524.1402133623327,
+            4.511741837812622,
+            -20574.83081398986
+          ],
+          "state": {
+            "altitude_m": 1.5510360170155764,
+            "angular_velocity_body_rad_s": [
+              2.9819156953794244e-07,
+              3.979137937387174e-07,
+              -2.2109603671580275e-05
+            ],
+            "bank_rad": -0.0002227288504045737,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd33037d125",
+              "414a2e0c8500edf8",
+              "414bc14c5dda2c47",
+              "3fe5724d33ce68c4",
+              "bfe25741ea2c0298",
+              "3ff426672a9384e8",
+              "3fea9d6b32e72cb0",
+              "bfd3c3c915ac2356",
+              "3fdba1dd9d062689",
+              "3fc4d29299617226",
+              "3e9402e4645d30c2",
+              "3e9ab41b5f4d43e1",
+              "bef72f006528a366",
+              "0000000000000000",
+              "4065eabb831e85f1",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278546440271653,
+            "orientation_xyzw": [
+              0.8317161554527015,
+              -0.308824797787158,
+              0.43175449690225115,
+              0.16267616738595442
+            ],
+            "pitch_rad": -0.00081376134827527,
+            "position_ecef_m": [
+              -3947430.376703399,
+              3431449.039090868,
+              3637912.7332206103
+            ],
+            "shaft_rad_s": 175.33538967095913,
+            "speed_mps": 1.537433497595051,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              0.6702028285829091,
+              -0.573151547781964,
+              1.2593757308134688
+            ],
+            "vertical_speed_mps": 8.874484446530495e-06
+          },
+          "static_blade_swept_clearance_m": 0.3481272178186217,
+          "time_s": 25.0
+        },
+        {
+          "aero_force_body_n": [
+            -4.1412899032153465,
+            -9.726283492402734e-05,
+            -34.872577714748836
+          ],
+          "contact_force_body_n": [
+            -427.4343852997226,
+            4.41665186409546,
+            -20539.871186684286
+          ],
+          "controls": {
+            "aileron": 0.0,
+            "brakes": 0.0,
+            "elevator": 0.0,
+            "flaps": 0.0,
+            "rudder": 0.0,
+            "throttle": 0.0
+          },
+          "disk_clearance_m": 0.34824206365529853,
+          "flow": {
+            "absolute_spin_rad_s": 176.8942592550034,
+            "absorbed_power_w": 23021.160334520682,
+            "blade_pitch_rad": 0.07,
+            "body_air_velocity_mps": [
+              2.698803362004199,
+              3.717566000538408e-06,
+              -0.0021979037963845427
+            ],
+            "hover_velocity_mps": 8.781066144177805,
+            "load_torque_nm": 130.14079954587072,
+            "relative_rpm": 1689.2157414568758,
+            "signed_adverse_ratio": -0.3073434726139277,
+            "signed_j": 0.03994166181189971,
+            "signed_thrust_work_w": 2306.1073370221266,
+            "thrust_n": 854.4925389857058,
+            "transverse_ratio": 0.00025030069290752537
+          },
+          "gear_clearances_m": [
+            -0.050526789389550686,
+            -0.04843993950635195,
+            -0.047755857929587364
+          ],
+          "nongravity_force_body_n": [
+            422.91686378276785,
+            4.416554601260536,
+            -20574.743764399034
+          ],
+          "state": {
+            "altitude_m": 1.5510916244238615,
+            "angular_velocity_body_rad_s": [
+              4.653648417794189e-07,
+              5.320559266552322e-07,
+              -2.1883604630422583e-05
+            ],
+            "bank_rad": -0.00022067149346199327,
+            "blade_pitch_rad": 0.07,
+            "canonical_state_bits_hex": [
+              "c14e1dd0dba19bd4",
+              "414a2e0a86ea9596",
+              "414bc150beca91fb",
+              "3ff2d3a44a6f2c17",
+              "bff0181c8ae9344d",
+              "4001af822c66dcf7",
+              "3fea9d8e0aa2edf3",
+              "bfd3c30696b4158a",
+              "3fdba1bda4b4bc6e",
+              "3fc4d3561f787fea",
+              "3e9f3ae83801dd1d",
+              "3ea1da535b20cae6",
+              "bef6f255dbfb182b",
+              "0000000000000000",
+              "40661c9dc49bf50f",
+              "3fb1eb851eb851ec"
+            ],
+            "heading_rad": 6.278436429798393,
+            "orientation_xyzw": [
+              0.8317327697508844,
+              -0.3087784263337531,
+              0.43174687466211636,
+              0.1626994756379639
+            ],
+            "pitch_rad": -0.0008096461189180412,
+            "position_ecef_m": [
+              -3947425.7158694062,
+              3431445.0540339453,
+              3637921.490556953
+            ],
+            "shaft_rad_s": 176.89425878963854,
+            "speed_mps": 2.6988042569923594,
+            "turbine_fraction": 0.0,
+            "velocity_ecef_mps": [
+              1.1766703517521415,
+              -1.0058865953644898,
+              2.2106975048915234
+            ],
+            "vertical_speed_mps": 1.2828413797461025e-05
+          },
+          "static_blade_swept_clearance_m": 0.34819753312362317,
+          "time_s": 30.0
+        }
+      ]
+    }
+  ],
+  "pairwise_refinement": [
+    {
+      "rates_hz": [
+        120,
+        240
+      ],
+      "maximum_history_difference_speed_mps": 0.0,
+      "maximum_history_difference_pitch_rad": 0.0,
+      "maximum_history_difference_shaft_rad_s": 0.0,
+      "maximum_history_difference_blade_pitch_rad": 0.0,
+      "maximum_history_difference_altitude_m": 0.0,
+      "maximum_history_difference_signed_j": 0.0,
+      "maximum_history_difference_relative_rpm": 0.0,
+      "maximum_history_difference_thrust_n": 0.0,
+      "maximum_history_difference_disk_clearance_m": 0.0,
+      "maximum_history_component_difference_gear_clearances_m": 0.0,
+      "maximum_history_component_difference_contact_force_body_n": 0.0,
+      "maximum_history_component_difference_body_air_velocity_mps": 0.0,
+      "maximum_history_component_difference_position_ecef_m": 0.0
+    },
+    {
+      "rates_hz": [
+        240,
+        480
+      ],
+      "maximum_history_difference_speed_mps": 8.559157215515256e-05,
+      "maximum_history_difference_pitch_rad": 8.343190462840877e-07,
+      "maximum_history_difference_shaft_rad_s": 0.0012291259090204676,
+      "maximum_history_difference_blade_pitch_rad": 1.9923383812792128e-05,
+      "maximum_history_difference_altitude_m": 6.30505383014679e-07,
+      "maximum_history_difference_signed_j": 1.7077875406334986e-06,
+      "maximum_history_difference_relative_rpm": 0.011737287846244726,
+      "maximum_history_difference_thrust_n": 0.31377972789641717,
+      "maximum_history_difference_disk_clearance_m": 2.540642232595758e-06,
+      "maximum_history_component_difference_gear_clearances_m": 1.3066455721855164e-06,
+      "maximum_history_component_difference_contact_force_body_n": 0.9297509054922557,
+      "maximum_history_component_difference_body_air_velocity_mps": 8.556533773784736e-05,
+      "maximum_history_component_difference_position_ecef_m": 9.37730073928833e-05
+    },
+    {
+      "rates_hz": [
+        480,
+        960
+      ],
+      "maximum_history_difference_speed_mps": 0.0,
+      "maximum_history_difference_pitch_rad": 0.0,
+      "maximum_history_difference_shaft_rad_s": 0.0,
+      "maximum_history_difference_blade_pitch_rad": 0.0,
+      "maximum_history_difference_altitude_m": 0.0,
+      "maximum_history_difference_signed_j": 0.0,
+      "maximum_history_difference_relative_rpm": 0.0,
+      "maximum_history_difference_thrust_n": 0.0,
+      "maximum_history_difference_disk_clearance_m": 0.0,
+      "maximum_history_component_difference_gear_clearances_m": 0.0,
+      "maximum_history_component_difference_contact_force_body_n": 0.0,
+      "maximum_history_component_difference_body_air_velocity_mps": 0.0,
+      "maximum_history_component_difference_position_ecef_m": 0.0
+    }
+  ],
+  "comparison_to_960hz": [
+    {
+      "rates_hz": [
+        120,
+        960
+      ],
+      "maximum_history_difference_speed_mps": 8.559157215515256e-05,
+      "maximum_history_difference_pitch_rad": 8.343190462840877e-07,
+      "maximum_history_difference_shaft_rad_s": 0.0012291259090204676,
+      "maximum_history_difference_blade_pitch_rad": 1.9923383812792128e-05,
+      "maximum_history_difference_altitude_m": 6.30505383014679e-07,
+      "maximum_history_difference_signed_j": 1.7077875406334986e-06,
+      "maximum_history_difference_relative_rpm": 0.011737287846244726,
+      "maximum_history_difference_thrust_n": 0.31377972789641717,
+      "maximum_history_difference_disk_clearance_m": 2.540642232595758e-06,
+      "maximum_history_component_difference_gear_clearances_m": 1.3066455721855164e-06,
+      "maximum_history_component_difference_contact_force_body_n": 0.9297509054922557,
+      "maximum_history_component_difference_body_air_velocity_mps": 8.556533773784736e-05,
+      "maximum_history_component_difference_position_ecef_m": 9.37730073928833e-05
+    },
+    {
+      "rates_hz": [
+        240,
+        960
+      ],
+      "maximum_history_difference_speed_mps": 8.559157215515256e-05,
+      "maximum_history_difference_pitch_rad": 8.343190462840877e-07,
+      "maximum_history_difference_shaft_rad_s": 0.0012291259090204676,
+      "maximum_history_difference_blade_pitch_rad": 1.9923383812792128e-05,
+      "maximum_history_difference_altitude_m": 6.30505383014679e-07,
+      "maximum_history_difference_signed_j": 1.7077875406334986e-06,
+      "maximum_history_difference_relative_rpm": 0.011737287846244726,
+      "maximum_history_difference_thrust_n": 0.31377972789641717,
+      "maximum_history_difference_disk_clearance_m": 2.540642232595758e-06,
+      "maximum_history_component_difference_gear_clearances_m": 1.3066455721855164e-06,
+      "maximum_history_component_difference_contact_force_body_n": 0.9297509054922557,
+      "maximum_history_component_difference_body_air_velocity_mps": 8.556533773784736e-05,
+      "maximum_history_component_difference_position_ecef_m": 9.37730073928833e-05
+    },
+    {
+      "rates_hz": [
+        480,
+        960
+      ],
+      "maximum_history_difference_speed_mps": 0.0,
+      "maximum_history_difference_pitch_rad": 0.0,
+      "maximum_history_difference_shaft_rad_s": 0.0,
+      "maximum_history_difference_blade_pitch_rad": 0.0,
+      "maximum_history_difference_altitude_m": 0.0,
+      "maximum_history_difference_signed_j": 0.0,
+      "maximum_history_difference_relative_rpm": 0.0,
+      "maximum_history_difference_thrust_n": 0.0,
+      "maximum_history_difference_disk_clearance_m": 0.0,
+      "maximum_history_component_difference_gear_clearances_m": 0.0,
+      "maximum_history_component_difference_contact_force_body_n": 0.0,
+      "maximum_history_component_difference_body_air_velocity_mps": 0.0,
+      "maximum_history_component_difference_position_ecef_m": 0.0
+    }
+  ],
+  "matrix": [
+    {
+      "case": "trim_38_0_0.5",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 499.03281631069353,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "roll_rudder_release_38_0_0.5",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.826661440666,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "trim_40_0_0",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 499.2172123811529,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "roll_rudder_release_40_0_0",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 499.2172123811529,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "trim_50_0_0",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.98186590779704,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "roll_rudder_release_50_0_0",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.98186590779704,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "trim_60_0_0",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.85496328214936,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "roll_rudder_release_60_0_0",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.6225672279133,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "trim_45_0.06_0.5",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 499.03857199926654,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "roll_rudder_release_45_0.06_0.5",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 499.03857199926654,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "ground_idle",
+      "completed_s": 20.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.3355523623040196,
+      "maximum_gear_compression_m": 0.060168675146996975,
+      "positive_flow_bit_exact_step_count": 2400
+    },
+    {
+      "case": "ground_head_crosswind",
+      "completed_s": 20.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.3399361617614309,
+      "maximum_gear_compression_m": 0.05751776695251465,
+      "positive_flow_bit_exact_step_count": 2400
+    },
+    {
+      "case": "sloped_ground",
+      "completed_s": 20.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.32532004378080703,
+      "maximum_gear_compression_m": 0.06146117836766572,
+      "positive_flow_bit_exact_step_count": 2400
+    },
+    {
+      "case": "takeoff",
+      "completed_s": 40.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.34376208926560875,
+      "maximum_gear_compression_m": 0.05567207280546427,
+      "positive_flow_bit_exact_step_count": 4800
+    },
+    {
+      "case": "ground_power_cycle",
+      "completed_s": 70.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.27812113259614635,
+      "maximum_gear_compression_m": 0.08992855157703161,
+      "positive_flow_bit_exact_step_count": 8400
+    },
+    {
+      "case": "braking_headwind",
+      "completed_s": 10.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.2516122638304515,
+      "maximum_gear_compression_m": 0.10396918933838606,
+      "positive_flow_bit_exact_step_count": 1200
+    },
+    {
+      "case": "touchdown_1",
+      "completed_s": 8.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.25747663863065146,
+      "maximum_gear_compression_m": 0.09753344021737576,
+      "positive_flow_bit_exact_step_count": 960
+    },
+    {
+      "case": "touchdown_2",
+      "completed_s": 8.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.2904211915391879,
+      "maximum_gear_compression_m": 0.08861656300723553,
+      "positive_flow_bit_exact_step_count": 960
+    },
+    {
+      "case": "touchdown_3",
+      "completed_s": 8.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 0.2858867835684671,
+      "maximum_gear_compression_m": 0.09804666601121426,
+      "positive_flow_bit_exact_step_count": 960
+    },
+    {
+      "case": "flight_power_cycle",
+      "completed_s": 60.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 498.98186590779704,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 7200
+    },
+    {
+      "case": "stall_recovery",
+      "completed_s": 20.0,
+      "failure": null,
+      "minimum_static_blade_swept_clearance_m": 480.89129964804886,
+      "maximum_gear_compression_m": 0.0,
+      "positive_flow_bit_exact_step_count": 2400
+    }
+  ]
+}

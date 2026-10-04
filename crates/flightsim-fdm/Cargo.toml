@@ -21,6 +21,8 @@ bench = false
 
 [dev-dependencies]
 criterion.workspace = true
+# Test-only raw-token access; never change the legacy float decoder's features.
+serde_json = { version = "1", features = ["raw_value"] }
 
 # harness = false: criterion が自前の main を持つため。
 [[bench]]

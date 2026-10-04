@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct ProfileWire {
+pub(crate) struct ProfileWire {
     pub version: u16,
     pub id: String,
     pub dynamics: DynamicsWire,
@@ -24,7 +24,7 @@ pub(super) struct ProfileWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct DynamicsWire {
+pub(crate) struct DynamicsWire {
     pub kind: String,
     pub revision: u32,
     pub airframe: AirframeWire,
@@ -38,7 +38,7 @@ pub(super) struct DynamicsWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct TurbineWire {
+pub(crate) struct TurbineWire {
     pub schema: u16,
     pub pressure_ratios: BoundedVec<ExactF64, 16>,
     pub temperature_ratios: BoundedVec<ExactF64, 16>,
@@ -70,14 +70,14 @@ impl TurbineWire {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PowerCellWire {
+pub(crate) struct PowerCellWire {
     pub idle_w: ExactF64,
     pub maximum_w: ExactF64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PropellerWire {
+pub(crate) struct PropellerWire {
     pub schema: u16,
     pub convention: String,
     pub diameter_m: ExactF64,
@@ -114,14 +114,14 @@ impl PropellerWire {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PropellerCellWire {
+pub(crate) struct PropellerCellWire {
     pub ct: ExactF64,
     pub cp: ExactF64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct GovernorWire {
+pub(crate) struct GovernorWire {
     pub schema: u16,
     pub reference_rad_s: ExactF64,
     pub gain: ExactF64,
@@ -146,7 +146,7 @@ impl GovernorWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct EnvelopeWire {
+pub(crate) struct EnvelopeWire {
     pub pressure_ratio: [ExactF64; 2],
     pub temperature_ratio: [ExactF64; 2],
     pub mach: [ExactF64; 2],
@@ -171,7 +171,7 @@ impl EnvelopeWire {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct RunningStartWire {
+pub(crate) struct RunningStartWire {
     pub turbine_fraction: ExactF64,
     pub shaft_rad_s: ExactF64,
     pub blade_pitch_rad: ExactF64,

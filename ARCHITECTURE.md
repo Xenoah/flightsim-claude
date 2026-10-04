@@ -176,6 +176,26 @@ pub struct Radians(pub f64);
   Existing replay v1–v4 never substitutes for full-state recording. See
   [ADR-0018](docs/adr/0018-bounded-running-turboprop.md) and
   [ADR-0019](docs/adr/0019-turboprop-full-state-replay-v5.md).
+- An explicit pure-FDM `turboprop::near_static` API adds authored law 2 with
+  stored negative J rows and fixed adverse/transverse induced-velocity limits.
+  It retains the complete law-1 forward model and all 16 physical state scalars.
+  It does not widen profile v3, identity schema 3, replay v5 or app support.
+  See [ADR-0020](docs/adr/0020-near-static-turboprop-law.md). Independent pure-law
+  review is complete; full aircraft and host qualification precede adoption.
+- [Profile v4](docs/aircraft-profile-v4.md) explicitly selects near-static law 2
+  through a concrete original-token loader. Propeller wrapper schema 2 retains
+  the complete schema-1 forward component, two stored negative rows and required
+  fixed semantic/domain commitments. Physical identity schema 4 contains the
+  full retained forward canonical bytes plus all extension bits. Old profile
+  and replay gates stay unchanged. The separate near-static host and
+  [replay 6](docs/replay-v6.md) preserve all 16 scalars and complete canonical
+  report provenance, with their own closed negative-flow terminal wire tags.
+  Unknown identities can be inspected/exported but exact reproduction requires
+  schema 4/law 2 and matching configuration/data. Bounded frame-zero seek and
+  prospective +dt weather admission retain the accepted v5 mechanics without
+  changing that old format. See [ADR-0023](docs/adr/0023-near-static-full-state-replay-v6.md).
+  Schema validation, physical construction and pointwise runtime admission are
+  distinct. See [ADR-0022](docs/adr/0022-near-static-profile-and-identity.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を

@@ -1,0 +1,101 @@
+{
+  "atmosphere_temperature_offset_k": 0.0,
+  "attempted_dt_s": 0.008333333333333333,
+  "committed_body_air_velocity_mps": [
+    0.00601837310354599,
+    0.0002762955602508936,
+    0.02972203360090324
+  ],
+  "committed_gear_clearances_m": [
+    -0.1001727432012558,
+    -0.02608150616288185,
+    -0.025428134948015213
+  ],
+  "effective_controls": {
+    "aileron": 0.0,
+    "brakes": 1.0,
+    "elevator": 0.0,
+    "flaps": 0.0,
+    "rudder": 0.0,
+    "throttle": 0.0
+  },
+  "ground_elevation_m": 0.0,
+  "ground_slope": [
+    0.0,
+    0.0
+  ],
+  "last_committed_state": {
+    "altitude_m": 1.5489465417340398,
+    "angular_velocity_body_rad_s": [
+      0.00021242372808755693,
+      0.05847348158498715,
+      0.0004919325100572038
+    ],
+    "bank_rad": -0.00021082989314478203,
+    "blade_pitch_rad": 0.07,
+    "canonical_state_bits_hex": [
+      "c14e1dd4295a12da",
+      "414a2e0d5a1a9950",
+      "414bc14a89345327",
+      "3f95124e0d093ee1",
+      "bf92aaf45c7be1f7",
+      "bf8a386a09aaa6ee",
+      "3feac74b400ee2ef",
+      "bfd3e3c0d69d97b9",
+      "3fdafdfd5b11a76b",
+      "3fc458323bdf46b3",
+      "3f2bd7c1ee1878bc",
+      "3fadf03c762e7a76",
+      "3f401ea10571c872",
+      "0000000000000000",
+      "40661c5ed591c8df",
+      "3fb1eb851eb851ec"
+    ],
+    "heading_rad": 6.278610668909284,
+    "orientation_xyzw": [
+      0.836827874291968,
+      -0.31077595671228725,
+      0.4217522992463418,
+      0.15894153521963048
+    ],
+    "pitch_rad": -0.02480852863151259,
+    "position_ecef_m": [
+      -3947432.3230613293,
+      3431450.7039367333,
+      3637909.0719093266
+    ],
+    "shaft_rad_s": 176.88657644723477,
+    "speed_mps": 0.030326497249489943,
+    "turbine_fraction": 0.0,
+    "velocity_ecef_mps": [
+      0.020577640100156173,
+      -0.018230264801760012,
+      -0.012802914066316142
+    ],
+    "vertical_speed_mps": -0.029862120435277372
+  },
+  "last_committed_time_s": 4.125,
+  "reason": "OutsidePropellerDomain(PropellerDomainStatus { advance_ratio: Below, blade_pitch: Within })",
+  "rejected_stage_absolute_spin_rad_s": 176.88595563680732,
+  "rejected_stage_advance_ratio": -4.8781986805208105e-06,
+  "rejected_stage_axial_velocity_mps": -0.0003295977284913038,
+  "rejected_stage_relative_rpm": 1689.1343849249638,
+  "rejected_stage_relative_shaft_rad_s": 176.88573915353933,
+  "stage": "K2",
+  "stage_attitude_note": "The error API exposes stage flow/RPM but not its intermediate attitude. The complete last committed attitude and contact state are preserved; no intermediate state is fabricated.",
+  "substep": 2,
+  "whole_state_bits_unchanged": true,
+  "wind_ecef_mps": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "profile_path": "assets/aircraft/experimental/cedar_turboprop_experimental.json",
+  "physical_identity": {
+    "algorithm": 1,
+    "schema": 3,
+    "kind": 3,
+    "law_revision": 1,
+    "fnv1a64": "f83d082e814871c0"
+  }
+}

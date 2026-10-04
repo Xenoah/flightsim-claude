@@ -1,0 +1,1124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:flightsim:aircraft-profile:v4",
+  "title": "FlightSim aircraft profile v4 (near-static turboprop law 2)",
+  "description": "Explicit original-token near-static law-2 profile. Structural JSON Schema validation is distinct from exact parser and physical admission and actual pointwise runtime support. No app, replay or preset admission is implied. See docs/aircraft-profile-v4.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "dynamics",
+    "model",
+    "controls",
+    "camera_eye_m",
+    "engine_sound"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 4,
+      "description": "Write the integer token 4; runtime rejects 4.0 and 4e0."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 48,
+      "pattern": "^[a-z0-9-]+(?![\\s\\S])",
+      "description": "Lowercase ASCII identifier; no uniqueness registry is implied."
+    },
+    "dynamics": {
+      "$ref": "#/$defs/dynamics"
+    },
+    "model": {
+      "$ref": "#/$defs/model"
+    },
+    "controls": {
+      "$ref": "#/$defs/controls"
+    },
+    "camera_eye_m": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number",
+        "minimum": -10,
+        "maximum": 10
+      },
+      "description": "Cockpit eye [forward, right, down] in metres from center of mass, each component within +/-10 m."
+    },
+    "engine_sound": {
+      "type": "string",
+      "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?:[pP][iI][sS][tT][oO][nN]|[pP][rR][oO][pP]|[pP][rR][oO][pP][eE][lL][lL][eE][rR]|[tT][uU][rR][bB][iI][nN][eE]|[jJ][eE][tT]|[tT][uU][rR][bB][oO][fF][aA][nN]|[fF][iI][gG][hH][tT][eE][rR])[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])",
+      "description": "Sound only: prefer piston or turbine. Existing parser also accepts prop/propeller and jet/turbofan/fighter, ignoring case and surrounding Unicode whitespace. Does not select a physical family."
+    }
+  },
+  "$defs": {
+    "axis": {
+      "type": "string",
+      "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[xXyYzZ][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])",
+      "description": "Signed cardinal axis. Prefer +x, -x, +y, -y, +z or -z. Legacy parser also accepts unsigned positive axes, ASCII letter case and surrounding Unicode whitespace."
+    },
+    "dynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "revision",
+        "airframe",
+        "turbine",
+        "propeller",
+        "governor",
+        "aero",
+        "envelope",
+        "running_start"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "running_turboprop_table"
+        },
+        "revision": {
+          "type": "integer",
+          "const": 2
+        },
+        "airframe": {
+          "$ref": "#/$defs/airframe"
+        },
+        "turbine": {
+          "$ref": "#/$defs/turbine"
+        },
+        "propeller": {
+          "$ref": "#/$defs/propeller"
+        },
+        "governor": {
+          "$ref": "#/$defs/governor"
+        },
+        "aero": {
+          "$ref": "#/$defs/schedule"
+        },
+        "envelope": {
+          "$ref": "#/$defs/envelope"
+        },
+        "running_start": {
+          "$ref": "#/$defs/running_start"
+        }
+      }
+    },
+    "aerodynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lift_zero",
+        "lift_alpha",
+        "lift_flaps",
+        "stall_angle_rad",
+        "stall_blend_rate",
+        "drag_min",
+        "oswald_efficiency",
+        "drag_flaps",
+        "side_beta",
+        "side_rudder",
+        "roll_beta",
+        "roll_rate_p",
+        "roll_rate_r",
+        "roll_aileron",
+        "roll_rudder",
+        "pitch_zero",
+        "pitch_alpha",
+        "pitch_rate_q",
+        "pitch_elevator",
+        "pitch_flaps",
+        "yaw_beta",
+        "yaw_rate_p",
+        "yaw_rate_r",
+        "yaw_aileron",
+        "yaw_rudder"
+      ],
+      "properties": {
+        "lift_zero": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Lift coefficient at zero angle of attack."
+        },
+        "lift_alpha": {
+          "type": "number",
+          "maximum": 100,
+          "description": "Lift slope per radian of angle of attack.",
+          "minimum": -100
+        },
+        "lift_flaps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Lift coefficient increment at full normalized flap extension."
+        },
+        "stall_angle_rad": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.7,
+          "description": "Stall angle of attack in radians."
+        },
+        "stall_blend_rate": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 100,
+          "description": "Stall blend sharpness in inverse radians."
+        },
+        "drag_min": {
+          "type": "number",
+          "minimum": 0.0001,
+          "maximum": 1,
+          "description": "Minimum parasitic drag coefficient."
+        },
+        "oswald_efficiency": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 1,
+          "description": "Oswald span efficiency, dimensionless."
+        },
+        "drag_flaps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Drag coefficient increment at full normalized flap extension."
+        },
+        "side_beta": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Side-force slope per radian of sideslip."
+        },
+        "side_rudder": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Side-force coefficient per normalized rudder command."
+        },
+        "roll_beta": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Roll-moment slope per radian of sideslip."
+        },
+        "roll_rate_p": {
+          "type": "number",
+          "minimum": -100,
+          "description": "Roll damping per nondimensional roll rate p b/(2 V).",
+          "maximum": 100
+        },
+        "roll_rate_r": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Roll moment per nondimensional yaw rate r b/(2 V)."
+        },
+        "roll_aileron": {
+          "type": "number",
+          "maximum": 100,
+          "description": "Roll moment per normalized aileron command.",
+          "minimum": -100
+        },
+        "roll_rudder": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Roll moment per normalized rudder command."
+        },
+        "pitch_zero": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Pitch-moment coefficient at zero angle of attack."
+        },
+        "pitch_alpha": {
+          "type": "number",
+          "minimum": -100,
+          "description": "Pitch-moment slope per radian of angle of attack.",
+          "maximum": 100
+        },
+        "pitch_rate_q": {
+          "type": "number",
+          "minimum": -100,
+          "description": "Pitch damping per nondimensional pitch rate q c/(2 V).",
+          "maximum": 100
+        },
+        "pitch_elevator": {
+          "type": "number",
+          "maximum": 100,
+          "description": "Pitch moment per normalized elevator command; positive means nose-up.",
+          "minimum": -100
+        },
+        "pitch_flaps": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Pitch-moment increment at full normalized flap extension."
+        },
+        "yaw_beta": {
+          "type": "number",
+          "maximum": 100,
+          "description": "Yaw-moment slope per radian of sideslip.",
+          "minimum": -100
+        },
+        "yaw_rate_p": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Yaw moment per nondimensional roll rate p b/(2 V)."
+        },
+        "yaw_rate_r": {
+          "type": "number",
+          "minimum": -100,
+          "description": "Yaw damping per nondimensional yaw rate r b/(2 V).",
+          "maximum": 100
+        },
+        "yaw_aileron": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "Yaw moment per normalized aileron command."
+        },
+        "yaw_rudder": {
+          "type": "number",
+          "maximum": 100,
+          "description": "Yaw moment per normalized rudder command.",
+          "minimum": -100
+        }
+      }
+    },
+    "gear": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contact_m",
+        "spring_n_per_m",
+        "damping_ns_per_m",
+        "max_stroke_m",
+        "bottom_stop_travel_m",
+        "max_recoil_mps"
+      ],
+      "properties": {
+        "contact_m": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": -100,
+            "maximum": 100
+          },
+          "description": "Wheel contact at full extension: [forward, right, down] metres from center of mass in body axes."
+        },
+        "spring_n_per_m": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100000000.0,
+          "description": "Main strut spring stiffness, N/m."
+        },
+        "damping_ns_per_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000000.0,
+          "description": "Strut damping, N s/m."
+        },
+        "max_stroke_m": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 10,
+          "description": "Main strut compression travel, m."
+        },
+        "bottom_stop_travel_m": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 10,
+          "description": "Additional bounded bump-stop travel, m."
+        },
+        "max_recoil_mps": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 20,
+          "description": "Maximum strut extension speed, m/s."
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "forward",
+        "up",
+        "length_m"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(?!/)(?!\\.(?:/|$))(?![\\s\\S]*(?:^|/)\\.\\.(?:/|$))[^\\\\:]*\\.glb(?![\\s\\S])",
+          "description": "Relative lower-case .glb path under the app asset root, not beside this JSON. No leading ./, parent component, absolute root, colon or backslash. Runtime caps UTF-8 length at 256 bytes; maxLength here counts characters. Repeated slashes/internal ./ may normalize in the legacy parser; use plain forward-slash components."
+        },
+        "forward": {
+          "$ref": "#/$defs/axis",
+          "description": "Direction the existing model nose points. Author new standard glTF content with +z; describe legacy asset axes honestly."
+        },
+        "up": {
+          "$ref": "#/$defs/axis",
+          "description": "Direction of the existing model top. Standard glTF is +y up. Must be perpendicular to forward."
+        },
+        "length_m": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Target visible length in m along model.forward; applied as uniform scale using loaded mesh bounds. Does not alter physics."
+        }
+      },
+      "allOf": [
+        {
+          "not": {
+            "properties": {
+              "forward": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[xX][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              },
+              "up": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[xX][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              }
+            },
+            "required": [
+              "forward",
+              "up"
+            ]
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "forward": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[yY][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              },
+              "up": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[yY][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              }
+            },
+            "required": [
+              "forward",
+              "up"
+            ]
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "forward": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[zZ][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              },
+              "up": {
+                "pattern": "^[\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[+-]?[zZ][\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*(?![\\s\\S])"
+              }
+            },
+            "required": [
+              "forward",
+              "up"
+            ]
+          }
+        }
+      ]
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface_rate",
+        "centering_rate",
+        "throttle_rate",
+        "flap_rate",
+        "default_trim",
+        "trim_rate",
+        "approach_speed_mps",
+        "approach_pitch_rad",
+        "approach_trim",
+        "approach_throttle",
+        "approach_flaps"
+      ],
+      "properties": {
+        "surface_rate": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Normalized surface units/s for aileron/rudder keyboard or rate-mode input; also pitch when elevator_rate is omitted/null."
+        },
+        "elevator_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Optional pitch-only normalized units/s. Omitted or null inherits surface_rate; absolute analog input is unaffected.",
+          "default": null
+        },
+        "centering_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Surface spring return in normalized units/s. Zero disables return."
+        },
+        "elevator_centering_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Optional pitch-only return in normalized units/s. Omitted or null inherits centering_rate; absolute analog input is unaffected.",
+          "default": null
+        },
+        "throttle_rate": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Normalized throttle units/s for rate-mode controls."
+        },
+        "flap_rate": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Normalized flap units/s for rate-mode controls."
+        },
+        "default_trim": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Elevator trim for parked starts, normalized control units."
+        },
+        "trim_rate": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Normalized trim units/s."
+        },
+        "approach_speed_mps": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 150,
+          "description": "Initial approach true airspeed, m/s."
+        },
+        "approach_pitch_rad": {
+          "type": "number",
+          "minimum": -0.7853981633974483,
+          "maximum": 0.7853981633974483,
+          "description": "Initial approach body pitch in radians, +/- pi/4; not glideslope."
+        },
+        "approach_trim": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Initial approach elevator trim, normalized control units."
+        },
+        "approach_throttle": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Initial approach throttle fraction."
+        },
+        "approach_flaps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Initial approach flap fraction."
+        }
+      }
+    },
+    "airframe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "mass_kg",
+        "inertia_kg_m2",
+        "wing_area_m2",
+        "wing_span_m",
+        "mean_chord_m",
+        "landing_gear",
+        "rolling_friction",
+        "braking_friction",
+        "lateral_friction",
+        "friction_transition_mps"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 96,
+          "pattern": "^[\\u0020-\\u007e]*[\\u0021-\\u007e][\\u0020-\\u007e]*(?![\\s\\S])",
+          "description": "Printable ASCII display name, at most 96 bytes, containing at least one non-space character."
+        },
+        "mass_kg": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 100000,
+          "description": "Total aircraft mass in kg."
+        },
+        "inertia_kg_m2": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 10000000000.0
+            },
+            {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 10000000000.0
+            },
+            {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 10000000000.0
+            },
+            {
+              "type": "number",
+              "minimum": -10000000000.0,
+              "maximum": 10000000000.0
+            }
+          ],
+          "items": false,
+          "description": "[Ixx,Iyy,Izz,Ixz] in kg m^2 for the entire locked-rotor aircraft. Runtime also validates the rotor-subtracted tensor I_B = I_L - I_r ex ex^T and its conditioning."
+        },
+        "wing_area_m2": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Reference wing area in m^2."
+        },
+        "wing_span_m": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Reference wing span in m."
+        },
+        "mean_chord_m": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 20,
+          "description": "Mean aerodynamic chord in m."
+        },
+        "landing_gear": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/gear"
+          },
+          "description": "Exactly three fixed wheel contacts."
+        },
+        "rolling_friction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Rolling friction coefficient, dimensionless."
+        },
+        "braking_friction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Braking friction coefficient, dimensionless."
+        },
+        "lateral_friction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Lateral friction coefficient, dimensionless."
+        },
+        "friction_transition_mps": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 10,
+          "description": "Friction regularization transition speed in m/s."
+        }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "knots"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "const": 1
+        },
+        "knots": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/aero_knot"
+          }
+        }
+      },
+      "description": "All 25 coefficients at 2..32 Mach knots; strictly increasing by at least 1e-9, first zero. No stability/control sign policy or trim certification is inferred."
+    },
+    "aero_knot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mach",
+        "aero"
+      ],
+      "properties": {
+        "mach": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.95
+        },
+        "aero": {
+          "$ref": "#/$defs/aerodynamics"
+        }
+      }
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pressure_ratio",
+        "temperature_ratio",
+        "mach",
+        "relative_shaft_rad_s",
+        "absolute_spin_rad_s",
+        "maximum_helical_tip_mach",
+        "maximum_crossflow_tip_ratio"
+      ],
+      "properties": {
+        "pressure_ratio": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 2
+          }
+        },
+        "temperature_ratio": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 2
+          }
+        },
+        "mach": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.95
+          }
+        },
+        "relative_shaft_rad_s": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          }
+        },
+        "absolute_spin_rad_s": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 20,
+            "maximum": 1000
+          }
+        },
+        "maximum_helical_tip_mach": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.8
+        },
+        "maximum_crossflow_tip_ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.1
+        }
+      },
+      "description": "Ordered inclusive intervals separated by >=1e-9. Pressure/temperature must be contained in turbine axes; Mach in aero schedule. Actual support is their intersection with J/pitch, positive absolute spin, tip-Mach and crossflow constraints. No extrapolation or query repair."
+    },
+    "turbine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "pressure_ratios",
+        "temperature_ratios",
+        "cells",
+        "rise_seconds",
+        "fall_seconds",
+        "output_torque_limit_nm"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "const": 1
+        },
+        "pressure_ratios": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 2
+          }
+        },
+        "temperature_ratios": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 2
+          }
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/power_cell"
+          }
+        },
+        "rise_seconds": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30
+        },
+        "fall_seconds": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 30
+        },
+        "output_torque_limit_nm": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      },
+      "description": "Output shaft power after gearbox/accessory losses; no hidden efficiency. Axes increase by >=1e-9; exact pressure*temperature paired cell count with temperature fastest. Each maximum_w must be >= idle_w."
+    },
+    "power_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idle_w",
+        "maximum_w"
+      ],
+      "properties": {
+        "idle_w": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5000000
+        },
+        "maximum_w": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5000000
+        }
+      }
+    },
+    "propeller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "forward",
+        "negative_advance_ratio",
+        "negative_rows",
+        "near_static_domain"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "const": 2
+        },
+        "forward": {
+          "$ref": "#/$defs/forward_propeller"
+        },
+        "negative_advance_ratio": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "type": "number",
+              "const": -0.01
+            },
+            {
+              "type": "number",
+              "const": -0.005
+            }
+          ],
+          "items": false
+        },
+        "negative_rows": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ct",
+                "cp"
+              ],
+              "properties": {
+                "ct": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 2
+                },
+                "cp": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 2
+                }
+              }
+            }
+          },
+          "description": "Two explicit rows in negative-J order, pitch fastest. Each row length must equal the forward pitch axis. Physical admission additionally requires positive finite static floor, CP >= floor minus 64 epsilon allowance and nondecreasing CP with pitch."
+        },
+        "near_static_domain": {
+          "$ref": "#/$defs/near_static_domain"
+        }
+      }
+    },
+    "propeller_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ct",
+        "cp"
+      ],
+      "properties": {
+        "ct": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "cp": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        }
+      }
+    },
+    "governor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "reference_rad_s",
+        "gain",
+        "fine_rate_rad_s",
+        "coarse_rate_rad_s",
+        "minimum_pitch_rad",
+        "maximum_pitch_rad"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "const": 1
+        },
+        "reference_rad_s": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 1000
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 0.0001,
+          "maximum": 10
+        },
+        "fine_rate_rad_s": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 1
+        },
+        "coarse_rate_rad_s": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 1
+        },
+        "minimum_pitch_rad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5707963267948966
+        },
+        "maximum_pitch_rad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5707963267948966
+        }
+      },
+      "description": "Sampled integral governor: positive overspeed commands coarser pitch. Stops increase by >=1e-9 and lie inside propeller pitch axis; reference lies inside relative shaft envelope. No additional hidden integrator state."
+    },
+    "running_start": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "turbine_fraction",
+        "shaft_rad_s",
+        "blade_pitch_rad"
+      ],
+      "properties": {
+        "turbine_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "shaft_rad_s": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 1000
+        },
+        "blade_pitch_rad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5707963267948966
+        }
+      },
+      "description": "Explicit default initial condition, excluded from physical identity. Loader additionally requires shaft speed inside relative shaft envelope and pitch inside governor stops. This does not prove support for a chosen body/environment state or solve equilibrium. No hidden warmup."
+    },
+    "forward_propeller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "convention",
+        "diameter_m",
+        "rotor_axial_inertia_kg_m2",
+        "rotation_sense",
+        "advance_ratio",
+        "blade_pitch_rad",
+        "cells"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "const": 1
+        },
+        "convention": {
+          "type": "string",
+          "const": "isolated_axial_propeller"
+        },
+        "diameter_m": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 6
+        },
+        "rotor_axial_inertia_kg_m2": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1000
+        },
+        "rotation_sense": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "advance_ratio": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 30,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 4
+          }
+        },
+        "blade_pitch_rad": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5707963267948966
+          }
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/propeller_cell"
+          }
+        }
+      },
+      "description": "The validated unchanged law-1 forward map. At most 30 J knots so the two negative knots keep the complete grid within 32. Static closure must additionally satisfy the law-2 positive static power floor."
+    },
+    "near_static_domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_adverse_inflow_ratio",
+        "maximum_transverse_inflow_ratio",
+        "static_power_epsilon_multiplier",
+        "interpolation",
+        "static_power_bound",
+        "inflow_scale"
+      ],
+      "properties": {
+        "maximum_adverse_inflow_ratio": {
+          "type": "number",
+          "const": 0.1
+        },
+        "maximum_transverse_inflow_ratio": {
+          "type": "number",
+          "const": 0.1
+        },
+        "static_power_epsilon_multiplier": {
+          "type": "number",
+          "const": 64.0
+        },
+        "interpolation": {
+          "type": "string",
+          "const": "signed_pitch_then_advance_ratio"
+        },
+        "static_power_bound": {
+          "type": "string",
+          "const": "positive_static_actuator_disk_floor"
+        },
+        "inflow_scale": {
+          "type": "string",
+          "const": "current_positive_thrust_hover_velocity"
+        }
+      },
+      "description": "Required fixed semantic commitments, not tuning parameters. Runtime compares correctly rounded binary64 bits. Decimal spellings that round to the same supported bits are accepted even when a decimal-arithmetic schema validator considers them distinct."
+    }
+  },
+  "$comment": "Runtime caps original UTF-8 at 1 MiB, nesting at 128 containers, and each number token at 128 bytes. Rejects duplicate/unknown fields, trailing data, nonfinite values, nonzero-decimal underflow-to-zero, and integer tags/sense in float notation. Arrays are bounded during decode before the excess element. JSON Schema cannot express raw token/byte constraints, UTF-8 metadata byte lengths, exact f64 arithmetic, inertia conditioning, axis spacing/products, coupled component/initial-state containment, energy/actuator-disk inequalities or actual atmosphere/wind/inflow support. Use the exact loader and runtime as the final admission gates."
+}

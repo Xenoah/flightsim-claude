@@ -63,6 +63,7 @@
 
 pub mod aircraft_profile;
 pub mod aircraft_profile_v3;
+pub mod aircraft_profile_v4;
 pub mod crash;
 pub mod director;
 pub mod flight;
@@ -70,9 +71,12 @@ pub mod ground;
 pub mod jet_scenarios;
 pub mod model_identity;
 pub mod model_simulation;
+pub mod near_static_turboprop_identity;
+pub mod near_static_turboprop_simulation;
 pub mod replay;
 pub mod replay_v4;
 pub mod replay_v5;
+pub mod replay_v6;
 pub mod simulation;
 pub mod turboprop_identity;
 pub mod turboprop_simulation;

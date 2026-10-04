@@ -607,6 +607,100 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_near_static_foundation_cannot_widen_law_identity_or_existing_app_dispatch(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-fdm/src/turboprop/mod.rs", b'pub mod near_static;', b''),
+            ("crates/flightsim-fdm/src/turboprop/near_static/propeller.rs",
+             b'MAX_ADVERSE_INFLOW_RATIO: f64 = 0.10;', b'MAX_ADVERSE_INFLOW_RATIO: f64 = 0.11;'),
+            ("crates/flightsim-fdm/src/turboprop/near_static/propeller.rs",
+             b'MAX_TRANSVERSE_INFLOW_RATIO: f64 = 0.10;', b'MAX_TRANSVERSE_INFLOW_RATIO: f64 = 0.11;'),
+            ("crates/flightsim-fdm/src/turboprop/near_static/propeller.rs",
+             b'[-0.01, -0.005]', b'[-0.02, -0.005]'),
+            ("crates/flightsim-sim/src/aircraft_profile/exact.rs",
+             b'token.parse::<f64>()', b'token.trim_start_matches(\'-\').parse::<f64>()'),
+            ("crates/flightsim-sim/src/aircraft_profile_v4/wire.rs",
+             b'actual.get().to_bits() != expected.to_bits()', b'false'),
+            ("crates/flightsim-sim/src/near_static_turboprop_identity.rs",
+             b'&canonical_turboprop_bytes(config.forward_config())', b'&[]'),
+            ("crates/flightsim-sim/src/near_static_turboprop_simulation/mod.rs",
+             b'bytes.extend(physical);', b'bytes.extend([0_u8; 8]);'),
+            ("crates/flightsim-sim/src/near_static_turboprop_simulation/mod.rs",
+             b'let elapsed = self.committed.elapsed + NEAR_STATIC_TURBOPROP_FIXED_DT;',
+             b'let elapsed = self.committed.elapsed;'),
+            ("crates/flightsim-sim/src/replay_v6/mod.rs",
+             b'.supported_near_static_turboprop()', b'.supported_turboprop()'),
+            ("crates/flightsim-sim/src/replay_v6/mod.rs",
+             b'report.origin.as_ref() == Some(&self.origin)', b'true'),
+            ("crates/flightsim-sim/src/replay_v6/terminal.rs",
+             b'R::OutsideNearStaticDomain(_) => mask == 0xfff,',
+             b'R::OutsideNearStaticDomain(_) => mask == 0x1ff,'),
+            ("crates/flightsim-app/src/aircraft_profile.rs",
+             b'3 => AircraftProfileV3::from_bytes(bytes)',
+             b'3 | 4 => AircraftProfileV3::from_bytes(bytes)'),
+            ("crates/flightsim-sim/tests/cedar_near_static_qualification.rs",
+             b'assert_eq!(total_parity_steps, 76_080);', b'assert!(total_parity_steps > 0);'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_near_static_and_retained_independent_references_keep_original_bytes(self):
+        scripts = (
+            "subsonic_reference.py", "jet_identity_reference.py",
+            "turboprop_profile_reference.py", "turboprop_identity_reference.py",
+            "near_static_turboprop_identity_reference.py",
+            "replay_v4_reference.py", "replay_v5_reference.py", "replay_v6_reference.py",
+        )
+        for script in scripts:
+            with self.subTest(script=script):
+                subprocess.run([candidate.sys.executable, str(ROOT / "docs/qa" / script)],
+                               cwd=self.root, check=True, capture_output=True)
+
+    def test_exported_near_static_sources_and_anchors_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        paths = candidate.NEAR_STATIC_FOUNDATION_PATHS | set(candidate.NEAR_STATIC_INDEPENDENT_HASHES)
+        for relative in sorted(paths):
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                elif relative in candidate.NEAR_STATIC_INDEPENDENT_HASHES:
+                    del changed["independent_replay_sha256"][relative]
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
     def test_help_reference_cannot_lose_replay_authority_or_scroll_bounds(self):
         repo, _ = self.source_fixture()
         mutations = (

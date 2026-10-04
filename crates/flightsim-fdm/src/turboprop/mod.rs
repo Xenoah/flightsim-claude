@@ -6,6 +6,8 @@
 
 mod config;
 mod governor;
+/// Explicit opt-in numerical law 2; law 1 remains unchanged.
+pub mod near_static;
 mod power;
 mod propeller;
 mod runtime;

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "file": "cedar-near-static-critical.json.gz",
+      "bytes": 2272520,
+      "sha256": "3d8149b9e5ff3af3250b63ff37cb722a5e8387eece1f4f6bb43566284fc94753",
+      "decompressed_sha256": "fe2fc11a4cf1d8ffe7253c3d769103a0479f42862196f3a44416797ffeb2db3b",
+      "decompressed_bytes": 15710888
+    },
+    {
+      "file": "cedar-near-static-matrix.json.gz",
+      "bytes": 7727640,
+      "sha256": "8a7be5fadf79a1122b9d7f32f087b91d838bcc40bf5fde94694e79af29da05f8",
+      "decompressed_sha256": "a3a1b86244853705ad2b8ead7854f5eb50de58fbe937d9f22f954874418e328a",
+      "decompressed_bytes": 46592005
+    }
+  ],
+  "storage": "External QA archive; complete histories intentionally excluded from source tree",
+  "compressed_total_bytes": 10000160
+}
