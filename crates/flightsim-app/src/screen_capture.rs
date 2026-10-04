@@ -72,6 +72,10 @@ pub(super) fn capture_screenshot(
     });
     info!("capturing a screenshot to {}", path.display());
     commands.spawn(screenshot).observe(save_capture);
+    if startup.windows_readback_diagnostic {
+        commands.insert_resource(crate::windows_readback_diagnostic::ProbeRequest);
+        eprintln!("FS_READBACK_PROBE event=armed");
+    }
 }
 
 fn save_capture(captured: On<ScreenshotCaptured>, startup: Res<Startup>) {
@@ -138,6 +142,56 @@ mod tests {
     use super::*;
     use bevy::asset::RenderAssetUsages;
     use bevy::render::render_resource::{Extent3d, TextureDimension};
+
+    #[test]
+    fn diagnostic_arms_once_at_the_ordinary_thirtieth_frame_request() {
+        for enabled in [false, true] {
+            let mut app = App::new();
+            app.insert_resource(Time::<()>::default())
+                .insert_resource(Startup {
+                    screenshot: Some("unused-proof.png".into()),
+                    screenshot_delay: 0.0,
+                    windows_readback_diagnostic: enabled,
+                    ..default()
+                })
+                .add_systems(Update, capture_screenshot);
+            for _ in 0..29 {
+                app.update();
+            }
+            assert_eq!(
+                app.world_mut()
+                    .query::<&Screenshot>()
+                    .iter(app.world())
+                    .count(),
+                0
+            );
+            assert!(
+                !app.world()
+                    .contains_resource::<crate::windows_readback_diagnostic::ProbeRequest>()
+            );
+            app.update();
+            assert_eq!(
+                app.world_mut()
+                    .query::<&Screenshot>()
+                    .iter(app.world())
+                    .count(),
+                1
+            );
+            assert_eq!(
+                app.world()
+                    .contains_resource::<crate::windows_readback_diagnostic::ProbeRequest>(),
+                enabled
+            );
+            app.update();
+            assert_eq!(
+                app.world_mut()
+                    .query::<&Screenshot>()
+                    .iter(app.world())
+                    .count(),
+                1
+            );
+        }
+    }
 
     fn image() -> Image {
         Image::new_fill(

@@ -1,6 +1,6 @@
 {
   "contract": "swift-candidate-replay-v3-v1",
-  "reviewed_source": "b68b0ff1ce63ff1fc441a72d9bbd997f9b39a014",
+  "reviewed_source": "c80596c0f73a03d2dff45efe75ddd15265dfc9ca",
   "schema_version": 1,
   "source_sha256": {
     "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
@@ -8,7 +8,7 @@
     "crates/flightsim-app/src/aircraft_profile.rs": "59c6deb0db1822178b30a0ba4e2fcbcac9e2177e1f0f0851f54c74510f3c6da0",
     "crates/flightsim-app/src/cloud_runtime.rs": "244f1aaf1100fabfc67a62740c3a3f93bb2bb3216561bd3fbfb2e7efb7dce891",
     "crates/flightsim-app/src/distribution.rs": "a898b724744a3c8c3532fdd4ccbfbe665b7a1a4eb92ef8aee4f827301796b12a",
-    "crates/flightsim-app/src/main.rs": "11783c63f5d1919cce097c0348068df945c755f8ab2988cf0e44192f5df17599",
+    "crates/flightsim-app/src/main.rs": "632121d2baf3ceaaadf4ac27ff1254fa5e5c6394aaea680bb4ef007eeb21736d",
     "crates/flightsim-app/src/region_runtime.rs": "8ff1f5bdec88ee046caa1014b6b6d35a78737d9c9f3265a70e2dcf36d6d50d67",
     "crates/flightsim-app/src/replay_migration_tests.rs": "2319a12ab38d2653dd678dbe38bbc78b29eff44de80f19d7ccc6568b04d5e388",
     "crates/flightsim-app/src/replay_policy.rs": "2f71b7e20dc7ed11361917036b1e08c16a687004ebf635c3d6f0975964ea790a",

@@ -75,6 +75,7 @@ mod scenery_runtime;
 mod screen_capture;
 mod water_runtime;
 mod weather_runtime;
+mod windows_readback_diagnostic;
 use replay_runtime::ReplayPlayback;
 #[cfg(test)]
 mod controls_runtime_tests;
@@ -325,6 +326,8 @@ struct Startup {
     headless_screenshot: bool,
     /// Exit only after the PNG encoder has finished successfully.
     exit_after_screenshot: bool,
+    /// One bounded, non-qualifying readback probe; disabled unless explicitly requested.
+    windows_readback_diagnostic: bool,
     /// 起動時の視点。実行中は `C` で切り替えられる。
     view: ViewMode,
     /// 機体の 3D モデル。`assets/` からの相対パス。
@@ -429,6 +432,7 @@ impl Default for Startup {
             screenshot_delay: 5.0,
             headless_screenshot: false,
             exit_after_screenshot: false,
+            windows_readback_diagnostic: false,
             view: ViewMode::default(),
             // 既定は同梱モデル。軸も同梱ぶんの実測値に合わせる。
             model: Some(BUNDLED_MODEL.to_owned()),
@@ -834,6 +838,7 @@ fn main() -> bevy::app::AppExit {
     graphics_runtime::configure(&mut app);
     cloud_runtime::configure(&mut app);
     weather_runtime::configure(&mut app);
+    windows_readback_diagnostic::configure(&mut app);
     distance_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
@@ -901,7 +906,8 @@ fn application_help() -> &'static str {
   Host defaults to 127.0.0.1:41520. No Internet authentication/NAT traversal.\n\
 --screenshot FILE.png [--exit-after-screenshot] Capture the actual app\n\
 --headless-screenshot FILE.png                  Capture without a display\n\
---screenshot-delay SECONDS                     Finite delay in 0..600\n\n\
+--screenshot-delay SECONDS                     Finite delay in 0..600\n\
+--windows-readback-diagnostic                   Opt-in bounded readback evidence\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
 [ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
 F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN (offline map: next pending weather)."
@@ -1577,6 +1583,7 @@ fn parse_arguments_from(
                 None => notes.push(format!("{flag} needs a PNG path")),
             },
             "--exit-after-screenshot" => startup.exit_after_screenshot = true,
+            "--windows-readback-diagnostic" => startup.windows_readback_diagnostic = true,
             "--screenshot-delay" => match next_argument_value(&mut arguments) {
                 Some(text) => match text.parse::<f64>() {
                     Ok(value) if value.is_finite() && (0.0..=600.0).contains(&value) => {
@@ -4426,6 +4433,27 @@ mod tests {
         assert!(!startup.headless_screenshot);
         assert!(!startup.exit_after_screenshot);
         assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn readback_probe_requires_explicit_flag_and_preserves_capture_options() {
+        let (ordinary, notes) = parse(&["--screenshot", "proof.png"]);
+        assert!(notes.is_empty());
+        assert!(!ordinary.windows_readback_diagnostic);
+        let (probe, notes) = parse(&["--screenshot", "proof.png", "--windows-readback-diagnostic"]);
+        assert!(notes.is_empty());
+        assert!(probe.windows_readback_diagnostic);
+        assert_eq!(probe.screenshot, ordinary.screenshot);
+        assert_eq!(
+            probe.screenshot_delay.to_bits(),
+            ordinary.screenshot_delay.to_bits()
+        );
+        assert_eq!(probe.headless_screenshot, ordinary.headless_screenshot);
+        assert_eq!(probe.exit_after_screenshot, ordinary.exit_after_screenshot);
+        let (without_capture, notes) = parse(&["--windows-readback-diagnostic"]);
+        assert!(notes.is_empty());
+        assert!(without_capture.screenshot.is_none());
+        assert!(!without_capture.exit_after_screenshot);
     }
 
     #[test]

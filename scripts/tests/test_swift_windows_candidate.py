@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from types import SimpleNamespace
 import zlib
 
 
@@ -35,6 +34,43 @@ SWIFT_LOG = ("INFO aircraft: Swift Sport (generic) (swift-sport)\n"
 LEGACY_LOG = ("INFO aircraft: Light Single (generic) (light-single)\n"
               "INFO Screenshot saved to capture.png\nBatch capture complete: status 0\n"
               + candidate.LEGACY_NOTICE + "\n")
+
+
+def readback_fixture(outcome):
+    """Protocol examples with independent expected observations in the tests."""
+    if outcome == "empty":
+        return ""
+    if outcome == "malformed":
+        return "FS_READBACK_PROBE event=unknown ignored=true\n"
+    lines = ["event=enabled", "event=armed", "event=submitted", "event=map_register_enter", "event=map_registered"]
+    if outcome == "no_summary":
+        lines.append("event=poll_enter gpu_timeout_ms=250 elapsed_ms=5000")
+    elif outcome == "queue_only":
+        lines.append("event=queue_callback cancelled=false phase=normal")
+    elif outcome == "pixels_only":
+        lines.extend(["event=map_callback result=ok cancelled=false phase=normal", "event=pixels valid=true count=16"])
+    else:
+        lines.extend(["event=async_started", "event=async_waiting", "event=async_signal"])
+        resumed = outcome != "async_not_resumed"
+        if resumed:
+            lines.append("event=async_resumed")
+        mapped = outcome not in ("gpu_timeout", "map_missing")
+        map_result = "error" if outcome == "map_error" else "ok"
+        if mapped:
+            lines.append("event=map_callback result=" + map_result + " cancelled=false phase=normal")
+        pixels = "valid" if mapped and map_result == "ok" else "missing"
+        if pixels == "valid":
+            lines.append("event=pixels valid=true count=16")
+        queued = outcome != "gpu_timeout"
+        if queued:
+            lines.append("event=queue_callback cancelled=false phase=normal")
+        poll = "timeout" if outcome == "gpu_timeout" else "wait_succeeded"
+        lines.extend(["event=poll_enter gpu_timeout_ms=250 elapsed_ms=5000", "event=poll_return status=" + poll + " wall_ms=2"])
+        lines.append("event=summary submitted=true queue_callback=" + str(queued).lower()
+                     + " map_callback=" + (map_result if mapped else "missing") + " pixels=" + pixels
+                     + " async_started=true async_waiting=true async_signal=true async_resumed=" + str(resumed).lower()
+                     + " poll=" + poll + " cleanup=true render_frames=120 elapsed_ms=15000")
+    return "".join("FS_READBACK_PROBE " + line + "\n" for line in lines)
 
 
 class CandidateAcceptanceTests(unittest.TestCase):
@@ -534,7 +570,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 candidate.run_candidate(ROOT, "a" * 40, self.root / "work", self.root / "evidence")
         self.assertFalse((self.root / "work").exists())
 
-    def capture_fixture(self, first="timeout", probe="success"):
+    def capture_fixture(self, first="timeout", probe="success", probe_events="complete"):
         work, evidence = self.root / "capture-work", self.root / "capture-evidence"
         evidence.mkdir()
         app = work / "extracted/swift-candidate/flightsim-app.exe"
@@ -546,7 +582,8 @@ class CandidateAcceptanceTests(unittest.TestCase):
         report["executable_sha256"] = candidate.digest(app)
         report["runtime_capture_rust_log"] = candidate.CAPTURE_TRACE
         calls = []
-        primary = subprocess.TimeoutExpired(candidate.capture_command(app, work / candidate.PNG_NAME), 180)
+        primary = (OSError("injected primary launcher failure") if first == "error" else
+                   subprocess.TimeoutExpired(candidate.capture_command(app, work / candidate.PNG_NAME), 180))
 
         def run(command, **kwargs):
             calls.append((command, kwargs))
@@ -554,20 +591,34 @@ class CandidateAcceptanceTests(unittest.TestCase):
             self.assertEqual(kwargs["timeout"], 180)
             self.assertIs(kwargs["runtime"], True)
             self.assertEqual(command[0], str(app))
+            self.assertNotIn("release_parity", kwargs)
+            self.assertNotIn("creationflags", kwargs)
+            self.assertNotIn("startupinfo", kwargs)
             outcome = first if len(calls) == 1 else probe
             if len(calls) > 1:
                 self.assertEqual(len(calls), 2, "probe must never loop")
-                self.assertIs(kwargs["release_parity"], True)
+                self.assertEqual(command, candidate.capture_command(app, work / candidate.PROBE_PNG_NAME)
+                                 + ["--windows-readback-diagnostic"])
+                self.assertIsNone(kwargs["accepted"])
+                log = SWIFT_LOG + readback_fixture(probe_events)
             else:
-                self.assertNotIn("release_parity", kwargs)
+                self.assertNotIn("--windows-readback-diagnostic", command)
+                log = SWIFT_LOG
+            if outcome == "error":
+                raise primary if len(calls) == 1 else OSError("injected diagnostic launcher failure")
             if outcome == "timeout":
-                kwargs["output"].write_text("INFO capturing a screenshot\nTRACE still waiting\n", encoding="utf-8")
+                log = "INFO capturing a screenshot\nTRACE still waiting\n" + (readback_fixture(probe_events) if len(calls) == 2 else "")
+                kwargs["output"].write_text(log, encoding="utf-8")
                 Path(command[2]).write_bytes(b"partial private screenshot")
                 raise primary if len(calls) == 1 else subprocess.TimeoutExpired(command, 180)
-            kwargs["output"].write_text(SWIFT_LOG, encoding="utf-8")
-            if outcome == "success":
+            if outcome == "bad_log":
+                log += "ERROR injected asset failure\n"
+            kwargs["output"].write_text(log, encoding="utf-8")
+            if outcome in ("success", "bad_log"):
                 Path(command[2]).write_bytes(png_bytes())
-            return subprocess.CompletedProcess(command, 0 if outcome == "success" else 2), SWIFT_LOG
+            elif outcome == "invalid_png":
+                Path(command[2]).write_bytes(b"invalid PNG")
+            return subprocess.CompletedProcess(command, 2 if outcome == "failure" else 0), log
 
         return run, app, unrelated, work, evidence, report, calls, primary
 
@@ -578,6 +629,11 @@ class CandidateAcceptanceTests(unittest.TestCase):
         }
         candidate.write_json(evidence / "acceptance.json", report)
 
+    def finish_failed_capture(self, evidence, report):
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+
     def test_successful_probe_cannot_turn_primary_timeout_into_acceptance(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
@@ -586,46 +642,57 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(report["status"], "failed")
         self.assertEqual(report["checks"], {})
-        probe = report["diagnostics"]["release_launcher_probe"]
-        self.assertEqual(probe["status"], "passed")
+        probe = report["diagnostics"]["readback_probe"]
+        self.assertEqual(probe["status"], "captured")
         self.assertFalse(probe["qualifies_acceptance"])
         self.assertFalse((evidence / candidate.PNG_NAME).exists())
         self.assertTrue((evidence / candidate.PROBE_PNG_NAME).exists())
-        report["failure"] = report["primary_capture_failure"]["message"]
-        self.seal_report(evidence, report)
-        candidate.validate_evidence(evidence)
+        self.finish_failed_capture(evidence, report)
         report["checks"]["default_swift"] = {"status": "passed", "exit_code": 0}
         self.seal_report(evidence, report)
-        with self.assertRaisesRegex(ValueError, "cannot replace or pass primary timeout"):
+        with self.assertRaisesRegex(ValueError, "cannot replace or pass primary failure"):
             candidate.validate_evidence(evidence)
 
     def test_probe_timeout_is_single_and_partial_images_never_enter_evidence(self):
-        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="timeout")
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="timeout", probe_events="no_summary")
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
             candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
-        self.assertEqual(report["diagnostics"]["release_launcher_probe"]["status"], "timed_out")
+        self.assertEqual(report["diagnostics"]["readback_probe"]["status"], "timed_out")
         self.assertFalse(any((evidence / name).exists() for name in candidate.PNG_EVIDENCE))
         self.assertTrue((work / candidate.PROBE_PNG_NAME).exists())
-        report["failure"] = report["primary_capture_failure"]["message"]
-        self.seal_report(evidence, report)
-        candidate.validate_evidence(evidence)
+        self.finish_failed_capture(evidence, report)
+        document = candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)
+        self.assertIsNone(document["summary"])
+        self.assertEqual(document["observations"]["poll"], "entered_without_return")
+        self.assertFalse(document["observations"]["gpu_completion_observed"])
 
-    def test_primary_success_or_non_timeout_failure_never_launches_probe(self):
+    def test_primary_success_never_launches_probe(self):
         run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="success")
         candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
         self.assertEqual(len(calls), 1)
         self.assertNotIn("diagnostics", report)
         self.assertIn("default_swift", report["checks"])
-        # A fresh isolated fixture is needed because outputs are never replaced.
-        self.root = self.root / "next"
-        self.root.mkdir()
-        run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="failure")
-        with self.assertRaisesRegex(ValueError, "did not exit 0"):
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
-        self.assertEqual(len(calls), 1)
-        self.assertNotIn("diagnostics", report)
+        self.assertFalse(any((evidence / name).exists() for name in (
+            candidate.PROBE_LOG_NAME, candidate.PROBE_JSON_NAME, candidate.PROBE_PNG_NAME)))
+
+    def test_non_timeout_primary_capture_failures_also_get_exactly_one_probe(self):
+        root = self.root
+        for first in ("failure", "bad_log", "invalid_png", "missing_png", "error"):
+            self.root = root / first
+            self.root.mkdir()
+            with self.subTest(first=first):
+                run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(first=first)
+                with self.assertRaises((ValueError, OSError)) as failed:
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                if first == "error":
+                    self.assertIs(failed.exception, primary)
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(report["primary_capture_failure"]["kind"], "capture_failed")
+                self.assertEqual(report["primary_capture_failure"]["message"], candidate.sanitize(str(failed.exception), ROOT, work))
+                self.assertEqual(report["checks"], {})
+                self.finish_failed_capture(evidence, report)
 
     def test_diagnostic_preparation_error_cannot_replace_original_timeout(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture()
@@ -642,70 +709,284 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 1)
         self.assertEqual(report["checks"], {})
-        self.assertIn("hash read failure", report["diagnostics"]["release_launcher_probe"]["failure"])
+        self.assertEqual(report["diagnostics"]["readback_probe"]["attempts"], 0)
+        self.assertIn("hash read failure", report["diagnostics"]["readback_probe"]["failure"])
 
-    def test_nonzero_probe_is_failed_diagnostics_and_never_primary_success(self):
-        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure")
-        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+    def test_both_launcher_errors_without_output_still_export_honest_evidence(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(first="error", probe="error")
+        with self.assertRaises(OSError) as failed:
             candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
-        probe = report["diagnostics"]["release_launcher_probe"]
-        self.assertEqual((probe["status"], probe["exit_code"]), ("failed", 2))
+        self.finish_failed_capture(evidence, report)
+        probe = report["diagnostics"]["readback_probe"]
+        self.assertEqual(probe["attempts"], 1)
+        self.assertEqual(probe["status"], "failed")
+        self.assertNotIn("exit_code", probe)
+        self.assertNotIn("exit_code", report["primary_capture_failure"])
+        for name in ("default-swift.log", candidate.PROBE_LOG_NAME):
+            self.assertIn("No process output was captured", (evidence / name).read_text())
+        document = candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)
+        self.assertEqual(document["events"], [])
+        self.assertIsNone(document["summary"])
+
+    def test_probe_observations_separate_gpu_map_async_and_absent_summary(self):
+        expected = {
+            "complete": (True, "ok", "valid", True, "wait_succeeded"),
+            "gpu_timeout": (False, "missing", "missing", True, "timeout"),
+            "map_error": (True, "error", "missing", True, "wait_succeeded"),
+            "map_missing": (True, "missing", "missing", True, "wait_succeeded"),
+            "async_not_resumed": (True, "ok", "valid", False, "wait_succeeded"),
+            "no_summary": (False, "missing", "missing", False, "entered_without_return"),
+            "queue_only": (False, "missing", "missing", False, "not_entered"),
+            "pixels_only": (True, "ok", "valid", False, "not_entered"),
+            "empty": (False, "missing", "missing", False, "not_entered"),
+        }
+        root = self.root
+        for outcome, values in expected.items():
+            self.root = root / outcome
+            self.root.mkdir()
+            with self.subTest(outcome=outcome):
+                run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure", probe_events=outcome)
+                with self.assertRaises(subprocess.TimeoutExpired) as failed:
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                self.assertIs(failed.exception, primary)
+                self.assertEqual(len(calls), 2)
+                probe = report["diagnostics"]["readback_probe"]
+                self.assertEqual((probe["status"], probe["exit_code"]), ("failed", 2))
+                self.assertIs(probe["qualifies_acceptance"], False)
+                self.finish_failed_capture(evidence, report)
+                observations = candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["observations"]
+                self.assertEqual(tuple(observations[key] for key in (
+                    "gpu_completion_observed", "map_callback", "pixels", "async_resumed", "poll")), values)
+
+    def test_remaining_readback_outcomes_preserve_original_failure(self):
+        incomplete = readback_fixture("gpu_timeout")
+        never_started = "".join(line for line in incomplete.splitlines(keepends=True)
+                                if not line.startswith("FS_READBACK_PROBE event=async_"))
+        for event in ("async_started", "async_waiting", "async_signal", "async_resumed"):
+            never_started = never_started.replace(event + "=true", event + "=false")
+        cases = {
+            "queue_empty": (incomplete.replace("status=timeout", "status=queue_empty")
+                            .replace("poll=timeout", "poll=queue_empty"),
+                            (True, "missing", "missing", True, "queue_empty")),
+            "wrong_submission": (incomplete.replace("status=timeout", "status=wrong_submission")
+                                  .replace("poll=timeout", "poll=wrong_submission"),
+                                  (False, "missing", "missing", True, "wrong_submission")),
+            "unexpected_poll": (incomplete.replace("status=timeout", "status=unexpected_poll")
+                                 .replace("poll=timeout", "poll=unexpected_poll"),
+                                 (False, "missing", "missing", True, "unexpected_poll")),
+            "invalid_pixels": (readback_fixture("pixels_only").replace("valid=true", "valid=false"),
+                               (False, "ok", "invalid", False, "not_entered")),
+            "async_never_started": (never_started, (False, "missing", "missing", False, "timeout")),
+        }
+        root = self.root
+        for outcome, (log, expected) in cases.items():
+            self.root = root / outcome
+            self.root.mkdir()
+            with self.subTest(outcome=outcome), patch(__name__ + ".readback_fixture", return_value=log):
+                run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure")
+                with self.assertRaises(subprocess.TimeoutExpired) as failed:
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                self.assertIs(failed.exception, primary)
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(report["checks"], {})
+                self.assertIs(report["diagnostics"]["readback_probe"]["qualifies_acceptance"], False)
+                self.finish_failed_capture(evidence, report)
+                observations = candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["observations"]
+                self.assertEqual(tuple(observations[key] for key in (
+                    "gpu_completion_observed", "map_callback", "pixels", "async_resumed", "poll")), expected)
+
+    def test_no_summary_png_is_only_nonqualifying_capture_evidence(self):
+        run, app, cwd, work, evidence, report, _, primary = self.capture_fixture(probe_events="empty")
+        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.finish_failed_capture(evidence, report)
+        self.assertIsNone(candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["summary"])
+        self.assertTrue((evidence / candidate.PROBE_PNG_NAME).exists())
         self.assertEqual(report["checks"], {})
-        report["failure"] = report["primary_capture_failure"]["message"]
-        self.seal_report(evidence, report)
-        candidate.validate_evidence(evidence)
+
+    def test_late_cancelled_callbacks_never_rewrite_summary_or_prove_completion(self):
+        log = readback_fixture("gpu_timeout") + (
+            "FS_READBACK_PROBE event=map_callback result=ok cancelled=true phase=cleanup\n"
+            "FS_READBACK_PROBE event=queue_callback cancelled=true phase=cleanup\n")
+        parsed = candidate.parse_readback_log(log)
+        self.assertEqual(parsed["summary"]["map_callback"], "missing")
+        self.assertFalse(parsed["summary"]["queue_callback"])
+        self.assertFalse(parsed["observations"]["gpu_completion_observed"])
+        self.assertEqual(parsed["observations"]["map_callback"], "missing")
+        self.assertFalse(parsed["observations"]["queue_callback_observed"])
+        with self.assertRaisesRegex(ValueError, "after terminal summary"):
+            candidate.parse_readback_log(readback_fixture("gpu_timeout") + "FS_READBACK_PROBE event=pixels valid=true count=16\n")
+
+    def test_cleanup_callbacks_before_summary_are_inert_and_freeze_active_events(self):
+        log = readback_fixture("gpu_timeout")
+        head, summary = log.split("FS_READBACK_PROBE event=summary", 1)
+        cleanup = "FS_READBACK_PROBE event=map_callback result=error cancelled=true phase=cleanup\n"
+        parsed = candidate.parse_readback_log(head + cleanup + "FS_READBACK_PROBE event=summary" + summary)
+        self.assertEqual(parsed["observations"]["map_callback"], "missing")
+        with self.assertRaisesRegex(ValueError, "after cleanup"):
+            candidate.parse_readback_log(head + cleanup + "FS_READBACK_PROBE event=queue_callback cancelled=false phase=after_poll\n")
+
+    def test_synchronous_map_and_poll_callback_phases_match_real_order(self):
+        log = readback_fixture("complete")
+        callback = "FS_READBACK_PROBE event=map_callback result=ok cancelled=false phase=normal\n"
+        synchronous = log.replace(callback, "").replace("FS_READBACK_PROBE event=map_registered", callback + "FS_READBACK_PROBE event=map_registered")
+        self.assertTrue(candidate.parse_readback_log(synchronous)["observations"]["gpu_completion_observed"])
+        for phase, location in (("poll", "FS_READBACK_PROBE event=poll_return"),
+                                ("after_poll", "FS_READBACK_PROBE event=summary")):
+            moved = callback.replace("phase=normal", "phase=" + phase)
+            # Move pixels after the map callback too; its causal proof must be prior.
+            pixels = "FS_READBACK_PROBE event=pixels valid=true count=16\n"
+            revised = log.replace(callback, "").replace(pixels, "").replace(location, moved + pixels + location)
+            self.assertEqual(candidate.parse_readback_log(revised)["observations"]["pixels"], "valid")
+            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "outside poll|precedes poll return"):
+                candidate.parse_readback_log(log.replace(callback, moved))
+
+    def test_only_map_callback_can_precede_registration_return(self):
+        base = readback_fixture("complete")
+        for event in ("async_started", "queue_callback", "pixels", "summary"):
+            lines = base.splitlines(keepends=True)
+            line = next(line for line in lines if "event=" + event + " " in line or "event=" + event + "\n" in line)
+            lines.remove(line)
+            position = lines.index("FS_READBACK_PROBE event=map_registered\n")
+            lines.insert(position, line)
+            with self.subTest(event=event), self.assertRaisesRegex(ValueError, "precedes causal predecessor|precede map registration"):
+                candidate.parse_readback_log("".join(lines))
+
+    def test_readback_protocol_rejects_malformed_and_contradictory_evidence(self):
+        base = readback_fixture("complete")
+        mutations = [
+            base.replace("event=armed", "event=unknown"),
+            base + "FS_READBACK_PROBE event=enabled\n",
+            base.replace("event=armed", "event=armed ignored=true"),
+            base.replace("valid=true count=16", "valid=1 count=16"),
+            base.replace("count=16", "count=15"),
+            base.replace("cancelled=false phase=normal", "cancelled=true phase=normal"),
+            base.replace("wall_ms=2", "wall_ms=180001"),
+            base.replace("wall_ms=2", "wall_ms=02"),
+            base.replace("event=armed", "event=armed event=armed"),
+            base.replace("event=map_register_enter\nFS_READBACK_PROBE event=map_registered", "event=map_registered\nFS_READBACK_PROBE event=map_register_enter"),
+            base.replace("event=async_waiting\nFS_READBACK_PROBE event=async_signal", "event=async_signal\nFS_READBACK_PROBE event=async_waiting"),
+            base.replace("elapsed_ms=5000", "elapsed_ms=4999"),
+            base.replace("elapsed_ms=5000", "elapsed_ms=15000"),
+            base.replace("render_frames=120 elapsed_ms=15000", "render_frames=0 elapsed_ms=15000"),
+            base.replace("render_frames=120 elapsed_ms=15000", "render_frames=120 elapsed_ms=14999"),
+            base.replace("FS_READBACK_PROBE event=armed", "prefix FS_READBACK_PROBE event=armed"),
+            base.replace("FS_READBACK_PROBE event=armed\n", ""),
+            base.replace("FS_READBACK_PROBE event=poll_enter gpu_timeout_ms=250 elapsed_ms=5000\n", ""),
+            base.replace("cleanup=true", "cleanup=false"),
+            base.replace("summary submitted=true queue_callback=true", "summary submitted=true queue_callback=false"),
+            base.replace("summary submitted=true", "summary submitted=false"),
+            base.replace("summary submitted=true", "summary  submitted=true"),
+        ]
+        for malformed in mutations:
+            with self.subTest(malformed=malformed), self.assertRaises(ValueError):
+                candidate.parse_readback_log(malformed)
 
     def test_diagnostic_png_requires_own_valid_proof_and_unchanged_log(self):
         run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired):
             candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
-        report["failure"] = report["primary_capture_failure"]["message"]
-        self.seal_report(evidence, report)
-        candidate.validate_evidence(evidence)
-        probe = report["diagnostics"]["release_launcher_probe"]
+        self.finish_failed_capture(evidence, report)
+        probe = report["diagnostics"]["readback_probe"]
         probe["rust_log"] = "info"
         self.seal_report(evidence, report)
         with self.assertRaisesRegex(ValueError, "identity/launch differs"):
             candidate.validate_evidence(evidence)
         probe["rust_log"] = candidate.CAPTURE_TRACE
+        image_proof = {key: probe.pop(key) for key in ("png", "executable_sha256_after")}
         probe["status"] = "failed"
         probe["failure"] = "injected failure"
         self.seal_report(evidence, report)
         with self.assertRaisesRegex(ValueError, "unproven diagnostic image"):
             candidate.validate_evidence(evidence)
-        probe["status"] = "passed"
-        (evidence / candidate.PROBE_LOG_NAME).write_text(SWIFT_LOG + "ERROR capture failed", encoding="utf-8")
+        probe["status"] = "captured"
+        probe.update(image_proof)
+        del probe["failure"]
+        log = evidence / candidate.PROBE_LOG_NAME
+        log.write_text(log.read_text() + "ERROR capture failed", encoding="utf-8")
         self.seal_report(evidence, report)
         with self.assertRaisesRegex(ValueError, "diagnostic log changed"):
             candidate.validate_evidence(evidence)
-        probe["log_sha256"] = candidate.digest(evidence / candidate.PROBE_LOG_NAME)
+        probe["log_sha256"] = candidate.digest(log)
+        candidate.write_json(evidence / candidate.PROBE_JSON_NAME, candidate.readback_document(log))
+        probe["json_sha256"] = candidate.digest(evidence / candidate.PROBE_JSON_NAME)
         self.seal_report(evidence, report)
         with self.assertRaisesRegex(ValueError, "runtime logged"):
             candidate.validate_evidence(evidence)
-        (evidence / candidate.PROBE_LOG_NAME).write_text(SWIFT_LOG, encoding="utf-8")
-        probe["log_sha256"] = candidate.digest(evidence / candidate.PROBE_LOG_NAME)
+        log.write_text(SWIFT_LOG + readback_fixture("complete"), encoding="utf-8")
+        probe["log_sha256"] = candidate.digest(log)
+        candidate.write_json(evidence / candidate.PROBE_JSON_NAME, candidate.readback_document(log))
+        probe["json_sha256"] = candidate.digest(evidence / candidate.PROBE_JSON_NAME)
         (evidence / candidate.PROBE_PNG_NAME).write_bytes(png_bytes() + b"hidden bytes")
         self.seal_report(evidence, report)
         with self.assertRaisesRegex(ValueError, "trailing bytes"):
             candidate.validate_evidence(evidence)
 
-    def test_optional_probe_files_without_original_timeout_are_rejected(self):
+    def test_diagnostic_json_tampering_is_rejected_even_after_rehash(self):
+        run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.finish_failed_capture(evidence, report)
+        path = evidence / candidate.PROBE_JSON_NAME
+        original = path.read_text()
+        for mutation in (original.replace('"gpu_completion_observed": true', '"gpu_completion_observed": false'),
+                         original.replace('"gpu_completion_observed": true', '"gpu_completion_observed": 1'),
+                         original.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1'),
+                         original.replace('"schema_version": 1', '"schema_version": 1, "extra": "secret"')):
+            path.write_text(mutation, encoding="utf-8")
+            report["diagnostics"]["readback_probe"]["json_sha256"] = candidate.digest(path)
+            self.seal_report(evidence, report)
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, "log projection|duplicate diagnostic JSON"):
+                candidate.validate_evidence(evidence)
+        path.write_text(" " * (candidate.PROBE_MAX_JSON_BYTES + 1) + original, encoding="utf-8")
+        report["diagnostics"]["readback_probe"]["json_sha256"] = candidate.digest(path)
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "JSON exceeds size bound"):
+            candidate.validate_evidence(evidence)
+
+    def test_malformed_probe_log_cannot_hide_primary_error_or_export_png(self):
+        run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe_events="malformed")
+        with self.assertRaises(subprocess.TimeoutExpired) as failed:
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.assertIs(failed.exception, primary)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse((evidence / candidate.PROBE_PNG_NAME).exists())
+        report["failure"] = report["primary_capture_failure"]["message"]
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "malformed diagnostic evidence"):
+            candidate.validate_evidence(evidence)
+
+    def test_probe_identity_mutations_cannot_change_launcher_or_acceptance(self):
+        run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.finish_failed_capture(evidence, report)
+        for key, value in (("qualifies_acceptance", True), ("qualifies_acceptance", 0), ("attempts", 2),
+                           ("attempts", True), ("timeout_seconds", 181), ("executable_sha256", "0" * 64),
+                           ("launch", {"creationflags": 16, "startupinfo": None}),
+                           ("launch", {"creationflags": False, "startupinfo": None}),
+                           ("command", report["primary_capture_failure"]["command"])):
+            changed = json.loads(json.dumps(report))
+            changed["diagnostics"]["readback_probe"][key] = value
+            self.seal_report(evidence, changed)
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "identity/launch differs"):
+                candidate.validate_evidence(evidence)
+
+    def test_optional_probe_files_without_original_failure_are_rejected(self):
         evidence = self.root / "evidence"
         evidence.mkdir()
         (evidence / candidate.PROBE_PNG_NAME).write_bytes(png_bytes())
         self.evidence_report(evidence)
-        with self.assertRaisesRegex(ValueError, "lack a timeout/probe record"):
+        with self.assertRaisesRegex(ValueError, "lack a primary failure/probe record"):
             candidate.validate_evidence(evidence)
 
-    def test_release_parity_requests_only_one_time_console_and_show_flags(self):
-        with patch.object(candidate.subprocess, "STARTUPINFO", SimpleNamespace, create=True), \
-                patch.object(candidate.subprocess, "STARTF_USESHOWWINDOW", 1, create=True), \
-                patch.object(candidate.subprocess, "CREATE_NEW_CONSOLE", 16, create=True):
-            options = candidate.release_parity_startup()
-        self.assertEqual(options["creationflags"], 16)
-        self.assertEqual(vars(options["startupinfo"]), {"dwFlags": 1, "wShowWindow": 1})
+    def test_baseline_subprocess_has_no_alternate_console_path(self):
+        text = (ROOT / "scripts/check-swift-windows-candidate.py").read_text(encoding="utf-8")
+        for removed in ("CREATE_NEW_CONSOLE", "STARTF_USESHOWWINDOW", "release_parity"):
+            self.assertNotIn(removed, text)
         self.assertEqual(candidate.BASELINE_LAUNCH, {"creationflags": 0, "startupinfo": None})
 
 

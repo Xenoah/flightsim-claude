@@ -101,16 +101,22 @@ REQUIRED_TEXT_EVIDENCE = {
     "absent-light-single.log", "default-rejects-legacy.log", "legacy-no-model.log",
 }
 PNG_NAME = "default-swift.png"
-PROBE_LOG_NAME = "diagnostic-release-launch.log"
-PROBE_PNG_NAME = "diagnostic-release-launch.png"
-TEXT_EVIDENCE = REQUIRED_TEXT_EVIDENCE | {PROBE_LOG_NAME}
+PROBE_LOG_NAME = "diagnostic-readback.log"
+PROBE_PNG_NAME = "diagnostic-readback.png"
+PROBE_JSON_NAME = "diagnostic-readback.json"
+TEXT_EVIDENCE = REQUIRED_TEXT_EVIDENCE | {PROBE_LOG_NAME, PROBE_JSON_NAME}
 PNG_EVIDENCE = {PNG_NAME, PROBE_PNG_NAME}
 CAPTURE_TRACE = ("info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,"
                  "wgpu_core::command::transfer=trace,wgpu_hal::dx12=debug,"
                  "bevy_app::task_pool_plugin=trace")
-# These are process-start requests, not recurring window/focus operations.
+# The diagnostic keeps the primary's ordinary Python launcher unchanged.
 BASELINE_LAUNCH = {"creationflags": 0, "startupinfo": None}
-RELEASE_PARITY_LAUNCH = {"creationflags": 0x10, "startupinfo": {"dwFlags": 0x1, "wShowWindow": 1}}
+CAPTURE_TIMEOUT_SECONDS = 180
+PROBE_PREFIX = "FS_READBACK_PROBE"
+PROBE_MAX_JSON_BYTES = 64 * 1024
+PROBE_MAX_EVENTS = 32
+PROBE_POLL_STATUSES = {"wait_succeeded", "queue_empty", "timeout", "wrong_submission", "unexpected_poll"}
+CAPTURE_ERRORS = (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zlib.error)
 SWIFT_MODEL_LOG = "aircraft model: <private-work>/extracted/swift-candidate/assets/aircraft/swift_sport.glb"
 MAX_EVIDENCE_BYTES = 32 * 1024 * 1024
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
@@ -295,6 +301,7 @@ def verify_bundle(bundle, built_executable, manifest_hash):
 
 def validate_png(path):
     """Validate complete 8-bit RGB/RGBA capture, including CRCs and zlib rows."""
+    require(path.stat().st_size <= MAX_EVIDENCE_BYTES, "invalid PNG signature/size")
     data = path.read_bytes()
     require(len(data) <= MAX_EVIDENCE_BYTES and data[:8] == b"\x89PNG\r\n\x1a\n", "invalid PNG signature/size")
     offset, image_data, header, ended = 8, bytearray(), None, False
@@ -389,103 +396,276 @@ def capture_command(executable, screenshot):
             "--exit-after-screenshot", "--view", "chase"]
 
 
-def release_parity_startup():
-    """Match Start-Process' console/show requests, keeping Python pipe handling."""
-    startup = subprocess.STARTUPINFO()
-    startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
-    startup.wShowWindow = 1  # SW_SHOWNORMAL
-    return {"creationflags": subprocess.CREATE_NEW_CONSOLE, "startupinfo": startup}
+def diagnostic_capture_command(executable, screenshot):
+    return capture_command(executable, screenshot) + ["--windows-readback-diagnostic"]
+
+
+def parse_readback_log(log):
+    """Strict bounded projection of diagnostic events, never an acceptance gate."""
+    boolean = {"true", "false"}
+    phase = {"normal", "poll", "after_poll", "cleanup"}
+    fields = {
+        name: {} for name in ("enabled", "armed", "submitted", "map_register_enter", "map_registered",
+                              "async_started", "async_waiting", "async_signal", "async_resumed")
+    }
+    fields.update({
+        "map_callback": {"result": {"ok", "error"}, "cancelled": boolean, "phase": phase},
+        "pixels": {"valid": boolean, "count": {"16"}},
+        "queue_callback": {"cancelled": boolean, "phase": phase},
+        "poll_enter": {"gpu_timeout_ms": {"250"}, "elapsed_ms": 180_000},
+        "poll_return": {"status": PROBE_POLL_STATUSES, "wall_ms": 180_000},
+        "summary": {"submitted": {"true"}, "queue_callback": boolean,
+                    "map_callback": {"missing", "ok", "error"}, "pixels": {"missing", "valid", "invalid"},
+                    "async_started": boolean, "async_waiting": boolean, "async_signal": boolean,
+                    "async_resumed": boolean, "poll": {"not_entered"} | PROBE_POLL_STATUSES,
+                    "cleanup": {"true"}, "render_frames": 1_000_000, "elapsed_ms": 180_000},
+    })
+    events, seen, active, summary, cleaning_up = [], set(), {}, None, False
+    for line in ANSI.sub("", log).splitlines():
+        if PROBE_PREFIX not in line:
+            continue
+        require(len(line) <= 1024 and line.startswith(PROBE_PREFIX + " "), "malformed readback event prefix/length")
+        tokens = line[len(PROBE_PREFIX) + 1:].split(" ")
+        record = {}
+        for token in tokens:
+            require(re.fullmatch(r"[a-z_]+=[a-z0-9_]+", token), "malformed readback event field")
+            key, value = token.split("=", 1)
+            require(key not in record, "duplicate readback event field")
+            record[key] = value
+        event = record.pop("event", None)
+        require(event in fields and event not in seen, "unknown or duplicate readback event")
+        require(len(events) < PROBE_MAX_EVENTS and set(record) == set(fields[event]), "unexpected readback event fields/count")
+        converted = {"event": event}
+        for key, allowed in fields[event].items():
+            value = record[key]
+            if type(allowed) is int:
+                require(re.fullmatch(r"0|[1-9][0-9]{0,6}", value) and int(value) <= allowed,
+                        "readback event integer exceeds bound")
+                converted[key] = int(value)
+            else:
+                require(value in allowed, "invalid readback event value")
+                converted[key] = value == "true" if allowed <= boolean else value
+        if event in ("map_callback", "queue_callback"):
+            require(converted["cancelled"] == (converted["phase"] == "cleanup"), "readback callback cancellation/phase differs")
+            if converted["phase"] == "normal":
+                require("poll_enter" not in active, "readback normal callback occurred after poll entry")
+            elif converted["phase"] == "poll":
+                require("poll_enter" in active and "poll_return" not in active, "readback poll callback outside poll")
+            elif converted["phase"] == "after_poll":
+                require("poll_return" in active, "readback callback precedes poll return")
+        if cleaning_up:
+            require(event == "summary" or converted.get("cancelled") is True,
+                    "active readback event after cleanup")
+        if summary is not None:
+            require(event in ("map_callback", "queue_callback") and converted["cancelled"],
+                    "readback event after terminal summary")
+        if not events:
+            require(event == "enabled", "readback events lack initial enabled record")
+        predecessors = {
+            "armed": "enabled", "submitted": "armed", "map_register_enter": "submitted",
+            "map_registered": "map_register_enter", "map_callback": "map_register_enter",
+            "queue_callback": "map_registered", "pixels": "map_callback", "poll_enter": "map_registered",
+            "poll_return": "poll_enter", "async_started": "map_registered", "async_waiting": "async_started",
+            "async_signal": "async_waiting", "async_resumed": "async_signal", "summary": "map_registered",
+        }
+        if event in predecessors:
+            require(predecessors[event] in active, "readback event precedes causal predecessor")
+        if event == "pixels":
+            require("map_registered" in active, "readback pixels precede map registration return")
+            require(active["map_callback"]["result"] == "ok", "readback pixels lack successful map")
+        if event == "poll_enter":
+            require(5000 <= converted["elapsed_ms"] < 15000, "readback poll entry outside diagnostic window")
+        if event == "summary":
+            require(converted["elapsed_ms"] >= 15000 and converted["render_frames"] >= 1,
+                    "readback summary precedes deadline/render observation")
+        if event == "summary":
+            observed = readback_observations(active)
+            expected = {
+                "submitted": "submitted" in active,
+                "queue_callback": observed["queue_callback_observed"],
+                "map_callback": observed["map_callback"], "pixels": observed["pixels"],
+                **{name: name in active for name in ("async_started", "async_waiting", "async_signal", "async_resumed")},
+                "poll": observed["poll"],
+            }
+            require(all(converted[key] == value for key, value in expected.items()), "readback summary contradicts events")
+            summary = converted
+        elif not converted.get("cancelled", False):
+            active[event] = converted
+        cleaning_up = cleaning_up or converted.get("cancelled", False)
+        events.append(converted)
+        seen.add(event)
+    return {"schema_version": 1, "protocol": PROBE_PREFIX + "/v1", "events": events,
+            "summary": summary, "observations": readback_observations(active)}
+
+
+def readback_observations(events):
+    poll = events.get("poll_return", {}).get("status", "entered_without_return" if "poll_enter" in events else "not_entered")
+    pixels = ("valid" if events["pixels"]["valid"] else "invalid") if "pixels" in events else "missing"
+    return {"gpu_completion_observed": poll in {"wait_succeeded", "queue_empty"} or pixels == "valid",
+            "queue_callback_observed": "queue_callback" in events,
+            "map_callback": events.get("map_callback", {}).get("result", "missing"),
+            "pixels": pixels, "async_resumed": "async_resumed" in events, "poll": poll}
+
+
+def readback_document(log_path):
+    require(log_path.stat().st_size <= MAX_EVIDENCE_BYTES, "diagnostic log exceeds size bound")
+    with log_path.open("rb") as stream:
+        raw = stream.read(MAX_EVIDENCE_BYTES + 1)
+    require(len(raw) <= MAX_EVIDENCE_BYTES, "diagnostic log exceeds size bound")
+    require(b"\0" not in raw, "binary bytes in diagnostic log")
+    return {**parse_readback_log(raw.decode("utf-8")), "log_sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def readback_json(path):
+    require(path.stat().st_size <= PROBE_MAX_JSON_BYTES, "diagnostic JSON exceeds size bound")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            require(key not in result, "duplicate diagnostic JSON key")
+            result[key] = value
+        return result
+
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+
+
+def record_missing_output(path, message):
+    """An invocation can fail before subprocess captures either output pipe."""
+    if not path.exists():
+        path.write_text("[harness] No process output was captured; invocation failed: "
+                        + message[:4096] + "\n", encoding="utf-8")
 
 
 def check_default_capture(run, repo, app, unrelated, work, evidence, report):
-    """One required attempt; timeout alone permits one non-qualifying comparison."""
+    """One required attempt, then one bounded non-qualifying diagnostic on failure."""
     require(digest(app) == report["executable_sha256"], "executable changed before primary capture")
     screenshot = work / PNG_NAME
     command = capture_command(app, screenshot)
+    result = None
     try:
-        result, log = run(command, cwd=unrelated, timeout=180, runtime=True,
+        result, log = run(command, cwd=unrelated, timeout=CAPTURE_TIMEOUT_SECONDS, runtime=True,
                           output=evidence / "default-swift.log")
-    except subprocess.TimeoutExpired as primary:
-        primary_message = sanitize(str(primary), repo, work)
+        validate_smoke(log, result.returncode, model=True)
+        png = validate_png(screenshot)
+        require(digest(app) == report["executable_sha256"], "executable changed during primary capture")
+        require(not (evidence / PNG_NAME).exists(), "primary image destination already exists")
+        screenshot.rename(evidence / PNG_NAME)
+    except CAPTURE_ERRORS as primary:
         report["primary_capture_failure"] = {
-            "kind": "timeout", "message": primary_message, "timeout_seconds": 180,
+            "kind": "timeout" if isinstance(primary, subprocess.TimeoutExpired) else "capture_failed",
+            "message": sanitize(str(primary), repo, work), "timeout_seconds": CAPTURE_TIMEOUT_SECONDS,
             "command": [sanitize(arg, repo, work) for arg in command],
-            "launch": BASELINE_LAUNCH,
+            "launch": BASELINE_LAUNCH, "rust_log": CAPTURE_TRACE,
         }
-        probe_command = capture_command(app, work / PROBE_PNG_NAME)
-        probe = {
-            "status": "failed", "attempts": 1, "qualifies_acceptance": False,
-            "timeout_seconds": 180, "command": [sanitize(arg, repo, work) for arg in probe_command],
-            "working_directory": sanitize(str(unrelated), repo, work),
-            "launch": RELEASE_PARITY_LAUNCH, "rust_log": CAPTURE_TRACE,
-        }
-        report["diagnostics"] = {"release_launcher_probe": probe}
+        if result is not None:
+            report["primary_capture_failure"]["exit_code"] = result.returncode
         try:
-            report["primary_capture_failure"]["log_sha256"] = digest(evidence / "default-swift.log")
-            probe["executable_sha256"] = digest(app)
-            require(probe["executable_sha256"] == report["executable_sha256"], "executable changed before diagnostic probe")
-            result, log = run(probe_command, cwd=unrelated, timeout=180, runtime=True,
-                              accepted=None, output=evidence / PROBE_LOG_NAME, release_parity=True)
-            probe["exit_code"] = result.returncode
-            validate_smoke(log, result.returncode, model=True)
-            png = validate_png(work / PROBE_PNG_NAME)
-            require(digest(app) == probe["executable_sha256"], "executable changed during diagnostic probe")
-            probe["executable_sha256_after"] = digest(app)
-            probe["png"] = png
-            # Private/evidence directories share the runner volume. Rename a
-            # fully validated image atomically; partial copies never appear.
-            require(not (evidence / PROBE_PNG_NAME).exists(), "diagnostic image destination already exists")
-            (work / PROBE_PNG_NAME).rename(evidence / PROBE_PNG_NAME)
-            probe["status"] = "passed"
-        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zlib.error) as error:
-            probe["status"] = "timed_out" if isinstance(error, subprocess.TimeoutExpired) else "failed"
-            probe["failure"] = sanitize(str(error), repo, work)
+            record_missing_output(evidence / "default-swift.log", report["primary_capture_failure"]["message"])
+            record_readback_probe(run, repo, app, unrelated, work, evidence, report)
         finally:
-            try:
-                if (evidence / PROBE_LOG_NAME).is_file():
-                    probe["log_sha256"] = digest(evidence / PROBE_LOG_NAME)
-            except OSError as error:
-                probe["failure"] = sanitize(str(error), repo, work)
-                probe["status"] = "failed"
-        # Never replace this failure, enter required checks, or continue the
-        # acceptance run on the strength of a successful diagnostic image.
-        raise primary from None
-    validate_smoke(log, result.returncode, model=True)
-    png = validate_png(screenshot)
+            # Even diagnostic preparation/parsing/I/O errors must never hide
+            # the original failure, add an acceptance check, or launch again.
+            raise primary from None
     report["checks"]["default_swift"] = {"status": "passed", "exit_code": result.returncode,
-                                           "png": png, "log_sha256": digest(evidence / "default-swift.log")}
-    shutil.copyfile(screenshot, evidence / PNG_NAME)
+                                        "png": png, "log_sha256": digest(evidence / "default-swift.log")}
+
+
+def record_readback_probe(run, repo, app, unrelated, work, evidence, report):
+    probe_command = diagnostic_capture_command(app, work / PROBE_PNG_NAME)
+    probe = {
+        "status": "failed", "attempts": 0, "qualifies_acceptance": False,
+        "timeout_seconds": CAPTURE_TIMEOUT_SECONDS,
+        "command": [sanitize(arg, repo, work) for arg in probe_command],
+        "working_directory": sanitize(str(unrelated), repo, work),
+        "launch": BASELINE_LAUNCH, "rust_log": CAPTURE_TRACE,
+    }
+    report["diagnostics"] = {"readback_probe": probe}
+    try:
+        report["primary_capture_failure"]["log_sha256"] = digest(evidence / "default-swift.log")
+        probe["executable_sha256"] = digest(app)
+        require(probe["executable_sha256"] == report["executable_sha256"], "executable changed before diagnostic probe")
+        probe["attempts"] = 1
+        result, log = run(probe_command, cwd=unrelated, timeout=CAPTURE_TIMEOUT_SECONDS, runtime=True,
+                          accepted=None, output=evidence / PROBE_LOG_NAME)
+        probe["exit_code"] = result.returncode
+        # Save the structured evidence before deciding whether an independently
+        # successful screenshot may be exposed. No JSON is trusted from the app.
+        document = readback_document(evidence / PROBE_LOG_NAME)
+        write_json(evidence / PROBE_JSON_NAME, document)
+        validate_smoke(log, result.returncode, model=True)
+        png = validate_png(work / PROBE_PNG_NAME)
+        probe["executable_sha256_after"] = digest(app)
+        require(probe["executable_sha256_after"] == probe["executable_sha256"], "executable changed during diagnostic probe")
+        require(not (evidence / PROBE_PNG_NAME).exists(), "diagnostic image destination already exists")
+        (work / PROBE_PNG_NAME).rename(evidence / PROBE_PNG_NAME)
+        probe.update(status="captured", png=png)
+    except Exception as error:
+        probe["status"] = "timed_out" if isinstance(error, subprocess.TimeoutExpired) else "failed"
+        probe["failure"] = sanitize(str(error), repo, work)
+        if probe["attempts"] == 1:
+            record_missing_output(evidence / PROBE_LOG_NAME, probe["failure"])
+    finally:
+        try:
+            if (evidence / PROBE_LOG_NAME).is_file():
+                probe["log_sha256"] = digest(evidence / PROBE_LOG_NAME)
+                document = readback_document(evidence / PROBE_LOG_NAME)
+                write_json(evidence / PROBE_JSON_NAME, document)
+                probe["json_sha256"] = digest(evidence / PROBE_JSON_NAME)
+        except Exception as error:
+            probe["evidence_failure"] = sanitize(str(error), repo, work)
 
 
 def validate_probe_evidence(directory, report):
     diagnostics = report.get("diagnostics")
-    has_pair = any((directory / name).exists() for name in (PROBE_LOG_NAME, PROBE_PNG_NAME))
+    has_probe = any((directory / name).exists() for name in (PROBE_LOG_NAME, PROBE_PNG_NAME, PROBE_JSON_NAME))
     if diagnostics is None:
-        require(not has_pair, "diagnostic files lack a timeout/probe record")
+        require(not has_probe and "primary_capture_failure" not in report, "diagnostic files lack a primary failure/probe record")
         return
-    require(isinstance(diagnostics, dict) and set(diagnostics) == {"release_launcher_probe"}, "unexpected diagnostic record")
+    require(isinstance(diagnostics, dict) and set(diagnostics) == {"readback_probe"}, "unexpected diagnostic record")
     require(isinstance(report.get("executable_sha256"), str)
             and re.fullmatch(r"[0-9a-f]{64}", report["executable_sha256"]), "diagnostic binary digest is missing")
     primary = report.get("primary_capture_failure", {})
-    require(report["status"] == "failed" and primary.get("kind") == "timeout"
-            and primary.get("timeout_seconds") == 180 and report.get("failure") == primary.get("message")
+    primary_fields = {"kind", "message", "timeout_seconds", "command", "launch", "rust_log", "log_sha256"}
+    require(isinstance(primary, dict) and report["status"] == "failed"
+            and primary_fields <= set(primary) <= primary_fields | {"exit_code"}
+            and primary.get("kind") in {"timeout", "capture_failed"}
+            and type(primary.get("timeout_seconds")) is int and primary["timeout_seconds"] == CAPTURE_TIMEOUT_SECONDS
+            and report.get("failure") == primary.get("message")
             and not report["checks"] and not (directory / PNG_NAME).exists(),
-            "diagnostic probe cannot replace or pass primary timeout")
+            "diagnostic probe cannot replace or pass primary failure")
     expected_exe = "<private-work>/extracted/swift-candidate/flightsim-app.exe"
     require(primary.get("command") == capture_command(expected_exe, "<private-work>/" + PNG_NAME)
-            and primary.get("launch") == BASELINE_LAUNCH, "primary launch changed")
-    require(digest(directory / "default-swift.log") == primary.get("log_sha256"), "primary timeout log changed")
-    probe = diagnostics["release_launcher_probe"]
-    require(probe.get("attempts") == 1 and probe.get("qualifies_acceptance") is False
-            and probe.get("timeout_seconds") == 180 and probe.get("launch") == RELEASE_PARITY_LAUNCH
+            and primary.get("launch") == BASELINE_LAUNCH
+            and type(primary["launch"]["creationflags"]) is int
+            and primary.get("rust_log") == report.get("runtime_capture_rust_log") == CAPTURE_TRACE
+            and ("exit_code" not in primary or type(primary["exit_code"]) is int),
+            "primary launch changed")
+    require(digest(directory / "default-swift.log") == primary.get("log_sha256"), "primary failure log changed")
+    probe = diagnostics["readback_probe"]
+    require(isinstance(probe, dict) and type(probe.get("attempts")) is int and probe["attempts"] == 1
+            and probe.get("qualifies_acceptance") is False
+            and type(probe.get("timeout_seconds")) is int and probe["timeout_seconds"] == CAPTURE_TIMEOUT_SECONDS
+            and probe.get("launch") == BASELINE_LAUNCH
+            and type(probe["launch"]["creationflags"]) is int
             and probe.get("working_directory") == "<private-work>/unrelated-cwd"
-            and probe.get("command") == capture_command(expected_exe, "<private-work>/" + PROBE_PNG_NAME)
+            and probe.get("command") == diagnostic_capture_command(expected_exe, "<private-work>/" + PROBE_PNG_NAME)
             and probe.get("rust_log") == CAPTURE_TRACE
             and probe.get("executable_sha256") == report.get("executable_sha256"), "diagnostic probe identity/launch differs")
-    if (directory / PROBE_LOG_NAME).exists():
-        require(digest(directory / PROBE_LOG_NAME) == probe.get("log_sha256"), "diagnostic log changed")
-    if probe.get("status") == "passed":
-        require(probe.get("exit_code") == 0 and probe.get("executable_sha256_after") == probe["executable_sha256"],
+    require("evidence_failure" not in probe, "malformed diagnostic evidence")
+    probe_fields = {"status", "attempts", "qualifies_acceptance", "timeout_seconds", "command", "working_directory",
+                    "launch", "rust_log", "executable_sha256", "log_sha256", "json_sha256"}
+    extra = {"exit_code", "png", "executable_sha256_after"} if probe.get("status") == "captured" else {"exit_code", "failure"}
+    require(probe_fields <= set(probe) <= probe_fields | extra, "unexpected diagnostic proof fields")
+    require((directory / PROBE_LOG_NAME).is_file() and (directory / PROBE_JSON_NAME).is_file(),
+            "diagnostic log/JSON pair is incomplete")
+    require(digest(directory / PROBE_LOG_NAME) == probe.get("log_sha256"), "diagnostic log changed")
+    require(digest(directory / PROBE_JSON_NAME) == probe.get("json_sha256"), "diagnostic JSON changed")
+    require(json.dumps(readback_json(directory / PROBE_JSON_NAME), sort_keys=True)
+            == json.dumps(readback_document(directory / PROBE_LOG_NAME), sort_keys=True),
+            "diagnostic JSON differs from log projection")
+    if probe.get("status") == "captured":
+        require(type(probe.get("exit_code")) is int and probe["exit_code"] == 0
+                and probe.get("executable_sha256_after") == probe["executable_sha256"],
                 "diagnostic probe lacks exit/binary proof")
         require(validate_png(directory / PROBE_PNG_NAME) == probe.get("png"), "diagnostic PNG does not match proof")
         validate_smoke((directory / PROBE_LOG_NAME).read_text(encoding="utf-8"), 0, model=True)
@@ -493,6 +673,8 @@ def validate_probe_evidence(directory, report):
         require(probe.get("status") in ("failed", "timed_out") and isinstance(probe.get("failure"), str)
                 and probe["failure"] and not (directory / PROBE_PNG_NAME).exists(),
                 "unproven diagnostic image cannot be uploaded")
+        if probe["status"] == "timed_out":
+            require("exit_code" not in probe, "timed-out diagnostic cannot claim an exit code")
 
 
 def validate_source_evidence(source, report):
@@ -638,18 +820,17 @@ def run_candidate(repo, expected, work, evidence):
     env.update(CARGO_TARGET_DIR=str(work / "target"), RUSTFLAGS="-D warnings", CARGO_TERM_COLOR="never")
     report["compiler_flags"] = {"RUSTFLAGS": env["RUSTFLAGS"], "CARGO_TARGET_DIR": "<private-work>/target"}
 
-    def run(command, *, cwd=repo, timeout=3600, accepted=(0,), output=None, runtime=False, release_parity=False):
+    def run(command, *, cwd=repo, timeout=3600, accepted=(0,), output=None, runtime=False):
         run_env = env.copy()
         if runtime:
             run_env.update(WGPU_BACKEND="dx12", WGPU_FORCE_FALLBACK_ADAPTER="1",
                            BEVY_ASSET_ROOT=str(repo), CARGO_MANIFEST_DIR=str(repo))
             if "--screenshot" in command:
                 run_env["RUST_LOG"] = CAPTURE_TRACE
-        launch = release_parity_startup() if release_parity else {}
         timed_out = None
         try:
             result = subprocess.run([str(x) for x in command], cwd=cwd, env=run_env,
-                                    capture_output=True, timeout=timeout, **launch)
+                                    capture_output=True, timeout=timeout)
         except subprocess.TimeoutExpired as error:
             # subprocess.run kills and waits for its process. Keep the captured
             # diagnostic bytes, but no partial screenshot enters evidence.

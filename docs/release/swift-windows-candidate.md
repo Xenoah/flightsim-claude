@@ -177,36 +177,63 @@ the following exact `RUST_LOG` selectors, recorded with the run:
 info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,wgpu_core::command::transfer=trace,wgpu_hal::dx12=debug,bevy_app::task_pool_plugin=trace
 ```
 
-Only a timeout of the default Swift capture triggers **one** fresh diagnostic
-process. It uses the same extracted executable, scene, WARP settings, unrelated
-working directory, asset-isolation environment, trace selectors and 180-second
-limit. The only launch-setting difference is `CREATE_NEW_CONSOLE` plus
-`STARTF_USESHOWWINDOW`/`SW_SHOWNORMAL`, matching the console/show requests in
-the release's PowerShell `Start-Process` path. Python pipe redirection remains
-in use; this is not complete harness equivalence. Requested flags, actual
-executable SHA-256 and the probe result are recorded separately.
+Any primary default Swift capture failure triggers **one** fresh diagnostic
+process. It uses the same extracted executable SHA-256, build/features, scene,
+WARP settings, unrelated working directory, asset-isolation environment, trace
+selectors, screenshot delay and 180-second watchdog. Its capture command adds
+only `--windows-readback-diagnostic` and uses a separate PNG destination. Both
+processes use the original Python launcher; no console/show/focus flags change.
+There is no third launch, timeout extension or diagnostic retry. Primary success
+does not run the probe. Failure to verify the executable or prepare evidence
+stops the diagnostic safely while preserving the original failure.
 
-This tests a launcher hypothesis, not an established cause of a missing capture
-callback. Continued CPU world updates do not prove swapchain rendering. Process
-order, driver/shader/filesystem cache warm-up, trace overhead and CPU scheduling
-can confound a comparison. There is no timeout increase, offscreen replacement,
-repeated focus operation, rendering change or task-pool change.
+The opt-in probe runs only after the ordinary window screenshot is requested.
+It performs one small independent GPU submission/readback and observes a
+separate async task through start, pending, external signal and resume. The log
+records map-registration entry and return separately, map result, pixel
+validation, queue callback, callback phase and cancellation. After at least five
+seconds of ordinary observation it may poll that specific submission once, with
+a requested GPU wait timeout of 250 ms. A blocked poll/callback is still bounded
+by the unchanged outer process watchdog; the GPU wait request does not guarantee
+a 250 ms wall-clock return. The first later render-system opportunity at or after
+15 seconds freezes observations and releases its task, mapped buffer and texture.
+This observer does not replace Bevy's screenshot or qualify its visible rendering.
 
-The original timeout remains the engineering failure even if the diagnostic
-process saves a valid image. The diagnostic cannot populate any of the four
-required checks; remaining acceptance stops after the failed primary capture.
-Primary success and failures other than timeout do not run the probe. The
-optional `diagnostic-release-launch.log` retains its complete sanitized output.
-Only successful model/path/fit, exit-zero, unchanged-executable and full PNG
-validation can expose `diagnostic-release-launch.png`, with its own digest and
-proof. A partial/unproven image remains in the private work directory.
+All machine-readable events use the `FS_READBACK_PROBE` prefix on stderr. The
+harness derives `diagnostic-readback.json` from the sanitized
+`diagnostic-readback.log`; the app supplies no JSON evidence. Parsing permits
+only known events, exact field sets, canonical bounded values and consistent
+causal ordering. There are at most 32 events of at most 1,024 characters each;
+the derived JSON is limited to 64 KiB. Its terminal summary must match the
+preceding observations. Late cleanup callbacks remain visible in the event list
+but cannot change frozen observations or prove success. A missing summary is
+valid partial evidence, including an early screenshot exit or a poll that never
+returned; it is not inferred to mean GPU, mapping or async success.
+
+GPU completion is observed only through successful polling of the diagnostic
+submission or validated mapped pixels. A queue callback by itself records only
+the callback. Map failure/missing completion, invalid pixels, missing async
+resume, poll errors and missing summary remain separate observations. None alone
+establishes the cause of the primary screenshot failure. Driver/cache warm-up,
+process order, trace overhead, CPU scheduling and diagnostic instrumentation can
+confound comparisons; the added work can perturb the behavior being examined.
+
+The original exception and failed engineering result remain unchanged, even if
+the diagnostic saves an image. The diagnostic always records
+`qualifies_acceptance: false`, cannot populate any of the four required checks,
+and never resumes acceptance after primary failure. Only successful
+model/path/fit, exit-zero, unchanged-executable and full PNG validation expose
+`diagnostic-readback.png`, with its own digest and proof. A valid diagnostic PNG
+may coexist with a missing probe summary, but remains nonqualifying capture
+evidence. A partial/unproven image remains private. Malformed events, inconsistent
+JSON, changed hashes or unproven images prevent evidence upload.
 
 ### Evidence export
 
 Only explicit filenames from a separate evidence directory can be uploaded:
 acceptance/source-input/dependency-inventory/readiness JSON, sanitized command
-and four runtime logs, `default-swift.png`, and the optional diagnostic log/image
-pair above. Complete runtime logs appear once in their own files; `commands.log`
+and four runtime logs, `default-swift.png`, and the optional diagnostic
+log/JSON/image set above. Complete runtime logs appear once in their own files; `commands.log`
 records the command, exit status and log reference/hash without duplicating
 verbose trace output. Every allowed file gets a size
 and SHA-256 in the report; the report excludes its own digest. Text must be
