@@ -129,20 +129,33 @@ fn tower_keeps_its_elevated_world_anchor_and_lod_observation_while_aircraft_move
 
 #[test]
 fn new_recording_uses_current_visual_epoch_and_restored_rate() {
-    let mut recorder = FlightRecorder(flightsim_sim::Recorder::new(
-        flightsim_sim::replay::Conditions::default(),
-    ));
+    let mut recorder = FlightRecorder(flightsim_sim::CurrentRecorder::new(recording_conditions(
+        &Startup::default(),
+        &flightsim_render::TimeOfDay::default(),
+    )));
     let clock = flightsim_render::TimeOfDay {
         utc: flightsim_render::JulianDate::J2000,
         rate: flightsim_render::TimeRate(600.0),
     };
     refresh_recording_clock(&mut recorder, &clock);
     assert_eq!(
-        recorder.0.recording().conditions().start_epoch.to_bits(),
+        recorder
+            .0
+            .recording()
+            .conditions()
+            .environment
+            .start_epoch
+            .to_bits(),
         clock.utc.get().to_bits()
     );
     assert_eq!(
-        recorder.0.recording().conditions().time_rate.to_bits(),
+        recorder
+            .0
+            .recording()
+            .conditions()
+            .environment
+            .time_rate
+            .to_bits(),
         600.0_f64.to_bits()
     );
 }
@@ -156,7 +169,7 @@ fn invalid_fallback_replay_epoch_does_not_poison_the_sun() {
         flightsim_fdm::ControlInputs::neutral(),
         Some(sim.0.state()),
     );
-    let mut playback = ReplayPlayback::new(recorder.finish());
+    let mut playback = ReplayPlayback::new(flightsim_sim::ReplayFile::V1(recorder.finish()));
     playback.elapsed = Seconds(86400.0);
     let epoch = flightsim_render::JulianDate(flightsim_sim::replay::MAX_VISUAL_EPOCH);
     let mut app = App::new();
@@ -234,10 +247,12 @@ fn faulted_replay_keeps_last_good_world_transform_on_every_update() {
         .init_resource::<SampledPilotInput>()
         .init_resource::<StallWarningStatus>()
         .insert_resource(flightsim_ui::Paused::default())
-        .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(
-            flightsim_sim::replay::Conditions::default(),
+        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            recording_conditions(&Startup::default(), &flightsim_render::TimeOfDay::default()),
         )))
-        .insert_resource(ReplayPlayback::new(recording))
+        .insert_resource(ReplayPlayback::new(flightsim_sim::ReplayFile::V1(
+            recording,
+        )))
         .insert_resource(ViewMode::Cockpit)
         .insert_resource(TowerViewAnchor(initial.geodetic()))
         .insert_resource(CameraWorldPosition(initial.geodetic()))
@@ -286,7 +301,9 @@ fn replay_disables_tutorial_and_live_visual_rate_keys() {
     };
     let mut app = App::new();
     app.insert_resource(keyboard)
-        .insert_resource(ReplayPlayback::new(recording))
+        .insert_resource(ReplayPlayback::new(flightsim_sim::ReplayFile::V1(
+            recording,
+        )))
         .insert_resource(flightsim_ui::Paused::default())
         .insert_resource(flightsim_ui::TutorialVisibility(true))
         .insert_resource(clock)
@@ -311,7 +328,9 @@ fn replay_sound_and_completion_status_use_recorded_inputs() {
         .insert_resource(controls)
         .init_resource::<SampledPilotInput>()
         .init_resource::<StallWarningStatus>()
-        .insert_resource(ReplayPlayback::new(recording))
+        .insert_resource(ReplayPlayback::new(flightsim_sim::ReplayFile::V1(
+            recording,
+        )))
         .insert_resource(flightsim_ui::Paused::default())
         .insert_resource(flightsim_ui::ReplayStatus::default())
         .insert_resource(flightsim_audio::AircraftSound::default())
@@ -367,8 +386,8 @@ fn restart_while_paused_restores_rate_and_records_current_epoch() {
     .insert_resource(PilotControls::default())
     .init_resource::<SampledPilotInput>()
     .init_resource::<StallWarningStatus>()
-    .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(
-        flightsim_sim::replay::Conditions::default(),
+    .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+        recording_conditions(&Startup::default(), &flightsim_render::TimeOfDay::default()),
     )))
     .insert_resource(flightsim_ui::Paused::default())
     .insert_resource(flightsim_ui::TutorialState::default())
@@ -407,8 +426,14 @@ fn restart_while_paused_restores_rate_and_records_current_epoch() {
         .0
         .recording()
         .conditions();
-    assert_eq!(conditions.start_epoch.to_bits(), epoch.get().to_bits());
-    assert_eq!(conditions.time_rate.to_bits(), 600.0_f64.to_bits());
+    assert_eq!(
+        conditions.environment.start_epoch.to_bits(),
+        epoch.get().to_bits()
+    );
+    assert_eq!(
+        conditions.environment.time_rate.to_bits(),
+        600.0_f64.to_bits()
+    );
     assert_eq!(
         app.world_mut()
             .resource_mut::<CameraRig>()
@@ -438,14 +463,16 @@ fn replay_location_and_weather_win_before_airport_and_difficulty_resolution() {
         Attitude::from_degrees(0.0, 0.0, 123.0),
         Ned::new(40.0, 0.0, 0.0),
     );
-    let conditions = flightsim_sim::replay::Conditions {
-        start: recorded_start,
-        heading: Degrees(123.0).to_radians(),
-        time_rate: 60.0,
-        ..default()
-    }
-    .with_aircraft(&startup.aircraft.configuration());
-    single_frame_recording(&initial, conditions.clone())
+    let conditions = flightsim_sim::CurrentConditions::for_aircraft(
+        &startup.aircraft.configuration(),
+        flightsim_sim::EnvironmentConditions {
+            start: recorded_start,
+            heading: Degrees(123.0).to_radians(),
+            time_rate: 60.0,
+            ..default()
+        },
+    );
+    single_current_frame_recording(&initial, conditions.clone())
         .write_to(&mut std::fs::File::create(&replay_path).unwrap())
         .unwrap();
     let near_recording = flightsim_world::AirportRunway::from_endpoints(
@@ -474,10 +501,13 @@ fn replay_location_and_weather_win_before_airport_and_difficulty_resolution() {
         RunwaySource::OpenStreetMap { way_id: 111 }
     );
     assert_eq!(startup.start, recorded_start);
-    assert_eq!(startup.heading, conditions.heading);
-    assert_eq!(startup.wind, conditions.wind);
-    assert_eq!(startup.turbulence, conditions.turbulence);
-    assert_eq!(startup.time_rate.to_bits(), conditions.time_rate.to_bits());
+    assert_eq!(startup.heading, conditions.environment.heading);
+    assert_eq!(startup.wind, conditions.environment.wind);
+    assert_eq!(startup.turbulence, conditions.environment.turbulence);
+    assert_eq!(
+        startup.time_rate.to_bits(),
+        conditions.environment.time_rate.to_bits()
+    );
     assert_eq!(recording.keyframe_exactly_at(0).unwrap().state, initial);
     assert!(startup.approach.is_none() && startup.drop_height.is_none());
     std::fs::remove_dir_all(directory).unwrap();
@@ -498,18 +528,18 @@ fn format_valid_but_unrenderable_replays_are_rejected_before_setup() {
                 ..default()
             };
             let mut state = *simulation().0.state();
-            let mut conditions = flightsim_sim::replay::Conditions::default()
-                .with_aircraft(&startup.aircraft.configuration());
+            let mut conditions =
+                recording_conditions(&startup, &flightsim_render::TimeOfDay::default());
             if invalid_start_only {
-                conditions.start.altitude = Meters(magnitude);
+                conditions.environment.start.altitude = Meters(magnitude);
             } else {
                 state.position = flightsim_core::Ecef::new(magnitude, 0.0, 0.0);
             }
-            let recording = single_frame_recording(&state, conditions);
+            let recording = single_current_frame_recording(&state, conditions);
             let mut bytes = Vec::new();
             recording.write_to(&mut bytes).unwrap();
             // These remain valid persisted data. Only the renderer has the f32 limit.
-            let decoded = flightsim_sim::Recording::read_from(&mut &bytes[..]).unwrap();
+            let decoded = flightsim_sim::CurrentRecording::read_from(&mut &bytes[..]).unwrap();
             assert_eq!(decoded, recording);
             std::fs::write(&path, bytes).unwrap();
             let mut diagnostics = StartupDiagnostics::default();
@@ -525,4 +555,17 @@ fn format_valid_but_unrenderable_replays_are_rejected_before_setup() {
         }
     }
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+fn single_current_frame_recording(
+    state: &flightsim_fdm::RigidBodyState,
+    conditions: flightsim_sim::CurrentConditions,
+) -> flightsim_sim::CurrentRecording {
+    let mut recorder = flightsim_sim::CurrentRecorder::new(conditions);
+    recorder.record(
+        Seconds(1.0 / 120.0),
+        flightsim_fdm::ControlInputs::neutral(),
+        Some(state),
+    );
+    recorder.finish()
 }

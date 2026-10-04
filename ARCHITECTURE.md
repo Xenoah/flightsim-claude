@@ -136,8 +136,13 @@ pub struct Radians(pub f64);
   the current frame at once; reports and physical time count only executed steps,
   and the remaining terminal frame budget is discarded (ADR-0004).
 - Replay aircraft identity includes the FDM model revision as well as configuration.
-  v1/v2 byte compatibility does not promise old-physics reproduction; old identities
-  are rejected without changing their format, durations or stored fingerprint.
+  New app recordings use complete identity in v3. Old-physics identities remain
+  rejected; v1/v2 partial evidence requires explicit supported-baseline opt-in and
+  a persistent missing-yaw notice. No format, duration or stored identity is upgraded.
+  Modeled-weather v3 restores exact validated parameters and executed simulation
+  time before render preparation. Weather CLI and manual replay cloud overrides
+  are blocked before startup mutation. Live manual cloud overrides visibly disable recording/F9;
+  see [the replay policy](docs/replay-identity.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を
@@ -385,6 +390,20 @@ seed ごとに面積校正する。High/Ultra は同じ Earth-space 密度場と
 Light の位置近似は上位と異なるが、公称雲量・層高・視程は品質で変更しない。
 従来の手動雲量・楕円体基準の雲底/雲頂・視程指定を優先し、物理には戻さない。
 旧 v1 replay と気候無効時の雲量 0 も保つ。[操作と科学的限定](docs/cloud-quality.md)。
+
+Authored weather is opt-in through render `RenderWeather` (validated sim
+`WeatherSelection` plus executed `Seconds`). The host updates it before
+`RenderSet::Weather`; the renderer resolves an independent deck so legacy climate
+writes cannot overwrite authored settings. Ambient/fog/cloud extinction add;
+upper readiness suppresses only the duplicated cloud contribution. Negative
+authored layer heights remain valid without relaxing the legacy constructor.
+Fog is camera-local homogeneous extinction with smooth layer boundaries, not
+a visible distant bank. Rain/snow are one deterministic, bounded, lit opaque
+proxy mesh in a fixed departure frame; no flight dynamics change. Off/Light,
+High and Ultra cap it at 128/256/384 samples with inverse-cap area weighting.
+Legacy/no-precipitation creates no precipitation assets. See
+[modeled weather](docs/modeled-weather.md) for exact parameters, budgets,
+approximations and the separate app/native validation gates.
 
 CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
 `.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに

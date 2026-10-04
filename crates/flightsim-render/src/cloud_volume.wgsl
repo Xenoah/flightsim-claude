@@ -73,6 +73,19 @@ fn sample_density(relative: vec3<f32>, footprint: f32, near_detail: bool) -> f32
     // are intentionally an approximation; cover caching error<=0.5/255.
     let horizontal = mix(cloud_field_density(noise,cloud.intersections.w),field.y,smoothstep(0.0,1.0,lod));
     if horizontal<=0.0 { return 0.0; }
+    // Authored scenarios share this nominal field/profile across every tier.
+    // Quality changes ray resolution only; no meteorological fields are inferred.
+    if cloud.seed.y != 0u {
+        var vertical=cloud_field_vertical_profile(h,noise);
+        if cloud.seed.y == 1u {
+            let edge=min(100.0/cloud.layer.z,0.25);
+            vertical=smoothstep(0.0,edge,h)*(1.0-smoothstep(1.0-edge,1.0,h));
+        } else if cloud.seed.y == 3u {
+            let ceiling=0.8+0.18*noise;
+            vertical=smoothstep(0.01,0.07,h)*(1.0-smoothstep(ceiling-0.16,ceiling,h));
+        }
+        return horizontal*vertical;
+    }
     var shape_height=h;
     // Spatially stable 3D erosion only modulates occupied columns, preserving
     // the calibrated plan-view support of the common field. Remove unresolved

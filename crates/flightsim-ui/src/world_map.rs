@@ -37,7 +37,8 @@ const MAP_ROOT_GAP: f32 = 10.0;
 const MAP_HEADER_HEIGHT: f32 = 36.0;
 const MAP_FOOTER_HEIGHT: f32 = 16.0;
 const MAP_BODY_GAP: f32 = 16.0;
-const MAP_COLUMN_MAX_WIDTH: f32 = 900.0;
+// The 2:1 raster reserves 35 vertical pixels for the two-line weather choice.
+const MAP_COLUMN_MAX_WIDTH: f32 = 830.0;
 const MAP_COLUMN_GAP: f32 = 6.0;
 const SIDEBAR_WIDTH: f32 = 308.0;
 const SIDEBAR_PADDING: f32 = 14.0;
@@ -226,6 +227,8 @@ pub struct WorldMapState {
     pub navigation_enabled: bool,
     /// App can explain why a start is unavailable, for example during replay.
     pub navigation_note: String,
+    /// Pending new-flight weather; supplied by the app, never a live mutation.
+    pub weather_note: String,
     /// Full app-verified ASCII derivative/source credits, shown in a separate
     /// paginated modal rather than abbreviated in the navigation sidebar.
     pub source_credits: String,
@@ -250,6 +253,7 @@ impl Default for WorldMapState {
             selected_climate: "Climate sample pending".to_owned(),
             navigation_enabled: true,
             navigation_note: "New flight: safe airborne start above terrain".to_owned(),
+            weather_note: String::new(),
             source_credits: "Data credits are supplied by the application.".to_owned(),
             credits_visible: false,
             credits_page: 0,
@@ -261,6 +265,16 @@ impl Default for WorldMapState {
 }
 
 impl WorldMapState {
+    /// True only on the plain, editable new-flight map.
+    #[must_use]
+    pub fn new_flight_controls_active(&self) -> bool {
+        self.visible
+            && self.navigation_enabled
+            && !self.regions.visible
+            && !self.credits_visible
+            && self.coordinate_field.is_none()
+    }
+
     /// Open regional package selection without applying any flight changes.
     pub fn show_regions(&mut self) {
         self.visible = true;
@@ -359,13 +373,18 @@ impl WorldMapState {
     }
 }
 
-/// App consumes with `take()`. No unbounded event queue or implicit flight move.
+/// Bounded input results. App takes queued requests and reads frame ownership;
+/// there is no unbounded event queue or implicit flight move.
 #[derive(Resource, Debug, Clone, Default)]
 pub struct WorldMapActions {
     pub regions: RegionsActions,
     pub start_at: Option<WorldMapStart>,
     /// A preview notification only. Do not apply it to the current flight.
     pub month_changed: Option<u8>,
+    /// Current-frame input ownership, not a persistent UI capability. False on
+    /// child-modal close, coordinate commit, map toggle and focus-loss frames.
+    /// App shortcuts must also respect their own replay/LAN/recording policy.
+    pub new_flight_shortcuts_available: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -478,6 +497,7 @@ pub enum WorldMapText {
     Legend,
     CoordinateHint,
     Navigation,
+    Weather,
     Credits,
     CreditsPage,
 }
@@ -591,6 +611,7 @@ pub fn spawn_world_map(
                 map_column.spawn((Text::new("90 S      A  aircraft       +  selected       1-8  destinations"), TextFont { font_size: 13.0, ..default() }, TextColor(MUTED)));
                 spawn_map_text(map_column, WorldMapText::Legend, 13.0, TEXT);
                 spawn_map_text(map_column, WorldMapText::Status, 12.0, MUTED);
+                spawn_map_text(map_column, WorldMapText::Weather, 12.0, TEXT);
             });
             body.spawn((Node {
                 // Resolve height against the bounded body. An auto-height column
@@ -791,6 +812,8 @@ pub fn handle_world_map_input(
     buttons: Query<(&Interaction, &WorldMapButton), Changed<Interaction>>,
     canvases: Query<&RelativeCursorPosition, With<WorldMapCanvas>>,
 ) {
+    let began_on_plain_map = state.new_flight_controls_active();
+    actions.new_flight_shortcuts_available = false;
     // ButtonInput loses event order and duplicate presses. Keep modifier history
     // from the ordered message stream, including while the editor/map is hidden.
     // A whole-frame focus-loss discard also avoids stale Ctrl after Alt-Tab.
@@ -982,6 +1005,11 @@ pub fn handle_world_map_input(
     if coordinate_enter {
         return;
     }
+    // Closing a child modal or committing an editor does not transfer that
+    // frame's input to app-owned shortcuts. Opening and committing an editor
+    // in one ordered message batch is likewise owned by that editor.
+    actions.new_flight_shortcuts_available =
+        began_on_plain_map && state.new_flight_controls_active();
     if state.coordinate_field.is_none()
         && (keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter))
     {
@@ -1290,6 +1318,7 @@ pub fn format_world_map_text(
             }
         }
         WorldMapText::Navigation => bounded_ascii(&state.navigation_note, 42, 2),
+        WorldMapText::Weather => bounded_ascii(&state.weather_note, 72, 2),
         WorldMapText::Credits => {
             let pages = credit_pages(&state.source_credits);
             pages[state.credits_page.min(pages.len() - 1)].clone()
@@ -1937,6 +1966,7 @@ mod tests {
     fn navigation_disclosure_keeps_both_safe_altitude_and_unsaved_recording_warning() {
         let state = WorldMapState {
             navigation_note: "New flight: 1000 m AGL\nUnsaved recording will be reset".into(),
+            weather_note: "Weather: MONTHLY / LEGACY [F12]\nAuthored / monthly model, not live; applies on Start".into(),
             ..default()
         };
         let text =
@@ -2159,6 +2189,7 @@ mod tests {
             selected_terrain: vec!["T".repeat(DETAILS_COLUMNS); TERRAIN_DETAIL_LINES].join("\n"),
             selected_climate: vec!["C".repeat(DETAILS_COLUMNS); CLIMATE_DETAIL_LINES].join("\n"),
             navigation_note: "New flight: 1000 m AGL\nUnsaved recording will be reset".into(),
+            weather_note: "Weather: MONTHLY / LEGACY [F12]\nAuthored / monthly model, not live; applies on Start".into(),
             ..default()
         });
         let world = app.world_mut();

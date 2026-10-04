@@ -364,7 +364,7 @@ pub(super) fn configure(app: &mut App) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn update(
+pub(super) fn update(
     mut runtime: ResMut<RegionRuntime>,
     startup: Res<Startup>,
     playback: Option<Res<ReplayPlayback>>,
@@ -917,9 +917,54 @@ mod tests {
             world.resource::<TerrainTiles>().overlay_usage().registered,
             1
         );
+        use flightsim_sim::weather::{WeatherPreset, WeatherScenario, WeatherSelection};
+        let preset = WeatherPreset::Storm;
+        let seed = 0xfedc_ba98_7654_3210;
+        let mut startup = world.remove_resource::<Startup>().unwrap();
+        startup.weather.requested = Some(preset);
+        startup.weather.seed = seed;
+        weather_runtime::resolve_departure(&mut startup).unwrap();
+        let initial_weather = startup.weather.selection;
+        let initial_conditions =
+            recording_conditions(&startup, &world_runtime::startup_clock(&startup));
+        world.insert_resource(startup);
+        world.insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            initial_conditions.clone(),
+        )));
+        world.init_resource::<weather_runtime::PendingWeather>();
+        world
+            .resource_mut::<weather_runtime::PendingWeather>()
+            .requested = Some(preset);
         let before = *world.resource::<FlightSimulation>().0.state();
         list_select(&mut world);
         assert_eq!(*world.resource::<FlightSimulation>().0.state(), before);
+        assert_eq!(
+            world.resource::<Startup>().weather.selection,
+            initial_weather
+        );
+        assert_eq!(
+            world
+                .resource::<FlightRecorder>()
+                .0
+                .recording()
+                .conditions(),
+            &initial_conditions
+        );
+        world.resource_mut::<WorldMapActions>().regions.pending = Some(RegionAction::Cancel);
+        world.run_system_once(update).unwrap();
+        assert_eq!(*world.resource::<FlightSimulation>().0.state(), before);
+        assert_eq!(
+            world.resource::<Startup>().weather.selection,
+            initial_weather
+        );
+        assert_eq!(
+            world
+                .resource::<FlightRecorder>()
+                .0
+                .recording()
+                .conditions(),
+            &initial_conditions
+        );
         assert_eq!(
             world.resource::<WorldMapState>().regions.installed().len(),
             1
@@ -960,6 +1005,35 @@ mod tests {
         assert!(!world.resource::<Startup>().airport_enabled);
         assert!(!world.resource::<WorldMapState>().visible);
         assert!(!replay_allowed(world.resource::<Startup>()));
+        let package_reference = Geodetic::new(
+            start().position.latitude,
+            start().position.longitude,
+            Meters(350.0),
+        );
+        let package_weather = WeatherSelection::Modeled(
+            WeatherScenario::from_preset(preset, package_reference, seed).unwrap(),
+        );
+        assert_eq!(
+            world.resource::<Startup>().weather.selection,
+            package_weather
+        );
+        assert_eq!(
+            world
+                .resource::<FlightRecorder>()
+                .0
+                .recording()
+                .conditions()
+                .weather,
+            package_weather
+        );
+        // F9 follows the same package block even though the exact initial weather
+        // and complete aircraft identity remain available in CurrentRecorder.
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F9);
+        world.run_system_once(control_replay).unwrap();
+        world.resource_mut::<ButtonInput<KeyCode>>().reset_all();
         assert!(
             world
                 .resource::<FlightRecorder>()
@@ -991,14 +1065,60 @@ mod tests {
         // A later baseline choice is an explicit free flight; old airport geometry
         // and runway evaluation are never resurrected against a different source.
         world.resource_mut::<WorldMapState>().visible = true;
+        let package_state = *world.resource::<FlightSimulation>().0.state();
+        let package_conditions = world
+            .resource::<FlightRecorder>()
+            .0
+            .recording()
+            .conditions()
+            .clone();
         world.resource_mut::<WorldMapActions>().regions.pending = Some(RegionAction::Select(None));
         world.run_system_once(update).unwrap();
+        world.resource_mut::<WorldMapActions>().regions.pending = Some(RegionAction::Cancel);
+        world.run_system_once(update).unwrap();
+        assert_eq!(
+            *world.resource::<FlightSimulation>().0.state(),
+            package_state
+        );
+        assert_eq!(
+            world.resource::<Startup>().weather.selection,
+            package_weather
+        );
+        assert_eq!(
+            world
+                .resource::<FlightRecorder>()
+                .0
+                .recording()
+                .conditions(),
+            &package_conditions
+        );
+        assert!(!replay_allowed(world.resource::<Startup>()));
+        let mut baseline = world.resource::<Startup>().clone();
+        baseline.active_region = None;
+        baseline.start = start().position;
+        weather_runtime::resolve_departure(&mut baseline).unwrap();
+        let baseline_weather = baseline.weather.selection;
+        assert_ne!(baseline_weather, package_weather);
         world.resource_mut::<WorldMapActions>().start_at = Some(start());
         world_runtime::apply_world_map_start(&mut world);
         assert!(world.resource::<Startup>().active_region.is_none());
         assert!(!world.contains_resource::<ActiveRunway>());
         assert!(!world.resource::<Startup>().airport_enabled);
         assert!(replay_allowed(world.resource::<Startup>()));
+        assert_eq!(
+            world.resource::<Startup>().weather.selection,
+            baseline_weather
+        );
+        assert_eq!(world.resource::<Startup>().weather.requested, Some(preset));
+        assert_eq!(world.resource::<Startup>().weather.seed, seed);
+        world.run_system_once(advance_simulation).unwrap();
+        let recording = world.resource::<FlightRecorder>().0.recording();
+        assert!(!recording.frames().is_empty());
+        let mut bytes = Vec::new();
+        recording.write_to(&mut bytes).unwrap();
+        let decoded = flightsim_sim::ReplayFile::read_from(&mut bytes.as_slice()).unwrap();
+        assert_eq!(decoded.format_version(), 3);
+        assert_eq!(decoded.weather(), baseline_weather);
     }
     #[test]
     fn failed_or_cancelled_import_and_failed_inspection_keep_current_flight() {
@@ -1259,6 +1379,175 @@ mod tests {
                 .error
                 .contains("metadata changed")
         );
+    }
+
+    #[test]
+    fn app_owned_region_open_precedes_weather_shortcuts_in_combined_schedule() {
+        use bevy::input::keyboard::{KeyboardFocusLost, KeyboardInput};
+        use flightsim_sim::weather::{WeatherPreset, WeatherScenario, WeatherSelection};
+        use flightsim_ui::world_map::{self, WorldMapSystems};
+        for lan in [false, true] {
+            for catalog in [false, true] {
+                for weather_registered_first in [false, true] {
+                    let temp = TestDirectory::new();
+                    let mut startup = Startup {
+                        regions: Options {
+                            store: Some(temp.store()),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    startup.weather.requested = Some(WeatherPreset::Rain);
+                    startup.weather.seed = 54;
+                    startup.weather.selection = WeatherSelection::Modeled(
+                        WeatherScenario::from_preset(
+                            WeatherPreset::Rain,
+                            Geodetic::from_degrees(35.55, 139.78, 0.0),
+                            54,
+                        )
+                        .unwrap(),
+                    );
+                    if lan {
+                        startup.traffic.join = Some("127.0.0.1:5678".parse().unwrap());
+                    }
+                    if catalog {
+                        let path = temp.0.join("catalog.json");
+                        std::fs::write(&path, br#"{"schema_version":1,"regions":[]}"#).unwrap();
+                        startup.regions.catalog = Some(path);
+                    }
+                    let actual_weather = startup.weather.selection;
+                    let conditions =
+                        recording_conditions(&startup, &world_runtime::startup_clock(&startup));
+                    let mut app = crate::controls_runtime_tests::control_app("light-single");
+                    app.insert_resource(startup)
+                        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+                            conditions.clone(),
+                        )))
+                        .init_resource::<WorldMapState>()
+                        .init_resource::<WorldMapActions>()
+                        .init_resource::<ButtonInput<KeyCode>>()
+                        .init_resource::<ButtonInput<MouseButton>>()
+                        .add_message::<KeyboardInput>()
+                        .add_message::<KeyboardFocusLost>()
+                        .add_message::<bevy::window::FileDragAndDrop>()
+                        .add_systems(
+                            Update,
+                            world_map::handle_world_map_input.in_set(WorldMapSystems::Input),
+                        )
+                        .add_systems(
+                            Update,
+                            world_runtime::capture_map_input
+                                .after(WorldMapSystems::Input)
+                                .before(advance_simulation)
+                                .before(world_runtime::apply_world_map_start),
+                        )
+                        .add_systems(
+                            Update,
+                            world_runtime::apply_world_map_start.before(advance_simulation),
+                        );
+                    crate::controls_runtime_tests::tick(
+                        &mut app,
+                        std::time::Duration::from_millis(100),
+                        flightsim_input::PilotKeys::default(),
+                    );
+                    let mut original_recording = Vec::new();
+                    app.world()
+                        .resource::<FlightRecorder>()
+                        .0
+                        .recording()
+                        .write_to(&mut original_recording)
+                        .unwrap();
+                    assert!(
+                        !app.world()
+                            .resource::<FlightRecorder>()
+                            .0
+                            .recording()
+                            .frames()
+                            .is_empty()
+                    );
+                    if weather_registered_first {
+                        weather_runtime::configure(&mut app);
+                        configure(&mut app);
+                    } else {
+                        configure(&mut app);
+                        weather_runtime::configure(&mut app);
+                    }
+                    app.world_mut().resource_mut::<WorldMapState>().visible = true;
+                    if !catalog {
+                        // A drop is processed after ordinary UI input; skip the
+                        // independent first-open listing job to make it eligible.
+                        app.world_mut().resource_mut::<RegionRuntime>().initialized = true;
+                        app.world_mut()
+                            .write_message(bevy::window::FileDragAndDrop::DroppedFile {
+                                window: Entity::PLACEHOLDER,
+                                path_buf: temp.zip(),
+                            })
+                            .unwrap();
+                    }
+                    let before = *app.world().resource::<FlightSimulation>().0.state();
+                    app.world_mut()
+                        .resource_mut::<ButtonInput<KeyCode>>()
+                        .press(KeyCode::F12);
+                    app.update();
+                    assert!(app.world().resource::<WorldMapState>().regions.visible);
+                    assert_eq!(
+                        app.world()
+                            .resource::<weather_runtime::PendingWeather>()
+                            .requested,
+                        Some(WeatherPreset::Rain)
+                    );
+                    assert_eq!(
+                        app.world().resource::<Startup>().weather.selection,
+                        actual_weather
+                    );
+                    assert_eq!(
+                        *app.world().resource::<FlightSimulation>().0.state(),
+                        before
+                    );
+                    assert_eq!(
+                        app.world()
+                            .resource::<FlightRecorder>()
+                            .0
+                            .recording()
+                            .conditions(),
+                        &conditions
+                    );
+                    assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+                    assert!(app.world().resource::<Startup>().active_region.is_none());
+                    assert_eq!(
+                        app.world()
+                            .resource::<flightsim_render::RenderWeather>()
+                            .selection,
+                        actual_weather
+                    );
+                    let mut current_recording = Vec::new();
+                    app.world()
+                        .resource::<FlightRecorder>()
+                        .0
+                        .recording()
+                        .write_to(&mut current_recording)
+                        .unwrap();
+                    assert_eq!(current_recording, original_recording);
+                    if lan {
+                        assert!(
+                            app.world()
+                                .resource::<ButtonInput<KeyCode>>()
+                                .just_pressed(KeyCode::F12)
+                        );
+                    }
+                    await_worker(app.world_mut());
+                    assert_eq!(
+                        app.world().resource::<Startup>().weather.selection,
+                        actual_weather
+                    );
+                    assert_eq!(
+                        *app.world().resource::<FlightSimulation>().0.state(),
+                        before
+                    );
+                    assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+                }
+            }
+        }
     }
 
     fn credit_paging_app(temp: &TestDirectory) -> (App, Entity) {

@@ -33,7 +33,8 @@ SWIFT_LOG = ("INFO aircraft: Swift Sport (generic) (swift-sport)\n"
              + "INFO aircraft model fitted: 7.12 m along its length → scale 1.0000\n"
              + "INFO Screenshot saved to capture.png\nBatch capture complete: status 0\n")
 LEGACY_LOG = ("INFO aircraft: Light Single (generic) (light-single)\n"
-              "INFO Screenshot saved to capture.png\nBatch capture complete: status 0\n")
+              "INFO Screenshot saved to capture.png\nBatch capture complete: status 0\n"
+              + candidate.LEGACY_NOTICE + "\n")
 
 
 class CandidateAcceptanceTests(unittest.TestCase):
@@ -44,7 +45,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
 
     def test_build_and_test_share_supported_release_msvc_flags(self):
         commands = candidate.candidate_commands()
-        for name in ("build", "identity_test"):
+        for name in ("build", "identity_test", *candidate.REPLAY_ACCEPTANCE_TESTS):
             command = commands[name]
             self.assertEqual(command[:2], ["cargo", "+1.93.0"])
             self.assertIn("--release", command)
@@ -56,11 +57,21 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(metadata[metadata.index("--filter-platform") + 1], candidate.TARGET)
         self.assertEqual(metadata[metadata.index("--features") + 1], "flightsim-app/commercial-staging")
 
-    def test_all_frozen_legacy_sources_match_independent_baseline(self):
-        for relative, expected in candidate.LEGACY_SOURCE_HASHES.items():
+    def test_reviewed_sources_and_independent_goldens_match_exact_committed_bytes(self):
+        contract = candidate.load_replay_contract(ROOT)
+        for relative, expected in {**contract["source_sha256"], **candidate.INDEPENDENT_REPLAY_HASHES}.items():
             self.assertEqual(candidate.digest(ROOT / relative), expected, relative)
             blob = subprocess.check_output(["git", "show", "HEAD:" + relative], cwd=ROOT)
             self.assertEqual(candidate.hashlib.sha256(blob).hexdigest(), expected, relative)
+        self.assertEqual(candidate.LEGACY_SOURCE_HASHES["crates/flightsim-sim/src/replay.rs"],
+                         "0b783ceed247b984729021ae57c74b061936d627c04275a850e59079266a18c1")
+        self.assertNotEqual(contract["source_sha256"]["crates/flightsim-sim/src/replay.rs"],
+                            candidate.LEGACY_SOURCE_HASHES["crates/flightsim-sim/src/replay.rs"])
+
+    def test_independent_reference_encoders_keep_all_existing_bytes_and_yaw_ambiguity(self):
+        for script in ("replay_identity_reference.py", "replay_v3_reference.py"):
+            subprocess.run([candidate.sys.executable, str(ROOT / "docs/qa" / script)],
+                           cwd=self.root, check=True, capture_output=True)
 
     def test_extracted_and_staged_identity_require_literal_offline_false(self):
         info = {"profile": "commercial-staging", "region_downloads": False}
@@ -85,7 +96,8 @@ class CandidateAcceptanceTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(repo)], check=True)
         # Use the actual attributes: Rust is text=auto, profiles explicitly LF,
         # and verbatim license text explicitly bypasses all EOL conversion.
-        for relative in (*candidate.LEGACY_SOURCE_HASHES, ".gitattributes",
+        for relative in (*candidate.REPLAY_CONTRACT_PATHS, *candidate.INDEPENDENT_REPLAY_HASHES,
+                         candidate.REPLAY_CONTRACT_PATH, ".gitattributes",
                          "assets/aircraft/.gitattributes", "docs/release/.gitattributes"):
             target = repo / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +129,11 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_windows_native_checkout_failure_then_explicit_lf_preserves_raw_notices(self):
         repo, notice = self.source_fixture()
         notice_bytes = notice.read_bytes()
-        expected = candidate.git(repo, "rev-parse", "HEAD")
+        # Keep the contract LF in this fixture so the independent implementation
+        # byte check is reached; another test covers a CRLF contract itself.
+        with (repo / ".gitattributes").open("a", encoding="utf-8") as attributes:
+            attributes.write("\nscripts/replay-candidate-contract.json text eol=lf\n")
+        expected = self.commit_source_fixture(repo)
         self.checkout_source_fixture(repo, "crlf")
         aircraft = repo / "crates/flightsim-fdm/src/aircraft.rs"
         self.assertEqual(aircraft.read_bytes().count(b"\r\n"), 799)
@@ -125,24 +141,26 @@ class CandidateAcceptanceTests(unittest.TestCase):
                          candidate.LEGACY_SOURCE_HASHES["assets/aircraft/light_single.json"])
         self.assertEqual(notice.read_bytes(), notice_bytes)
         self.assertEqual(candidate.git(repo, "status", "--porcelain"), "")
-        with self.assertRaisesRegex(ValueError, "legacy checkout differs") as failure:
+        with self.assertRaisesRegex(ValueError, "reviewed replay checkout differs") as failure:
             candidate.source_inputs(repo, expected)
-        self.assertIn("expected_sha256=72091944", str(failure.exception))
-        self.assertIn("canonical_sha256=72091944", str(failure.exception))
-        self.assertIn("checkout_sha256=5fb95408", str(failure.exception))
+        relative = "crates/flightsim-app/src/aircraft_profile.rs"
+        pinned = candidate.load_replay_contract(repo)["source_sha256"][relative]
+        self.assertIn("expected_sha256=" + pinned, str(failure.exception))
+        self.assertIn("canonical_sha256=" + pinned, str(failure.exception))
+        self.assertIn("checkout_sha256=" + candidate.digest(repo / relative), str(failure.exception))
 
         self.checkout_source_fixture(repo, "lf")
         self.assertEqual(aircraft.read_bytes().count(b"\r\n"), 0)
         self.assertEqual(notice.read_bytes(), notice_bytes)
         evidence = candidate.source_inputs(repo, expected)
-        self.assertEqual(evidence["schema_version"], 2)
+        self.assertEqual(evidence["schema_version"], 3)
         self.assertEqual(evidence["canonical_git_object_format"], "sha1")
         record = next(r for r in evidence["files"] if r["path"] == "docs/release/licenses/upstream/NOTICE")
         self.assertEqual(record["checkout_sha256"], candidate.digest(notice))
         self.assertEqual(record["checkout_bytes"], len(notice_bytes))
         self.assertEqual(record["canonical_git_blob"], candidate.git(repo, "rev-parse", "HEAD:" + record["path"]))
-        for relative, pinned in candidate.LEGACY_SOURCE_HASHES.items():
-            identity = evidence["legacy_source_evidence"][relative]
+        for relative, pinned in candidate.load_replay_contract(repo)["source_sha256"].items():
+            identity = evidence["reviewed_replay_source_evidence"][relative]
             self.assertEqual(identity["canonical_sha256"], pinned)
             self.assertEqual(identity["checkout_sha256"], pinned)
             self.assertEqual(identity["canonical_bytes"], identity["checkout_bytes"])
@@ -155,11 +173,67 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertNotEqual(original, changed)
         path.write_bytes(changed)
         expected = self.commit_source_fixture(repo)
-        with self.assertRaisesRegex(ValueError, "legacy canonical baseline changed") as failure:
+        with self.assertRaisesRegex(ValueError, "reviewed replay canonical baseline changed") as failure:
             candidate.source_inputs(repo, expected)
         self.assertIn("expected_sha256=8cf101b6", str(failure.exception))
         self.assertIn("canonical_sha256=" + candidate.digest(path), str(failure.exception))
         self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+
+    def test_reviewed_contract_cannot_shrink_or_repin_unchanged_legacy_inputs(self):
+        repo, _ = self.source_fixture()
+        path = repo / candidate.REPLAY_CONTRACT_PATH
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for relative in candidate.REPLAY_CONTRACT_PATHS:
+            changed = json.loads(json.dumps(original))
+            del changed["source_sha256"][relative]
+            candidate.write_json(path, changed)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "boundary changed"):
+                candidate.load_replay_contract(repo)
+        changed = json.loads(json.dumps(original))
+        changed["source_sha256"]["assets/aircraft/light_single.json"] = "0" * 64
+        candidate.write_json(path, changed)
+        with self.assertRaisesRegex(ValueError, "frozen legacy input changed"):
+            candidate.load_replay_contract(repo)
+
+    def test_all_expanded_helpers_and_independent_goldens_fail_on_committed_drift(self):
+        repo, _ = self.source_fixture()
+        for relative in (*candidate.REPLAY_CONTRACT_PATHS, *candidate.INDEPENDENT_REPLAY_HASHES):
+            path = repo / relative
+            original = path.read_bytes()
+            path.write_bytes(original + b"\n")
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
+        repo, _ = self.source_fixture()
+        self.checkout_source_fixture(repo, "crlf")
+        self.assertEqual(candidate.git(repo, "status", "--porcelain"), "")
+        with self.assertRaisesRegex(ValueError, "contract checkout differs"):
+            candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+
+    def test_opt_in_and_full_limitation_are_required_only_for_positive_legacy_smoke(self):
+        command = candidate.legacy_capture_command("app.exe", "legacy.fsreplay", "legacy.png")
+        self.assertEqual(command.count("--legacy-replay-compatibility"), 1)
+        self.assertIn("--no-model", command)
+        candidate.validate_legacy_smoke(LEGACY_LOG, 0)
+        for text in (LEGACY_LOG.replace(candidate.LEGACY_NOTICE, ""),
+                     LEGACY_LOG.replace("not recorded or verified", "verified"),
+                     LEGACY_LOG.replace("historical yaw_rate_p", "identity")):
+            with self.assertRaisesRegex(ValueError, "full partial-identity limitation"):
+                candidate.validate_legacy_smoke(text, 0)
+        negative = "aircraft/FDM model mismatch: recorded legacy partial fingerprint 0505e6644bb29a53"
+        candidate.validate_legacy_rejection(negative, 2)
+        for log, code in ((negative, 0), (negative.replace("0505e6644bb29a53", "42"), 2),
+                          (negative.replace("legacy partial fingerprint", "fingerprint"), 2)):
+            with self.assertRaisesRegex(ValueError, "hexadecimal"):
+                candidate.validate_legacy_rejection(log, code)
+        text = (ROOT / "scripts/check-swift-windows-candidate.py").read_text(encoding="utf-8")
+        self.assertIn('run([app, "--replay", fixture]', text)
+        for name, test in candidate.REPLAY_ACCEPTANCE_TESTS.items():
+            self.assertEqual(candidate.candidate_commands()[name][-3:], [test, "--", "--exact"])
 
     def test_legacy_header_records_actual_u16_version_and_fixed_identity(self):
         path = self.root / "fixture.fsreplay"
@@ -330,6 +404,119 @@ class CandidateAcceptanceTests(unittest.TestCase):
         checks["default_swift"]["log_sha256"] = candidate.digest(evidence / "default-swift.log")
         self.evidence_report(evidence, checks)
         with self.assertRaisesRegex(ValueError, "runtime logged"):
+            candidate.validate_evidence(evidence)
+
+    def test_exported_legacy_success_requires_partial_notice_and_persistence_evidence(self):
+        evidence = self.root / "evidence"
+        evidence.mkdir()
+        log = evidence / "legacy-no-model.log"
+        log.write_text(LEGACY_LOG, encoding="utf-8")
+        proof = {"status": "passed", "exit_code": 0, "identity_evidence": "legacy_partial",
+                 "legacy_opt_in": True, "historical_yaw_verified": False,
+                 "notice": candidate.LEGACY_NOTICE, "fingerprint": candidate.LEGACY_FINGERPRINT,
+                 "log_sha256": candidate.digest(log)}
+        report = self.evidence_report(evidence, {"legacy_no_model": proof})
+        report["limits"] = [candidate.LEGACY_LIMIT]
+        report["replay_tests"] = {
+            name: {"status": "passed", "test": test} for name, test in candidate.REPLAY_ACCEPTANCE_TESTS.items()
+        }
+        self.seal_report(evidence, report)
+        candidate.validate_evidence(evidence)
+        for key, value in (("identity_evidence", "complete"), ("historical_yaw_verified", True),
+                           ("historical_yaw_verified", 0), ("legacy_opt_in", 1), ("notice", "partial")):
+            changed = json.loads(json.dumps(report))
+            changed["checks"]["legacy_no_model"][key] = value
+            self.seal_report(evidence, changed)
+            with self.subTest(key=key, value=value), self.assertRaisesRegex(ValueError, "cannot claim"):
+                candidate.validate_evidence(evidence)
+        for field in ("limits", "replay_tests"):
+            changed = json.loads(json.dumps(report))
+            del changed[field]
+            self.seal_report(evidence, changed)
+            with self.assertRaisesRegex(ValueError, "limitation|persistent notice"):
+                candidate.validate_evidence(evidence)
+        log.write_text(LEGACY_LOG.replace(candidate.LEGACY_NOTICE, ""), encoding="utf-8")
+        report["checks"]["legacy_no_model"]["log_sha256"] = candidate.digest(log)
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "full partial-identity limitation"):
+            candidate.validate_evidence(evidence)
+
+    def successful_evidence_fixture(self):
+        repo, _ = self.source_fixture()
+        source_sha = candidate.git(repo, "rev-parse", "HEAD")
+        source = candidate.source_inputs(repo, source_sha)
+        evidence = self.root / "evidence"
+        evidence.mkdir()
+        for name in candidate.REQUIRED_TEXT_EVIDENCE - {"acceptance.json"}:
+            (evidence / name).write_text("{}" if name.endswith(".json") else "fixture", encoding="utf-8")
+        candidate.write_json(evidence / "source-inputs.json", source)
+        (evidence / candidate.PNG_NAME).write_bytes(png_bytes())
+        (evidence / "default-swift.log").write_text(SWIFT_LOG, encoding="utf-8")
+        (evidence / "legacy-no-model.log").write_text(LEGACY_LOG, encoding="utf-8")
+        (evidence / "default-rejects-legacy.log").write_text(
+            "aircraft/FDM model mismatch: recorded legacy partial fingerprint 0505e6644bb29a53", encoding="utf-8")
+        checks = {
+            "default_swift": {"status": "passed", "exit_code": 0,
+                              "png": candidate.validate_png(evidence / candidate.PNG_NAME),
+                              "log_sha256": candidate.digest(evidence / "default-swift.log")},
+            "absent_light_single": {"status": "passed", "exit_code": 2},
+            "default_rejects_legacy": {"status": "passed", "exit_code": 2},
+            "legacy_no_model": {"status": "passed", "exit_code": 0, "identity_evidence": "legacy_partial",
+                                "legacy_opt_in": True, "historical_yaw_verified": False,
+                                "notice": candidate.LEGACY_NOTICE, "fingerprint": candidate.LEGACY_FINGERPRINT,
+                                "log_sha256": candidate.digest(evidence / "legacy-no-model.log")},
+        }
+        report = self.evidence_report(evidence, checks)
+        report.update(status="engineering_checks_passed", source_sha=source_sha,
+                      source_inputs_sha256=candidate.digest(evidence / "source-inputs.json"),
+                      replay_contract=candidate.REPLAY_CONTRACT_ID,
+                      replay_contract_sha256=source["replay_contract_sha256"],
+                      legacy_replay={"fingerprint": candidate.LEGACY_FINGERPRINT},
+                      distribution={"region_downloads": False}, limits=[candidate.LEGACY_LIMIT],
+                      replay_tests={name: {"status": "passed", "test": test}
+                                    for name, test in candidate.REPLAY_ACCEPTANCE_TESTS.items()})
+        self.seal_report(evidence, report)
+        return evidence, source, report
+
+    def test_success_requires_complete_consistent_source_and_contract_evidence(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        mutations = []
+        for field in source:
+            changed = json.loads(json.dumps(source))
+            del changed[field]
+            mutations.append((field, changed))
+        for path, value in (("source_sha", "0" * 40), ("replay_contract_sha256", "0" * 64),
+                            ("replay_contract_text", "{}"), ("files", []),
+                            ("reviewed_replay_source_evidence", {}), ("independent_replay_sha256", {})):
+            mutations.append((path, {**source, path: value}))
+        changed = json.loads(json.dumps(source))
+        changed["replay_contract"]["source_sha256"].pop("crates/flightsim-sim/src/replay/player.rs")
+        mutations.append(("removed helper", changed))
+        changed = json.loads(json.dumps(source))
+        changed["reviewed_replay_source_evidence"]["crates/flightsim-sim/src/replay.rs"]["checkout_bytes"] += 1
+        mutations.append(("inconsistent bytes", changed))
+        for name, changed in mutations:
+            candidate.write_json(evidence / "source-inputs.json", changed)
+            report["source_inputs_sha256"] = candidate.digest(evidence / "source-inputs.json")
+            self.seal_report(evidence, report)
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                candidate.validate_evidence(evidence)
+        candidate.write_json(evidence / "source-inputs.json", source)
+        report["source_inputs_sha256"] = candidate.digest(evidence / "source-inputs.json")
+        for field in ("source_sha", "source_inputs_sha256", "replay_contract", "replay_contract_sha256"):
+            changed = dict(report)
+            del changed[field]
+            self.seal_report(evidence, changed)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                candidate.validate_evidence(evidence)
+        # Regression: absent hashes on both sides must never pass as None == None.
+        source.pop("replay_contract_sha256")
+        candidate.write_json(evidence / "source-inputs.json", source)
+        report.pop("replay_contract_sha256")
+        report["source_inputs_sha256"] = candidate.digest(evidence / "source-inputs.json")
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "byte binding"):
             candidate.validate_evidence(evidence)
 
     def test_success_cannot_be_declared_by_an_incomplete_report(self):

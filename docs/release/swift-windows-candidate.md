@@ -43,9 +43,19 @@ candidate, even if counts happen to agree. The collector always retains
 authorization receipt. Final-manifest changes require recollection.
 
 Every tracked source input records its canonical Git blob identity and the
-SHA-256/size of its actual checked-out bytes separately. The five legacy
-identity pins are checked against raw Git blobs and then require byte-exact
-checkout equality; semantic changes and newline differences both fail. The
+SHA-256/size of its actual checked-out bytes separately. The versioned
+`scripts/replay-candidate-contract.json` freezes the reviewed implementation as
+whole-file SHA-256 values, including replay codecs/identity/player/weather,
+app acceptance/runtime/main/profile wiring, new-flight/weather/region helpers,
+the actual persistent UI/map ownership and the regression tests used by this
+recipe. The exact required path set is checked;
+missing/extra entries fail. All listed raw Git blobs and the contract file itself
+require byte-exact checkout equality; semantic changes and newline differences
+both fail. Independently authored Python reference encoders and every existing
+v1/v2/v3 golden fixture have separate unchanged pins in the checker. The original
+five historical hashes remain provenance under their original baseline commit;
+the obsolete monolithic replay hash is never relabeled as the migrated source.
+The unchanged Light profile and FDM source pins remain enforced directly. The
 workflow fixes process-local `core.autocrlf=false` **and** `core.eol=lf`, because
 `text=auto` can otherwise use native Windows CRLF even with automatic conversion
 disabled. Upstream notice paths marked `-text` retain their original bytes;
@@ -80,8 +90,9 @@ checkout containing the excluded developer model, to expose asset-search leaks:
 
 1. Two `--distribution-info` runs must be byte-identical and match staged
    Swift-only MSVC identity. Both the executable and staged metadata must report
-   the literal boolean `region_downloads: false`; the optional network feature
-   and its separate inventory are outside this unchanged offline recipe
+   the literal boolean `region_downloads: false`; missing, null, numeric and
+   network-enabled identities fail. The optional network feature and its separate
+   inventory are outside this unchanged offline recipe
 2. No aircraft argument, `--view chase --screenshot ... --screenshot-delay 5
    --exit-after-screenshot`, must exit 0, identify Swift Sport, load the model
    from the extracted adjacent assets, fit 7.12 m at scale 1.0000, and produce a
@@ -89,21 +100,56 @@ checkout containing the excluded developer model, to expose asset-search leaks:
 3. `--aircraft light-single` must exit 2 for the absent adjacent GLB, despite the
    developer model reachable through those poisoned environment variables
 4. The existing exact app fingerprint test runs with the candidate's same
-   release/MSVC/features. The same-head pure sim `record_takeoff` produces a
-   private legacy-v1 Light Single replay. Its observed fingerprint must be
-   `0505e6644bb29a53`; five unchanged profile/FDM/replay source hashes bind this
-   to public baseline `5c5b2a3057549c7429236b93aa0cdc99e2de38d1`. Updating those constants
-   needs a separate identity review; the fixture and consumer cannot silently
-   drift together
-5. Default Swift plus that replay must exit 2 for aircraft/FDM mismatch.
-   `--aircraft light-single --no-model --replay ...` must instead capture a valid
-   PNG, identify original Light Single without model loading, and exit 0
+   release/MSVC/features. Three additional exact app tests enforce legacy policy,
+   persistent notice through playback/pause/seek/completion/fault, and real-font
+   layout at the tested window widths. Each must actually execute one passing
+   test. The independently pinned Python reference encoders also run without
+   regenerating anything, before compilation. The same-head pure sim
+   `record_takeoff` still creates a private legacy-v1 Light replay with observed
+   partial fingerprint `0505e6644bb29a53`. The reviewed source contract binds that
+   producer and consumer; independent golden bytes and identity vectors prevent
+   both from silently moving to an unreviewed meaning
+5. Default Swift plus that replay must exit 2 for aircraft/FDM mismatch, naming
+   the actual `legacy partial fingerprint 0505e6644bb29a53` in hexadecimal. This
+   negative case has no compatibility flag.
+   `--aircraft light-single --no-model --legacy-replay-compatibility --replay ...`
+   must capture a valid PNG, identify Light Single without model loading, and
+   exit 0. Its log must include the full `LEGACY PARTIAL IDENTITY: historical
+   yaw_rate_p was not recorded or verified` notice. The report records explicit
+   opt-in, partial evidence, unverified historical yaw, and the persistence/layout
+   test outcomes; evidence validation rechecks that disclosure and the log
 
-The legacy screenshot and replay stay private. This is identity and replay
+The opt-in assumes the supported frozen complete Light baseline. It cannot prove
+which omitted yaw coefficient the historical recording used. No old file is
+rewritten, upgraded or treated as complete evidence. A startup warning and passing
+layout/system tests do not alone qualify persistent native on-screen readability;
+the actual integrated Windows run and inspection remain necessary.
+
+The legacy screenshot and replay stay private. This is partial-identity and replay
 startup acceptance, not a whole-flight bit-exact or cross-version guarantee.
 D3D12 uses WARP/fallback; physical Windows GPU, controller, audio, performance
 and store qualification remain separate. A human must inspect the actual Swift
 image before calling its appearance reviewed.
+
+## Reviewed source contract maintenance
+
+The contract's `reviewed_source` names the coherent source reviewed for its file
+pins. The qualification still binds its own exact clean HEAD, complete tree and
+all tracked input bytes before and after the run, including the checker/tests
+and contract. These are distinct guarantees: a run inventory identifies what ran;
+the frozen contract rejects implementation drift beyond the reviewed boundary.
+The historical commit need not exist in a shallow Windows checkout.
+
+When implementation changes, inspect the full delta from the recorded reviewed
+source, include any newly extracted helpers in the required path set, review the
+identity/codec/app/UI behavior and retained independent goldens, then update only
+the affected source pins and the reviewed-source pointer. Do not regenerate a
+fixture, rewrite the historical hashes, normalize source bytes, hash selected
+function fragments, or automatically refresh all pins to make a check green.
+Changing an independent anchor requires its own compatibility review. An approved
+pin migration is source acceptance, not Windows qualification; run this complete
+recipe on the exact integrated source again. See the
+[migration evidence](../qa/replay-candidate-contract-2026-10-04.md).
 
 ## CI trigger and evidence boundary
 

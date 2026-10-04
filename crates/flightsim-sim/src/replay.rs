@@ -14,8 +14,10 @@
 //!
 //! 決定論が保証するのは**同じビルド・同じ環境**での一致だけ。
 //!
-//! - Aircraft parameters or the FDM model revision can change the trajectory;
-//!   their combined fingerprint must match before replay.
+//! - Aircraft parameters or the FDM model revision can change the trajectory.
+//!   v1/v2 fingerprints omit `aero.yaw_rate_p`: a match is only legacy partial
+//!   compatibility. [`identity`] provides complete aircraft identity separately;
+//!   it does not change old bytes or supply missing evidence for old recordings.
 //! - **地形が違えば接地が変わる** → 地形は指紋を取れない（タイルは実行時に
 //!   ストリーミングされ、どれが読まれたかは軌跡に依存する）。代わりに
 //!   [`Keyframe`] を一定間隔で埋め込み、再生側が実際にずれたことを**検出**する
@@ -74,11 +76,29 @@ use glam::{DQuat, DVec3};
 
 use crate::simulation::Wind;
 
+mod current;
+pub mod identity;
+mod player;
+use player::PlaybackCursor;
+pub use player::ReplayFilePlayer;
+
+pub use current::{
+    CURRENT_FORMAT_VERSION, CurrentConditions, CurrentRecorder, CurrentRecording,
+    EnvironmentConditions, MAX_CONDITIONS_BYTES, MAX_WEATHER_BYTES, ReplayFile,
+};
+
+use identity::{AircraftCompatibility, RecordedAircraftIdentity};
+
 /// ファイル先頭の識別子。
 pub const MAGIC: [u8; 8] = *b"FSREPLAY";
 
-/// 形式版。**互換性を壊す変更のたびに上げること。**
-pub const FORMAT_VERSION: u16 = 2;
+/// Historical maximum used by the legacy [`Recording`] API. Kept at 2 for
+/// source compatibility; [`ReplayFile`] dispatches through [`CURRENT_FORMAT_VERSION`].
+pub const FORMAT_VERSION: u16 = WORLD_FORMAT_VERSION;
+
+/// Version 2, with the fixed world/climate extension. Never use the newest
+/// supported version as a test for whether this legacy extension is present.
+pub const WORLD_FORMAT_VERSION: u16 = 2;
 
 /// Original format. The writer retains its exact layout when world/climate
 /// settings are disabled; old recordings always restore ISA/legacy terrain.
@@ -161,7 +181,8 @@ pub struct Keyframe {
 pub struct Conditions {
     /// 機体名。人が読むためのもの。一致判定には使わない。
     pub aircraft_name: String,
-    /// Aircraft parameters and FDM model revision identity. A mismatch rejects playback.
+    /// Frozen v1/v2 partial fingerprint, including the FDM model revision but
+    /// omitting `aero.yaw_rate_p`. Never reinterpret this field as complete identity.
     pub aircraft_fingerprint: u64,
     /// 開始位置。
     pub start: Geodetic,
@@ -219,6 +240,15 @@ impl Conditions {
         self
     }
 
+    /// Describe the evidence actually stored by the unchanged v1/v2 formats.
+    /// A name or current configuration cannot fill in their omitted coefficient.
+    #[must_use]
+    pub const fn aircraft_identity(&self) -> RecordedAircraftIdentity {
+        RecordedAircraftIdentity::LegacyPartial {
+            fingerprint: self.aircraft_fingerprint,
+        }
+    }
+
     /// Populate replay-safe identities for this build's bundled world data.
     /// This must be called before recording the first physics frame.
     #[must_use]
@@ -245,8 +275,11 @@ impl Conditions {
 
 /// 機体諸元の指紋。
 ///
-/// Mix flight-affecting parameters and [`FDM_MODEL_REVISION`], never the display
-/// name. An unchanged aircraft configuration does not imply compatible physics.
+/// Frozen legacy algorithm: mixes most flight-affecting parameters and
+/// [`FDM_MODEL_REVISION`], never the display name. It omits `aero.yaw_rate_p`.
+/// A matching value is only [`AircraftCompatibility::LegacyPartialMatch`],
+/// never proof of complete aircraft identity. Use [`identity::AircraftIdentity`]
+/// for a new, complete identity contract; do not put it in the old u64 field.
 /// Pre-revision alpha.21 identities are rejected without changing v1/v2 file
 /// layouts, or rewriting old recordings as if they used the current model.
 ///
@@ -512,11 +545,7 @@ impl SeekPlan {
 #[derive(Debug, Clone)]
 pub struct Player {
     recording: Recording,
-    cursor: u32,
-    paused: bool,
-    speed: f64,
-    /// 未消化の再生時間。
-    budget: Seconds,
+    playback: PlaybackCursor,
 }
 
 impl Player {
@@ -532,10 +561,7 @@ impl Player {
     pub const fn new(recording: Recording) -> Self {
         Self {
             recording,
-            cursor: 0,
-            paused: false,
-            speed: 1.0,
-            budget: Seconds(0.0),
+            playback: PlaybackCursor::new(),
         }
     }
 
@@ -548,35 +574,32 @@ impl Player {
     /// 次に流すフレーム番号。
     #[must_use]
     pub const fn cursor(&self) -> u32 {
-        self.cursor
+        self.playback.cursor
     }
 
     /// 最後まで流し終えたか。
     #[must_use]
     pub fn is_finished(&self) -> bool {
-        self.cursor as usize >= self.recording.frames.len()
+        self.playback.cursor as usize >= self.recording.frames.len()
     }
 
     /// 一時停止しているか。
     #[must_use]
     pub const fn is_paused(&self) -> bool {
-        self.paused
+        self.playback.paused
     }
 
     /// 一時停止・再開。
     ///
     /// 一時停止中は時間を溜めない。**溜めると再開の瞬間に早送りになる。**
     pub const fn set_paused(&mut self, paused: bool) {
-        self.paused = paused;
-        if paused {
-            self.budget = Seconds(0.0);
-        }
+        self.playback.set_paused(paused);
     }
 
     /// 再生速度。
     #[must_use]
     pub const fn speed(&self) -> f64 {
-        self.speed
+        self.playback.speed
     }
 
     /// 再生速度を変える。[`MIN_SPEED`]〜[`MAX_SPEED`] に丸める。
@@ -584,24 +607,12 @@ impl Player {
     /// NaN は 1 倍に倒す。`f64::clamp` は NaN をそのまま返すので、
     /// 素直に書くと速度が NaN になって再生が止まる。
     pub const fn set_speed(&mut self, speed: f64) {
-        self.speed = if speed.is_nan() {
-            1.0
-        } else {
-            speed.clamp(MIN_SPEED, MAX_SPEED)
-        };
+        self.playback.set_speed(speed);
     }
 
     /// 描画フレームごとに 1 回呼び、進めてよい時間を足す。
     pub fn accumulate(&mut self, real_frame_time: Seconds) {
-        if self.paused || !real_frame_time.get().is_finite() || real_frame_time.get() <= 0.0 {
-            return;
-        }
-        let budget = self.budget.get() + real_frame_time.get() * self.speed;
-        // Finite operands can still overflow in either operation. Ignore that
-        // update, preserving the previous usable budget, just as for NaN input.
-        if budget.is_finite() {
-            self.budget = Seconds(budget);
-        }
+        self.playback.accumulate(real_frame_time);
     }
 
     /// 溜めた時間の範囲で次のフレームを 1 つ配る。無ければ `None`。
@@ -609,23 +620,12 @@ impl Player {
     /// 予算が尽きるまで繰り返し呼ぶ。**時間を足すのは
     /// [`Self::accumulate`] だけ**なので、何度呼んでも二重に進まない。
     pub fn next_due(&mut self) -> Option<Frame> {
-        if self.paused {
-            return None;
-        }
-        let frame = *self.recording.frames.get(self.cursor as usize)?;
-        if self.budget.get() < frame.frame_time.get() {
-            return None;
-        }
-        self.budget = Seconds(self.budget.get() - frame.frame_time.get());
-        self.cursor = self.cursor.saturating_add(1);
-        Some(frame)
+        self.playback.next_due(self.recording.frames())
     }
 
     /// 一時停止に関係なく次のフレームを 1 つ取り出す。シークの空回しに使う。
     pub fn step_once(&mut self) -> Option<Frame> {
-        let frame = *self.recording.frames.get(self.cursor as usize)?;
-        self.cursor = self.cursor.saturating_add(1);
-        Some(frame)
+        self.playback.step_once(self.recording.frames())
     }
 
     /// 指定フレームへ移る。
@@ -638,8 +638,7 @@ impl Player {
     pub fn seek(&mut self, frame: u32) -> Option<SeekPlan> {
         let target = frame.min(self.frame_count());
         let keyframe = self.recording.keyframe_at_or_before(target)?;
-        self.cursor = keyframe.frame;
-        self.budget = Seconds(0.0);
+        self.playback.seek(keyframe.frame);
         Some(SeekPlan {
             state: keyframe.state,
             replay_from: keyframe.frame,
@@ -776,57 +775,30 @@ impl Recording {
     // Recorder deliberately retains its infallible, permissive API. File
     // boundaries and reproducibility checks validate the resulting recording.
     fn validate(&self) -> Result<(), ReplayError> {
-        for (what, declared, maximum) in [
-            (
-                "bytes of aircraft name",
-                self.conditions.aircraft_name.len(),
-                MAX_NAME_BYTES as usize,
-            ),
-            ("frames", self.frames.len(), MAX_FRAMES as usize),
-            (
-                "keyframes",
-                self.keyframes.len(),
-                self.frames.len() / KEYFRAME_INTERVAL as usize + 1,
-            ),
-        ] {
-            if declared > maximum {
-                return Err(ReplayError::TooLarge {
-                    what,
-                    declared: u64::try_from(declared).unwrap_or(u64::MAX),
-                    maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
-                });
-            }
-        }
-        validate_conditions(&self.conditions)?;
-        let mut duration = 0.0;
-        for (index, frame) in (0_u32..).zip(&self.frames) {
-            validate_frame_values(&frame_values(frame), index)?;
-            duration = add_duration(duration, frame, index)?;
-        }
-        validate_visual_duration(&self.conditions, duration)?;
-        let mut previous = None;
-        for keyframe in &self.keyframes {
-            let frame = keyframe.frame;
-            if frame as usize >= self.frames.len().max(1)
-                || previous.is_some_and(|last| frame <= last)
-            {
-                return Err(ReplayError::InvalidKeyframe { frame });
-            }
-            validate_keyframe_state(&keyframe.state, frame)?;
-            previous = Some(frame);
-        }
-        Ok(())
+        validate_records(
+            &self.conditions.aircraft_name,
+            &EnvironmentConditions::from(&self.conditions),
+            &self.frames,
+            &self.keyframes,
+        )
     }
 
-    /// 再生しようとしている機体で、この記録が再現できるか調べる。
+    /// Validate existing recording values/world data and classify aircraft identity.
     ///
-    /// **名前ではなく指紋で見る。** 同じ名前で係数を書き換えた機体で再生すると
-    /// 別の軌跡になり、リプレイが嘘をつく。
+    /// All v1/v2 recordings can return only `LegacyPartialMatch` or `Mismatch`.
+    /// They never recorded `aero.yaw_rate_p`, so even a matching bundled name and
+    /// hash cannot establish that coefficient. This result is evidence, not a
+    /// playback policy: callers must explicitly decide whether to permit legacy
+    /// partial matches and communicate that uncertainty.
     ///
     /// # Errors
     ///
-    /// 記録の数値が不正なとき、または機体・全球地形・気候データの指紋が一致しないとき。
-    pub fn check_reproducible_with(&self, config: &AircraftConfig) -> Result<(), ReplayError> {
+    /// Invalid recorded values or mismatched bundled world/climate data.
+    /// An aircraft identity mismatch is returned as `Ok(Mismatch)`.
+    pub fn check_compatibility_with(
+        &self,
+        config: &AircraftConfig,
+    ) -> Result<AircraftCompatibility, ReplayError> {
         self.validate()?;
         if self.conditions.world_terrain
             && self.conditions.terrain_fingerprint != GLOBAL_TERRAIN_FINGERPRINT
@@ -842,10 +814,28 @@ impl Recording {
                 detail: "the bundled climate dataset differs from the recording".to_owned(),
             });
         }
-        let actual = aircraft_fingerprint(config);
-        if actual == self.conditions.aircraft_fingerprint {
-            return Ok(());
+        Ok(self.conditions.aircraft_identity().verify(config))
+    }
+
+    /// Historical v1/v2 playback gate retained for source compatibility.
+    ///
+    /// **`Ok(())` means only legacy partial compatibility**, not complete aircraft
+    /// identity or proven reproducibility. The legacy algorithm omits
+    /// `aero.yaw_rate_p`. Migrate callers to [`Self::check_compatibility_with`] and
+    /// an explicit legacy playback policy before presenting complete verification.
+    /// Names and small positional drift cannot recover the missing evidence.
+    ///
+    /// # Errors
+    ///
+    /// Invalid recorded values or mismatched aircraft/model/world/climate identity.
+    pub fn check_reproducible_with(&self, config: &AircraftConfig) -> Result<(), ReplayError> {
+        match self.check_compatibility_with(config)? {
+            AircraftCompatibility::CompleteMatch | AircraftCompatibility::LegacyPartialMatch => {
+                return Ok(());
+            }
+            AircraftCompatibility::Mismatch => {}
         }
+        let actual = aircraft_fingerprint(config);
         let recorded_name = &self.conditions.aircraft_name;
         Err(ReplayError::ConditionsMismatch {
             detail: format!(
@@ -862,14 +852,41 @@ impl Recording {
     /// 数値・個数・名前長・キーフレームが不正なとき、および書き込みに失敗したとき。
     /// データの検証は最初の書き込みより前に終える（I/O 自体は非 atomic）。
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ReplayError> {
-        self.validate()?;
-        writer.write_all(&MAGIC)?;
-        let extended = self.conditions.world_terrain || self.conditions.climate_date.is_some();
-        let version = if extended {
-            FORMAT_VERSION
+        let version = if self.conditions.world_terrain || self.conditions.climate_date.is_some() {
+            WORLD_FORMAT_VERSION
         } else {
             LEGACY_FORMAT_VERSION
         };
+        self.write_legacy_to(writer, version)
+    }
+
+    /// Write exactly format 1, retaining the frozen partial aircraft fingerprint.
+    ///
+    /// # Errors
+    /// Rejects invalid values and enabled world/climate data before writing.
+    pub fn write_v1_to<W: Write>(&self, writer: &mut W) -> Result<(), ReplayError> {
+        self.write_legacy_to(writer, LEGACY_FORMAT_VERSION)
+    }
+
+    /// Write exactly format 2, including its 32-byte world block even if disabled.
+    ///
+    /// # Errors
+    /// Rejects invalid values before writing; I/O can fail after a partial write.
+    pub fn write_v2_to<W: Write>(&self, writer: &mut W) -> Result<(), ReplayError> {
+        self.write_legacy_to(writer, WORLD_FORMAT_VERSION)
+    }
+
+    fn write_legacy_to<W: Write>(&self, writer: &mut W, version: u16) -> Result<(), ReplayError> {
+        self.validate()?;
+        require_valid(
+            version == WORLD_FORMAT_VERSION
+                || (!self.conditions.world_terrain && self.conditions.climate_date.is_none()),
+            "format 1 world/climate",
+            None,
+            "format 1 cannot represent enabled world or climate data",
+        )?;
+        let extended = version == WORLD_FORMAT_VERSION;
+        writer.write_all(&MAGIC)?;
         writer.write_all(&version.to_le_bytes())?;
 
         let name = self.conditions.aircraft_name.as_bytes();
@@ -904,42 +921,7 @@ impl Recording {
             writer.write_all(&self.conditions.climate_fingerprint.to_le_bytes())?;
         }
 
-        let frame_count = u32::try_from(self.frames.len()).unwrap_or(u32::MAX);
-        let keyframe_count = u32::try_from(self.keyframes.len()).unwrap_or(u32::MAX);
-        writer.write_all(&frame_count.to_le_bytes())?;
-        writer.write_all(&keyframe_count.to_le_bytes())?;
-
-        for frame in &self.frames {
-            let mut bytes = [0_u8; FRAME_BYTES];
-            for (slot, value) in bytes.chunks_exact_mut(8).zip(frame_values(frame)) {
-                slot.copy_from_slice(&value.to_le_bytes());
-            }
-            writer.write_all(&bytes)?;
-        }
-
-        for keyframe in &self.keyframes {
-            writer.write_all(&keyframe.frame.to_le_bytes())?;
-            let state = keyframe.state;
-            let position = state.position.0;
-            for value in [
-                position.x,
-                position.y,
-                position.z,
-                state.velocity.x,
-                state.velocity.y,
-                state.velocity.z,
-                state.orientation.x,
-                state.orientation.y,
-                state.orientation.z,
-                state.orientation.w,
-                state.angular_velocity.x,
-                state.angular_velocity.y,
-                state.angular_velocity.z,
-            ] {
-                write_f64(writer, value)?;
-            }
-        }
-        Ok(())
+        write_records(writer, &self.frames, &self.keyframes)
     }
 
     /// 読み込む。
@@ -958,7 +940,7 @@ impl Recording {
             return Err(ReplayError::NotAReplay { found: magic });
         }
         let version = read_u16(reader)?;
-        if !(LEGACY_FORMAT_VERSION..=FORMAT_VERSION).contains(&version) {
+        if !matches!(version, LEGACY_FORMAT_VERSION | WORLD_FORMAT_VERSION) {
             return Err(ReplayError::UnsupportedVersion {
                 found: version,
                 expected: FORMAT_VERSION,
@@ -990,7 +972,7 @@ impl Recording {
         let time_rate = read_f64(reader)?;
 
         let (world_terrain, terrain_fingerprint, climate_date, climate_fingerprint) =
-            if version == FORMAT_VERSION {
+            if version == WORLD_FORMAT_VERSION {
                 let flags = read_u64(reader)?;
                 let terrain_fingerprint = read_u64(reader)?;
                 let phase = read_f64(reader)?;
@@ -1054,89 +1036,8 @@ impl Recording {
         };
         validate_conditions(&conditions)?;
 
-        let frame_count = read_u32(reader)?;
-        if frame_count > MAX_FRAMES {
-            return Err(ReplayError::TooLarge {
-                what: "frames",
-                declared: u64::from(frame_count),
-                maximum: u64::from(MAX_FRAMES),
-            });
-        }
-        let keyframe_count = read_u32(reader)?;
-        // キーフレームは間隔ごとに 1 つ。上限はそこから決まる。
-        let keyframe_limit = frame_count / KEYFRAME_INTERVAL + 1;
-        if keyframe_count > keyframe_limit {
-            return Err(ReplayError::TooLarge {
-                what: "keyframes",
-                declared: u64::from(keyframe_count),
-                maximum: u64::from(keyframe_limit),
-            });
-        }
-
-        let mut frames = Vec::new();
-        frames
-            .try_reserve_exact(frame_count as usize)
-            .map_err(|_| ReplayError::OutOfMemory {
-                what: "frames",
-                count: frame_count as usize,
-            })?;
-        let mut bytes = [0_u8; FRAME_BYTES];
-        let mut duration = 0.0;
-        for index in 0..frame_count {
-            reader.read_exact(&mut bytes)?;
-            let mut values = [0.0_f64; 7];
-            for (value, chunk) in values.iter_mut().zip(bytes.chunks_exact(8)) {
-                let mut eight = [0_u8; 8];
-                eight.copy_from_slice(chunk);
-                *value = f64::from_le_bytes(eight);
-            }
-            // Reject before ControlInputs can silently sanitize corruption.
-            validate_frame_values(&values, index)?;
-            let frame = Frame {
-                frame_time: Seconds(values[0]),
-                controls: ControlInputs::new(values[1], values[2], values[3], values[4], values[5])
-                    .with_brakes(values[6]),
-            };
-            duration = add_duration(duration, &frame, index)?;
-            frames.push(frame);
-        }
-        validate_visual_duration(&conditions, duration)?;
-
-        let mut keyframes = Vec::new();
-        keyframes
-            .try_reserve_exact(keyframe_count as usize)
-            .map_err(|_| ReplayError::OutOfMemory {
-                what: "keyframes",
-                count: keyframe_count as usize,
-            })?;
-        let mut keyframe_bytes = [0_u8; KEYFRAME_BYTES];
-        let mut previous: Option<u32> = None;
-        for _ in 0..keyframe_count {
-            reader.read_exact(&mut keyframe_bytes)?;
-            let mut four = [0_u8; 4];
-            four.copy_from_slice(&keyframe_bytes[..4]);
-            let frame = u32::from_le_bytes(four);
-            // **範囲外や逆順を通すと `keyframe_at_or_before` の二分探索が
-            // 嘘を返す。** 読んだ時点で弾く。
-            if frame >= frame_count.max(1) || previous.is_some_and(|last| frame <= last) {
-                return Err(ReplayError::InvalidKeyframe { frame });
-            }
-            previous = Some(frame);
-            let mut values = [0.0_f64; 13];
-            for (value, chunk) in values.iter_mut().zip(keyframe_bytes[4..].chunks_exact(8)) {
-                let mut eight = [0_u8; 8];
-                eight.copy_from_slice(chunk);
-                *value = f64::from_le_bytes(eight);
-            }
-            let state = RigidBodyState {
-                position: flightsim_core::Ecef::new(values[0], values[1], values[2]),
-                velocity: DVec3::new(values[3], values[4], values[5]),
-                orientation: DQuat::from_xyzw(values[6], values[7], values[8], values[9]),
-                angular_velocity: DVec3::new(values[10], values[11], values[12]),
-            };
-            validate_keyframe_state(&state, frame)?;
-            keyframes.push(Keyframe { frame, state });
-        }
+        let (frames, keyframes) =
+            read_records(reader, conditions.start_epoch, conditions.time_rate)?;
 
         Ok(Self {
             conditions,
@@ -1166,6 +1067,10 @@ fn require_valid(
 }
 
 fn validate_conditions(conditions: &Conditions) -> Result<(), ReplayError> {
+    validate_environment(&EnvironmentConditions::from(conditions))
+}
+
+fn validate_environment(conditions: &EnvironmentConditions) -> Result<(), ReplayError> {
     require_valid(
         conditions.world_terrain == (conditions.terrain_fingerprint != 0),
         "terrain fingerprint",
@@ -1292,17 +1197,21 @@ fn add_duration(elapsed: f64, frame: &Frame, index: u32) -> Result<f64, ReplayEr
     Ok(total)
 }
 
-fn validate_visual_duration(conditions: &Conditions, duration: f64) -> Result<(), ReplayError> {
+fn validate_visual_time(
+    start_epoch: f64,
+    time_rate: f64,
+    duration: f64,
+) -> Result<(), ReplayError> {
     // Match the app's multiplication-before-division order. A finite epoch and
     // finite rate alone do not protect the derived visual clock from overflow.
-    let elapsed = duration * conditions.time_rate;
+    let elapsed = duration * time_rate;
     require_valid(
         elapsed.is_finite(),
         "visual duration",
         None,
         "duration multiplied by time rate must remain finite",
     )?;
-    let end = conditions.start_epoch + elapsed / 86_400.0;
+    let end = start_epoch + elapsed / 86_400.0;
     require_valid(
         end.is_finite() && end <= MAX_VISUAL_EPOCH,
         "visual end epoch",
@@ -1361,4 +1270,186 @@ fn read_u16<R: Read>(reader: &mut R) -> std::io::Result<u16> {
     let mut bytes = [0_u8; 2];
     reader.read_exact(&mut bytes)?;
     Ok(u16::from_le_bytes(bytes))
+}
+
+fn write_records<W: Write>(
+    writer: &mut W,
+    frames: &[Frame],
+    keyframes: &[Keyframe],
+) -> Result<(), ReplayError> {
+    let frame_count = u32::try_from(frames.len()).unwrap_or(u32::MAX);
+    let keyframe_count = u32::try_from(keyframes.len()).unwrap_or(u32::MAX);
+    writer.write_all(&frame_count.to_le_bytes())?;
+    writer.write_all(&keyframe_count.to_le_bytes())?;
+
+    for frame in frames {
+        let mut bytes = [0_u8; FRAME_BYTES];
+        for (slot, value) in bytes.chunks_exact_mut(8).zip(frame_values(frame)) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+        writer.write_all(&bytes)?;
+    }
+
+    for keyframe in keyframes {
+        writer.write_all(&keyframe.frame.to_le_bytes())?;
+        let state = keyframe.state;
+        let position = state.position.0;
+        for value in [
+            position.x,
+            position.y,
+            position.z,
+            state.velocity.x,
+            state.velocity.y,
+            state.velocity.z,
+            state.orientation.x,
+            state.orientation.y,
+            state.orientation.z,
+            state.orientation.w,
+            state.angular_velocity.x,
+            state.angular_velocity.y,
+            state.angular_velocity.z,
+        ] {
+            write_f64(writer, value)?;
+        }
+    }
+    Ok(())
+}
+
+fn read_records<R: Read>(
+    reader: &mut R,
+    start_epoch: f64,
+    time_rate: f64,
+) -> Result<(Vec<Frame>, Vec<Keyframe>), ReplayError> {
+    let frame_count = read_u32(reader)?;
+    if frame_count > MAX_FRAMES {
+        return Err(ReplayError::TooLarge {
+            what: "frames",
+            declared: u64::from(frame_count),
+            maximum: u64::from(MAX_FRAMES),
+        });
+    }
+    let keyframe_count = read_u32(reader)?;
+    // キーフレームは間隔ごとに 1 つ。上限はそこから決まる。
+    let keyframe_limit = frame_count / KEYFRAME_INTERVAL + 1;
+    if keyframe_count > keyframe_limit {
+        return Err(ReplayError::TooLarge {
+            what: "keyframes",
+            declared: u64::from(keyframe_count),
+            maximum: u64::from(keyframe_limit),
+        });
+    }
+
+    let mut frames = Vec::new();
+    frames
+        .try_reserve_exact(frame_count as usize)
+        .map_err(|_| ReplayError::OutOfMemory {
+            what: "frames",
+            count: frame_count as usize,
+        })?;
+    let mut bytes = [0_u8; FRAME_BYTES];
+    let mut duration = 0.0;
+    for index in 0..frame_count {
+        reader.read_exact(&mut bytes)?;
+        let mut values = [0.0_f64; 7];
+        for (value, chunk) in values.iter_mut().zip(bytes.chunks_exact(8)) {
+            let mut eight = [0_u8; 8];
+            eight.copy_from_slice(chunk);
+            *value = f64::from_le_bytes(eight);
+        }
+        // Reject before ControlInputs can silently sanitize corruption.
+        validate_frame_values(&values, index)?;
+        let frame = Frame {
+            frame_time: Seconds(values[0]),
+            controls: ControlInputs::new(values[1], values[2], values[3], values[4], values[5])
+                .with_brakes(values[6]),
+        };
+        duration = add_duration(duration, &frame, index)?;
+        frames.push(frame);
+    }
+    validate_visual_time(start_epoch, time_rate, duration)?;
+
+    let mut keyframes = Vec::new();
+    keyframes
+        .try_reserve_exact(keyframe_count as usize)
+        .map_err(|_| ReplayError::OutOfMemory {
+            what: "keyframes",
+            count: keyframe_count as usize,
+        })?;
+    let mut keyframe_bytes = [0_u8; KEYFRAME_BYTES];
+    let mut previous: Option<u32> = None;
+    for _ in 0..keyframe_count {
+        reader.read_exact(&mut keyframe_bytes)?;
+        let mut four = [0_u8; 4];
+        four.copy_from_slice(&keyframe_bytes[..4]);
+        let frame = u32::from_le_bytes(four);
+        // **範囲外や逆順を通すと `keyframe_at_or_before` の二分探索が
+        // 嘘を返す。** 読んだ時点で弾く。
+        if frame >= frame_count.max(1) || previous.is_some_and(|last| frame <= last) {
+            return Err(ReplayError::InvalidKeyframe { frame });
+        }
+        previous = Some(frame);
+        let mut values = [0.0_f64; 13];
+        for (value, chunk) in values.iter_mut().zip(keyframe_bytes[4..].chunks_exact(8)) {
+            let mut eight = [0_u8; 8];
+            eight.copy_from_slice(chunk);
+            *value = f64::from_le_bytes(eight);
+        }
+        let state = RigidBodyState {
+            position: flightsim_core::Ecef::new(values[0], values[1], values[2]),
+            velocity: DVec3::new(values[3], values[4], values[5]),
+            orientation: DQuat::from_xyzw(values[6], values[7], values[8], values[9]),
+            angular_velocity: DVec3::new(values[10], values[11], values[12]),
+        };
+        validate_keyframe_state(&state, frame)?;
+        keyframes.push(Keyframe { frame, state });
+    }
+
+    Ok((frames, keyframes))
+}
+
+fn validate_records(
+    name: &str,
+    environment: &EnvironmentConditions,
+    frames: &[Frame],
+    keyframes: &[Keyframe],
+) -> Result<(), ReplayError> {
+    for (what, declared, maximum) in [
+        (
+            "bytes of aircraft name",
+            name.len(),
+            MAX_NAME_BYTES as usize,
+        ),
+        ("frames", frames.len(), MAX_FRAMES as usize),
+        (
+            "keyframes",
+            keyframes.len(),
+            frames.len() / KEYFRAME_INTERVAL as usize + 1,
+        ),
+    ] {
+        if declared > maximum {
+            return Err(ReplayError::TooLarge {
+                what,
+                declared: u64::try_from(declared).unwrap_or(u64::MAX),
+                maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            });
+        }
+    }
+
+    validate_environment(environment)?;
+    let mut duration = 0.0;
+    for (index, frame) in (0_u32..).zip(frames) {
+        validate_frame_values(&frame_values(frame), index)?;
+        duration = add_duration(duration, frame, index)?;
+    }
+    validate_visual_time(environment.start_epoch, environment.time_rate, duration)?;
+    let mut previous = None;
+    for keyframe in keyframes {
+        let frame = keyframe.frame;
+        if frame as usize >= frames.len().max(1) || previous.is_some_and(|last| frame <= last) {
+            return Err(ReplayError::InvalidKeyframe { frame });
+        }
+        validate_keyframe_state(&keyframe.state, frame)?;
+        previous = Some(frame);
+    }
+    Ok(())
 }

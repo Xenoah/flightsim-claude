@@ -256,6 +256,12 @@ pub(super) fn data_attribution(startup: &Startup) -> DataAttribution {
     {
         sources.push(OSM_AIRPORT_ATTRIBUTION);
     }
+    if matches!(
+        startup.weather.selection,
+        flightsim_sim::weather::WeatherSelection::Modeled(_)
+    ) {
+        sources.push("Weather: authored model, not live");
+    }
     if startup.active_region.is_some() {
         sources.push("Region: recording/export unavailable; credits in M > Regions");
     }
@@ -276,6 +282,12 @@ pub(super) fn data_attribution_with_scenery(startup: &Startup, scenery: &str) ->
         && !scenery.contains("OpenStreetMap")
     {
         sources.push(OSM_AIRPORT_ATTRIBUTION);
+    }
+    if matches!(
+        startup.weather.selection,
+        flightsim_sim::weather::WeatherSelection::Modeled(_)
+    ) {
+        sources.push("Weather: authored model, not live");
     }
     if startup.active_region.is_some() {
         sources.push("Region: recording/export unavailable; credits in M > Regions");
@@ -408,7 +420,12 @@ pub(super) fn configure(app: &mut App) {
             Update,
             world_map::handle_world_map_input.in_set(WorldMapSystems::Input),
         )
-        .add_systems(Update, sync_world_map_camera.after(apply_world_map_start))
+        .add_systems(
+            Update,
+            sync_world_map_camera
+                .after(apply_world_map_start)
+                .before(RenderSet::Weather),
+        )
         .add_systems(
             Update,
             capture_map_input
@@ -588,6 +605,19 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         64 * 1024 * 1024,
         terrain_levels(&startup),
     );
+    if !startup.clouds_were_given
+        && startup.traffic.host.is_none()
+        && startup.traffic.join.is_none()
+        && let Some(pending) = world.get_resource::<super::weather_runtime::PendingWeather>()
+    {
+        startup.weather.requested = pending.requested;
+    }
+    if let Err(error) = super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain) {
+        if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
+            runtime.last_navigation_error = Some(error);
+        }
+        return;
+    }
     let state = airborne_state(&startup, &mut terrain, Meters(1000.0));
     if replay_runtime::validate_replay_state(&state).is_err() {
         return;
@@ -609,7 +639,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     simulation.set_turbulence(startup.turbulence);
     let mut clock = startup_clock(&startup);
     clock.rate = flightsim_render::TimeRate(startup.time_rate);
-    let recorder = flightsim_sim::Recorder::new(recording_conditions(&startup, &clock));
+    let recorder = flightsim_sim::CurrentRecorder::new(recording_conditions(&startup, &clock));
     let controls = initial_controls(&startup);
     let source = make_source(&startup);
     if let Some(mut traffic) = world.get_resource_mut::<traffic_runtime::TrafficRuntime>() {
@@ -761,7 +791,12 @@ fn sync_climate_clouds(
     mut layer: ResMut<CloudLayer>,
     mut elapsed: Local<f64>,
 ) {
-    if startup.clouds_were_given || !startup.world.climate_enabled {
+    if !matches!(
+        startup.weather.selection,
+        flightsim_sim::weather::WeatherSelection::Legacy
+    ) || startup.clouds_were_given
+        || !startup.world.climate_enabled
+    {
         return;
     }
     *elapsed += f64::from(time.delta_secs());
@@ -1392,12 +1427,82 @@ mod tests {
             let recorder = &world.resource::<FlightRecorder>().0;
             assert!(recorder.recording().frames().is_empty());
             assert_eq!(
-                recorder.recording().conditions().climate_date,
+                recorder.recording().conditions().environment.climate_date,
                 sim.climate()
             );
-            assert!(recorder.recording().conditions().world_terrain);
+            assert!(recorder.recording().conditions().environment.world_terrain);
             assert!(!world.resource::<WorldMapState>().visible);
             assert!(!world.resource::<flightsim_ui::Paused>().is_paused());
+        }
+    }
+
+    #[test]
+    fn new_flight_weather_commits_only_with_start_and_uses_actual_surface() {
+        use flightsim_sim::weather::{WeatherPreset, WeatherScenario, WeatherSelection};
+        let mut world = map_jump_world();
+        world.insert_resource(super::super::weather_runtime::PendingWeather::default());
+        for (preset, lat, lon) in [
+            (WeatherPreset::Clear, 0.0, -140.0),
+            (WeatherPreset::Cloud, 31.5, 35.5),
+            (WeatherPreset::Fog, 90.0, 180.0),
+            (WeatherPreset::Rain, -90.0, -180.0),
+            (WeatherPreset::Snow, 0.0, 180.0),
+            (WeatherPreset::Storm, 46.5, 8.0),
+        ] {
+            let before = world.resource::<Startup>().weather.selection;
+            world
+                .resource_mut::<super::super::weather_runtime::PendingWeather>()
+                .requested = Some(preset);
+            apply_world_map_start(&mut world); // Merely selecting cannot mutate a flight.
+            assert_eq!(world.resource::<Startup>().weather.selection, before);
+            world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                position: Geodetic::from_degrees(lat, lon, 0.0),
+                month: 7,
+            });
+            apply_world_map_start(&mut world);
+            let startup = world.resource::<Startup>();
+            // Resolve at the exact requested departure, before an ECEF state
+            // round-trip slightly changes the sampler's latitude/longitude.
+            let mut reference_terrain =
+                Terrain::new(make_source(startup), 1024 * 1024, terrain_levels(startup));
+            let reference = Geodetic::from_degrees(lat, lon, 0.0);
+            let ground = GroundSampler::default()
+                .sample(&mut reference_terrain, reference)
+                .elevation;
+            assert!(
+                (ground.get()
+                    - world
+                        .resource::<FlightSimulation>()
+                        .0
+                        .ground()
+                        .elevation
+                        .get())
+                .abs()
+                    < 1e-8
+            );
+            let expected = WeatherSelection::Modeled(
+                WeatherScenario::from_preset(
+                    preset,
+                    Geodetic::from_degrees(lat, lon, ground.get()),
+                    startup.weather.seed,
+                )
+                .unwrap(),
+            );
+            assert_eq!(startup.weather.selection, expected);
+            assert_eq!(
+                world
+                    .resource::<FlightRecorder>()
+                    .0
+                    .recording()
+                    .conditions()
+                    .weather,
+                expected
+            );
+            assert_eq!(
+                world.resource::<FlightSimulation>().0.elapsed(),
+                Seconds::ZERO
+            );
+            assert!(!world.resource::<WorldMapState>().visible);
         }
     }
 
@@ -1422,6 +1527,7 @@ mod tests {
                 .0
                 .recording()
                 .conditions()
+                .environment
                 .climate_date,
             old_date
         );

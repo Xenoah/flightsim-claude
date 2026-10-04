@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 use flightsim_core::{Ecef, RenderFrame, Seconds};
 use flightsim_fdm::{ControlInputs, RigidBodyState};
-use flightsim_sim::{Player, Recording, Simulation};
+use flightsim_sim::{ReplayFile, ReplayFilePlayer as Player, Simulation};
 use flightsim_world::TileSource;
 
 const FRAMES_PER_UPDATE: usize = 240;
@@ -53,7 +53,7 @@ pub(crate) struct ReplayPlayback {
 }
 
 impl ReplayPlayback {
-    pub fn new(recording: Recording) -> Self {
+    pub fn new(recording: ReplayFile) -> Self {
         Self {
             elapsed: Seconds(0.0),
             total: recording.duration(),
@@ -65,6 +65,11 @@ impl ReplayPlayback {
             fault: None,
             seek_target: None,
         }
+    }
+
+    pub fn identity_notice(&self) -> Option<&'static str> {
+        (self.player.recording().format_version() < 3)
+            .then_some(crate::replay_policy::LEGACY_NOTICE)
     }
 
     pub fn initial_state(&self) -> RigidBodyState {
@@ -219,7 +224,7 @@ mod tests {
     use super::*;
     use flightsim_core::{Attitude, Geodetic, Ned, Radians};
     use flightsim_fdm::{AircraftConfig, Turbulence};
-    use flightsim_sim::{GroundSampler, Recorder, replay::Conditions};
+    use flightsim_sim::{GroundSampler, Recorder, Recording, replay::Conditions};
     use flightsim_world::{MemoryTileSource, Terrain};
 
     fn simulation(state: RigidBodyState) -> Simulation<MemoryTileSource> {
@@ -263,7 +268,7 @@ mod tests {
         for bad in [f64::NAN, f64::INFINITY, -1.0] {
             let mut recorder = Recorder::new(Conditions::default());
             recorder.record(Seconds(bad), ControlInputs::neutral(), Some(&initial));
-            let mut replay = ReplayPlayback::new(recorder.finish());
+            let mut replay = ReplayPlayback::new(ReplayFile::V1(recorder.finish()));
             let mut sim = simulation(initial);
             assert!(replay.tick(&mut sim, Seconds(1.0)));
             assert!(replay.fault.is_some());
@@ -277,7 +282,7 @@ mod tests {
         let (recording, _) = record();
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
             for invalid_elapsed in [false, true] {
-                let mut replay = ReplayPlayback::new(recording.clone());
+                let mut replay = ReplayPlayback::new(ReplayFile::V1(recording.clone()));
                 let mut sim = simulation(replay.initial_state());
                 if invalid_elapsed {
                     replay.elapsed = Seconds(value);
@@ -303,7 +308,7 @@ mod tests {
         states[4].orientation = bevy::math::DQuat::from_xyzw(0.0, 0.0, 0.0, 2.0);
         states[5].orientation = bevy::math::DQuat::from_xyzw(0.0, 0.0, 0.0, f64::MAX);
         for state in states {
-            let mut replay = ReplayPlayback::new(recording.clone());
+            let mut replay = ReplayPlayback::new(ReplayFile::V1(recording.clone()));
             let mut sim = simulation(state);
             assert!(replay.tick(&mut sim, Seconds(0.0)));
             assert_eq!(replay.player.cursor(), 0);
@@ -319,7 +324,7 @@ mod tests {
             state.position = Ecef::new(magnitude, 0.0, 0.0);
             assert!(state.is_finite() && state.position.0.length_squared().is_finite());
             let mut sim = simulation(state);
-            let mut replay = ReplayPlayback::new(recording.clone());
+            let mut replay = ReplayPlayback::new(ReplayFile::V1(recording.clone()));
             assert!(replay.tick(&mut sim, Seconds::ZERO));
             assert_eq!(replay.player.cursor(), 0);
             assert!(replay.fault.as_ref().unwrap().contains("invalid state"));
@@ -352,7 +357,7 @@ mod tests {
         assert!(validate_replay_state(&state).is_ok());
         let mut recorder = Recorder::new(Conditions::default());
         recorder.record(Seconds(1.0 / 120.0), ControlInputs::neutral(), Some(&state));
-        let mut replay = ReplayPlayback::new(recorder.finish());
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recorder.finish()));
         let mut sim = simulation(state);
         assert!(replay.tick(&mut sim, Seconds(1.0)));
         assert_eq!(replay.player.cursor(), 1);
@@ -372,7 +377,7 @@ mod tests {
             ControlInputs::neutral(),
             Some(&corrupt_keyframe),
         );
-        let mut replay = ReplayPlayback::new(recorder.finish());
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recorder.finish()));
         let mut sim = simulation(initial);
         assert!(replay.tick(&mut sim, Seconds(1.0)));
         assert_eq!(replay.player.cursor(), 0);
@@ -386,7 +391,7 @@ mod tests {
         let initial = recording.keyframe_exactly_at(0).unwrap().state;
         let mut recorder = Recorder::new(Conditions::default());
         recorder.record(Seconds(f64::MAX), ControlInputs::neutral(), Some(&initial));
-        let mut replay = ReplayPlayback::new(recorder.finish());
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recorder.finish()));
         replay.elapsed = Seconds(f64::MAX);
         let mut sim = simulation(initial);
         assert!(replay.tick(&mut sim, Seconds(1.0)));
@@ -402,7 +407,7 @@ mod tests {
         for _ in 0..1_000 {
             recorder.record(Seconds::ZERO, ControlInputs::neutral(), Some(&initial));
         }
-        let mut replay = ReplayPlayback::new(recorder.finish());
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recorder.finish()));
         let mut sim = simulation(initial);
         assert!(!replay.tick(&mut sim, Seconds::ZERO));
         assert_eq!(replay.player.cursor(), 240);
@@ -420,7 +425,7 @@ mod tests {
     #[test]
     fn audio_mutes_all_nonplaying_replay_states() {
         let (recording, _) = record();
-        let mut replay = ReplayPlayback::new(recording);
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recording));
         assert!(!replay.audio_paused());
         replay.player.set_paused(true);
         assert!(replay.audio_paused());
@@ -438,7 +443,7 @@ mod tests {
     #[test]
     fn airborne_initial_state_and_variable_time_replay_match_exactly() {
         let (recording, flown) = record();
-        let mut replay = ReplayPlayback::new(recording);
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recording));
         assert!(replay.initial_state().altitude().get() > 1900.0);
         let mut sim = simulation(replay.initial_state());
         while !replay.player.is_finished() {
@@ -455,7 +460,7 @@ mod tests {
         for frame in recording.frames().iter().take(517) {
             reference.advance(frame.frame_time, frame.controls);
         }
-        let mut replay = ReplayPlayback::new(recording);
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recording));
         let mut sim = simulation(initial);
         while !replay.player.is_finished() {
             replay.tick(&mut sim, Seconds(1.0));
@@ -481,7 +486,7 @@ mod tests {
     #[test]
     fn mismatch_stops_and_is_reported_before_wrong_inputs_advance() {
         let (recording, _) = record();
-        let mut replay = ReplayPlayback::new(recording);
+        let mut replay = ReplayPlayback::new(ReplayFile::V1(recording));
         let mut state = replay.initial_state();
         state.position.0.x += 100.0;
         let mut sim = simulation(state);

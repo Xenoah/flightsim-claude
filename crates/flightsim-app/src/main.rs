@@ -69,13 +69,17 @@ mod distribution;
 mod graphics_runtime;
 mod region_runtime;
 mod render_metrics;
+mod replay_policy;
 mod replay_runtime;
 mod scenery_runtime;
 mod screen_capture;
 mod water_runtime;
+mod weather_runtime;
 use replay_runtime::ReplayPlayback;
 #[cfg(test)]
 mod controls_runtime_tests;
+#[cfg(test)]
+mod replay_migration_tests;
 #[cfg(test)]
 mod runtime_tests;
 mod traffic_runtime;
@@ -196,13 +200,13 @@ enum StartCondition {
     InFlight(flightsim_fdm::RigidBodyState),
 }
 
-/// 飛行の記録。**常に回している。**
+/// 飛行の記録。記録可能な条件では固定ステップごとに保存する。
 ///
 /// 「今のを保存したい」と思うのは飛んだ**後**なので、押してから
 /// 記録を始める作りでは間に合わない。1 フレーム 56 バイトなので、
-/// 上限（約 4.6 時間）まで溜めても数十 MB。
+/// 上限 1,000,000 ステップ（120 Hz で約 2 時間 19 分）は変えない。
 #[derive(Resource)]
-struct FlightRecorder(flightsim_sim::Recorder);
+struct FlightRecorder(flightsim_sim::CurrentRecorder);
 
 /// 実行時に差し替えられる地形供給元。
 type BoxedSource = Box<dyn TileSource + Send + Sync>;
@@ -257,6 +261,7 @@ struct StartupDiagnostics(Vec<String>);
 struct Startup {
     world: world_runtime::WorldOptions,
     clouds_were_given: bool,
+    weather: weather_runtime::Options,
     traffic: traffic_runtime::Options,
     traffic_error: Option<String>,
     aircraft: aircraft_profile::AircraftProfile,
@@ -336,6 +341,8 @@ struct Startup {
     difficulty: Difficulty,
     /// `--replay <FILE>` で再生する記録。指定があれば操縦を受け付けない。
     replay: Option<PathBuf>,
+    /// Explicit assumption for supported v1/v2 partial-identity recordings.
+    legacy_replay_compatibility: bool,
     /// どの動力の音を鳴らすか。**音だけ。飛び方は変わらない。**
     engine_sound: flightsim_audio::EngineKind,
     /// `--wind` が明示されたか。**難易度の既定で上書きしないため。**
@@ -381,6 +388,7 @@ impl Default for Startup {
         Self {
             world: world_runtime::WorldOptions::default(),
             clouds_were_given: false,
+            weather: weather_runtime::Options::default(),
             traffic: traffic_runtime::Options::default(),
             traffic_error: None,
             aircraft,
@@ -429,6 +437,7 @@ impl Default for Startup {
             turbulence: flightsim_fdm::Turbulence::CALM,
             difficulty: Difficulty::default(),
             replay: None,
+            legacy_replay_compatibility: false,
             engine_sound,
             wind_was_given: false,
             turbulence_was_given: false,
@@ -509,6 +518,10 @@ fn main() -> bevy::app::AppExit {
         return bevy::app::AppExit::Success;
     }
     let (mut startup, mut diagnostics) = parse_arguments();
+    if let Some(error) = startup.weather.error.as_ref() {
+        eprintln!("invalid weather options: {error}");
+        return bevy::app::AppExit::error();
+    }
     if let Some(error) = startup.regions.error.as_ref() {
         eprintln!("invalid region options: {error}");
         return bevy::app::AppExit::error();
@@ -608,9 +621,9 @@ fn main() -> bevy::app::AppExit {
         // 再生では記録された暦上の一点へ合わせる。**時分だけ合わせても
         // 日付がずれれば太陽高度が変わり、昼夜も影の向きも別物になる。**
         if let Some(recording) = recording.as_ref()
-            && recording.conditions().start_epoch > 0.0
+            && recording.environment().start_epoch > 0.0
         {
-            clock.utc = flightsim_render::JulianDate(recording.conditions().start_epoch);
+            clock.utc = flightsim_render::JulianDate(recording.environment().start_epoch);
         }
         clock
     };
@@ -618,7 +631,7 @@ fn main() -> bevy::app::AppExit {
         && replay_visual_epoch(
             clock.utc,
             recording.duration(),
-            recording.conditions().time_rate,
+            recording.environment().time_rate,
         )
         .is_none()
     {
@@ -643,6 +656,12 @@ fn main() -> bevy::app::AppExit {
             return bevy::app::AppExit::error();
         }
     };
+    if recording.is_none()
+        && let Err(error) = weather_runtime::resolve_departure(&mut startup)
+    {
+        eprintln!("{error}");
+        return bevy::app::AppExit::error();
+    }
     let clouds = startup.clouds;
     let engine_sound = startup.engine_sound;
     let conditions = recording_conditions(&startup, &clock);
@@ -733,7 +752,9 @@ fn main() -> bevy::app::AppExit {
             visible: input_diagnostics_visible,
             ..default()
         })
-        .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            conditions,
+        )))
         .insert_resource(flightsim_audio::AudioSettings {
             engine: engine_sound,
             ..flightsim_audio::AudioSettings::default()
@@ -812,6 +833,7 @@ fn main() -> bevy::app::AppExit {
     water_runtime::configure(&mut app);
     graphics_runtime::configure(&mut app);
     cloud_runtime::configure(&mut app);
+    weather_runtime::configure(&mut app);
     distance_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
@@ -846,6 +868,8 @@ fn application_help() -> &'static str {
 --tiles DIR --start LAT,LON --max-level N        Local DEM over global baseline\n\
 --import-region FILE.zip                       Install prepared local package, then exit\n\
 --list-regions [--region-store DIR]              List installed local versions, then exit\n\
+--weather legacy|clear|cloud|fog|rain|snow|storm   New-flight authored visual weather\n\
+--weather-seed U64                              Deterministic modeled weather seed (default 0)\n\
 --region ID@VERSION [--region-store DIR]          Select pending region on map; Start applies\n\
 --region-catalog FILE.json                     Opt-in downloads catalog (region-downloads feature)\n\
 --region-cache DIR [--region-offline]           Catalog cache override / verified-cache-only mode\n\
@@ -867,7 +891,8 @@ fn application_help() -> &'static str {
 --cloud-cover 0..1 --cloud-base M --cloud-top M --cloud-visibility M\n\
 --engine turbine|piston                        Sound override\n\
 --model ASSET.glb --model-forward AXIS --model-up AXIS | --no-model\n\
---replay FILE.fsreplay                          Replay selected aircraft\n\
+--replay FILE.fsreplay                          Replay selected aircraft (complete v3 identity)\n\
+--legacy-replay-compatibility                   Assume supported v1/v2 baseline; yaw_rate_p unknown\n\
 --input-config FILE.json --input-diagnostics    Load mappings/show values\n\
 --native-controllers                           Opt-in native HOTAS channels\n\
 --write-input-config FILE.json                  Save editable config, then exit\n\
@@ -879,7 +904,7 @@ fn application_help() -> &'static str {
 --screenshot-delay SECONDS                     Finite delay in 0..600\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
 [ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
-F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN."
+F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN (offline map: next pending weather)."
 }
 
 /// Recorded location must drive airport lookup, while airport selection must not
@@ -888,7 +913,7 @@ F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clou
 fn resolve_flight_sources(
     startup: &mut Startup,
     diagnostics: &mut StartupDiagnostics,
-) -> Option<flightsim_sim::Recording> {
+) -> Option<flightsim_sim::ReplayFile> {
     let requested = startup.replay.is_some();
     let recording = resolve_replay(startup, diagnostics);
     if requested && recording.is_none() {
@@ -901,6 +926,11 @@ fn resolve_flight_sources(
     resolve_airport_database(startup, diagnostics);
     if recording.is_none() {
         apply_difficulty(startup);
+        if startup.clouds_were_given {
+            diagnostics
+                .0
+                .push(replay_policy::MANUAL_CLOUD_DIAGNOSTIC.into());
+        }
     }
     recording
 }
@@ -912,8 +942,17 @@ fn resolve_flight_sources(
 fn resolve_replay(
     startup: &mut Startup,
     diagnostics: &mut StartupDiagnostics,
-) -> Option<flightsim_sim::Recording> {
+) -> Option<flightsim_sim::ReplayFile> {
     let path = startup.replay.clone()?;
+    if startup.weather.was_given
+        || startup.weather.seed_was_given
+        || startup.weather.error.is_some()
+    {
+        diagnostics.0.push(
+            "recorded replay weather is authoritative; remove --weather/--weather-seed".into(),
+        );
+        return None;
+    }
     if !region_runtime::replay_allowed(startup) || startup.regions.select.is_some() {
         diagnostics.0.push(region_runtime::REPLAY_NOTICE.into());
         return None;
@@ -928,7 +967,7 @@ fn resolve_replay(
             return None;
         }
     };
-    let recording = match flightsim_sim::Recording::read_from(&mut std::io::BufReader::new(file)) {
+    let recording = match flightsim_sim::ReplayFile::read_from(&mut std::io::BufReader::new(file)) {
         Ok(recording) => recording,
         Err(error) => {
             diagnostics
@@ -940,12 +979,21 @@ fn resolve_replay(
     };
 
     // 記録した機体で再生できるか。**違う機体なら別の軌跡になる。**
-    if let Err(error) = recording.check_reproducible_with(&startup.aircraft.configuration()) {
-        diagnostics
-            .0
-            .push(format!("`{}` cannot be replayed: {error}", path.display()));
-        startup.replay = None;
-        return None;
+    match replay_policy::validate_playback(
+        &recording,
+        &startup.aircraft.configuration(),
+        startup.legacy_replay_compatibility,
+        startup.clouds_were_given,
+    ) {
+        Ok(Some(notice)) => diagnostics.0.push(notice.into()),
+        Ok(None) => {}
+        Err(error) => {
+            diagnostics
+                .0
+                .push(format!("`{}` cannot be replayed: {error}", path.display()));
+            startup.replay = None;
+            return None;
+        }
     }
 
     let Some(initial) = recording.keyframe_exactly_at(0) else {
@@ -957,7 +1005,7 @@ fn resolve_replay(
         return None;
     };
     if let Err(error) = replay_runtime::validate_replay_state(&initial.state).and_then(|()| {
-        replay_runtime::validate_replay_position(recording.conditions().start.to_ecef())
+        replay_runtime::validate_replay_position(recording.environment().start.to_ecef())
     }) {
         diagnostics.0.push(format!(
             "`{}` cannot be rendered as a replay: {error}",
@@ -968,7 +1016,8 @@ fn resolve_replay(
     }
 
     // 条件を写す。ここを飛ばすと、同じ入力を流しても別の飛行になる。
-    let conditions = recording.conditions();
+    let conditions = recording.environment();
+    startup.weather.selection = recording.weather();
     startup.start = conditions.start;
     startup.heading = conditions.heading;
     startup.wind = conditions.wind;
@@ -991,8 +1040,8 @@ fn resolve_replay(
 fn recording_conditions(
     startup: &Startup,
     clock: &flightsim_render::TimeOfDay,
-) -> flightsim_sim::replay::Conditions {
-    flightsim_sim::replay::Conditions {
+) -> flightsim_sim::CurrentConditions {
+    let environment = flightsim_sim::EnvironmentConditions {
         start: startup.start,
         heading: startup.heading,
         wind: startup.wind,
@@ -1011,9 +1060,13 @@ fn recording_conditions(
         } else {
             0
         },
-        ..flightsim_sim::replay::Conditions::default()
-    }
-    .with_aircraft(&startup.aircraft.configuration())
+    };
+    let mut conditions = flightsim_sim::CurrentConditions::for_aircraft(
+        &startup.aircraft.configuration(),
+        environment,
+    );
+    conditions.weather = startup.weather.selection;
+    conditions
 }
 
 /// Reserve a replay name atomically. An existence check followed by File::create
@@ -1094,6 +1147,10 @@ fn parse_arguments_from(
             startup.clouds_were_given = true;
         }
         match flag.as_str() {
+            "--weather" | "--weather-seed" => {
+                let value = next_argument_value(&mut arguments);
+                startup.weather.parse_flag(&flag, value.as_deref());
+            },
             "--import-region" | "--region" | "--region-store" | "--region-catalog" | "--region-cache" => {
                 if let Some(value) = next_argument_value(&mut arguments) {
                     let duplicate = match flag.as_str() {
@@ -1274,6 +1331,7 @@ fn parse_arguments_from(
                 },
                 None => notes.push("--engine needs a kind".to_owned()),
             },
+            "--legacy-replay-compatibility" => startup.legacy_replay_compatibility = true,
             "--replay" => match next_argument_value(&mut arguments) {
                 Some(path) => startup.replay = Some(PathBuf::from(path)),
                 None => notes.push("--replay needs a file".to_owned()),
@@ -1577,6 +1635,9 @@ fn parse_arguments_from(
         notes.push("invalid cloud arguments; using the clear default".to_owned());
     }
 
+    startup
+        .weather
+        .validate_flags(startup.clouds_were_given, startup.replay.is_some());
     region_runtime::validate_options(&mut startup);
     (startup, StartupDiagnostics(notes))
 }
@@ -2212,7 +2273,7 @@ fn sync_replay_clock(
     let Some(next) = replay_visual_epoch(
         epoch,
         playback.elapsed,
-        playback.player.recording().conditions().time_rate,
+        playback.player.recording().environment().time_rate,
     ) else {
         playback.stop("REPLAY STOPPED: visual clock exceeds its supported range".into());
         return;
@@ -2371,7 +2432,7 @@ fn restart_flight(
     // **記録は捨てる。** やり直しは記録に残らないので、残したまま続けると
     // 再生時に同じ入力を流しても別の飛行になる。
     let conditions = recorder.0.recording().conditions().clone();
-    recorder.0 = flightsim_sim::Recorder::new(conditions);
+    recorder.0 = flightsim_sim::CurrentRecorder::new(conditions);
 
     *tutorial = flightsim_ui::TutorialState::default();
     *landing = flightsim_ui::LandingReportState::default();
@@ -2379,9 +2440,9 @@ fn restart_flight(
 
 fn refresh_recording_clock(recorder: &mut FlightRecorder, clock: &flightsim_render::TimeOfDay) {
     let mut conditions = recorder.0.recording().conditions().clone();
-    conditions.start_epoch = clock.utc.get();
-    conditions.time_rate = clock.rate.get();
-    recorder.0 = flightsim_sim::Recorder::new(conditions);
+    conditions.environment.start_epoch = clock.utc.get();
+    conditions.environment.time_rate = clock.rate.get();
+    recorder.0 = flightsim_sim::CurrentRecorder::new(conditions);
 }
 
 /// リプレイの保存と再生操作。
@@ -2420,6 +2481,13 @@ fn control_replay(
                 warn!("{}", region_runtime::REPLAY_NOTICE);
                 return;
             }
+            if startup
+                .as_deref()
+                .is_some_and(|startup| startup.clouds_were_given)
+            {
+                warn!("{}", replay_policy::MANUAL_CLOUD_DIAGNOSTIC);
+                return;
+            }
             save_recording(recorder.0.recording());
         }
         return;
@@ -2455,7 +2523,7 @@ fn control_replay(
 }
 
 /// 記録をファイルへ書く。
-fn save_recording(recording: &flightsim_sim::Recording) {
+fn save_recording(recording: &flightsim_sim::CurrentRecording) {
     if recording.frames().is_empty() {
         warn!("nothing to save yet");
         return;
@@ -2676,10 +2744,18 @@ fn publish_crash(
 /// 再生状態を UI へ渡す。
 fn publish_replay_status(
     playback: Option<Res<ReplayPlayback>>,
+    startup: Option<Res<Startup>>,
     mut status: ResMut<flightsim_ui::ReplayStatus>,
 ) {
-    let next = playback.map_or_else(flightsim_ui::ReplayStatus::default, |playback| {
-        flightsim_ui::ReplayStatus {
+    let next = playback.map_or_else(
+        || flightsim_ui::ReplayStatus {
+            notice: startup
+                .as_deref()
+                .filter(|s| s.clouds_were_given)
+                .map(|_| replay_policy::MANUAL_CLOUD_NOTICE.into()),
+            ..default()
+        },
+        |playback| flightsim_ui::ReplayStatus {
             active: true,
             paused: playback.player.is_paused(),
             speed: playback.player.speed(),
@@ -2688,8 +2764,9 @@ fn publish_replay_status(
             seeking: playback.is_seeking(),
             fault: playback.fault.clone(),
             finished: playback.player.is_finished(),
-        }
-    });
+            notice: playback.identity_notice().map(str::to_owned),
+        },
+    );
     if *status != next {
         *status = next;
     }
@@ -3647,10 +3724,9 @@ fn advance_simulation(
                     // Record the exact input used by each executed physics step,
                     // with its PRE-step state. Render-end snapshots lose ramp
                     // history and cannot reproduce this controlled flight.
-                    if startup
-                        .as_deref()
-                        .is_none_or(region_runtime::replay_allowed)
-                    {
+                    if startup.as_deref().is_none_or(|startup| {
+                        region_runtime::replay_allowed(startup) && !startup.clouds_were_given
+                    }) {
                         recorder.0.record(fixed_dt, input, Some(before));
                     }
                     input
@@ -4039,7 +4115,17 @@ fn publish_hud(
     simulation: Res<FlightSimulation>,
     controls: Res<PilotControls>,
     playback: Option<Res<ReplayPlayback>>,
-    (mode, quality, cloud_quality, cloud_status, distance, water_quality, water_status, startup): (
+    (
+        mode,
+        quality,
+        cloud_quality,
+        cloud_status,
+        distance,
+        water_quality,
+        water_status,
+        startup,
+        weather,
+    ): (
         Res<ViewMode>,
         Res<flightsim_render::graphics_quality::GraphicsQuality>,
         Res<flightsim_render::cloud_volume::CloudQuality>,
@@ -4048,6 +4134,7 @@ fn publish_hud(
         Res<flightsim_render::water::WaterQuality>,
         Res<flightsim_render::water::WaterDiagnostics>,
         Option<Res<Startup>>,
+        Option<Res<flightsim_render::RenderWeather>>,
     ),
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
@@ -4101,9 +4188,10 @@ fn publish_hud(
         draw_distance: distance_runtime::label(distance.0),
         water_quality: water_runtime::quality_label(*water_quality, &water_status),
         cloud_quality: cloud_runtime::quality_label(*cloud_quality, &cloud_status),
-        cloud_source: startup
-            .as_deref()
-            .map_or("MODEL", cloud_runtime::source_label),
+        cloud_source: cloud_runtime::effective_source_label(
+            weather.as_deref().map(|weather| weather.selection),
+            startup.as_deref(),
+        ),
         wind_from: simulation.0.wind().from,
         wind_speed: simulation.0.wind().speed,
         // 計器の照明に使う。ui は render に依存できないので app が渡す。
@@ -4220,7 +4308,7 @@ mod tests {
             flightsim_fdm::ControlInputs::neutral(),
             Some(&state),
         );
-        let mut playback = ReplayPlayback::new(recorder.finish());
+        let mut playback = ReplayPlayback::new(flightsim_sim::ReplayFile::V1(recorder.finish()));
         playback.elapsed = Seconds(30.0);
         let epoch = flightsim_render::JulianDate::J2000;
         let mut app = App::new();
@@ -5015,23 +5103,26 @@ mod tests {
         let clock = flightsim_render::TimeOfDay::default();
         let conditions = recording_conditions(&startup, &clock);
 
-        assert_eq!(conditions.start, startup.start);
-        assert_eq!(conditions.heading, startup.heading);
-        assert_eq!(conditions.wind, startup.wind);
-        assert_eq!(conditions.turbulence, startup.turbulence);
+        assert_eq!(conditions.environment.start, startup.start);
+        assert_eq!(conditions.environment.heading, startup.heading);
+        assert_eq!(conditions.environment.wind, startup.wind);
+        assert_eq!(conditions.environment.turbulence, startup.turbulence);
         // 暦上の一点をそのまま持つ。**丸めると日付をまたぐ瞬間がずれる。**
         assert!(
-            (conditions.start_epoch - clock.utc.get()).abs() < f64::EPSILON,
+            (conditions.environment.start_epoch - clock.utc.get()).abs() < f64::EPSILON,
             "the recorded epoch must be the clock's epoch"
         );
         assert!(
-            conditions.aircraft_fingerprint != 0,
+            conditions.aircraft_identity
+                == flightsim_sim::replay::identity::AircraftIdentity::for_config(
+                    &startup.aircraft.configuration()
+                ),
             "the aircraft must be identified, otherwise any aircraft would replay it"
         );
         // 同じ機体で記録した飛行は、同じ機体で再生できること。
-        flightsim_sim::Recorder::new(conditions)
+        flightsim_sim::CurrentRecorder::new(conditions)
             .finish()
-            .check_reproducible_with(&startup.aircraft.configuration())
+            .check_compatibility_with(&startup.aircraft.configuration())
             .expect("the recording must be reproducible with the aircraft it names");
     }
 

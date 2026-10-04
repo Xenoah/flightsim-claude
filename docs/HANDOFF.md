@@ -30,6 +30,13 @@ Steam へ出荷できるという承認ではない。公開版・PR の状態�
 三角形の描画面と物理のバイリニア補間、建物の基礎、遠方の精度制限は残る。
 最終集約試験・実画面・公開の状態は、その時点の QA 記録と対象 commit の CI で確認する。
 
+2026-10-04 のリプレイ v3 移行は [互換方針](replay-identity.md) と
+[app 検証](qa/replay-app-v3-2026-10-04.md) を参照。新規記録は完全な機体 ID を持ち、
+旧 v1/v2 は対応基準機の明示 opt-in と欠けた yaw 情報の常時表示が必要。
+`record_takeoff` 等の旧 Recorder を使う例も legacy ファイルを作るためこの opt-in が要る。
+手動雲天候の通常飛行は記録不可を表示する。後続の[モデル天候統合](modeled-weather.md)では
+明示プリセットと v3 記録値を実行済み物理時間に結線する。実画面の受け入れは別途確認する。
+
 2026-10-04 の追加は [地域 ZIP](content-packages.md)、[描画距離](draw-distance.md)、
 [水面品質](water-quality.md) と [統合 QA](qa/expansion-integration-2026-10-04.md) を参照。
 アプリの地域 ZIP は prepared DEM-only schema v1。既定はオフラインのローカル読み込みで、

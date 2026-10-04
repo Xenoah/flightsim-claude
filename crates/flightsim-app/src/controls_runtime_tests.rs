@@ -18,7 +18,7 @@ fn sample(keys: PilotKeys) -> SampledPilotInput {
     )
 }
 
-fn control_app(id: &str) -> App {
+pub(super) fn control_app(id: &str) -> App {
     let profile = aircraft_profile::AircraftProfile::builtin(id).unwrap();
     let config = profile.configuration();
     let initial = RigidBodyState::from_geodetic(
@@ -33,11 +33,13 @@ fn control_app(id: &str) -> App {
         Terrain::new(source, 1024 * 1024, 8..=12),
         GroundSampler::default(),
     );
-    let conditions = flightsim_sim::replay::Conditions {
-        start: initial.geodetic(),
-        ..default()
-    }
-    .with_aircraft(&config);
+    let conditions = flightsim_sim::CurrentConditions::for_aircraft(
+        &config,
+        flightsim_sim::EnvironmentConditions {
+            start: initial.geodetic(),
+            ..default()
+        },
+    );
     let mut controls = profile.pilot_controls(false);
     controls.throttle.set_absolute(0.8);
     let mut app = App::new();
@@ -46,7 +48,9 @@ fn control_app(id: &str) -> App {
         .insert_resource(SampledPilotInput::default())
         .insert_resource(flightsim_ui::Paused::default())
         .insert_resource(world_runtime::MapCapture::default())
-        .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            conditions,
+        )))
         .insert_resource(FlightSimulation(simulation))
         .add_systems(
             Update,
@@ -56,7 +60,7 @@ fn control_app(id: &str) -> App {
     app
 }
 
-fn tick(app: &mut App, dt: Duration, keys: PilotKeys) {
+pub(super) fn tick(app: &mut App, dt: Duration, keys: PilotKeys) {
     app.world_mut().resource_mut::<Time>().advance_by(dt);
     *app.world_mut().resource_mut::<SampledPilotInput>() = sample(keys);
     app.update();
@@ -108,7 +112,7 @@ fn live_fixed_step_recording_replays_and_rewinds_through_actual_app_path() {
         let recorded = live.world().resource::<FlightRecorder>().0.recording();
         let mut bytes = Vec::new();
         recorded.write_to(&mut bytes).unwrap();
-        let recording = flightsim_sim::Recording::read_from(&mut bytes.as_slice()).unwrap();
+        let recording = flightsim_sim::ReplayFile::read_from(&mut bytes.as_slice()).unwrap();
         let mut app = control_app(id);
         app.insert_resource(ReplayPlayback::new(recording));
         for _ in 0..190 {

@@ -14,7 +14,10 @@ pub(super) fn configure(app: &mut App) {
             .before(super::publish_hud)
             .run_if(world_runtime::flight_controls_active),
     )
-    .add_systems(Update, log_cloud_status);
+    .add_systems(
+        Update,
+        log_cloud_status.after(flightsim_render::RenderSet::Weather),
+    );
 }
 
 fn log_cloud_status(
@@ -22,6 +25,7 @@ fn log_cloud_status(
     status: Option<Res<CloudVolumeDiagnostics>>,
     layer: Option<Res<flightsim_render::CloudLayer>>,
     time: Option<Res<Time<Real>>>,
+    weather: Option<Res<flightsim_render::RenderWeather>>,
     mut last: Local<Option<(f64, CloudQuality, CloudQuality, &'static str)>>,
 ) {
     let (Some(startup), Some(status), Some(layer), Some(time)) = (startup, status, layer, time)
@@ -41,6 +45,50 @@ fn log_cloud_status(
         return;
     }
     *last = Some((now, status.requested, status.effective, status.status));
+    if let Some(weather) = weather
+        && let flightsim_sim::weather::WeatherSelection::Modeled(scenario) = weather.selection
+    {
+        let p = scenario.parameters();
+        info!(
+            "cloud stats requested={} effective={} ready={} status={} source={} authored_not_live=true elapsed_s={} seed={} schema={} model_revision={} departure_lat_rad={} departure_lon_rad={} departure_height_m={} morphology={:?} cover={} base_m={:?} top_m={:?} cloud_visibility_m={:?} ambient_visibility_m={} fog_bottom_m={:?} fog_top_m={:?} fog_visibility_m={:?} precipitation={:?} water_equivalent_mps={} resolution={}x{} view_steps={} sun_steps={} target_bytes={} noise_bytes={} uniform_bytes={} source_bytes={} noise_generations={} density_uploads={} target_allocations={} last_upload_bytes={}",
+            status.requested.name(),
+            status.effective.name(),
+            status.ready,
+            status.status,
+            super::weather_runtime::preset_label(p.preset),
+            weather.elapsed.get(),
+            p.seed,
+            p.parameter_schema,
+            p.model_revision,
+            p.departure_reference.latitude.get(),
+            p.departure_reference.longitude.get(),
+            p.departure_reference.altitude.get(),
+            p.cloud.map(|cloud| cloud.morphology),
+            p.cloud.map_or(0.0, |cloud| cloud.coverage),
+            p.cloud.map(|cloud| cloud.base.get()),
+            p.cloud.map(|cloud| cloud.top.get()),
+            p.cloud.map(|cloud| cloud.visibility.get()),
+            p.ambient_visibility.get(),
+            p.fog.map(|fog| fog.bottom.get()),
+            p.fog.map(|fog| fog.top.get()),
+            p.fog.map(|fog| fog.visibility.get()),
+            p.precipitation_kind,
+            p.precipitation_rate.0,
+            status.target_size.x,
+            status.target_size.y,
+            status.view_samples,
+            status.sun_samples,
+            status.target_bytes,
+            status.noise_bytes,
+            status.uniform_bytes,
+            status.source_bytes,
+            status.noise_generation_count,
+            status.density_upload_count,
+            status.target_allocation_count,
+            status.last_upload_bytes,
+        );
+        return;
+    }
     info!(
         "cloud stats requested={} effective={} ready={} status={} cover={} base_m={} top_m={} visibility_m={} resolution={}x{} view_steps={} sun_steps={} target_bytes={} noise_bytes={} uniform_bytes={} source_bytes={} noise_generations={} density_uploads={} target_allocations={} last_upload_bytes={}",
         status.requested.name(),
@@ -77,14 +125,26 @@ fn select_cloud_quality(keyboard: Res<ButtonInput<KeyCode>>, mut quality: ResMut
     }
 }
 
-pub(super) const fn source_label(startup: &Startup) -> &'static str {
-    if startup.clouds_were_given {
-        "USER MODEL"
-    } else if startup.world.climate_enabled {
-        "MONTHLY MODEL"
-    } else {
-        "CLEAR"
+pub(super) fn source_label(startup: &Startup) -> &'static str {
+    effective_source_label(Some(startup.weather.selection), Some(startup))
+}
+
+pub(super) fn effective_source_label(
+    selection: Option<flightsim_sim::weather::WeatherSelection>,
+    startup: Option<&Startup>,
+) -> &'static str {
+    if let Some(flightsim_sim::weather::WeatherSelection::Modeled(scenario)) = selection {
+        return super::weather_runtime::preset_label(scenario.parameters().preset);
     }
+    startup.map_or("MODEL", |startup| {
+        if startup.clouds_were_given {
+            "USER MODEL"
+        } else if startup.world.climate_enabled {
+            "MONTHLY MODEL"
+        } else {
+            "CLEAR"
+        }
+    })
 }
 
 pub(super) fn quality_label(
@@ -184,6 +244,51 @@ mod tests {
             app.world_mut()
                 .resource_mut::<ButtonInput<KeyCode>>()
                 .reset_all();
+        }
+    }
+
+    #[test]
+    fn authored_hud_labels_and_cloud_tier_controls_preserve_weather_identity() {
+        use flightsim_sim::weather::{WeatherPreset, WeatherScenario, WeatherSelection};
+        for (preset, label) in [
+            (WeatherPreset::Clear, "MODELED CLEAR"),
+            (WeatherPreset::Cloud, "MODELED CLOUD"),
+            (WeatherPreset::Fog, "MODELED FOG"),
+            (WeatherPreset::Rain, "MODELED RAIN"),
+            (WeatherPreset::Snow, "MODELED SNOW"),
+            (WeatherPreset::Storm, "MODELED STORM"),
+        ] {
+            let scenario = WeatherScenario::from_preset(
+                preset,
+                flightsim_core::Geodetic::from_degrees(31.5, 35.5, -430.0),
+                75,
+            )
+            .unwrap();
+            let mut startup = Startup::default();
+            startup.weather.selection = WeatherSelection::Modeled(scenario);
+            assert_eq!(source_label(&startup), label);
+            let original = flightsim_render::RenderWeather {
+                selection: startup.weather.selection,
+                elapsed: flightsim_core::Seconds(17.0),
+            };
+            let mut app = App::new();
+            app.insert_resource(original)
+                .init_resource::<CloudQuality>()
+                .init_resource::<ButtonInput<KeyCode>>()
+                .add_systems(Update, select_cloud_quality);
+            for _ in 0..5 {
+                app.world_mut()
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .reset_all();
+                app.world_mut()
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(KeyCode::F3);
+                app.update();
+                assert_eq!(
+                    *app.world().resource::<flightsim_render::RenderWeather>(),
+                    original
+                );
+            }
         }
     }
 

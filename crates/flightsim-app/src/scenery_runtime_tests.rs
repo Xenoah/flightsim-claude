@@ -691,7 +691,9 @@ fn physics_app() -> App {
     let conditions = recording_conditions(&startup, &clock);
     app.insert_resource(FlightSimulation(simulation))
         .insert_resource(StartCondition::InFlight(initial))
-        .insert_resource(FlightRecorder(flightsim_sim::Recorder::new(conditions)))
+        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            conditions,
+        )))
         .insert_resource(Time::<()>::default())
         .insert_resource(clock)
         .insert_resource(world_runtime::initial_controls(&startup))
@@ -733,7 +735,8 @@ fn actual_restart_and_rewind_controls_invalidate_scenery() {
                 Some(&state),
             );
             let recording =
-                flightsim_sim::Recording::read_from(&mut recording_bytes(&app).as_slice()).unwrap();
+                flightsim_sim::ReplayFile::read_from(&mut recording_bytes(&app).as_slice())
+                    .unwrap();
             app.insert_resource(ReplayPlayback::new(recording));
             app.add_systems(Update, control_replay.before(stream));
             app.world_mut()
@@ -819,7 +822,7 @@ fn draw_distance_and_scenery_resets_leave_physics_and_replay_bytes_exact() {
     let expected = *baseline.world().resource::<FlightSimulation>().0.state();
     let bytes = recording_bytes(&baseline);
     for app in [&mut baseline, &mut detailed] {
-        let recording = flightsim_sim::Recording::read_from(&mut bytes.as_slice()).unwrap();
+        let recording = flightsim_sim::ReplayFile::read_from(&mut bytes.as_slice()).unwrap();
         let playback = ReplayPlayback::new(recording);
         let initial = playback.initial_state();
         app.world_mut()
@@ -1267,7 +1270,7 @@ fn clear_restart_and_rewind_cancel_eight_partially_staged_assets_before_more_upl
                     Some(&state),
                 );
                 let recording =
-                    flightsim_sim::Recording::read_from(&mut recording_bytes(&app).as_slice())
+                    flightsim_sim::ReplayFile::read_from(&mut recording_bytes(&app).as_slice())
                         .unwrap();
                 app.insert_resource(ReplayPlayback::new(recording));
                 app.add_systems(Update, control_replay.before(stream));
@@ -1417,7 +1420,7 @@ fn draw_distance_clear_restart_and_rewind_remove_pending_and_retained_ground() {
                     Some(&state),
                 );
                 let recording =
-                    flightsim_sim::Recording::read_from(&mut recording_bytes(&app).as_slice())
+                    flightsim_sim::ReplayFile::read_from(&mut recording_bytes(&app).as_slice())
                         .unwrap();
                 app.insert_resource(ReplayPlayback::new(recording));
                 app.add_systems(Update, control_replay.before(stream));

@@ -42,6 +42,12 @@ reference can differ substantially from the regional DEM.
 Manual `--cloud-cover`, `--cloud-base`, `--cloud-top` and `--cloud-visibility`
 remain explicit overrides. Base/top are WGS84 ellipsoidal metres, not AGL or MSL.
 These visual parameters do not create cloud collisions or aerodynamic forces.
+They are not yet represented by app recordings: a live flight using any of these
+four flags keeps its clouds and controls but disables recording/F9 with a visible
+notice. Restart without them to record. Combining them with `--replay` is rejected
+before recorded conditions are applied. `--cloud-quality` and F3 are unaffected.
+Explicit modeled-weather v3 files are also blocked until their full presentation
+path is integrated; see [replay policy](replay-identity.md).
 
 ## Rendering tiers
 

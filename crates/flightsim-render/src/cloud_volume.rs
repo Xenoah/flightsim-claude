@@ -11,9 +11,8 @@ use crate::cloud_field::{
     CLOUD_FIELD_CELL_SIZE, CLOUD_FIELD_TEXTURE_SIZE, CloudField, cloud_cover_threshold,
     cloud_horizontal_density,
 };
-use crate::{
-    CloudDeckSurface, CloudDistanceFog, CloudLayer, RenderOrigin, SunDirection, TimeOfDay,
-};
+use crate::modeled_weather::{NonCloudWeatherFog, RenderWeather, ResolvedCloudLayer};
+use crate::{CloudDeckSurface, CloudDistanceFog, RenderOrigin, SunDirection, TimeOfDay};
 use bevy::{
     asset::{load_internal_asset, uuid_handle},
     core_pipeline::{
@@ -46,6 +45,7 @@ use bevy::{
     },
 };
 use flightsim_core::{Seconds, geodetic::wgs84};
+use flightsim_sim::weather::WeatherSelection;
 use std::sync::{Arc, Mutex};
 
 const SHADER: Handle<Shader> = uuid_handle!("69f03d26-74b2-4b09-a8b0-4f81cc7d3302");
@@ -197,6 +197,12 @@ impl Plugin for CloudVolumePlugin {
             );
     }
 }
+fn ready_camera_fog(remaining: Option<&NonCloudWeatherFog>) -> DistanceFog {
+    remaining.map_or_else(crate::weather::inactive_cloud_distance_fog, |fog| {
+        fog.0.clone()
+    })
+}
+
 fn receive_diagnostics(
     quality: Res<CloudQuality>,
     feedback: Res<CloudFeedback>,
@@ -215,31 +221,35 @@ fn receive_diagnostics(
 #[derive(Resource)]
 struct CloudInputs {
     quality: CloudQuality,
-    layer: CloudLayer,
+    layer: ResolvedCloudLayer,
+    weather: RenderWeather,
     origin: Option<RenderOrigin>,
     sun: SunDirection,
     clock: TimeOfDay,
     decks: Vec<MainEntity>,
-    fog_cameras: Vec<MainEntity>,
+    fog_cameras: Vec<(MainEntity, DistanceFog)>,
 }
 #[allow(
     clippy::too_many_arguments,
-    reason = "Extracts only the bounded cloud source resources and ownership markers"
+    clippy::type_complexity,
+    reason = "Extracts bounded cloud inputs and each owned camera’s optional non-cloud fog"
 )]
 fn extract_cloud_inputs(
     mut commands: Commands,
     quality: Extract<Res<CloudQuality>>,
-    layer: Extract<Res<CloudLayer>>,
+    layer: Extract<Res<ResolvedCloudLayer>>,
+    weather: Extract<Res<RenderWeather>>,
     origin: Extract<Option<Res<RenderOrigin>>>,
     sun: Extract<Res<SunDirection>>,
     clock: Extract<Res<TimeOfDay>>,
     decks: Extract<Query<Entity, With<CloudDeckSurface>>>,
-    fog: Extract<Query<Entity, With<CloudDistanceFog>>>,
+    fog: Extract<Query<(Entity, Option<&NonCloudWeatherFog>), With<CloudDistanceFog>>>,
 ) {
     let collect_owners = quality.is_volume() && !layer.is_clear();
     commands.insert_resource(CloudInputs {
         quality: **quality,
         layer: **layer,
+        weather: **weather,
         origin: origin.as_ref().map(|v| **v),
         sun: **sun,
         clock: **clock,
@@ -249,7 +259,9 @@ fn extract_cloud_inputs(
             Vec::new()
         },
         fog_cameras: if collect_owners {
-            fog.iter().map(MainEntity::from).collect()
+            fog.iter()
+                .map(|(entity, remaining)| (MainEntity::from(entity), ready_camera_fog(remaining)))
+                .collect()
         } else {
             Vec::new()
         },
@@ -766,13 +778,12 @@ fn prepare_clouds(
         // Keep DistanceFog present: Bevy specializes every PBR material on its
         // presence. Removing it can make the scene disappear while cold mesh
         // pipelines compile when a cloud tier changes.
-        if inputs
+        if let Some((_, remaining)) = inputs
             .fog_cameras
-            .contains(&view.retained_view_entity.main_entity)
+            .iter()
+            .find(|(main, _)| *main == view.retained_view_entity.main_entity)
         {
-            commands
-                .entity(entity)
-                .insert(crate::weather::inactive_cloud_distance_fog());
+            commands.entity(entity).insert(remaining.clone());
         }
         if let Ok(mut entities) = visible.get_mut(entity) {
             for list in entities.entities.values_mut() {
@@ -838,12 +849,15 @@ fn cloud_uniform(
     exposure: f32,
     size: UVec2,
 ) -> Option<CloudUniform> {
-    if inputs.layer.validate().is_err() || view.clip_from_view.w_axis.w.abs() > f32::EPSILON {
+    if !inputs.layer.is_valid() || view.clip_from_view.w_axis.w.abs() > f32::EPSILON {
         return None;
     }
     let camera_render = view.world_from_view.translation();
     let world = origin.0.to_world(camera_render);
-    let elapsed = Seconds(inputs.clock.utc.days_since_j2000() * 86400.0);
+    let elapsed = match inputs.weather.selection {
+        WeatherSelection::Legacy => Seconds(inputs.clock.utc.days_since_j2000() * 86400.0),
+        WeatherSelection::Modeled(_) => inputs.weather.elapsed,
+    };
     let drift = Vec3::from_array(CloudField::drift(elapsed)?);
     let camera_ecef_cells = (world.as_vec() / CLOUD_FIELD_CELL_SIZE.get()).as_vec3();
     // One kilometre detail cells use the same ECEF advection as the macro field.
@@ -907,10 +921,21 @@ fn cloud_uniform(
             camera_height as f32,
             base as f32,
             (top - base) as f32,
-            crate::weather::fog_extinction(inputs.layer.visibility),
+            if inputs.layer.modeled {
+                crate::modeled_weather::modeled_extinction(inputs.layer.visibility)
+            } else {
+                crate::weather::fog_extinction(inputs.layer.visibility)
+            },
         ),
         intersections: Vec4::new(
-            c(0.0),
+            // The legacy sea-level blocker would hide authored sub-zero cloud
+            // decks over below-sea-level terrain. Keep it below this layer;
+            // actual opaque terrain remains the primary depth constraint.
+            c(if inputs.layer.modeled {
+                base.min(0.0) - 1.0
+            } else {
+                0.0
+            }),
             c(base),
             c(top),
             cloud_cover_threshold(inputs.layer.cover),
@@ -919,7 +944,18 @@ fn cloud_uniform(
         light: color.extend(0.001 + 0.22 * daylight),
         viewport: view.viewport.as_vec4(),
         samples: Vec4::new(size.x as f32, size.y as f32, steps as f32, sun_steps as f32),
-        seed: UVec4::new(CloudField::new(inputs.layer.seed).seed(), 0, 0, 0),
+        seed: UVec4::new(
+            CloudField::new(inputs.layer.seed).seed(),
+            match inputs.weather.selection {
+                WeatherSelection::Legacy => 0,
+                WeatherSelection::Modeled(scenario) => scenario
+                    .parameters()
+                    .cloud
+                    .map_or(0, |cloud| u32::from(cloud.morphology as u16)),
+            },
+            0,
+            0,
+        ),
     };
     uniform.is_valid().then_some(uniform)
 }
@@ -1067,6 +1103,23 @@ impl ViewNode for CloudNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CloudLayer;
+    #[test]
+    fn readiness_suppresses_only_cloud_owned_extinction() {
+        let remaining = NonCloudWeatherFog(DistanceFog {
+            color: Color::srgb(0.5, 0.5, 0.5),
+            falloff: FogFalloff::Exponential { density: 0.012 },
+            ..default()
+        });
+        let fog = ready_camera_fog(Some(&remaining));
+        assert_eq!(fog.color, remaining.0.color);
+        assert!(
+            matches!(fog.falloff,FogFalloff::Exponential { density } if density.to_bits()==0.012_f32.to_bits())
+        );
+        let legacy = ready_camera_fog(None);
+        assert_eq!(legacy.color, Color::NONE);
+    }
+
     #[test]
     fn inactive_fog_preserves_the_engine_mesh_specialization_key() {
         use bevy::pbr::{
@@ -1284,10 +1337,21 @@ mod tests {
     }
 
     fn uniform_fixture(layer: CloudLayer, projection: Mat4) -> Option<CloudUniform> {
+        uniform_fixture_weather(layer, projection, RenderWeather::default())
+    }
+    fn uniform_fixture_weather(
+        layer: CloudLayer,
+        projection: Mat4,
+        weather: RenderWeather,
+    ) -> Option<CloudUniform> {
         let origin = RenderOrigin::new(flightsim_core::Geodetic::from_degrees(35.0, 139.0, 1500.0));
         let inputs = CloudInputs {
             quality: CloudQuality::High,
-            layer,
+            layer: ResolvedCloudLayer {
+                layer,
+                modeled: matches!(weather.selection, WeatherSelection::Modeled(_)),
+            },
+            weather,
             origin: Some(origin),
             sun: SunDirection::default(),
             clock: TimeOfDay::default(),
@@ -1309,6 +1373,48 @@ mod tests {
             invert_culling: false,
         };
         cloud_uniform(&inputs, &origin, &view, 0.000025, UVec2::new(640, 360))
+    }
+
+    #[test]
+    fn authored_negative_layers_are_not_hidden_by_the_synthetic_sea_level_blocker() {
+        use flightsim_sim::weather::{WeatherPreset, WeatherScenario};
+        let mut p = WeatherScenario::from_preset(
+            WeatherPreset::Rain,
+            flightsim_core::Geodetic::from_degrees(35.0, 139.0, 0.0),
+            7,
+        )
+        .unwrap()
+        .parameters();
+        p.preset = WeatherPreset::Custom;
+        let cloud = p.cloud.as_mut().unwrap();
+        cloud.base = flightsim_core::Meters(-900.0);
+        cloud.top = flightsim_core::Meters(-500.0);
+        let layer = CloudLayer {
+            cover: 1.0,
+            base: cloud.base,
+            top: cloud.top,
+            visibility: cloud.visibility,
+            seed: p.seed,
+        };
+        let scenario = WeatherScenario::try_from(p).unwrap();
+        let uniform = uniform_fixture_weather(
+            layer,
+            Mat4::perspective_infinite_reverse_rh(1.0, 16.0 / 9.0, 0.1),
+            RenderWeather {
+                selection: WeatherSelection::Modeled(scenario),
+                elapsed: Seconds::ZERO,
+            },
+        )
+        .unwrap();
+        assert!(
+            uniform.intersections.x > uniform.intersections.y,
+            "earth blocker must lie below cloud base"
+        );
+        assert_eq!(uniform.seed.y, 1);
+        assert!(
+            (uniform.layer.w - crate::modeled_weather::modeled_extinction(layer.visibility)).abs()
+                < 1e-7
+        );
     }
 
     #[test]

@@ -67,6 +67,7 @@ pub mod flight;
 pub mod ground;
 pub mod replay;
 pub mod simulation;
+pub mod weather;
 
 pub use crash::{Crash, CrashCause, CrashLimits};
 pub use director::{DirectorGains, DirectorTargets, FlightDirector, VerticalTarget};
@@ -75,7 +76,10 @@ pub use flight::{
     gear_height, parked_state,
 };
 pub use ground::{GroundPlane, GroundSampler};
-pub use replay::{Player, Recorder, Recording, ReplayError};
+pub use replay::{
+    CurrentConditions, CurrentRecorder, CurrentRecording, EnvironmentConditions, Player, Recorder,
+    Recording, ReplayError, ReplayFile, ReplayFilePlayer,
+};
 pub use simulation::{
     FlightLog, InterpolatedState, Simulation, StepReport, Touchdown, Wind,
     climate_atmosphere_sample,

@@ -63,6 +63,8 @@ pub mod daylight;
 pub mod graphics_quality;
 pub mod holding_position;
 pub mod model;
+pub mod modeled_weather;
+pub mod precipitation;
 pub mod runway;
 pub mod runway_lights;
 pub mod scenery;
@@ -92,6 +94,10 @@ pub use daylight::{
     SunIlluminancePolicy, SunLight, SunLighting, TimeOfDay, TimeRate, direct_normal_illuminance,
 };
 pub use model::{ModelAxis, ModelFit, ModelFitError, extents_in_model_space};
+pub use modeled_weather::{
+    RenderWeather, WeatherExtinction, modeled_extinction, weather_extinction,
+};
+pub use precipitation::PrecipitationDiagnostics;
 pub use sun::{JulianDate, SolarPosition, UtcDateTime, solar_position};
 pub use terrain::{TerrainRenderConfig, TerrainTiles};
 pub use terrain_selection::{
@@ -199,6 +205,10 @@ impl Plugin for FlightsimRenderPlugin {
         .init_resource::<SunLighting>()
         .init_resource::<CloudLayer>()
         .init_resource::<weather::CloudVisuals>()
+        .init_resource::<RenderWeather>()
+        .init_resource::<modeled_weather::ResolvedCloudLayer>()
+        .init_resource::<precipitation::PrecipitationVisuals>()
+        .init_resource::<PrecipitationDiagnostics>()
         // `LightPlugin` も同じことをする。**どちらが先でも同じ値**になるよう
         // `init_resource` で入れること（`insert_resource` だと上書きし合う）。
         .init_resource::<bevy::light::GlobalAmbientLight>()
@@ -239,9 +249,12 @@ impl Plugin for FlightsimRenderPlugin {
                     .chain()
                     .in_set(RenderSet::Sun),
                 (
+                    modeled_weather::resolve_weather_cloud,
                     weather::sync_cloud_visuals,
                     weather::update_cloud_visuals,
                     weather::update_cloud_distance_fog,
+                    modeled_weather::update_modeled_weather_fog,
+                    precipitation::update_precipitation,
                 )
                     .chain()
                     .in_set(RenderSet::Weather),

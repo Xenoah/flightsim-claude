@@ -26,7 +26,9 @@ use std::error::Error;
 use std::fmt;
 
 use crate::cloud_volume::CloudQuality;
+use crate::modeled_weather::{RenderWeather, ResolvedCloudLayer};
 use crate::{RenderOrigin, SunDirection, SunLighting, TimeOfDay};
+use flightsim_sim::weather::WeatherSelection;
 
 /// 雲模様 1 周のおおよその大きさ。
 ///
@@ -364,7 +366,7 @@ pub(crate) fn inactive_cloud_distance_fog() -> DistanceFog {
 /// している。通常の `DefaultPlugins` 構成では最初の Update で作られる。
 pub(crate) fn sync_cloud_visuals(
     mut commands: Commands,
-    layer: Res<CloudLayer>,
+    layer: Res<ResolvedCloudLayer>,
     quality: Res<CloudQuality>,
     mut visuals: ResMut<CloudVisuals>,
     meshes: Option<ResMut<Assets<Mesh>>>,
@@ -401,7 +403,7 @@ pub(crate) fn sync_cloud_visuals(
         return;
     }
 
-    let (image, threshold) = cloud_mask_image(*layer);
+    let (image, threshold) = cloud_mask_image(layer.layer);
     visuals.calibration = Some((layer.seed, layer.cover, threshold));
     let texture = images.add(image);
     let repeats = cloud_texture_repeats();
@@ -442,8 +444,13 @@ pub(crate) fn sync_cloud_visuals(
 }
 
 /// 雲面をカメラ付近へ保ち、雲模様を地球上の位置と時刻へ固定する。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "optional authored clock alongside existing cloud render resources"
+)]
 pub(crate) fn update_cloud_visuals(
-    layer: Res<CloudLayer>,
+    weather: Res<RenderWeather>,
+    layer: Res<ResolvedCloudLayer>,
     clock: Res<TimeOfDay>,
     origin: Option<Res<RenderOrigin>>,
     cameras: Query<&Transform, (With<Camera3d>, Without<CloudDeckSurface>)>,
@@ -465,7 +472,7 @@ pub(crate) fn update_cloud_visuals(
     };
 
     for (surface, mut transform) in &mut surfaces {
-        let altitude = surface.altitude(*layer);
+        let altitude = surface.altitude(layer.layer);
         let world = Geodetic::new(
             camera_position.latitude,
             camera_position.longitude,
@@ -481,7 +488,16 @@ pub(crate) fn update_cloud_visuals(
     let (Some(material), Some(mut materials), Some((u, v))) = (
         visuals.material.as_ref(),
         materials,
-        cloud_field_coordinates(*clock, camera_position),
+        match weather.selection {
+            WeatherSelection::Legacy => cloud_field_coordinates(*clock, camera_position),
+            WeatherSelection::Modeled(_) => cloud_field_coordinates_at(
+                weather
+                    .elapsed
+                    .get()
+                    .rem_euclid(CLOUD_PATTERN_METRES / CLOUD_DRIFT_NORTH_METRES_PER_SECOND),
+                camera_position,
+            ),
+        },
     ) else {
         return;
     };
@@ -498,8 +514,9 @@ pub(crate) fn update_cloud_visuals(
     reason = "Bevy system の resource と、相反する marker filter を明示する"
 )]
 pub(crate) fn update_cloud_distance_fog(
+    weather: Res<RenderWeather>,
     mut commands: Commands,
-    layer: Res<CloudLayer>,
+    layer: Res<ResolvedCloudLayer>,
     quality: Res<CloudQuality>,
     clock: Res<TimeOfDay>,
     origin: Option<Res<RenderOrigin>>,
@@ -512,6 +529,9 @@ pub(crate) fn update_cloud_distance_fog(
     >,
     cameras_without_fog: Query<(Entity, &Transform), (With<Camera3d>, Without<DistanceFog>)>,
 ) {
+    if matches!(weather.selection, WeatherSelection::Modeled(_)) {
+        return;
+    }
     if *quality == CloudQuality::Off {
         for (_, _, mut fog) in &mut owned_fog {
             *fog = inactive_cloud_distance_fog();
@@ -529,10 +549,10 @@ pub(crate) fn update_cloud_distance_fog(
 
     let density_at = |position| {
         let Some((seed, cover, threshold)) = visuals.calibration else {
-            return cloud_density_at(*layer, *clock, position);
+            return cloud_density_at(layer.layer, *clock, position);
         };
         if seed != layer.seed || cover.to_bits() != layer.cover.to_bits() || layer.is_clear() {
-            return cloud_density_at(*layer, *clock, position);
+            return cloud_density_at(layer.layer, *clock, position);
         }
         let Some((u, v)) = cloud_field_coordinates(*clock, position) else {
             return 0.0;
@@ -547,11 +567,11 @@ pub(crate) fn update_cloud_distance_fog(
 
     for (_, transform, mut current) in &mut owned_fog {
         let local_density = camera_geodetic(&origin, transform).map_or(0.0, density_at);
-        *current = cloud_distance_fog(*layer, local_density, &lighting, sun.elevation);
+        *current = cloud_distance_fog(layer.layer, local_density, &lighting, sun.elevation);
     }
     for (camera, transform) in &cameras_without_fog {
         let local_density = camera_geodetic(&origin, transform).map_or(0.0, density_at);
-        let fog = cloud_distance_fog(*layer, local_density, &lighting, sun.elevation);
+        let fog = cloud_distance_fog(layer.layer, local_density, &lighting, sun.elevation);
         commands.entity(camera).insert((CloudDistanceFog, fog));
     }
 }
@@ -686,7 +706,7 @@ fn cloud_uv_transform(u: f64, v: f64) -> Affine2 {
     Affine2::from_scale_angle_translation(scale, 0.0, phase - scale * 0.5)
 }
 
-fn cloud_fog_color(lighting: &SunLighting, elevation: Radians, density: f32) -> Color {
+pub(crate) fn cloud_fog_color(lighting: &SunLighting, elevation: Radians, density: f32) -> Color {
     let ambient = lighting.ambient(elevation);
     let span = lighting.daylight_ambient - lighting.night_ambient;
     let daylight = if span.is_finite() && span.abs() > f32::EPSILON {
@@ -707,9 +727,12 @@ fn cloud_fog_color(lighting: &SunLighting, elevation: Radians, density: f32) -> 
 }
 
 fn cloud_field_coordinates(clock: TimeOfDay, position: Geodetic) -> Option<(f64, f64)> {
+    cloud_field_coordinates_at(clock.utc.days_since_j2000() * SECONDS_PER_DAY, position)
+}
+
+fn cloud_field_coordinates_at(time: f64, position: Geodetic) -> Option<(f64, f64)> {
     let latitude = position.latitude.get();
     let longitude = position.longitude.get();
-    let time = clock.utc.days_since_j2000() * SECONDS_PER_DAY;
     if !(latitude.is_finite()
         && longitude.is_finite()
         && position.altitude.get().is_finite()
@@ -725,7 +748,7 @@ fn cloud_field_coordinates(clock: TimeOfDay, position: Geodetic) -> Option<(f64,
     Some((east / CLOUD_PATTERN_METRES, north / CLOUD_PATTERN_METRES))
 }
 
-fn camera_geodetic(origin: &RenderOrigin, transform: &Transform) -> Option<Geodetic> {
+pub(crate) fn camera_geodetic(origin: &RenderOrigin, transform: &Transform) -> Option<Geodetic> {
     if !transform.translation.is_finite() {
         return None;
     }

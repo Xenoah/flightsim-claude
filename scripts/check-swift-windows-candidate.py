@@ -29,14 +29,71 @@ LEGACY_BASELINE = "5c5b2a3057549c7429236b93aa0cdc99e2de38d1"
 # Independently reproduced from the 68 f64 values, signed-zero inertia entries,
 # FNV byte order and FDM revision 2 suffix; also matches prior native QA.
 LEGACY_FINGERPRINT = "0505e6644bb29a53"
-# A same-head fixture and consumer must not silently drift together. Updating
-# these requires explicit review of legacy identity, not a generated refresh.
+# Historical provenance, never refreshed to current source. The reviewed manifest
+# below supersedes the monolithic replay pin without relabeling old evidence.
 LEGACY_SOURCE_HASHES = {
     "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
     "crates/flightsim-fdm/src/aircraft.rs": "72091944bfff40abace7f10f05566d9a4394b96aa2cf767e149b54c996219671",
     "crates/flightsim-fdm/src/lib.rs": "a956e3046e906304e23e675d440ed20875ea5e47d1a3552158b8356f16b8ccc9",
     "crates/flightsim-sim/src/replay.rs": "0b783ceed247b984729021ae57c74b061936d627c04275a850e59079266a18c1",
     "crates/flightsim-app/src/aircraft_profile.rs": "59c6deb0db1822178b30a0ba4e2fcbcac9e2177e1f0f0851f54c74510f3c6da0",
+}
+REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
+REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
+# Whole files, not selected functions or text-normalized projections. Adding a
+# helper or changing any reviewed implementation requires a boundary review.
+REPLAY_CONTRACT_PATHS = {
+    'assets/aircraft/light_single.json',
+    'assets/aircraft/swift_sport.json',
+    'crates/flightsim-fdm/src/aircraft.rs',
+    'crates/flightsim-fdm/src/lib.rs',
+    'crates/flightsim-sim/src/replay.rs',
+    'crates/flightsim-sim/src/replay/identity.rs',
+    'crates/flightsim-sim/src/replay/current.rs',
+    'crates/flightsim-sim/src/replay/player.rs',
+    'crates/flightsim-sim/src/lib.rs',
+    'crates/flightsim-sim/src/weather.rs',
+    'crates/flightsim-sim/examples/record_takeoff.rs',
+    'crates/flightsim-app/src/aircraft_profile.rs',
+    'crates/flightsim-app/src/distribution.rs',
+    'crates/flightsim-app/src/main.rs',
+    'crates/flightsim-app/src/replay_policy.rs',
+    'crates/flightsim-app/src/replay_runtime.rs',
+    'crates/flightsim-app/src/replay_migration_tests.rs',
+    'crates/flightsim-ui/src/replay.rs',
+    'crates/flightsim-sim/tests/replay_complete_identity.rs',
+    'crates/flightsim-sim/tests/replay_v3.rs',
+    'crates/flightsim-sim/tests/replay_player_versions.rs',
+    "crates/flightsim-app/src/weather_runtime.rs",
+    "crates/flightsim-app/src/world_runtime.rs",
+    "crates/flightsim-app/src/cloud_runtime.rs",
+    "crates/flightsim-app/src/region_runtime.rs",
+    "crates/flightsim-ui/src/world_map.rs",
+}
+# Independent Python encoders and their existing bytes stay frozen separately
+# from the moving reviewed implementation. Never regenerate to satisfy a pin.
+INDEPENDENT_REPLAY_HASHES = {
+    'docs/qa/replay_identity_reference.py': 'a1b65acbc795880f8fa9ba5891260ab0437dc0281081658454169c22277b1034',
+    'docs/qa/replay_v3_reference.py': 'f5b5128b147d512f55441c8610ff337b787fd8be28c7564149861aa0d442b1c6',
+    'crates/flightsim-sim/tests/fixtures/legacy_v1.fsreplay': 'c9d0404374f540797ad4dd3b648abb3fbf928b6de0cde88195172cb2beffad57',
+    'crates/flightsim-sim/tests/fixtures/legacy_v2_disabled.fsreplay': '02f14d7c188fd9426faa78dd1670168997abf18f9ec4aeae1f02fbce024732b7',
+    'crates/flightsim-sim/tests/fixtures/legacy_v2_world.fsreplay': 'fe156d5e407b847b37544dc6fb7e153b6b0ba49d0e2d0a38ffda57ac1c8c57f0',
+    'crates/flightsim-sim/tests/fixtures/v3_clear.fsreplay': 'c26a89dfc0db1cb75bb9a09a02be0c650d13d3fae6f584c277c9da0ba5541f94',
+    'crates/flightsim-sim/tests/fixtures/v3_cloud.fsreplay': '77ee335e29b6c352ba121d6134f2aa0add52cc57dc7e26f0ebd10375e8906476',
+    'crates/flightsim-sim/tests/fixtures/v3_custom_both.fsreplay': 'dc558b9a5dcc46ba91513b9fc1894121f3314252eb4292cb7e47ad9ac010b30f',
+    'crates/flightsim-sim/tests/fixtures/v3_fog.fsreplay': '9b7fcb8ceb52e84d54f015fa01c8d5aed24721ef01952805b23164b2d12a0760',
+    'crates/flightsim-sim/tests/fixtures/v3_legacy_weather.fsreplay': 'ba5fa5cc8fac02853f1f00c1364316fff46fbe4e95734b915a966dbafb10ba91',
+    'crates/flightsim-sim/tests/fixtures/v3_rain.fsreplay': 'de73fc4ab21401bd38f99a9be49b024683b593c7f4ae834c1f21b2ba1bb79b85',
+    'crates/flightsim-sim/tests/fixtures/v3_snow.fsreplay': '29a0d186e4efdbac32e901ceabda6b831e8a13bf0517d57a5d37333688c382fb',
+    'crates/flightsim-sim/tests/fixtures/v3_storm.fsreplay': 'b9f6208a9880a87998fb9a4e04b2d0e3400ad2df3b4e312f58fd98bb2630945d',
+}
+LEGACY_NOTICE = "LEGACY PARTIAL IDENTITY: historical yaw_rate_p was not recorded or verified"
+LEGACY_LIMIT = ("Legacy smoke checks the original partial fingerprint and replay startup under explicit "
+                "baseline assumption; historical yaw_rate_p is not verified, nor whole-flight/cross-version reproduction")
+REPLAY_ACCEPTANCE_TESTS = {
+    "legacy_policy_test": "replay_policy::tests::legacy_requires_explicit_choice_and_selected_complete_baseline",
+    "legacy_notice_test": "replay_migration_tests::light_and_swift_all_versions_keep_exact_controls_clock_rewind_and_export",
+    "legacy_layout_test": "replay_migration_tests::real_replay_notices_fit_narrow_resizes_and_keep_live_tutorial_clear",
 }
 REQUIRED_TEXT_EVIDENCE = {
     "acceptance.json", "source-inputs.json", "dependency-inventory.json",
@@ -89,6 +146,28 @@ def git(repo, *args):
     return subprocess.check_output(["git", *args], cwd=repo).decode("utf-8").strip()
 
 
+def validate_replay_contract(contract):
+    require(isinstance(contract, dict) and contract.get("schema_version") == 1
+            and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
+    require(isinstance(contract.get("reviewed_source"), str)
+            and re.fullmatch(r"[0-9a-f]{40}", contract["reviewed_source"]), "missing reviewed replay source")
+    pins = contract.get("source_sha256")
+    require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
+            "reviewed replay source boundary changed")
+    require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in pins.values()),
+            "invalid reviewed replay source digest")
+    # These profile/FDM inputs never migrated. main/profile wiring is separately
+    # reviewed; the old monolithic replay hash stays historical provenance only.
+    for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs",
+                 "crates/flightsim-fdm/src/lib.rs"):
+        require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
+    return contract
+
+
+def load_replay_contract(repo):
+    return validate_replay_contract(json.loads((repo / REPLAY_CONTRACT_PATH).read_text(encoding="utf-8")))
+
+
 def source_inputs(repo, expected):
     require(re.fullmatch(r"[0-9a-f]{40}", expected), "expected source must be a full lowercase SHA")
     require(git(repo, "rev-parse", "HEAD") == expected, "checkout is not the expected source")
@@ -105,32 +184,43 @@ def source_inputs(repo, expected):
                         "checkout_bytes": path.stat().st_size, "checkout_sha256": digest(path)})
     records.sort(key=lambda record: record["path"])
     by_path = {record["path"]: record for record in records}
-    legacy_sources = {}
-    for relative, expected_hash in LEGACY_SOURCE_HASHES.items():
+    require(REPLAY_CONTRACT_PATH in by_path, "reviewed replay contract must be tracked")
+    contract_record = by_path[REPLAY_CONTRACT_PATH]
+    contract_blob = subprocess.check_output(
+        ["git", "cat-file", "blob", contract_record["canonical_git_blob"]], cwd=repo)
+    require(hashlib.sha256(contract_blob).hexdigest() == contract_record["checkout_sha256"],
+            "reviewed replay contract checkout differs from canonical Git blob")
+    contract = load_replay_contract(repo)
+    reviewed_sources = {}
+    for relative, expected_hash in {**contract["source_sha256"], **INDEPENDENT_REPLAY_HASHES}.items():
+        require(relative in by_path, "missing reviewed replay source: " + relative)
         record = by_path[relative]
         blob = subprocess.check_output(["git", "cat-file", "blob", record["canonical_git_blob"]], cwd=repo)
         canonical_hash = hashlib.sha256(blob).hexdigest()
         diagnostic = (f"{relative}; expected_sha256={expected_hash}; canonical_sha256={canonical_hash}; "
                       f"checkout_sha256={record['checkout_sha256']}")
-        require(canonical_hash == expected_hash, "legacy canonical baseline changed: " + diagnostic)
+        require(canonical_hash == expected_hash, "reviewed replay canonical baseline changed: " + diagnostic)
         # Exact compiled bytes still matter. No hashing normalization or newline
         # equivalence is accepted; the workflow explicitly selects LF checkout.
         require(record["checkout_sha256"] == canonical_hash,
-                "legacy checkout differs from canonical Git blob (check core.eol=lf): " + diagnostic)
-        legacy_sources[relative] = {"canonical_sha256": canonical_hash, "canonical_bytes": len(blob),
+                "reviewed replay checkout differs from canonical Git blob (check core.eol=lf): " + diagnostic)
+        reviewed_sources[relative] = {"canonical_sha256": canonical_hash, "canonical_bytes": len(blob),
                                     "canonical_git_blob": record["canonical_git_blob"],
                                     "checkout_sha256": record["checkout_sha256"],
                                     "checkout_bytes": record["checkout_bytes"]}
-    return {"schema_version": 2, "source_sha": expected, "source_tree": git(repo, "rev-parse", "HEAD^{tree}"),
+    return {"schema_version": 3, "source_sha": expected, "source_tree": git(repo, "rev-parse", "HEAD^{tree}"),
             "canonical_git_object_format": git(repo, "rev-parse", "--show-object-format"),
             "legacy_baseline": LEGACY_BASELINE, "legacy_source_sha256": LEGACY_SOURCE_HASHES,
-            "legacy_source_evidence": legacy_sources, "files": records}
+            "replay_contract": contract, "replay_contract_text": contract_blob.decode("utf-8"),
+            "replay_contract_sha256": digest(repo / REPLAY_CONTRACT_PATH),
+            "independent_replay_sha256": INDEPENDENT_REPLAY_HASHES,
+            "reviewed_replay_source_evidence": reviewed_sources, "files": records}
 
 
 def candidate_commands():
     common = ["--locked", "--release", "-j", "2", "--target", TARGET, "-p", "flightsim-app",
               "--features", ",".join(FEATURES)]
-    return {
+    commands = {
         "build": ["cargo", "+" + TOOLCHAIN, "build", *common],
         "identity_test": ["cargo", "+" + TOOLCHAIN, "test", *common, "--bin", "flightsim-app",
                           "distribution::tests::explicit_legacy_aircraft_retains_fingerprint_and_is_not_remapped",
@@ -139,6 +229,10 @@ def candidate_commands():
                      "--filter-platform", TARGET, "--features",
                      ",".join("flightsim-app/" + feature for feature in FEATURES)],
     }
+    for name, test in REPLAY_ACCEPTANCE_TESTS.items():
+        commands[name] = ["cargo", "+" + TOOLCHAIN, "test", *common,
+                          "--bin", "flightsim-app", test, "--", "--exact"]
+    return commands
 
 
 def validate_inventory(inventory, metadata, repo, metadata_path):
@@ -256,6 +350,24 @@ def validate_smoke(log, exit_code, *, model):
     else:
         require("aircraft model fitted:" not in plain and "aircraft model:" not in plain,
                 "explicit no-model unexpectedly loaded a model")
+
+
+def legacy_capture_command(executable, fixture, screenshot):
+    return [str(executable), "--aircraft", "light-single", "--no-model",
+            "--legacy-replay-compatibility", "--replay", str(fixture),
+            "--screenshot", str(screenshot), "--screenshot-delay", "5",
+            "--exit-after-screenshot", "--view", "chase"]
+
+
+def validate_legacy_smoke(log, exit_code):
+    validate_smoke(log, exit_code, model=False)
+    require(LEGACY_NOTICE in ANSI.sub("", log), "legacy playback lacks full partial-identity limitation")
+
+
+def validate_legacy_rejection(log, exit_code):
+    require(exit_code == 2 and "aircraft/FDM model mismatch" in log
+            and "legacy partial fingerprint " + LEGACY_FINGERPRINT in log,
+            "default Swift did not reject the actual legacy identity in hexadecimal")
 
 
 def legacy_identity(path):
@@ -383,6 +495,55 @@ def validate_probe_evidence(directory, report):
                 "unproven diagnostic image cannot be uploaded")
 
 
+def validate_source_evidence(source, report):
+    def hex_value(value, length):
+        return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{" + str(length) + "}", value)
+
+    require(isinstance(source, dict) and source.get("schema_version") == 3
+            and hex_value(report.get("source_sha"), 40) and source.get("source_sha") == report["source_sha"],
+            "invalid reviewed source identity")
+    object_length = {"sha1": 40, "sha256": 64}.get(source.get("canonical_git_object_format"))
+    require(object_length and hex_value(source.get("source_tree"), object_length), "invalid reviewed source tree")
+    contract = validate_replay_contract(source.get("replay_contract"))
+    contract_text = source.get("replay_contract_text")
+    contract_hash = source.get("replay_contract_sha256")
+    require(isinstance(contract_text, str) and hex_value(contract_hash, 64)
+            and hashlib.sha256(contract_text.encode("utf-8")).hexdigest() == contract_hash
+            and json.loads(contract_text) == contract
+            and report.get("replay_contract") == REPLAY_CONTRACT_ID
+            and report.get("replay_contract_sha256") == contract_hash,
+            "invalid reviewed contract byte binding")
+    require(source.get("legacy_baseline") == LEGACY_BASELINE
+            and source.get("legacy_source_sha256") == LEGACY_SOURCE_HASHES
+            and source.get("independent_replay_sha256") == INDEPENDENT_REPLAY_HASHES,
+            "frozen replay evidence anchors changed")
+    files = source.get("files")
+    require(isinstance(files, list) and files, "missing tracked source inputs")
+    by_path = {}
+    for record in files:
+        require(isinstance(record, dict) and isinstance(record.get("path"), str)
+                and record["path"] not in by_path and record.get("git_mode") in ("100644", "100755")
+                and hex_value(record.get("canonical_git_blob"), object_length)
+                and type(record.get("checkout_bytes")) is int and record["checkout_bytes"] >= 0
+                and hex_value(record.get("checkout_sha256"), 64), "invalid tracked source input")
+        by_path[record["path"]] = record
+    require(by_path.get(REPLAY_CONTRACT_PATH, {}).get("checkout_sha256") == contract_hash
+            and by_path[REPLAY_CONTRACT_PATH]["checkout_bytes"] == len(contract_text.encode("utf-8")),
+            "contract missing from tracked source inputs")
+    pins = {**contract["source_sha256"], **INDEPENDENT_REPLAY_HASHES}
+    reviewed = source.get("reviewed_replay_source_evidence")
+    require(isinstance(reviewed, dict) and set(reviewed) == set(pins), "incomplete reviewed source evidence")
+    for path, expected_hash in pins.items():
+        record = by_path.get(path)
+        require(record is not None and record["checkout_sha256"] == expected_hash,
+                "reviewed source missing or differs: " + path)
+        require(reviewed[path] == {
+            "canonical_sha256": expected_hash, "canonical_bytes": record["checkout_bytes"],
+            "canonical_git_blob": record["canonical_git_blob"],
+            "checkout_sha256": expected_hash, "checkout_bytes": record["checkout_bytes"],
+        }, "reviewed source byte evidence differs: " + path)
+
+
 def validate_evidence(directory):
     require(directory.is_dir() and not directory.is_symlink(), "missing evidence directory")
     for path in directory.iterdir():
@@ -408,12 +569,33 @@ def validate_evidence(directory):
     for name, check in checks.items():
         require(check.get("status") == "passed" and check.get("exit_code") == expected_checks[name],
                 "invalid acceptance check state")
+    if "default_rejects_legacy" in checks:
+        validate_legacy_rejection((directory / "default-rejects-legacy.log").read_text(encoding="utf-8"),
+                                  checks["default_rejects_legacy"]["exit_code"])
+    if "legacy_no_model" in checks:
+        proof = checks["legacy_no_model"]
+        require(proof.get("identity_evidence") == "legacy_partial" and proof.get("legacy_opt_in") is True
+                and proof.get("historical_yaw_verified") is False and proof.get("notice") == LEGACY_NOTICE
+                and proof.get("fingerprint") == LEGACY_FINGERPRINT,
+                "legacy smoke cannot claim complete or historical yaw identity")
+        require(LEGACY_LIMIT in report.get("limits", []), "missing legacy partial-identity limitation")
+        legacy_log = directory / "legacy-no-model.log"
+        require(digest(legacy_log) == proof.get("log_sha256"), "legacy log changed")
+        validate_legacy_smoke(legacy_log.read_text(encoding="utf-8"), proof["exit_code"])
+        require(report.get("replay_tests") == {
+            name: {"status": "passed", "test": test} for name, test in REPLAY_ACCEPTANCE_TESTS.items()
+        }, "legacy smoke lacks persistent notice/policy test evidence")
     if report.get("status") == "engineering_checks_passed":
         require(set(checks) == set(expected_checks), "successful report lacks required checks")
         require((directory / PNG_NAME).exists() and all((directory / name).is_file() for name in REQUIRED_TEXT_EVIDENCE),
                 "successful report lacks required evidence")
         require(report.get("legacy_replay", {}).get("fingerprint") == LEGACY_FINGERPRINT,
                 "successful report lacks frozen legacy fingerprint")
+        source = json.loads((directory / "source-inputs.json").read_text(encoding="utf-8"))
+        require(report.get("source_inputs_sha256") == digest(directory / "source-inputs.json"),
+                "successful report lacks reviewed replay source binding")
+        validate_source_evidence(source, report)
+        validate_distribution(report.get("distribution"), report.get("distribution"))
     else:
         require(report.get("status") == "failed" and isinstance(report.get("failure"), str)
                 and report["failure"], "failed report needs an explicit reason")
@@ -448,7 +630,7 @@ def run_candidate(repo, expected, work, evidence):
                   "Engineering acceptance only; rights, dependency review and release authorization remain independent",
                   "Bundled AgX/Filmic LUTs remain enabled and retain unresolved review records",
                   "Software D3D12 fallback is not physical GPU/controller/audio or Steam qualification",
-                  "Legacy check proves original identity and replay startup, not whole-flight/cross-version reproduction"],
+                  LEGACY_LIMIT],
               "commands": candidate_commands(), "runtime_capture_rust_log": CAPTURE_TRACE}
     env = os.environ.copy()
     for name in ("CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS"):
@@ -494,6 +676,10 @@ def run_candidate(repo, expected, work, evidence):
         source = source_inputs(repo, expected)
         write_json(evidence / "source-inputs.json", source)
         report["source_inputs_sha256"] = digest(evidence / "source-inputs.json")
+        report["replay_contract"] = REPLAY_CONTRACT_ID
+        report["replay_contract_sha256"] = source["replay_contract_sha256"]
+        for reference in ("replay_identity_reference.py", "replay_v3_reference.py"):
+            run([sys.executable, repo / "docs/qa" / reference])
         rustc, _ = run(["rustc", "+" + TOOLCHAIN, "-Vv"])
         report["rustc"] = rustc.stdout.decode("utf-8").strip()
         require(report["rustc"].startswith("rustc 1.93.0 "), "wrong Rust compiler")
@@ -557,23 +743,28 @@ def run_candidate(repo, expected, work, evidence):
         report["checks"]["absent_light_single"] = {"status": "passed", "exit_code": result.returncode}
         _, log = run(report["commands"]["identity_test"])
         require("1 passed; 0 failed" in log, "legacy identity test did not actually execute")
+        report["replay_tests"] = {}
+        for name in REPLAY_ACCEPTANCE_TESTS:
+            _, log = run(report["commands"][name])
+            require("1 passed; 0 failed" in log, name + " did not actually execute")
+            report["replay_tests"][name] = {"status": "passed", "test": REPLAY_ACCEPTANCE_TESTS[name]}
         fixture = work / "legacy.fsreplay"
         run(["cargo", "+" + TOOLCHAIN, "run", "--locked", "--release", "-j", "2", "--target", TARGET,
              "-p", "flightsim-sim", "--example", "record_takeoff", "--", fixture])
         report["legacy_replay"] = legacy_identity(fixture)
         result, log = run([app, "--replay", fixture], cwd=unrelated, timeout=30, accepted=(2,), runtime=True,
                           output=evidence / "default-rejects-legacy.log")
-        require("aircraft/FDM model mismatch" in log and report["legacy_replay"]["fingerprint"] in log,
-                "default Swift did not reject the actual legacy identity")
+        validate_legacy_rejection(log, result.returncode)
         report["checks"]["default_rejects_legacy"] = {"status": "passed", "exit_code": result.returncode}
-        result, log = run([app, "--aircraft", "light-single", "--no-model", "--replay", fixture,
-                           "--screenshot", work / "legacy-no-model.png", "--screenshot-delay", "5",
-                           "--exit-after-screenshot", "--view", "chase"], cwd=unrelated, timeout=180, runtime=True,
-                          output=evidence / "legacy-no-model.log")
-        validate_smoke(log, result.returncode, model=False)
+        result, log = run(legacy_capture_command(app, fixture, work / "legacy-no-model.png"),
+                          cwd=unrelated, timeout=180, runtime=True, output=evidence / "legacy-no-model.log")
+        validate_legacy_smoke(log, result.returncode)
         validate_png(work / "legacy-no-model.png")
         report["checks"]["legacy_no_model"] = {"status": "passed", "exit_code": result.returncode,
-                                                "fingerprint": report["legacy_replay"]["fingerprint"]}
+                                                "fingerprint": report["legacy_replay"]["fingerprint"],
+                                                "identity_evidence": "legacy_partial", "legacy_opt_in": True,
+                                                "historical_yaw_verified": False, "notice": LEGACY_NOTICE,
+                                                "log_sha256": digest(evidence / "legacy-no-model.log")}
         require(source_inputs(repo, expected) == source, "source changed during candidate check")
         verify_bundle(bundle, executable, manifest_hash)
         report["status"] = "engineering_checks_passed"

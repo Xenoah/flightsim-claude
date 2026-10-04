@@ -1,0 +1,33 @@
+{
+  "contract": "swift-candidate-replay-v3-v1",
+  "reviewed_source": "b68b0ff1ce63ff1fc441a72d9bbd997f9b39a014",
+  "schema_version": 1,
+  "source_sha256": {
+    "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+    "assets/aircraft/swift_sport.json": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+    "crates/flightsim-app/src/aircraft_profile.rs": "59c6deb0db1822178b30a0ba4e2fcbcac9e2177e1f0f0851f54c74510f3c6da0",
+    "crates/flightsim-app/src/cloud_runtime.rs": "244f1aaf1100fabfc67a62740c3a3f93bb2bb3216561bd3fbfb2e7efb7dce891",
+    "crates/flightsim-app/src/distribution.rs": "a898b724744a3c8c3532fdd4ccbfbe665b7a1a4eb92ef8aee4f827301796b12a",
+    "crates/flightsim-app/src/main.rs": "11783c63f5d1919cce097c0348068df945c755f8ab2988cf0e44192f5df17599",
+    "crates/flightsim-app/src/region_runtime.rs": "8ff1f5bdec88ee046caa1014b6b6d35a78737d9c9f3265a70e2dcf36d6d50d67",
+    "crates/flightsim-app/src/replay_migration_tests.rs": "2319a12ab38d2653dd678dbe38bbc78b29eff44de80f19d7ccc6568b04d5e388",
+    "crates/flightsim-app/src/replay_policy.rs": "2f71b7e20dc7ed11361917036b1e08c16a687004ebf635c3d6f0975964ea790a",
+    "crates/flightsim-app/src/replay_runtime.rs": "6f4fe36a36ce3fdf7ec2b0bd2e3e67d8dd861db81a918173bd2c60d37f53920b",
+    "crates/flightsim-app/src/weather_runtime.rs": "99d2e573f37957fe9f868890b6478b96e3ee78fb2f8a3a1bffb4fed6693df85c",
+    "crates/flightsim-app/src/world_runtime.rs": "fdb21350d9b1e92ed80cca3791c8703beb400984e810807f070e15c03a9d217a",
+    "crates/flightsim-fdm/src/aircraft.rs": "72091944bfff40abace7f10f05566d9a4394b96aa2cf767e149b54c996219671",
+    "crates/flightsim-fdm/src/lib.rs": "a956e3046e906304e23e675d440ed20875ea5e47d1a3552158b8356f16b8ccc9",
+    "crates/flightsim-sim/examples/record_takeoff.rs": "53fa3903cd8af2f81659f5646aca948590f6efe90be3b53d37278eaecd0d0f59",
+    "crates/flightsim-sim/src/lib.rs": "54aaab306f51f39221eeeb5d9dcacc8b92631b96692a4618fad240eb9cff05ac",
+    "crates/flightsim-sim/src/replay.rs": "a28f347af026d1b3629917db3961f9021c486dc71cf53c4501ff17028bd3ebe4",
+    "crates/flightsim-sim/src/replay/current.rs": "4366128d688bd5c6773a288e592e567bc0010fda9b7c58d5f3799c6c96408efe",
+    "crates/flightsim-sim/src/replay/identity.rs": "b702fa49a2c7138adf4b9f90a81cdab9178e2f8a071f8376ecc578efa5751eae",
+    "crates/flightsim-sim/src/replay/player.rs": "54455583a9d0e96291afceb970d3c1063cc7e00437836053feb6eb24fb2e2246",
+    "crates/flightsim-sim/src/weather.rs": "21acbb1e924c48cea00a504993dcb5c0474c0a5aab1b474c43bab6613e6e9618",
+    "crates/flightsim-sim/tests/replay_complete_identity.rs": "79346f595472962fdb7e45b2151e8a39c86062b3fb218f5c81ca75cc5929501b",
+    "crates/flightsim-sim/tests/replay_player_versions.rs": "e7c1f0c8bedaa3270af79a694d81d34ee25acd443aa00d183f1501bac618061f",
+    "crates/flightsim-sim/tests/replay_v3.rs": "ae443724d824cc697520f42576512b1c736d491c6c152f7c8792152ed7af0cfe",
+    "crates/flightsim-ui/src/replay.rs": "85afdefccb331fb4a59c851834357d4d8a5d44d1428de93cff0f70a125d01fc0",
+    "crates/flightsim-ui/src/world_map.rs": "358b14908cbb53aa57d6dc1015835b6905bcbb39f1eef935a19d64d9efacaf7b"
+  }
+}
