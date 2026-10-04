@@ -592,36 +592,55 @@ mod selection_tests {
     fn jet_metadata_adapter_retains_exact_numbers_signed_zero_and_subnormals() {
         // Just above the halfway point between 1 and its next binary64 value.
         let halfway_above = "1.00000000000000011102230246251565404236316680908203126";
-        let json = JET_JSON
-            .replace(
-                "\"length_m\": 8.3",
-                &format!("\"length_m\": {halfway_above}"),
-            )
-            .replace(
-                "\"surface_rate\": 2.5",
-                &format!("\"surface_rate\": {halfway_above}"),
-            )
-            .replace("\"default_trim\": 0.09", "\"default_trim\": -0.0")
-            .replace(
-                "    0.6,\n    -0.25,\n    -0.9",
-                "    -0.0,\n    4.9406564584124654e-324,\n    -0.9",
+        // Exercise both checkout styles without parsing or reserializing numbers.
+        for newline in ["\n", "\r\n"] {
+            let mut json = JET_JSON.replace("\r\n", "\n").replace('\n', newline);
+            for (before, after) in [
+                (
+                    "\"length_m\": 8.3",
+                    format!("\"length_m\": {halfway_above}"),
+                ),
+                (
+                    "\"surface_rate\": 2.5",
+                    format!("\"surface_rate\": {halfway_above}"),
+                ),
+                (
+                    "\"default_trim\": 0.09",
+                    "\"default_trim\": -0.0".to_owned(),
+                ),
+                (
+                    "    0.6,\n    -0.25,\n    -0.9",
+                    "    -0.0,\n    4.9406564584124654e-324,\n    -0.9".to_owned(),
+                ),
+            ] {
+                let before = before.replace('\n', newline);
+                let after = after.replace('\n', newline);
+                assert_eq!(
+                    json.matches(&before).count(),
+                    1,
+                    "missing fixture: {before:?}"
+                );
+                json = json.replacen(&before, &after, 1);
+                assert!(!json.contains(&before));
+                assert!(json.contains(&after));
+            }
+            let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+            assert_eq!(
+                selected.model_fit().target_length.get().to_bits(),
+                0x3ff0_0000_0000_0001
             );
-        let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
-        assert_eq!(
-            selected.model_fit().target_length.get().to_bits(),
-            0x3ff0_0000_0000_0001
-        );
-        assert_eq!(
-            selected.pilot_controls(false).aileron,
-            AxisState::new(f64::from_bits(0x3ff0_0000_0000_0001), 1.8)
-        );
-        assert_eq!(
-            selected.pilot_controls(false).trim.value().to_bits(),
-            (-0.0_f64).to_bits()
-        );
-        let eye = selected.camera_eye();
-        assert_eq!(eye[0].get().to_bits(), (-0.0_f64).to_bits());
-        assert_eq!(eye[1].get().to_bits(), 1);
+            assert_eq!(
+                selected.pilot_controls(false).aileron,
+                AxisState::new(f64::from_bits(0x3ff0_0000_0000_0001), 1.8)
+            );
+            assert_eq!(
+                selected.pilot_controls(false).trim.value().to_bits(),
+                (-0.0_f64).to_bits()
+            );
+            let eye = selected.camera_eye();
+            assert_eq!(eye[0].get().to_bits(), (-0.0_f64).to_bits());
+            assert_eq!(eye[1].get().to_bits(), 1);
+        }
     }
 
     #[test]
@@ -707,31 +726,40 @@ mod selection_tests {
     #[test]
     fn jet_input_defaults_optional_pitch_rates_and_approach_pose_are_applied() {
         use flightsim_core::{Degrees, NauticalMiles};
-        let json = JET_JSON
-            .replace("    \"elevator_rate\": 0.25,\n", "")
-            .replace("    \"elevator_centering_rate\": 5.0,\n", "");
-        let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
-        let parked = selected.pilot_controls(false);
-        assert_eq!(parked.elevator, AxisState::new(2.5, 1.8));
-        assert_eq!(parked.throttle.value().to_bits(), 0.0_f64.to_bits());
-        assert_eq!(parked.flaps.value().to_bits(), 0.0_f64.to_bits());
-        assert_eq!(parked.trim.value().to_bits(), 0.09_f64.to_bits());
-        let approach = selected.pilot_controls(true);
-        assert_eq!(
-            approach.throttle.value().to_bits(),
-            0.39155148_f64.to_bits()
-        );
-        assert_eq!(approach.flaps.value().to_bits(), 1.0_f64.to_bits());
-        assert_eq!(approach.trim.value().to_bits(), 0.15570889_f64.to_bits());
-        let runway = flightsim_world::Runway::synthetic();
-        let distance = NauticalMiles(1.5).to_meters();
-        let glideslope = Degrees(3.0).to_radians();
-        let state = selected.approach_state(&runway, distance, glideslope);
-        let expected =
-            flightsim_sim::approach_state(&runway, distance, glideslope, MetersPerSecond(35.0));
-        assert!((state.position.0 - expected.position.0).length() < 1e-6);
-        assert!((state.velocity - expected.velocity).length() < 1e-9);
-        assert!((state.attitude().pitch.get() - -0.07269918).abs() < 1e-9);
+        for newline in ["\n", "\r\n"] {
+            let mut json = JET_JSON.replace("\r\n", "\n").replace('\n', newline);
+            for optional_field in [
+                "    \"elevator_rate\": 0.25,\n",
+                "    \"elevator_centering_rate\": 5.0,\n",
+            ] {
+                let optional_field = optional_field.replace('\n', newline);
+                assert_eq!(json.matches(&optional_field).count(), 1);
+                json = json.replacen(&optional_field, "", 1);
+                assert!(!json.contains(&optional_field));
+            }
+            let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+            let parked = selected.pilot_controls(false);
+            assert_eq!(parked.elevator, AxisState::new(2.5, 1.8));
+            assert_eq!(parked.throttle.value().to_bits(), 0.0_f64.to_bits());
+            assert_eq!(parked.flaps.value().to_bits(), 0.0_f64.to_bits());
+            assert_eq!(parked.trim.value().to_bits(), 0.09_f64.to_bits());
+            let approach = selected.pilot_controls(true);
+            assert_eq!(
+                approach.throttle.value().to_bits(),
+                0.39155148_f64.to_bits()
+            );
+            assert_eq!(approach.flaps.value().to_bits(), 1.0_f64.to_bits());
+            assert_eq!(approach.trim.value().to_bits(), 0.15570889_f64.to_bits());
+            let runway = flightsim_world::Runway::synthetic();
+            let distance = NauticalMiles(1.5).to_meters();
+            let glideslope = Degrees(3.0).to_radians();
+            let state = selected.approach_state(&runway, distance, glideslope);
+            let expected =
+                flightsim_sim::approach_state(&runway, distance, glideslope, MetersPerSecond(35.0));
+            assert!((state.position.0 - expected.position.0).length() < 1e-6);
+            assert!((state.velocity - expected.velocity).length() < 1e-9);
+            assert!((state.attitude().pitch.get() - -0.07269918).abs() < 1e-9);
+        }
     }
 
     #[test]

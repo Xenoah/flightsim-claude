@@ -1,11 +1,11 @@
 {
   "contract": "swift-candidate-replay-v3-v1",
-  "reviewed_source": "138e317e199b6bda8108b1ce1a7c7b48ab70461c",
+  "reviewed_source": "c02fc80631cf5e70fccfb712bce70d717b807435",
   "schema_version": 1,
   "source_sha256": {
     "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
     "assets/aircraft/swift_sport.json": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
-    "crates/flightsim-app/src/aircraft_profile.rs": "3f5e6669d00136a0607e719cfbb2633ab56a2329158f1726760ce22fc5959bbe",
+    "crates/flightsim-app/src/aircraft_profile.rs": "75f304b41fc41022691ef60ce4315fc699078e271e6f3fac0ad5c824e1a40e36",
     "crates/flightsim-app/src/cloud_runtime.rs": "244f1aaf1100fabfc67a62740c3a3f93bb2bb3216561bd3fbfb2e7efb7dce891",
     "crates/flightsim-app/src/controls_runtime_tests.rs": "0213b5e2cdec2f8f04b29d489cd28982b6bc527025cc465b31c2118572a00838",
     "crates/flightsim-app/src/distribution.rs": "26e1bb7a3e13ea7629b64bb7fe8169ba11dfffe7ae17f36de3882554c9cec411",
@@ -18,7 +18,7 @@
     "crates/flightsim-app/src/replay_runtime.rs": "6f4fe36a36ce3fdf7ec2b0bd2e3e67d8dd861db81a918173bd2c60d37f53920b",
     "crates/flightsim-app/src/traffic_runtime.rs": "ab0791764da79c8a9aed26fc7f6deeb35d692b11fe0af0d078ecb9aeb5d66ff2",
     "crates/flightsim-app/src/weather_runtime.rs": "da00164ef63327c6281dae0dad7ef60a650878ba590e7ed1b81d5f32754e2214",
-    "crates/flightsim-app/src/world_runtime.rs": "c5081744251787e47ddd5a8b8309247046168bce3377c72e472199f5144d4c50",
+    "crates/flightsim-app/src/world_runtime.rs": "4974da66bd2928a068a0bb0a2e6a44731d89875c0570813519cacaf3ef98763d",
     "crates/flightsim-fdm/src/aircraft.rs": "72091944bfff40abace7f10f05566d9a4394b96aa2cf767e149b54c996219671",
     "crates/flightsim-fdm/src/landing_gear.rs": "aa569b2d2c2ff7296e9a4d4814b91d6b7346c92546b51b640116caf1475b7915",
     "crates/flightsim-fdm/src/lib.rs": "4d51cf4b5d62ce0f6bcc031df445225ac07c2bad0ed590c4b422ad6cca579462",

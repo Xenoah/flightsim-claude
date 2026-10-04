@@ -1479,14 +1479,20 @@ mod tests {
 
     #[test]
     fn failed_jet_environment_and_domain_preserve_flight_weather_and_start_request() {
-        for outside_domain in [false, true] {
+        for (newline, outside_domain) in
+            [("\n", false), ("\n", true), ("\r\n", false), ("\r\n", true)]
+        {
             let mut world = map_jump_world();
-            let json =
+            let source =
                 include_str!("../../../docs/examples/aircraft-profiles-v2/numerical-jet.json")
-                    .replace(
-                        "\"pressure_ratio\": [\n        0.01,",
-                        "\"pressure_ratio\": [\n        0.7,",
-                    );
+                    .replace("\r\n", "\n")
+                    .replace('\n', newline);
+            let before = format!("\"pressure_ratio\": [{newline}        0.01,");
+            let after = format!("\"pressure_ratio\": [{newline}        0.7,");
+            assert_eq!(source.matches(&before).count(), 1);
+            let json = source.replacen(&before, &after, 1);
+            assert!(!json.contains(&before));
+            assert!(json.contains(&after));
             let profile = flightsim_sim::aircraft_profile::AircraftProfileV2::parse(&json).unwrap();
             assert_eq!(
                 profile

@@ -209,3 +209,37 @@ including original independent encoders, explicit/default diagnostic branches,
 all added semantic mutations and complete per-path drift checks. `git diff
 --check` also passes. This binding review executes no Cargo, native/GPU process,
 Windows candidate or diagnostic; the integration owner retains final native QA.
+
+## Follow-up: Windows test-fixture line endings
+
+Reviewed source `c02fc80631cf5e70fccfb712bce70d717b807435` repairs three test
+bodies after public source `2f30b519b362304f726377d393f57b1860b420ca` failed
+[Windows render CI](https://github.com/Xenoah/flightsim-claude/actions/runs/37203963444/job/111441184921).
+The original multiline LF-only replacements did not match CRLF fixture input:
+the signed-zero/subnormal eye mutation and optional pitch-field removals stayed
+unchanged, as did the intentionally narrowed pressure bound in the rollback test.
+The failure log's observed values match those unmodified fixture values.
+
+Only the three `#[cfg(test)]` bodies in app `aircraft_profile.rs` and
+`world_runtime.rs` change. Each constructs both LF and CRLF fixture copies in
+memory without parsing/reserializing numeric tokens, matches exactly one intended
+fragment, proves replacement/removal and retains the original exact-number,
+default-control, approach and atomic-failure assertions. This is test setup,
+not runtime input normalization. Full production prefixes are byte-identical to
+the previous source. The numerical JSON fixture remains byte-identical at
+SHA-256 `8339b68183ea31c228082e56984a39775f7f23df5633dd8a333fe06a65be7c74`.
+
+Both files were already pinned: `aircraft_profile.rs` has been part of the
+original legacy parser boundary throughout the native dispatch review.
+Only those two whole-file digests and the reviewed-source pointer advance;
+the other 34 digests, required 36-file set, all 13 independent anchors,
+historical hashes, default models, rights/staging/authorization gates and
+workflow newline policy are unchanged. The candidate still checks exact raw
+canonical/checkout bytes and never accepts newline normalization as equality.
+
+The fix author and integration owner report 34 focused jet tests plus strict
+app all-targets Clippy, formatting and diff checks passed. This binding review
+passes all 171 tests in the six Python contract suites, including the existing
+LF/CRLF checkout-byte rejection and exact-source evidence tests. A fresh remote
+Windows result remains separate. No Cargo, native/GPU, workflow trigger or
+publication is performed by the binding review.
