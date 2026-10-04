@@ -72,6 +72,11 @@ pub(super) fn parse_date(text: &str) -> Option<((i32, u8, u8), ClimateDate)> {
 /// The global baseline is consulted only after every permitted real ancestor.
 /// Legacy replay keeps the historical regional-level search range.
 pub(super) fn terrain_levels(startup: &Startup) -> core::ops::RangeInclusive<u8> {
+    if startup.aircraft.is_jet() {
+        // Match JetSimulation's pinned physical sampler. Render-only LOD still
+        // uses its own selector; a visual-detail option cannot alter jet ground.
+        return 8..=12;
+    }
     (if startup.world.global_terrain {
         0
     } else {
@@ -474,8 +479,9 @@ fn initialize_map(startup: Res<Startup>, mut map: ResMut<WorldMapState>) {
         .world
         .climate_date()
         .map_or(startup.world.civil_date.1, ClimateDate::month);
-    map.navigation_enabled = startup.replay.is_none() && startup.world.global_terrain;
-    if startup.replay.is_none() && !startup.world.global_terrain {
+    map.navigation_enabled =
+        startup.replay.is_none() && (startup.world.global_terrain || startup.aircraft.is_jet());
+    if startup.replay.is_none() && !startup.world.global_terrain && !startup.aircraft.is_jet() {
         map.navigation_note = LEGACY_MAP_NOTICE.into();
     }
     refresh_map_credits(&startup, &mut map);
@@ -503,6 +509,11 @@ fn refresh_map_credits(startup: &Startup, map: &mut WorldMapState) {
 }
 
 pub(super) fn initial_controls(startup: &Startup) -> PilotControls {
+    if startup.aircraft.is_jet() {
+        return startup
+            .aircraft
+            .pilot_controls(startup.approach.is_some() || startup.world.fly_height.is_some());
+    }
     let mut controls = startup.aircraft.pilot_controls(startup.approach.is_some());
     if startup.world.fly_height.is_some() {
         controls = startup.aircraft.pilot_controls(false);
@@ -512,8 +523,9 @@ pub(super) fn initial_controls(startup: &Startup) -> PilotControls {
     controls
 }
 
-/// Safe initial clearance and density-adjusted true speed are initialization,
-/// not an autopilot. The pilot must still fly after the explicit new-flight jump.
+/// Safe initial clearance and authored attitude/speed are initialization, not
+/// trim or an autopilot. Legacy starts retain their density-adjusted speed;
+/// jet starts use the exact profile hints and need continued pilot input.
 pub(super) fn airborne_state(
     startup: &Startup,
     terrain: &mut Terrain<BoxedSource>,
@@ -525,13 +537,25 @@ pub(super) fn airborne_state(
         startup.start.longitude,
         Meters(ground.elevation.get() + height.get()),
     );
+    let direction = Attitude::new(Radians::ZERO, Radians::ZERO, startup.heading).to_quaternion()
+        * bevy::math::DVec3::X;
+    if let Some(profile) = startup.aircraft.jet() {
+        let controls = profile.controls();
+        return flightsim_fdm::RigidBodyState::from_geodetic(
+            position,
+            Attitude::new(
+                Radians::ZERO,
+                Radians(controls.approach_pitch_rad.get()),
+                startup.heading,
+            ),
+            Ned(direction * controls.approach_speed_mps.get() + startup.wind.to_ned().0),
+        );
+    }
     let atmosphere =
         flightsim_sim::climate_atmosphere_sample(position, startup.world.climate_date())
             .expect("world climate data validated before initialization");
     let density_ratio = atmosphere.density_ratio().max(0.15);
     let speed = Knots(90.0).to_meters_per_second().get() / density_ratio.sqrt();
-    let direction = Attitude::new(Radians::ZERO, Radians::ZERO, startup.heading).to_quaternion()
-        * bevy::math::DVec3::X;
     flightsim_fdm::RigidBodyState::from_geodetic(
         position,
         Attitude::new(Radians::ZERO, Degrees(2.0).to_radians(), startup.heading),
@@ -559,10 +583,34 @@ pub(super) fn tower_anchor(terrain: &mut Terrain<BoxedSource>, start: Geodetic) 
 /// An exclusive system keeps the restart transaction independent of Bevy's
 /// deferred Commands and prevents one stale frame of camera/recording state.
 pub(super) fn apply_world_map_start(world: &mut World) {
-    let Some((request, package)) = region_runtime::take_start(world) else {
-        return;
+    let jet = world.resource::<Startup>().aircraft.is_jet();
+    let (request, package) = if jet {
+        // A jet start must remain completely retryable until every candidate
+        // component has passed validation. In particular, take_start may consume
+        // a request or launch regional inspection, so never call it on this path.
+        let Some(request) = world.resource::<WorldMapActions>().start_at else {
+            return;
+        };
+        if let Some(error) = region_runtime::jet_start_error(world) {
+            navigation_error(world, error.into());
+            return;
+        }
+        if world.resource::<WorldMapState>().regions.visible {
+            return;
+        }
+        (request, None)
+    } else {
+        let Some(start) = region_runtime::take_start(world) else {
+            return;
+        };
+        start
     };
-    if world.contains_resource::<ReplayPlayback>() {
+    if world.contains_resource::<ReplayPlayback>()
+        || world.resource::<Startup>().replay.is_some()
+        || world
+            .get_resource::<FlightSimulation>()
+            .is_some_and(|simulation| simulation.0.is_replay())
+    {
         return;
     }
     if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
@@ -578,7 +626,7 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     // Airport surfaces were draped once from this session's terrain source.
     // Never silently enable a different supporting surface beneath them. The
     // explicitly disabled legacy mode may preview the map, but not relocate.
-    if !startup.world.global_terrain {
+    if !startup.world.global_terrain && !jet {
         let mut map = world.resource_mut::<WorldMapState>();
         map.navigation_enabled = false;
         map.navigation_note = LEGACY_MAP_NOTICE.into();
@@ -613,41 +661,69 @@ pub(super) fn apply_world_map_start(world: &mut World) {
         startup.weather.requested = pending.requested;
     }
     if let Err(error) = super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain) {
-        if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
-            runtime.last_navigation_error = Some(error);
-        }
+        navigation_error(world, error);
         return;
     }
     let state = airborne_state(&startup, &mut terrain, Meters(1000.0));
-    if replay_runtime::validate_replay_state(&state).is_err() {
+    let valid_state = if jet {
+        crate::flight_session::validate_jet_state(&state)
+    } else {
+        replay_runtime::validate_replay_state(&state).map_err(str::to_owned)
+    };
+    if let Err(error) = valid_state {
+        navigation_error(world, format!("Cannot start flight: {error}"));
         return;
     }
     let tower = tower_anchor(&mut terrain, startup.start);
-    let mut simulation = Simulation::from_state(
-        startup.aircraft.configuration(),
-        state,
-        terrain,
-        GroundSampler::default(),
-    );
-    if let Err(error) = simulation.set_climate(Some(date)) {
-        if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
-            runtime.last_navigation_error = Some(format!("Cannot start climate: {error}"));
-        }
-        return;
-    }
-    simulation.set_wind(startup.wind);
-    simulation.set_turbulence(startup.turbulence);
     let mut clock = startup_clock(&startup);
     clock.rate = flightsim_render::TimeRate(startup.time_rate);
-    let recorder = flightsim_sim::CurrentRecorder::new(recording_conditions(&startup, &clock));
+    let (simulation, recorder) = if jet {
+        let session = match crate::flight_session::FlightSession::prepare_jet(
+            &startup,
+            &clock,
+            StartCondition::InFlight(state),
+        ) {
+            Ok(session) => session,
+            Err(error) => {
+                navigation_error(world, format!("Cannot start jet flight: {error}"));
+                return;
+            }
+        };
+        (session, None)
+    } else {
+        let mut simulation = Simulation::from_state(
+            startup.aircraft.configuration(),
+            state,
+            terrain,
+            GroundSampler::default(),
+        );
+        if let Err(error) = simulation.set_climate(Some(date)) {
+            navigation_error(world, format!("Cannot start climate: {error}"));
+            return;
+        }
+        simulation.set_wind(startup.wind);
+        simulation.set_turbulence(startup.turbulence);
+        let recorder = flightsim_sim::CurrentRecorder::new(recording_conditions(&startup, &clock));
+        (simulation.into(), Some(recorder))
+    };
     let controls = initial_controls(&startup);
     let source = make_source(&startup);
+    if jet {
+        world.resource_mut::<WorldMapActions>().start_at.take();
+    }
     if let Some(mut traffic) = world.get_resource_mut::<traffic_runtime::TrafficRuntime>() {
         traffic.restart_synthetic_at(state.geodetic());
     }
     world.insert_resource(FlightSimulation(simulation));
+    if jet && let Some(mut reset) = world.get_resource_mut::<JetHudReset>() {
+        reset.0 = true;
+    }
     world.insert_resource(StartCondition::InFlight(state));
-    world.insert_resource(FlightRecorder(recorder));
+    if let Some(recorder) = recorder {
+        world.insert_resource(FlightRecorder(recorder));
+    } else {
+        world.remove_resource::<FlightRecorder>();
+    }
     world.insert_resource(controls);
     world.insert_resource(SampledPilotInput::default());
     world.insert_resource(clock);
@@ -713,6 +789,13 @@ pub(super) fn apply_world_map_start(world: &mut World) {
     world.insert_resource(startup);
 }
 
+fn navigation_error(world: &mut World, error: String) {
+    if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
+        runtime.last_navigation_error = Some(error.clone());
+    }
+    world.resource_mut::<WorldMapState>().navigation_note = error;
+}
+
 fn publish_world_map(
     simulation: Res<FlightSimulation>,
     runtime: Res<WorldRuntime>,
@@ -727,13 +810,14 @@ fn publish_world_map(
         return;
     }
     map.aircraft = Some(simulation.0.state().geodetic());
+    let replay = playback.is_some() || simulation.0.is_replay() || startup.replay.is_some();
     map.navigation_enabled =
-        playback.is_none() && startup.world.global_terrain && !map.regions.busy;
+        !replay && (startup.world.global_terrain || startup.aircraft.is_jet()) && !map.regions.busy;
     map.navigation_note = if let Some(error) = &runtime.last_navigation_error {
         error.clone()
-    } else if playback.is_some() {
+    } else if replay {
         "Replay preview only\nNew-flight relocation is disabled".into()
-    } else if !startup.world.global_terrain {
+    } else if !startup.world.global_terrain && !startup.aircraft.is_jet() {
         LEGACY_MAP_NOTICE.into()
     } else if map.regions.busy {
         "Inspecting region; current flight unchanged".into()
@@ -791,10 +875,12 @@ fn sync_climate_clouds(
     mut layer: ResMut<CloudLayer>,
     mut elapsed: Local<f64>,
 ) {
-    if !matches!(
-        startup.weather.selection,
-        flightsim_sim::weather::WeatherSelection::Legacy
-    ) || startup.clouds_were_given
+    let weather = simulation
+        .0
+        .jet_environment()
+        .map_or(startup.weather.selection, |environment| environment.weather);
+    if !matches!(weather, flightsim_sim::weather::WeatherSelection::Legacy)
+        || startup.clouds_were_given
         || !startup.world.climate_enabled
     {
         return;
@@ -1237,6 +1323,290 @@ mod tests {
         world
     }
 
+    pub(super) fn jet_profile() -> aircraft_profile::SelectedAircraftProfile {
+        aircraft_profile::SelectedAircraftProfile::Jet(
+            flightsim_sim::aircraft_profile::AircraftProfileV2::parse(include_str!(
+                "../../../docs/examples/aircraft-profiles-v2/numerical-jet.json"
+            ))
+            .unwrap(),
+        )
+    }
+
+    #[test]
+    fn jet_airborne_initial_conditions_use_profile_hints_and_explicit_wind() {
+        let mut startup = Startup {
+            aircraft: jet_profile(),
+            ..Default::default()
+        };
+        startup.world.global_terrain = false;
+        startup.world.fly_height = Some(Meters(4000.0));
+        startup.heading = Degrees(90.0).to_radians();
+        startup.wind = flightsim_sim::Wind {
+            from: Degrees(270.0).to_radians(),
+            speed: flightsim_core::MetersPerSecond(7.0),
+        };
+        let hints = startup.aircraft.jet().unwrap().controls();
+        let mut terrain = Terrain::new(make_source(&startup), 1024, 8..=12);
+        let state = airborne_state(&startup, &mut terrain, Meters(4000.0));
+        assert!((state.altitude().get() - 4000.0).abs() < 1e-8);
+        let velocity = state.velocity_ned().0;
+        assert!(velocity.x.abs() < 1e-9);
+        assert!((velocity.y - hints.approach_speed_mps.get() - 7.0).abs() < 1e-9);
+        assert!(velocity.z.abs() < 1e-9);
+        assert!((state.attitude().pitch.get() - hints.approach_pitch_rad.get()).abs() < 1e-9);
+        let controls = initial_controls(&startup).to_control_inputs();
+        assert_eq!(
+            controls.throttle().to_bits(),
+            hints.approach_throttle.get().to_bits()
+        );
+        assert_eq!(
+            controls.flaps().to_bits(),
+            hints.approach_flaps.get().to_bits()
+        );
+        assert_eq!(
+            controls.elevator().to_bits(),
+            hints.approach_trim.get().to_bits()
+        );
+    }
+
+    #[test]
+    fn jet_departure_weather_and_altitude_match_authoritative_ground() {
+        use flightsim_sim::weather::{WeatherPreset, WeatherSelection};
+        // Neither user render-detail levels nor the legacy global ancestor range
+        // changes the jet's supported physical sampler contract.
+        let mut legacy = Startup {
+            min_level: 6,
+            max_level: 15,
+            ..Default::default()
+        };
+        assert_eq!(terrain_levels(&legacy), 0..=15);
+        legacy.world.global_terrain = false;
+        assert_eq!(terrain_levels(&legacy), 6..=15);
+        for global in [true, false] {
+            for (latitude, longitude) in [
+                (0.0, -140.0),
+                (30.0, 90.0),
+                (0.0, 180.0),
+                (90.0, -180.0),
+                (-90.0, 180.0),
+            ] {
+                let mut startup = Startup {
+                    aircraft: jet_profile(),
+                    start: Geodetic::from_degrees(latitude, longitude, 0.0),
+                    min_level: 6,
+                    max_level: 15,
+                    ..Default::default()
+                };
+                startup.world.global_terrain = global;
+                startup.world.fly_height = Some(Meters(1000.0));
+                startup.weather.requested = Some(WeatherPreset::Rain);
+                assert_eq!(terrain_levels(&startup), 8..=12);
+                let mut terrain =
+                    Terrain::new(make_source(&startup), 1024 * 1024, terrain_levels(&startup));
+                super::super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain)
+                    .unwrap();
+                let state = airborne_state(&startup, &mut terrain, Meters(1000.0));
+                let session = crate::flight_session::FlightSession::prepare_jet(
+                    &startup,
+                    &startup_clock(&startup),
+                    StartCondition::InFlight(state),
+                )
+                .unwrap();
+                let ground = session.ground().elevation;
+                assert!((state.altitude().get() - ground.get() - 1000.0).abs() < 1e-5);
+                let WeatherSelection::Modeled(weather) = startup.weather.selection else {
+                    panic!("explicit rain preset was not resolved");
+                };
+                let reference = weather.parameters().departure_reference;
+                assert!((reference.altitude.get() - ground.get()).abs() < 1e-6);
+                assert_eq!(reference.latitude, startup.start.latitude);
+                assert_eq!(reference.longitude, startup.start.longitude);
+                assert_eq!(
+                    session.jet_environment().unwrap().weather,
+                    startup.weather.selection
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn jet_map_start_commits_bundled_global_and_explicit_flat_zero_sessions() {
+        use flightsim_sim::{model_simulation::JetTerrain, weather::WeatherPreset};
+        for global in [true, false] {
+            let mut world = map_jump_world();
+            {
+                let mut startup = world.resource_mut::<Startup>();
+                startup.aircraft = jet_profile();
+                startup.world.global_terrain = global;
+            }
+            let mut pending = super::super::weather_runtime::PendingWeather::default();
+            pending.requested = Some(WeatherPreset::Rain);
+            world.insert_resource(pending);
+            let request = world_map::WorldMapStart {
+                position: Geodetic::from_degrees(0.0, -140.0, 0.0),
+                month: 7,
+            };
+            world.resource_mut::<WorldMapState>().visible = true;
+            world.resource_mut::<WorldMapActions>().start_at = Some(request);
+            apply_world_map_start(&mut world);
+            let session = &world.resource::<FlightSimulation>().0;
+            assert!(session.is_jet());
+            assert!(!session.is_replay());
+            assert!((session.agl().get() - 1000.0).abs() < 1e-8);
+            assert_eq!(session.elapsed(), Seconds::ZERO);
+            let environment = session.jet_environment().unwrap();
+            assert_eq!(
+                environment.terrain,
+                if global {
+                    JetTerrain::BundledGlobal
+                } else {
+                    JetTerrain::Flat {
+                        elevation: Meters::ZERO,
+                    }
+                }
+            );
+            assert_eq!(
+                environment.weather,
+                world.resource::<Startup>().weather.selection
+            );
+            assert_eq!(session.climate(), ClimateDate::from_month(7));
+            assert!(world.resource::<WorldMapActions>().start_at.is_none());
+            assert!(!world.resource::<WorldMapState>().visible);
+            assert!(!world.contains_resource::<FlightRecorder>());
+            assert_eq!(world.resource::<Startup>().start, request.position);
+        }
+    }
+
+    #[test]
+    fn failed_jet_environment_and_domain_preserve_flight_weather_and_start_request() {
+        for outside_domain in [false, true] {
+            let mut world = map_jump_world();
+            let json =
+                include_str!("../../../docs/examples/aircraft-profiles-v2/numerical-jet.json")
+                    .replace(
+                        "\"pressure_ratio\": [\n        0.01,",
+                        "\"pressure_ratio\": [\n        0.7,",
+                    );
+            let profile = flightsim_sim::aircraft_profile::AircraftProfileV2::parse(&json).unwrap();
+            assert_eq!(
+                profile
+                    .configuration()
+                    .envelope()
+                    .definition()
+                    .pressure_ratio[0]
+                    .to_bits(),
+                0.7_f64.to_bits()
+            );
+            world.resource_mut::<Startup>().aircraft =
+                aircraft_profile::SelectedAircraftProfile::Jet(profile);
+            world.resource_mut::<WorldMapActions>().start_at = Some(world_map::WorldMapStart {
+                position: Geodetic::from_degrees(0.0, -140.0, 0.0),
+                month: 7,
+            });
+            apply_world_map_start(&mut world);
+            let before = *world.resource::<FlightSimulation>().0.state();
+            let snapshot = world
+                .resource::<FlightSimulation>()
+                .0
+                .jet()
+                .unwrap()
+                .snapshot();
+            let clock = *world.resource::<flightsim_render::TimeOfDay>();
+            let controls = world.resource::<PilotControls>().to_control_inputs();
+            let start = world.resource::<Startup>().start;
+            let weather = world.resource::<Startup>().weather.selection;
+            let tower = world.resource::<TowerViewAnchor>().0;
+            // A forged in-memory environment is rejected by full session preparation,
+            // after candidate terrain/weather have resolved but before any commit.
+            if !outside_domain {
+                world.resource_mut::<Startup>().time_rate = f64::NAN;
+            }
+            let mut pending = super::super::weather_runtime::PendingWeather::default();
+            pending.requested = Some(flightsim_sim::weather::WeatherPreset::Snow);
+            world.insert_resource(pending);
+            let request = world_map::WorldMapStart {
+                position: if outside_domain {
+                    Geodetic::from_degrees(30.0, 90.0, 0.0)
+                } else {
+                    Geodetic::from_degrees(35.0, 139.0, 0.0)
+                },
+                month: 1,
+            };
+            if outside_domain {
+                // At this high-terrain departure, 1000 m AGL leaves the explicitly
+                // narrowed pressure envelope even though all source/state inputs are valid.
+                let mut candidate = world.resource::<Startup>().clone();
+                candidate.start = request.position;
+                let mut terrain = Terrain::new(
+                    make_source(&candidate),
+                    1024 * 1024,
+                    terrain_levels(&candidate),
+                );
+                let state = airborne_state(&candidate, &mut terrain, Meters(1000.0));
+                let atmosphere = flightsim_sim::climate_atmosphere_sample(
+                    state.geodetic(),
+                    ClimateDate::from_month(request.month),
+                )
+                .unwrap();
+                let ambient = flightsim_fdm::subsonic::JetConditions::from_atmosphere(
+                    atmosphere,
+                    flightsim_core::MetersPerSecond(35.0),
+                )
+                .unwrap();
+                assert!(ambient.pressure_ratio.0 < 0.7);
+                assert!(world.resource::<Startup>().time_rate.is_finite());
+            }
+            world.resource_mut::<WorldMapState>().regions.status = "Existing region preview".into();
+            world.resource_mut::<WorldMapState>().visible = true;
+            world.resource_mut::<WorldMapActions>().start_at = Some(request);
+            apply_world_map_start(&mut world);
+            assert_eq!(*world.resource::<FlightSimulation>().0.state(), before);
+            assert_eq!(
+                world
+                    .resource::<FlightSimulation>()
+                    .0
+                    .jet()
+                    .unwrap()
+                    .snapshot(),
+                snapshot
+            );
+            assert_eq!(
+                world.resource::<flightsim_render::TimeOfDay>().utc,
+                clock.utc
+            );
+            assert_eq!(
+                world.resource::<flightsim_render::TimeOfDay>().rate,
+                clock.rate
+            );
+            assert_eq!(
+                world.resource::<PilotControls>().to_control_inputs(),
+                controls
+            );
+            assert_eq!(world.resource::<Startup>().start, start);
+            assert_eq!(world.resource::<Startup>().weather.selection, weather);
+            assert_eq!(
+                world
+                    .resource::<FlightSimulation>()
+                    .0
+                    .jet_environment()
+                    .unwrap()
+                    .weather,
+                weather
+            );
+            assert_eq!(world.resource::<TowerViewAnchor>().0, tower);
+            assert_eq!(world.resource::<WorldMapActions>().start_at, Some(request));
+            let map = world.resource::<WorldMapState>();
+            assert!(map.visible);
+            assert!(map.navigation_note.starts_with("Cannot start jet flight:"));
+            if outside_domain {
+                assert!(map.navigation_note.contains("operating envelope"));
+            }
+            assert!(world.resource::<Startup>().active_region.is_none());
+            assert!(map.regions.selected.is_none());
+            assert_eq!(map.regions.status, "Existing region preview");
+        }
+    }
+
     #[test]
     fn legacy_terrain_rejects_forged_map_start_without_moving_airport_or_aircraft() {
         let mut world = map_jump_world();
@@ -1251,7 +1621,7 @@ mod tests {
             GroundSampler::default(),
         );
         let aircraft_before = *simulation.state();
-        world.insert_resource(FlightSimulation(simulation));
+        world.insert_resource(FlightSimulation(simulation.into()));
         world.insert_resource(ActiveRunway(startup.runway));
         let airport_before = startup.runway.threshold.to_ecef();
         let airport = world.spawn(WorldPosition(airport_before)).id();

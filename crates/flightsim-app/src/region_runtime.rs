@@ -368,11 +368,15 @@ pub(super) fn update(
     mut runtime: ResMut<RegionRuntime>,
     startup: Res<Startup>,
     playback: Option<Res<ReplayPlayback>>,
+    simulation: Option<Res<FlightSimulation>>,
     mut map: ResMut<WorldMapState>,
     mut actions: ResMut<WorldMapActions>,
     mut drops: MessageReader<bevy::window::FileDragAndDrop>,
 ) {
-    let enabled = playback.is_none() && startup.world.global_terrain && runtime.store.is_ok();
+    let replay = playback.is_some()
+        || startup.replay.is_some()
+        || simulation.is_some_and(|simulation| simulation.0.is_replay());
+    let enabled = !replay && startup.world.global_terrain && runtime.store.is_ok();
     map.regions.operations_enabled = enabled;
     #[cfg(feature = "region-downloads")]
     {
@@ -684,11 +688,40 @@ pub(super) fn credits(manifest: &flightsim_content::Manifest) -> String {
     text
 }
 
+/// Inspect every source-selection stage without consuming a Start or changing
+/// a worker's generation, cancellation state or selected package.
+pub(super) fn jet_start_error(world: &World) -> Option<&'static str> {
+    let startup = world.resource::<Startup>();
+    if startup.tiles.is_some() {
+        return Some(
+            "Jet flights support bundled global or flat-zero terrain; remove --tiles before starting",
+        );
+    }
+    let regional = startup.active_region.is_some()
+        || startup.regions.select.is_some()
+        || world.resource::<WorldMapState>().regions.selected.is_some()
+        || world
+            .get_resource::<RegionRuntime>()
+            .is_some_and(|runtime| {
+                runtime.selected.is_some()
+                    || runtime.initial_selection.is_some()
+                    || runtime.pending.is_some()
+                    || runtime.ready.is_some()
+            });
+    regional.then_some("Jet flights cannot start with selected, active or pending regional terrain; current flight and region are unchanged")
+}
+
 /// Resolve an explicit Start without changing the current flight. A package Start
 /// yields until the one worker has fully inspected the selected identity.
 pub(super) fn take_start(
     world: &mut World,
 ) -> Option<(WorldMapStart, Option<Arc<InstalledPackage>>)> {
+    if world.resource::<Startup>().aircraft.is_jet()
+        && let Some(error) = jet_start_error(world)
+    {
+        world.resource_mut::<WorldMapState>().regions.error = error.into();
+        return None;
+    }
     if !world.contains_resource::<RegionRuntime>() {
         return world
             .resource_mut::<WorldMapActions>()
@@ -698,7 +731,13 @@ pub(super) fn take_start(
     }
     let request = world.resource_mut::<WorldMapActions>().start_at.take();
     let visible = world.resource::<WorldMapState>().visible;
-    if !visible || world.contains_resource::<ReplayPlayback>() {
+    if !visible
+        || world.contains_resource::<ReplayPlayback>()
+        || world.resource::<Startup>().replay.is_some()
+        || world
+            .get_resource::<FlightSimulation>()
+            .is_some_and(|simulation| simulation.0.is_replay())
+    {
         return None;
     }
     let mut runtime = world
@@ -837,7 +876,7 @@ mod tests {
         world.insert_resource(runtime);
         world.insert_resource(ActiveRunway(startup.runway));
         world.insert_resource(startup);
-        world.insert_resource(FlightSimulation(simulation));
+        world.insert_resource(FlightSimulation(simulation.into()));
         let mut map = WorldMapState::default();
         map.visible = true;
         map.selected = start().position;
@@ -862,6 +901,87 @@ mod tests {
             material: Handle::default(),
         });
         world
+    }
+
+    #[test]
+    fn rejected_jet_map_start_preserves_all_regional_selection_stages() {
+        let temp = TestDirectory::new();
+        let package = Arc::new(imported(&temp));
+        for stage in 0..7 {
+            let mut world = world(&temp);
+            let profile = flightsim_sim::aircraft_profile::AircraftProfileV2::parse(include_str!(
+                "../../../docs/examples/aircraft-profiles-v2/numerical-jet.json"
+            ))
+            .unwrap();
+            world.resource_mut::<Startup>().aircraft =
+                aircraft_profile::SelectedAircraftProfile::Jet(profile);
+            let (sender, receiver) = mpsc::sync_channel(1);
+            let cancel = Arc::new(AtomicBool::new(false));
+            match stage {
+                0 => world.resource_mut::<Startup>().tiles = Some(temp.0.join("raw-tiles")),
+                1 => world.resource_mut::<Startup>().active_region = Some(Arc::clone(&package)),
+                2 => world.resource_mut::<RegionRuntime>().selected = Some(KEY.into()),
+                3 => {
+                    world.resource_mut::<RegionRuntime>().pending = Some(Worker {
+                        generation: 0,
+                        cancel: Arc::clone(&cancel),
+                        progress: Arc::new(Mutex::new(None)),
+                        receiver: Mutex::new(receiver),
+                    });
+                }
+                4 => {
+                    world.resource_mut::<RegionRuntime>().ready =
+                        Some((start(), Arc::clone(&package)));
+                }
+                5 => world.resource_mut::<RegionRuntime>().initial_selection = Some(KEY.into()),
+                6 => world.resource_mut::<WorldMapState>().regions.selected = Some(KEY.into()),
+                _ => unreachable!(),
+            }
+            let before = *world.resource::<FlightSimulation>().0.state();
+            let startup = world.resource::<Startup>().clone();
+            let runtime = world.resource::<RegionRuntime>();
+            let generation = runtime.generation;
+            let selected = runtime.selected.clone();
+            let initial = runtime.initial_selection.clone();
+            let was_pending = runtime.pending.is_some();
+            let was_ready = runtime.ready.is_some();
+            world.resource_mut::<WorldMapActions>().start_at = Some(start());
+            world_runtime::apply_world_map_start(&mut world);
+            assert_eq!(
+                world.resource::<WorldMapActions>().start_at,
+                Some(start()),
+                "stage {stage}"
+            );
+            assert_eq!(*world.resource::<FlightSimulation>().0.state(), before);
+            assert_eq!(world.resource::<Startup>().start, startup.start);
+            assert_eq!(world.resource::<Startup>().tiles, startup.tiles);
+            assert_eq!(
+                world.resource::<Startup>().weather.selection,
+                startup.weather.selection
+            );
+            assert_eq!(
+                world
+                    .resource::<Startup>()
+                    .active_region
+                    .as_ref()
+                    .map(|p| p.identity()),
+                startup.active_region.as_ref().map(|p| p.identity())
+            );
+            let runtime = world.resource::<RegionRuntime>();
+            assert_eq!(runtime.generation, generation);
+            assert_eq!(runtime.selected, selected);
+            assert_eq!(runtime.initial_selection, initial);
+            assert_eq!(runtime.pending.is_some(), was_pending);
+            assert_eq!(runtime.ready.is_some(), was_ready);
+            assert!(!cancel.load(Ordering::Relaxed));
+            let map = world.resource::<WorldMapState>();
+            assert!(map.visible);
+            assert!(map.navigation_note.starts_with("Jet flights"));
+            // Direct consumers share the guard and also retain the request.
+            assert!(take_start(&mut world).is_none());
+            assert_eq!(world.resource::<WorldMapActions>().start_at, Some(start()));
+            drop(sender);
+        }
     }
     pub(super) fn await_worker(world: &mut World) {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);

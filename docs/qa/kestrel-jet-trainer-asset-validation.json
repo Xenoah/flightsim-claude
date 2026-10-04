@@ -1,0 +1,184 @@
+{
+  "asset": "Kestrel Jet Trainer",
+  "status": "asset/schema contract PASS; runtime/native handling require separate acceptance",
+  "glb_bytes": 164292,
+  "mesh_count": 53,
+  "primitive_count": 53,
+  "material_count": 8,
+  "exported_vertices": 4284,
+  "triangles": 6062,
+  "gltf_bounds_m": {
+    "min": [
+      -5.5,
+      -1.0,
+      -4.849999904632568
+    ],
+    "max": [
+      5.5,
+      1.8600000143051147,
+      3.6500000953674316
+    ],
+    "extents": [
+      11.0,
+      2.8600000143051147,
+      8.5
+    ]
+  },
+  "model_fit_scale": 1.0,
+  "wheel_contacts": [
+    {
+      "mesh": "Nose tyre",
+      "actual_body_contact_m": [
+        1.600000023841858,
+        -0.0,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        1.6,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "mesh": "Port main tyre",
+      "actual_body_contact_m": [
+        -0.7999999821186066,
+        -1.300000011920929,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        -0.8,
+        -1.3,
+        1.0
+      ]
+    },
+    {
+      "mesh": "Starboard main tyre",
+      "actual_body_contact_m": [
+        -0.7999999821186066,
+        1.300000011920929,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        -0.8,
+        1.3,
+        1.0
+      ]
+    }
+  ],
+  "navigation_lenses": [
+    {
+      "side": "port_red",
+      "gltf_position_m": [
+        5.454999923706055,
+        0.18000000715255737,
+        -0.7699999809265137
+      ],
+      "rgba": [
+        0.6499999761581421,
+        0.012000000104308128,
+        0.017999999225139618,
+        1
+      ]
+    },
+    {
+      "side": "starboard_green",
+      "gltf_position_m": [
+        -5.454999923706055,
+        0.18000000715255737,
+        -0.7699999809265137
+      ],
+      "rgba": [
+        0.014999999664723873,
+        0.47999998927116394,
+        0.10000000149011612,
+        1
+      ]
+    }
+  ],
+  "camera_eye_body_m": [
+    0.6,
+    -0.25,
+    -0.9
+  ],
+  "camera_eye_gltf_m": [
+    0.25,
+    0.9,
+    0.6
+  ],
+  "minimum_eye_to_opaque_triangle_m": 0.2674324243010592,
+  "eye_inside_canopy_and_cg_inside_fuselage": true,
+  "forward_sightlines": [
+    {
+      "gltf_direction": [
+        0,
+        0,
+        1
+      ],
+      "opaque_hits": 0
+    },
+    {
+      "gltf_direction": [
+        0.5,
+        0,
+        1
+      ],
+      "opaque_hits": 0
+    },
+    {
+      "gltf_direction": [
+        -0.5,
+        0,
+        1
+      ],
+      "opaque_hits": 0
+    },
+    {
+      "gltf_direction": [
+        0,
+        0.18,
+        1
+      ],
+      "opaque_hits": 0
+    },
+    {
+      "gltf_direction": [
+        0,
+        -0.18,
+        1
+      ],
+      "opaque_hits": 0
+    }
+  ],
+  "arbitrary_attitude_rebase_contact_checks": 18,
+  "maximum_arbitrary_attitude_rebase_contact_error_m": 1.1920928955078125e-07,
+  "sea_level_static_thrust_n": {
+    "idle_n": 100.0,
+    "maximum_dry_n": 2500.0
+  },
+  "controls_match_initial_numerical_fixture": true,
+  "preview_sha256": {
+    "kestrel-jet-trainer-three-quarter.jpg": "6acea3c5fadc7601439f35dcd495a56526bea55abad07560241f304b3c62b3bd",
+    "kestrel-jet-trainer-starboard.jpg": "a698f464dcac046308c3f5f0afb7395245465f8fe2cbd31d57c996868f19b3ab",
+    "kestrel-jet-trainer-front.jpg": "1ce7073579cd895b1d4e81e58e9f8277a8ab3fc2f8de4d95e9f60ed60b445abd",
+    "kestrel-jet-trainer-eye.jpg": "17ca0d437cdd4b9a59157a0653541d7b85a9dab5948a60ec4cf4b30ac8b4662b"
+  },
+  "unchanged_baseline_sha256": {
+    "assets/aircraft/.gitattributes": "b2b276e35044f3217231b6d4874589137762a45efad7d42c92cf967fe396740f",
+    "assets/aircraft/light_single.glb": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+    "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+    "assets/aircraft/meadow_trainer.blend": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+    "assets/aircraft/meadow_trainer.glb": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+    "assets/aircraft/meadow_trainer.json": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+    "assets/aircraft/swift_sport.blend": "29a25578733be83d25ccff12c117b29124b57b5e69e8356bd8189d128e514e77",
+    "assets/aircraft/swift_sport.glb": "9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1",
+    "assets/aircraft/swift_sport.json": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+    "docs/examples/aircraft-profiles-v2/numerical-jet.json": "8339b68183ea31c228082e56984a39775f7f23df5633dd8a333fe06a65be7c74"
+  },
+  "sha256": {
+    "kestrel_jet_trainer.glb": "5a9d8747084f7ad6ff93dbadc80d87acbef42c6882030c0b88ca3aded16bef21",
+    "kestrel_jet_trainer.blend": "f098deb4a7e66e4c46a74383d4c0bf6708f9f0c6638ff3c6b7788765c3707c3c",
+    "kestrel_jet_trainer.json": "fab72bf40f23a70f22c3ee11b33aa36ae8b736fcfed7f4df11c2d053db749e1f",
+    "build_kestrel_jet_trainer.py": "3fba71d2b695c58c68c3e559f6a92518cbfadfe8376c9f7738f3c1c7c247e6a2"
+  }
+}

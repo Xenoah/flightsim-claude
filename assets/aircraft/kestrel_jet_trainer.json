@@ -1,0 +1,260 @@
+{
+  "version": 2,
+  "id": "kestrel-jet-trainer",
+  "dynamics": {
+    "kind": "dry_jet_table",
+    "revision": 1,
+    "airframe": {
+      "name": "Kestrel Jet Trainer (fictional)",
+      "mass_kg": 1043.0,
+      "inertia_kg_m2": [
+        1285.0,
+        1825.0,
+        2667.0,
+        0.0
+      ],
+      "wing_area_m2": 16.17,
+      "wing_span_m": 11.0,
+      "mean_chord_m": 1.49,
+      "landing_gear": [
+        {
+          "contact_m": [
+            1.6,
+            0,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        },
+        {
+          "contact_m": [
+            -0.8,
+            -1.3,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        },
+        {
+          "contact_m": [
+            -0.8,
+            1.3,
+            1.0
+          ],
+          "spring_n_per_m": 120000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.25,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.5
+        }
+      ],
+      "rolling_friction": 0.015,
+      "braking_friction": 0.7,
+      "lateral_friction": 0.8,
+      "friction_transition_mps": 0.25
+    },
+    "thrust": {
+      "schema": 1,
+      "pressure_ratios": [
+        0.0,
+        1.0,
+        1.1
+      ],
+      "temperature_ratios": [
+        0.65,
+        1.0,
+        1.2
+      ],
+      "mach": [
+        0.0,
+        0.35
+      ],
+      "cells": [
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 124.03473458920844,
+          "maximum_dry_n": 3100.8683647302114
+        },
+        {
+          "idle_n": 106.66987174671927,
+          "maximum_dry_n": 2970.6318934115425
+        },
+        {
+          "idle_n": 100.0,
+          "maximum_dry_n": 2500.0
+        },
+        {
+          "idle_n": 86.0,
+          "maximum_dry_n": 2395.0
+        },
+        {
+          "idle_n": 91.28709291752769,
+          "maximum_dry_n": 2282.1773229381924
+        },
+        {
+          "idle_n": 78.50689990907381,
+          "maximum_dry_n": 2186.325875374788
+        },
+        {
+          "idle_n": 136.4382080481293,
+          "maximum_dry_n": 3410.9552012032323
+        },
+        {
+          "idle_n": 117.3368589213912,
+          "maximum_dry_n": 3267.6950827526966
+        },
+        {
+          "idle_n": 110.00000000000001,
+          "maximum_dry_n": 2750.0
+        },
+        {
+          "idle_n": 94.60000000000001,
+          "maximum_dry_n": 2634.5
+        },
+        {
+          "idle_n": 100.41580220928047,
+          "maximum_dry_n": 2510.3950552320116
+        },
+        {
+          "idle_n": 86.3575898999812,
+          "maximum_dry_n": 2404.958462912267
+        }
+      ]
+    },
+    "aero": {
+      "schema": 1,
+      "knots": [
+        {
+          "mach": 0.0,
+          "aero": {
+            "lift_zero": 0.31,
+            "lift_alpha": 5.143,
+            "lift_flaps": 0.65,
+            "stall_angle_rad": 0.2792526803190927,
+            "stall_blend_rate": 50.0,
+            "drag_min": 0.031,
+            "oswald_efficiency": 0.75,
+            "drag_flaps": 0.06,
+            "side_beta": -0.31,
+            "side_rudder": 0.07835299999999999,
+            "roll_beta": -0.089,
+            "roll_rate_p": -0.47,
+            "roll_rate_r": 0.096,
+            "roll_aileron": 0.06212199999999999,
+            "roll_rudder": 0.0061592999999999995,
+            "pitch_zero": 0.015,
+            "pitch_alpha": -0.89,
+            "pitch_rate_q": -30.400000000000002,
+            "pitch_elevator": 0.55808,
+            "pitch_flaps": -0.12,
+            "yaw_beta": 0.065,
+            "yaw_rate_p": -0.0,
+            "yaw_rate_r": -0.099,
+            "yaw_aileron": -0.0018497,
+            "yaw_rudder": 0.027528299999999995
+          }
+        },
+        {
+          "mach": 0.35,
+          "aero": {
+            "lift_zero": 0.31,
+            "lift_alpha": 5.143,
+            "lift_flaps": 0.65,
+            "stall_angle_rad": 0.2792526803190927,
+            "stall_blend_rate": 50.0,
+            "drag_min": 0.031,
+            "oswald_efficiency": 0.75,
+            "drag_flaps": 0.06,
+            "side_beta": -0.31,
+            "side_rudder": 0.07835299999999999,
+            "roll_beta": -0.089,
+            "roll_rate_p": -0.47,
+            "roll_rate_r": 0.096,
+            "roll_aileron": 0.06212199999999999,
+            "roll_rudder": 0.0061592999999999995,
+            "pitch_zero": 0.015,
+            "pitch_alpha": -0.89,
+            "pitch_rate_q": -30.400000000000002,
+            "pitch_elevator": 0.55808,
+            "pitch_flaps": -0.12,
+            "yaw_beta": 0.065,
+            "yaw_rate_p": -0.0,
+            "yaw_rate_r": -0.099,
+            "yaw_aileron": -0.0018497,
+            "yaw_rudder": 0.027528299999999995
+          }
+        }
+      ]
+    },
+    "envelope": {
+      "pressure_ratio": [
+        0.35,
+        1.08
+      ],
+      "temperature_ratio": [
+        0.65,
+        1.2
+      ],
+      "mach": [
+        0.0,
+        0.35
+      ]
+    }
+  },
+  "model": {
+    "path": "aircraft/kestrel_jet_trainer.glb",
+    "forward": "+z",
+    "up": "+y",
+    "length_m": 8.5
+  },
+  "controls": {
+    "surface_rate": 2.5,
+    "elevator_rate": 0.25,
+    "elevator_centering_rate": 5.0,
+    "centering_rate": 1.8,
+    "throttle_rate": 0.25,
+    "flap_rate": 0.25,
+    "default_trim": 0.09,
+    "trim_rate": 0.12,
+    "approach_speed_mps": 35.0,
+    "approach_throttle": 0.39155148,
+    "approach_flaps": 1.0,
+    "approach_pitch_rad": -0.07269918,
+    "approach_trim": 0.15570889
+  },
+  "camera_eye_m": [
+    0.6,
+    -0.25,
+    -0.9
+  ],
+  "engine_sound": "turbine"
+}

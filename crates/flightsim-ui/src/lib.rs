@@ -69,6 +69,30 @@ pub use world_map::{
     WorldMapActions, WorldMapLayer, WorldMapRaster, WorldMapStart, WorldMapState, WorldMapSystems,
 };
 
+/// App-selected live guidance for an aircraft with different operating cues.
+///
+/// This resource changes presentation only. Playback retains its own controls,
+/// and the default preserves the original light-aircraft help and tutorial.
+#[derive(Resource, Debug, Clone, PartialEq, Eq)]
+pub struct FlightGuidance {
+    /// Complete replacement for the live help panel; `None` keeps legacy help.
+    pub live_help: Option<String>,
+    /// Whether the original light-aircraft tutorial is applicable.
+    ///
+    /// This is independent of the pilot's hide/show preference. The app may
+    /// provide separate aircraft instructions when this is false.
+    pub tutorial_enabled: bool,
+}
+
+impl Default for FlightGuidance {
+    fn default() -> Self {
+        Self {
+            live_help: None,
+            tutorial_enabled: true,
+        }
+    }
+}
+
 /// HUD に出す値。アプリ側が毎フレーム詰める。
 #[derive(Resource, Debug, Clone, Copy, Default)]
 pub struct HudState {
@@ -178,6 +202,19 @@ pub struct DisplayedValues {
 }
 
 impl HudSmoothing {
+    /// Reseed the display after a discontinuity such as a new flight or rewind.
+    /// Keep the caller's refresh/smoothing settings, but discard old flight
+    /// history so even a paused (zero-dt) first frame shows the current state.
+    pub fn reset(&mut self, state: &HudState) {
+        self.elapsed = 0.0;
+        self.smoothed_vertical_speed = if state.vertical_speed.get().is_finite() {
+            state.vertical_speed.get()
+        } else {
+            0.0
+        };
+        self.refresh_display(state);
+    }
+
     /// 1 フレーム進めて、表示すべき値を返す。
     pub fn update(&mut self, dt: Seconds, state: &HudState) -> DisplayedValues {
         // 昇降率だけは連続的に均す。接地の瞬間に ±50 m/s を往復するため。
@@ -193,18 +230,22 @@ impl HudSmoothing {
         self.elapsed += dt.get().max(0.0);
         if self.elapsed >= self.refresh_interval.get() {
             self.elapsed = 0.0;
-            self.displayed = DisplayedValues {
-                airspeed: state.equivalent_airspeed.to_knots(),
-                altitude: state.altitude.to_feet(),
-                agl: state.agl.to_feet(),
-                vertical_speed: MetersPerSecond(self.smoothed_vertical_speed).to_feet_per_minute(),
-                // 方位は 0〜360 に正規化する。-10° を 350° と出す。
-                heading_degrees: state.heading.wrap_positive().to_degrees().get(),
-                pitch_degrees: state.pitch.to_degrees().get(),
-                roll_degrees: state.roll.to_degrees().get(),
-            };
+            self.refresh_display(state);
         }
         self.displayed
+    }
+
+    fn refresh_display(&mut self, state: &HudState) {
+        self.displayed = DisplayedValues {
+            airspeed: state.equivalent_airspeed.to_knots(),
+            altitude: state.altitude.to_feet(),
+            agl: state.agl.to_feet(),
+            vertical_speed: MetersPerSecond(self.smoothed_vertical_speed).to_feet_per_minute(),
+            // 方位は 0〜360 に正規化する。-10° を 350° と出す。
+            heading_degrees: state.heading.wrap_positive().to_degrees().get(),
+            pitch_degrees: state.pitch.to_degrees().get(),
+            roll_degrees: state.roll.to_degrees().get(),
+        };
     }
 
     #[must_use]
@@ -303,6 +344,7 @@ impl Plugin for FlightsimUiPlugin {
         app.add_plugins(attitude::AttitudeIndicatorPlugin)
             .init_resource::<HudState>()
             .init_resource::<HudSmoothing>()
+            .init_resource::<FlightGuidance>()
             .init_resource::<DataAttribution>()
             .init_resource::<InputDiagnosticsPanel>()
             .init_resource::<TrafficPanel>()
@@ -334,7 +376,7 @@ impl Plugin for FlightsimUiPlugin {
             .add_systems(Update, update_tutorial_prompt)
             // 再生中の表示。app が `ReplayStatus` を埋めなければ出ない。
             .init_resource::<replay::ReplayStatus>()
-            .add_systems(Startup, replay::spawn_replay_banner)
+            .add_systems(Startup, replay::spawn_replay_banner.after(spawn_hud))
             .add_systems(Update, replay::update_replay_banner)
             // 一時停止。app が `Esc` で `Paused` を切り替える。
             .init_resource::<pause::Paused>()
@@ -359,21 +401,38 @@ impl Plugin for FlightsimUiPlugin {
 
 /// HUD を組み立てる。
 pub fn spawn_hud(mut commands: Commands) {
-    commands.spawn((
-        Text::new(""),
-        TextFont {
-            font_size: 18.0,
-            ..default()
-        },
-        TextColor(Color::srgb(0.85, 1.0, 0.85)),
-        Node {
+    // Measure the instruments and notices in the same layout pass. A percentage
+    // inset on an independent banner can cover the EAS stall warning. The HUD
+    // keeps its original font and origin; notices use the remaining space and
+    // wrap below it when the viewport cannot accommodate two readable columns.
+    commands
+        .spawn(Node {
             position_type: PositionType::Absolute,
             top: Val::Px(12.0),
             left: Val::Px(12.0),
+            right: Val::Px(12.0),
+            flex_wrap: FlexWrap::Wrap,
+            align_items: AlignItems::FlexStart,
+            column_gap: Val::Px(12.0),
+            row_gap: Val::Px(8.0),
             ..default()
-        },
-        HudText,
-    ));
+        })
+        .with_children(|top| {
+            top.spawn((
+                Text::new(""),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.85, 1.0, 0.85)),
+                Node {
+                    max_width: Val::Percent(100.0),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                HudText,
+            ));
+        });
 
     // Keep help and the flight log in one row above the footer. Flex layout
     // reserves its actual wrapped height in the same layout pass, including
@@ -506,10 +565,13 @@ LANDINGS {:>6}",
 /// Keep live flight controls out of recorded playback guidance.
 pub fn update_help_for_replay(
     status: Res<ReplayStatus>,
+    guidance: Option<Res<FlightGuidance>>,
     mut help: Query<&mut Text, With<HudHelp>>,
 ) {
     let desired = if status.active {
         "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nM .............. world map (preview only)\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay.".to_owned()
+    } else if let Some(custom) = guidance.as_ref().and_then(|value| value.live_help.as_ref()) {
+        custom.clone()
     } else {
         help_text()
     };
@@ -977,6 +1039,64 @@ mod tests {
     // --- 平滑化 ---
 
     #[test]
+    fn reset_reseeds_every_value_at_zero_dt_without_changing_display_tuning() {
+        let mut smoothing = HudSmoothing {
+            refresh_interval: Seconds(0.3),
+            vertical_speed_time_constant: Seconds(2.1),
+            ..default()
+        };
+        let previous = HudState {
+            equivalent_airspeed: MetersPerSecond(80.0),
+            altitude: Meters(5_000.0),
+            agl: Meters(4_000.0),
+            vertical_speed: MetersPerSecond(-40.0),
+            heading: Radians(2.0),
+            pitch: Radians(-0.3),
+            roll: Radians(0.8),
+            ..cruising()
+        };
+        smoothing.update(Seconds(3.0), &previous);
+        smoothing.update(Seconds(0.2), &previous);
+        let current = cruising();
+        let expected = DisplayedValues {
+            airspeed: current.equivalent_airspeed.to_knots(),
+            altitude: current.altitude.to_feet(),
+            agl: current.agl.to_feet(),
+            vertical_speed: current.vertical_speed.to_feet_per_minute(),
+            heading_degrees: current.heading.wrap_positive().to_degrees().get(),
+            pitch_degrees: current.pitch.to_degrees().get(),
+            roll_degrees: current.roll.to_degrees().get(),
+        };
+        assert_ne!(smoothing.displayed(), expected);
+        smoothing.reset(&current);
+        assert_eq!(smoothing.refresh_interval, Seconds(0.3));
+        assert_eq!(smoothing.vertical_speed_time_constant, Seconds(2.1));
+        assert_eq!(smoothing.displayed(), expected);
+        assert_eq!(smoothing.update(Seconds(0.0), &current), expected);
+        // The old flight's partial refresh interval must also be discarded.
+        assert_eq!(smoothing.update(Seconds(0.2), &previous), expected);
+        assert_ne!(smoothing.update(Seconds(0.2), &previous), expected);
+    }
+
+    #[test]
+    fn reset_replaces_nonfinite_vertical_speed_with_zero() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut smoothing = HudSmoothing::default();
+            smoothing.update(Seconds(1.0), &cruising());
+            let current = HudState {
+                vertical_speed: MetersPerSecond(invalid),
+                ..cruising()
+            };
+            smoothing.reset(&current);
+            assert_eq!(smoothing.displayed().vertical_speed, FeetPerMinute(0.0));
+            assert_eq!(
+                smoothing.update(Seconds(0.0), &current).vertical_speed,
+                FeetPerMinute(0.0)
+            );
+        }
+    }
+
+    #[test]
     fn the_numbers_do_not_change_every_frame() {
         // 毎フレーム更新すると下 1 桁が読めなくなる。
         let mut smoothing = HudSmoothing::default();
@@ -1158,8 +1278,45 @@ mod tests {
             "the help does not say how to take off"
         );
     }
+
+    #[test]
+    fn aircraft_help_restores_after_replay_and_legacy_selection() {
+        let mut app = App::new();
+        app.init_resource::<ReplayStatus>()
+            .add_systems(Update, update_help_for_replay);
+        let entity = app.world_mut().spawn((Text::new(""), HudHelp)).id();
+        app.update();
+        assert_eq!(
+            app.world().get::<Text>(entity).unwrap().as_str(),
+            help_text()
+        );
+        let custom = "DRY JET\nB: parking brake\nZero throttle is engine idle.";
+        app.insert_resource(FlightGuidance {
+            live_help: Some(custom.to_owned()),
+            tutorial_enabled: false,
+        });
+        for _ in 0..3 {
+            app.update();
+            assert_eq!(app.world().get::<Text>(entity).unwrap().as_str(), custom);
+            app.world_mut().resource_mut::<ReplayStatus>().active = true;
+            app.update();
+            let replay = app.world().get::<Text>(entity).unwrap().as_str();
+            assert!(replay.starts_with("REPLAY CONTROLS"));
+            assert!(!replay.contains("parking brake") && !replay.contains("75 kt"));
+            app.world_mut().resource_mut::<ReplayStatus>().active = false;
+        }
+        app.insert_resource(FlightGuidance::default());
+        app.update();
+        assert_eq!(
+            app.world().get::<Text>(entity).unwrap().as_str(),
+            help_text()
+        );
+    }
 }
 
 #[cfg(test)]
 #[path = "attribution_layout_tests.rs"]
 mod attribution_layout_tests;
+
+#[cfg(test)]
+mod top_layout_tests;

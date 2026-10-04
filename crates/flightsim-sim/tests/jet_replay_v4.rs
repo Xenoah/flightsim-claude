@@ -471,6 +471,7 @@ fn failed_step_after_successes_preserves_last_committed_time_and_log() {
         JetFailureReason::OutsideOperatingEnvelope(_)
     ));
     assert_ne!(sim.terminal().unwrap().failure.stage, JetStage::Initial);
+    assert_eq!(sim.interpolated().position, sim.state().position);
 }
 
 #[test]
@@ -603,6 +604,14 @@ fn terminal_at_cursor_240_is_deferred_by_work_cap_and_settled_without_time() {
     for _ in 0..8 {
         player.advance(Seconds(0.25)).unwrap();
     }
+    assert!(player.finished());
+    assert_eq!(player.simulation().snapshot(), expected);
+    player.restart().unwrap();
+    player.set_speed(8.0);
+    assert_eq!(player.advance(Seconds(0.25)).unwrap(), 240);
+    assert!(!player.finished());
+    assert!(player.simulation().terminal().is_none());
+    assert_eq!(player.advance(Seconds::ZERO).unwrap(), 1);
     assert!(player.finished());
     assert_eq!(player.simulation().snapshot(), expected);
 }

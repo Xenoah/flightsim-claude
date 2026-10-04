@@ -689,7 +689,7 @@ fn physics_app() -> App {
     );
     let clock = world_runtime::startup_clock(&startup);
     let conditions = recording_conditions(&startup, &clock);
-    app.insert_resource(FlightSimulation(simulation))
+    app.insert_resource(FlightSimulation(simulation.into()))
         .insert_resource(StartCondition::InFlight(initial))
         .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
             conditions,

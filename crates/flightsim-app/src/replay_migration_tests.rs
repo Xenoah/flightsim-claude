@@ -276,6 +276,7 @@ fn light_and_swift_all_versions_keep_exact_controls_clock_rewind_and_export() {
                             .world_mut()
                             .resource_mut::<FlightSimulation>()
                             .0
+                            .legacy_mut()
                             .advance(frame.frame_time, frame.controls);
                     }
                     let prefix = &prefix.world().resource::<FlightSimulation>().0;
@@ -346,12 +347,18 @@ fn startup_requires_opt_in_without_changing_original_file_or_conditions_on_rejec
             }
             // A profile's missing legacy yaw coefficient cannot be supplied by the flag.
             let mut startup = Startup {
-                aircraft: aircraft_profile::AircraftProfile::builtin(id).unwrap(),
+                aircraft: aircraft_profile::AircraftProfile::builtin(id)
+                    .unwrap()
+                    .into(),
                 replay: Some(path),
                 legacy_replay_compatibility: true,
                 ..default()
             };
-            startup.aircraft.dynamics.aero.yaw_rate_p += 0.01;
+            let aircraft_profile::SelectedAircraftProfile::Legacy(profile) = &mut startup.aircraft
+            else {
+                unreachable!()
+            };
+            profile.dynamics.aero.yaw_rate_p += 0.01;
             let before = recording_conditions(&startup, &startup_clock(&startup));
             let mut diagnostics = StartupDiagnostics::default();
             assert!(resolve_flight_sources(&mut startup, &mut diagnostics).is_none());

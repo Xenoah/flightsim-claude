@@ -74,6 +74,17 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-app/src/cloud_runtime.rs",
     "crates/flightsim-app/src/region_runtime.rs",
     "crates/flightsim-ui/src/world_map.rs",
+    # Typed app dispatch and its UI/traffic adapters now sit on the legacy path.
+    # ModelReplayFile must delegate original bytes to the old codecs and never
+    # admit a jet replay as a Swift flight. These pins do not qualify jet flights.
+    "crates/flightsim-app/src/flight_session.rs",
+    "crates/flightsim-app/src/traffic_runtime.rs",
+    "crates/flightsim-app/src/controls_runtime_tests.rs",
+    "crates/flightsim-app/src/jet_runtime_tests.rs",
+    "crates/flightsim-sim/src/replay_v4.rs",
+    "crates/flightsim-ui/src/lib.rs",
+    "crates/flightsim-ui/src/tutorial.rs",
+    "crates/flightsim-ui/src/top_layout_tests.rs",
 }
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -268,6 +279,20 @@ def validate_distribution(info, staged):
     require(info.get("region_downloads") is False and staged.get("region_downloads") is False,
             "this offline candidate requires explicit region_downloads=false")
     require(info == staged, "extracted distribution identity changed")
+    # Bind exported evidence too: equality with itself is not proof of the
+    # selected model, package membership or platform. Explicit external v2/v4
+    # support in this executable never broadens this Swift-only qualification.
+    expected = {
+        "schema_version": 1, "package": "flightsim-app", "profile": "commercial-staging",
+        "default_aircraft": "swift-sport", "default_model": "aircraft/swift_sport.glb",
+        "bundled_aircraft": ["swift-sport"], "release_authorized": False,
+        "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc",
+    }
+    require(all(info.get(key) == value for key, value in expected.items())
+            and type(info.get("schema_version")) is int
+            and info.get("release_authorized") is False
+            and isinstance(info.get("package_version"), str) and bool(info["package_version"]),
+            "candidate distribution must be the Swift-only Windows MSVC build")
 
 
 def validate_readiness(report, returncode):
@@ -716,8 +741,8 @@ def record_missing_output(path, message):
                         + message[:4096] + "\n", encoding="utf-8")
 
 
-def check_default_capture(run, repo, app, unrelated, work, evidence, report):
-    """One required attempt, then one bounded non-qualifying diagnostic on failure."""
+def check_default_capture(run, repo, app, unrelated, work, evidence, report, *, diagnose_readback=False):
+    """One required attempt; an explicit opt-in allows one nonqualifying probe."""
     require(digest(app) == report["executable_sha256"], "executable changed before primary capture")
     screenshot = work / PNG_NAME
     command = capture_command(app, screenshot)
@@ -741,7 +766,10 @@ def check_default_capture(run, repo, app, unrelated, work, evidence, report):
             report["primary_capture_failure"]["exit_code"] = result.returncode
         try:
             record_missing_output(evidence / "default-swift.log", report["primary_capture_failure"]["message"])
-            record_readback_probe(run, repo, app, unrelated, work, evidence, report)
+            if diagnose_readback:
+                record_readback_probe(run, repo, app, unrelated, work, evidence, report)
+            else:
+                report["primary_capture_failure"]["log_sha256"] = digest(evidence / "default-swift.log")
         finally:
             # Even diagnostic preparation/parsing/I/O errors must never hide
             # the original failure, add an acceptance check, or launch again.
@@ -799,9 +827,11 @@ def validate_probe_evidence(directory, report):
     diagnostics = report.get("diagnostics")
     has_probe = any((directory / name).exists() for name in (PROBE_LOG_NAME, PROBE_PNG_NAME, PROBE_JSON_NAME))
     if diagnostics is None:
-        require(not has_probe and "primary_capture_failure" not in report, "diagnostic files lack a primary failure/probe record")
-        return
-    require(isinstance(diagnostics, dict) and set(diagnostics) == {"readback_probe"}, "unexpected diagnostic record")
+        require(not has_probe, "diagnostic files lack a primary failure/probe record")
+        if "primary_capture_failure" not in report:
+            return
+    else:
+        require(isinstance(diagnostics, dict) and set(diagnostics) == {"readback_probe"}, "unexpected diagnostic record")
     require(isinstance(report.get("executable_sha256"), str)
             and re.fullmatch(r"[0-9a-f]{64}", report["executable_sha256"]), "diagnostic binary digest is missing")
     primary = report.get("primary_capture_failure", {})
@@ -821,6 +851,8 @@ def validate_probe_evidence(directory, report):
             and ("exit_code" not in primary or type(primary["exit_code"]) is int),
             "primary launch changed")
     require(digest(directory / "default-swift.log") == primary.get("log_sha256"), "primary failure log changed")
+    if diagnostics is None:
+        return
     probe = diagnostics["readback_probe"]
     require(isinstance(probe, dict) and type(probe.get("attempts")) is int and probe["attempts"] == 1
             and probe.get("qualifies_acceptance") is False
@@ -978,7 +1010,7 @@ def validate_evidence(directory):
     validate_probe_evidence(directory, report)
 
 
-def run_candidate(repo, expected, work, evidence):
+def run_candidate(repo, expected, work, evidence, *, diagnose_readback=False):
     require(sys.platform == "win32", "actual candidate execution requires Windows")
     require(not work.exists() and not evidence.exists(), "use new work and evidence directories")
     require(work != evidence and not work.is_relative_to(evidence) and not evidence.is_relative_to(work), "work/evidence must be separate siblings")
@@ -1096,7 +1128,8 @@ def run_candidate(repo, expected, work, evidence):
         info = json.loads(first.stdout)
         validate_distribution(info, json.loads((bundle / "distribution-info.json").read_text(encoding="utf-8")))
         report["distribution"] = info
-        check_default_capture(run, repo, app, unrelated, work, evidence, report)
+        check_default_capture(run, repo, app, unrelated, work, evidence, report,
+                              diagnose_readback=diagnose_readback)
         result, log = run([app, "--aircraft", "light-single"], cwd=unrelated, timeout=30, accepted=(2,),
                           runtime=True, output=evidence / "absent-light-single.log")
         require("selected aircraft model is missing: aircraft/light_single.glb" in log, "wrong absent-model failure")
@@ -1148,13 +1181,16 @@ def main(argv=None):
     parser.add_argument("--work", type=Path)
     parser.add_argument("--evidence", type=Path)
     parser.add_argument("--validate-evidence", type=Path)
+    parser.add_argument("--diagnose-readback", action="store_true",
+                        help="after primary capture failure, run one nonqualifying readback probe (default: disabled)")
     args = parser.parse_args(argv)
     try:
         if args.validate_evidence:
             validate_evidence(args.validate_evidence)
         else:
             require(args.expected_source and args.work and args.evidence, "expected-source, work and evidence are required")
-            run_candidate(args.repo.resolve(), args.expected_source, args.work.resolve(), args.evidence.resolve())
+            run_candidate(args.repo.resolve(), args.expected_source, args.work.resolve(), args.evidence.resolve(),
+                          diagnose_readback=args.diagnose_readback)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zlib.error) as error:
         print(f"Swift Windows candidate check failed: {error}", file=sys.stderr)
         return 1

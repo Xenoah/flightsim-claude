@@ -3,13 +3,16 @@ use super::*;
 
 fn simulation() -> FlightSimulation {
     let source: BoxedSource = Box::new(MemoryTileSource::new());
-    FlightSimulation(Simulation::parked(
-        AircraftConfig::light_single(),
-        Geodetic::from_degrees(35.55, 139.78, 0.0),
-        Radians::ZERO,
-        Terrain::new(source, 1024, 8..=12),
-        GroundSampler::default(),
-    ))
+    FlightSimulation(
+        Simulation::parked(
+            AircraftConfig::light_single(),
+            Geodetic::from_degrees(35.55, 139.78, 0.0),
+            Radians::ZERO,
+            Terrain::new(source, 1024, 8..=12),
+            GroundSampler::default(),
+        )
+        .into(),
+    )
 }
 
 fn camera_app(mode: ViewMode) -> (App, Entity, Entity) {

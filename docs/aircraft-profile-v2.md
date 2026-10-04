@@ -3,8 +3,9 @@
 `flightsim_sim::aircraft_profile::AircraftProfileV2` is an additive pure Rust
 loader for explicit `dry_jet_table` dynamics revision 1. It validates local data
 and returns immutable `JetAircraftConfig` plus presentation/input metadata.
-It performs no network access or GLB load and does not make a jet selectable in
-the current app. Profile v1, its 128 KiB limit and ordinary numeric decoder,
+The pure loader performs no network access or GLB load. The separate
+[native integration](jet-native-app.md) accepts an explicitly selected external
+v2 file. Profile v1, its 128 KiB limit and ordinary numeric decoder,
 legacy FDM revision 2 and replay v1–v3 APIs/identities are unchanged.
 
 The public authoring schema is
@@ -151,6 +152,6 @@ python3 schemas/tests/test_aircraft_profile_schema.py
 The executed checks and legacy before/after comparison are recorded in
 [profile boundary QA](qa/aircraft-profile-v2-2026-10-04.md).
 
-This profile foundation has no native/GPU acceptance, real aircraft performance
-validation, asset importer, app selector or new replay codec. Those integrations
-retain their separate review gates.
+These profile-boundary checks do not establish native/GPU acceptance or real
+aircraft performance. The [v4 codec](replay-v4.md), [original Kestrel asset](aircraft/kestrel-jet-trainer.md)
+and [opt-in app](jet-native-app.md) retain separate reviews and runtime acceptance.

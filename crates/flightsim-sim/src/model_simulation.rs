@@ -1,4 +1,7 @@
 //! Transactional simulation for the explicit jet model. Legacy simulation is untouched.
+mod parked;
+mod presentation;
+
 use crate::{
     FlightLog, GroundPlane, GroundSampler, Touchdown,
     replay::{EnvironmentConditions, ReplayError},
@@ -13,6 +16,7 @@ use flightsim_world::{
     GlobalClimate, MemoryTileSource, Terrain,
     global::{GlobalTerrain, GlobalTileSource},
 };
+pub use presentation::JetPresentationSnapshot;
 
 /// Pins fixed time, prospective weather, terrain sampling and contact semantics.
 pub const JET_SIMULATION_REVISION: u32 = 1;
@@ -74,6 +78,7 @@ pub enum JetSimulationError {
     Conditions(ReplayError),
     Initial(JetStepError),
     World(String),
+    Parked(&'static str),
 }
 impl std::fmt::Display for JetSimulationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,6 +86,7 @@ impl std::fmt::Display for JetSimulationError {
             Self::Conditions(e) => e.fmt(f),
             Self::Initial(e) => e.fmt(f),
             Self::World(e) => f.write_str(e),
+            Self::Parked(e) => f.write_str(e),
         }
     }
 }

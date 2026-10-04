@@ -42,71 +42,96 @@ pub struct ReplayBanner;
 #[derive(Component, Debug)]
 pub struct ReplayBannerPanel;
 
-/// 画面上部中央に再生の状態を出す。
-///
-/// 上部中央はチュートリアル導線と同じ帯。**再生中はチュートリアルを
-/// 出さない**（記録の再生に「今すぐ離陸しろ」と指示しても意味がない）ので
-/// 重ならない。app が `--replay` のときに黙らせる。
-///
-/// 幅は画面の中央 60% ではなく 76% を取る。**30% ずつ空けると 1 行に
-/// 収まらず折り返した**（実機のスクリーンショットで発覚）。
-pub fn spawn_replay_banner(mut commands: Commands) {
-    commands
-        .spawn((
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            Node {
+/// Reserve the measured HUD width before placing replay/recording notices.
+/// The shared wrapping row keeps long notices away from the complete stall
+/// warning, including N/A. A narrow viewport stacks the notice below the HUD
+/// instead of shrinking, clipping, or covering critical instrument text.
+/// Schedule after `spawn_hud`; standalone use without a HUD remains supported.
+pub fn spawn_replay_banner(mut commands: Commands, hud: Query<&ChildOf, With<crate::HudText>>) {
+    if let Ok(hud) = hud.single() {
+        commands
+            .entity(hud.parent())
+            .with_children(spawn_banner_content);
+    } else {
+        commands
+            .spawn(Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(12.0),
-                left: Val::Percent(12.0),
-                right: Val::Percent(12.0),
-                padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                left: Val::Px(12.0),
+                right: Val::Px(12.0),
+                ..default()
+            })
+            .with_children(spawn_banner_content);
+    }
+}
+
+fn spawn_banner_content(top: &mut ChildSpawnerCommands) {
+    top.spawn((
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        Node {
+            display: Display::None,
+            flex_basis: Val::Px(240.0),
+            flex_grow: 1.0,
+            flex_shrink: 0.0,
+            max_width: Val::Percent(100.0),
+            min_width: Val::Px(0.0),
+            padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+            ..default()
+        },
+        Visibility::Hidden,
+        ReplayBannerPanel,
+    ))
+    .with_children(|parent| {
+        // Text's final glyph bounds use its whole node width. Give padding
+        // its own parent so measurement and rendered wrapping agree.
+        parent.spawn((
+            Text::new(""),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(Color::srgb(1.0, 0.9, 0.6)),
+            TextLayout::new_with_justify(Justify::Center)
+                .with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+            Node {
+                width: Val::Percent(100.0),
+                min_width: Val::Px(0.0),
                 ..default()
             },
             Visibility::Hidden,
-            ReplayBannerPanel,
-        ))
-        .with_children(|parent| {
-            // Text's final glyph bounds use its whole node width. Give padding
-            // its own parent so measurement and rendered wrapping agree.
-            parent.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(1.0, 0.9, 0.6)),
-                TextLayout::new_with_justify(Justify::Center),
-                Node {
-                    width: Val::Percent(100.0),
-                    min_width: Val::Px(0.0),
-                    ..default()
-                },
-                Visibility::Hidden,
-                ReplayBanner,
-            ));
-        });
+            ReplayBanner,
+        ));
+    });
 }
+
+type BannerPanels<'w, 's> = Query<
+    'w,
+    's,
+    (&'static mut Node, &'static mut Visibility),
+    (With<ReplayBannerPanel>, Without<ReplayBanner>),
+>;
 
 /// 表示を状態に合わせる。
 pub fn update_replay_banner(
     status: Res<ReplayStatus>,
     mut query: Query<(&mut Text, &mut Visibility), With<ReplayBanner>>,
-    mut panels: Query<&mut Visibility, (With<ReplayBannerPanel>, Without<ReplayBanner>)>,
+    mut panels: BannerPanels,
 ) {
     let shown = status.active || status.notice.is_some();
-    for mut visibility in &mut panels {
-        *visibility = if shown {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+    let display = if shown { Display::Flex } else { Display::None };
+    let visible = if shown {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    for (mut node, mut visibility) in &mut panels {
+        if node.display != display {
+            node.display = display;
+        }
+        visibility.set_if_neq(visible);
     }
     for (mut text, mut visibility) in &mut query {
-        *visibility = if shown {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        visibility.set_if_neq(visible);
         if !status.active && status.notice.is_none() {
             continue;
         }
@@ -182,6 +207,35 @@ fn clock(seconds: Seconds) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Resource, Default)]
+    struct ChangedPanels(usize);
+
+    #[test]
+    fn unchanged_hidden_and_visible_banners_do_not_invalidate_layout() {
+        let mut app = App::new();
+        app.init_resource::<ReplayStatus>()
+            .init_resource::<ChangedPanels>()
+            .add_systems(Startup, spawn_replay_banner)
+            .add_systems(Update, update_replay_banner)
+            .add_systems(
+                PostUpdate,
+                |panels: Query<Ref<Node>, With<ReplayBannerPanel>>,
+                 mut changed: ResMut<ChangedPanels>| {
+                    changed.0 = panels.iter().filter(|node| node.is_changed()).count();
+                },
+            );
+        app.update();
+        app.update();
+        assert_eq!(app.world().resource::<ChangedPanels>().0, 0);
+        for notice in [Some("RECORDING DISABLED".into()), None] {
+            app.world_mut().resource_mut::<ReplayStatus>().notice = notice;
+            app.update();
+            assert_eq!(app.world().resource::<ChangedPanels>().0, 1);
+            app.update();
+            assert_eq!(app.world().resource::<ChangedPanels>().0, 0);
+        }
+    }
 
     fn status() -> ReplayStatus {
         ReplayStatus {

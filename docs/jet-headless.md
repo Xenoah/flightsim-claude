@@ -69,6 +69,8 @@ so even an unexpectedly successful probe cannot advance the committed replay sta
 
 The [v4 wire and identity contract](replay-v4.md) specifies every field and limit.
 Current/legacy APIs and all v1/v2/v3 bytes remain separate and unchanged. The
-existing app cannot read v4 through its old `ReplayFile` API. Profile-v2 loading,
-identity and replay validity do not establish trimability, handling or certification.
-Native visuals, manual control, audio and app selection remain later work.
+legacy app path cannot read v4 through its old `ReplayFile` API. The separate
+[opt-in native jet path](jet-native-app.md) explicitly dispatches profile v2 and
+matching v4 files. Profile loading, identity and replay validity do not establish
+trimability, handling or certification. Native visuals, manual controls and audio
+retain their own acceptance gates beyond the headless checks described here.

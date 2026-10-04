@@ -1,5 +1,9 @@
 # Swift candidate binding after the additive headless jet milestone
 
+This records the headless milestone at the commits below. The later explicit
+native v2/v4 dispatch has its own [source-binding review](replay-candidate-native-jet-pin-review-2026-10-04.md);
+the historical statements here about app support do not describe that later source.
+
 Independent source-boundary review on 2026-10-04. Reviewed integration:
 `b8ff801ea3a36a1934d01d47b24da6851959e1ed`. Previous contract source:
 `c80596c0f73a03d2dff45efe75ddd15265dfc9ca`. This change owns only the reviewed

@@ -22,6 +22,9 @@
 !/assets/aircraft/meadow_trainer.glb
 !/assets/aircraft/meadow_trainer.json
 !/assets/aircraft/meadow_trainer.blend
+!/assets/aircraft/kestrel_jet_trainer.glb
+!/assets/aircraft/kestrel_jet_trainer.json
+!/assets/aircraft/kestrel_jet_trainer.blend
 
 # API キー。**中身を絶対にコミットしない。**
 # 書き方は .env.example を参照（そちらは追跡する）。

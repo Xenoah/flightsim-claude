@@ -1,5 +1,49 @@
 # Bounded Windows readback diagnostic
 
+## Completed Windows v2 observation and opt-in boundary
+
+The one authorized Windows v2 observation is complete. Exact source
+`f3850a2e23948e778e1122ff3881708a331b07ba` ran in candidate
+[37197960445, job 111423624879](https://github.com/Xenoah/flightsim-claude/actions/runs/37197960445/job/111423624879).
+The exported evidence artifact was `11302661595`, 1,051,396 bytes, with SHA-256
+`01da663894619f27032b99307cbb24840a55e3b68e52f56dcf0dbe6191f9a0b7`.
+Its exported acceptance/log/JSON evidence was validated read-only. The adapter
+was CPU Microsoft Basic Render Driver 10.0.26100.33438, D3D12; executable SHA-256
+was `d3a5a1130d47f98a102cb9169dff5604f613bcf5049b7cc3b60d952a70b93b78`.
+
+The pre-scene clear/copy successfully mapped all sixteen valid green pixels and
+finished cleanup at 3 ms. Its one wait returned `queue_empty`, with 1 ms measured
+wall time. Ordinary-scene callbacks for frames 1 and 2 arrived at 23,167 ms and
+frame 4 at 45,019 ms. The scene summary froze at 60,565 ms with six registrations
+and three credited completions. Callbacks for frames 8 and 16 arrived at 65,868 ms
+and 105,196 ms with `cancelled=true phase=owner_released`, and receive no completion
+credit beyond the 60-second observation window. No frame-30 completion was
+observed.
+
+The late marker's requested 250 ms wait returned timeout after 284 ms wall time.
+Its separate async task started, suspended, received its signal and resumed.
+At its 15,015 ms summary there were no successful map, validated pixels or queue
+callback; the only map callback was a cancelled cleanup error and cannot count
+as success. Both the primary screenshot and the secondary diagnostic timed out
+at their unchanged 180-second watchdogs. No PNG was exported, acceptance remained
+failed with no passed checks, and `qualifies_acceptance` remained `false`.
+
+This establishes working basic pre-scene readback on that exact software-adapter
+run. The full-scene screenshot/progress problem remains unresolved. Callback
+delivery times do not distinguish CPU scene preparation from GPU/backend cost,
+and the result is not a production rendering fix or Windows qualification.
+
+The checker now requires explicit `--diagnose-readback` to request the secondary
+attempt after primary failure. The default and unchanged automatic candidate
+workflow perform only the ordinary primary attempt. The opt-in allows at most
+one probe using the same source, extracted executable and adapter settings; it
+retains the original failure even if that probe succeeds. A successful primary
+capture never launches a probe. The original v1/v2 evidence rules remain intact,
+and primary-only failures retain their validated command, timeout, launch and
+log-hash evidence. This completed observation authorizes no further diagnostic
+runs. The [candidate recipe](../release/swift-windows-candidate.md#bounded-screenshot-diagnostics)
+documents the explicit opt-in separately from normal acceptance.
+
 ## Integrated Linux v2 observation
 
 The combined jet/profile/replay and diagnostic source `b8ff801ea3a36a1934d01d47b24da6851959e1ed`
@@ -24,7 +68,8 @@ is not a clean-exit assertion. The saved scene PNG SHA-256 is
 `2f5774abf4e654571189d6a825a6b720676b498f86f74e9b3303bfd9c31d82a5`,
 and the complete log SHA-256 is
 `c1e1bfbd66b77fadea3d4c5f28f3b64d128e1cf0e5fac7b70ac1189e6e2678d3`.
-The separately authorized exact Windows v2 observation remains outstanding.
+The separately authorized exact Windows v2 observation was subsequently completed
+with the failed result recorded above.
 
 ## V2 pre-scene and sparse scene observation (2026-10-04)
 
@@ -268,10 +313,12 @@ interpret a missing return alongside the process outcome and actual PNG proof.
 
 ## Evidence and interpretation
 
-All machine-readable events use `FS_READBACK_PROBE` on stderr. The candidate
-replaces the old alternate-console comparison with one launch of the same EXE,
-using the baseline launcher, scene, features, delay and 180-second watchdog,
-adding only this flag (and a distinct diagnostic PNG destination). It always
+All machine-readable events use `FS_READBACK_PROBE` on stderr. When the checker
+is explicitly given `--diagnose-readback`, a primary capture failure permits one
+launch of the same EXE using the baseline launcher, scene, features, delay and
+180-second watchdog, adding only the app's `--windows-readback-diagnostic` flag
+(and a distinct diagnostic PNG destination). The old alternate-console
+comparison remains absent. The checker always
 preserves the primary capture failure and never proceeds to remaining required
 acceptance checks on the strength of diagnostic success. The diagnostic record
 always has `qualifies_acceptance=false`.

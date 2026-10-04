@@ -3,11 +3,247 @@ use flightsim_core::{Attitude, Meters, MetersPerSecond, Radians};
 use flightsim_fdm::{AircraftConfig, RigidBodyState, definition::AircraftDefinition};
 use flightsim_input::{AxisState, ElevatorTrim, PilotControls, RampAxis};
 use flightsim_render::{ModelAxis, ModelFit};
+use flightsim_sim::aircraft_profile::{AircraftProfileV2, EngineSound};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::{Component, Path};
 
 const MAX_PROFILE_BYTES: u64 = 128 * 1024;
+
+/// App selection keeps each dynamics family behind its own validated decoder.
+/// Display metadata and sound categories never choose the physical model.
+#[derive(Debug, Clone)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "bounded startup-only profiles retain their validated family values explicitly"
+)]
+pub(super) enum SelectedAircraftProfile {
+    Legacy(AircraftProfile),
+    Jet(AircraftProfileV2),
+}
+
+impl From<AircraftProfile> for SelectedAircraftProfile {
+    fn from(profile: AircraftProfile) -> Self {
+        Self::Legacy(profile)
+    }
+}
+
+impl SelectedAircraftProfile {
+    pub fn builtin(id: &str) -> Result<Self, String> {
+        AircraftProfile::builtin(id).map(Self::Legacy)
+    }
+
+    pub fn load(choice: &str) -> Result<Self, String> {
+        if !choice.ends_with(".json") {
+            return AircraftProfile::load(choice).map(Self::Legacy);
+        }
+        let mut bytes = Vec::new();
+        std::fs::File::open(choice)
+            .map_err(|error| error.to_string())?
+            .take((flightsim_sim::aircraft_profile::MAX_PROFILE_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|error| error.to_string())?;
+        Self::from_bytes(&bytes)
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() > flightsim_sim::aircraft_profile::MAX_PROFILE_BYTES {
+            return Err("aircraft profile exceeds 1 MiB".into());
+        }
+        // Only the integer version is decoded here. Derived unknown-field
+        // handling uses IgnoredAny, so physical/metadata number tokens are
+        // skipped without f64 conversion, Value, or enum-content buffering.
+        // Both actual decoders receive the same original bounded bytes.
+        #[derive(Deserialize)]
+        struct VersionProbe {
+            version: u16,
+        }
+        let probe: VersionProbe =
+            serde_json::from_slice(bytes).map_err(|error| error.to_string())?;
+        match probe.version {
+            1 => {
+                if bytes.len() as u64 > MAX_PROFILE_BYTES {
+                    return Err("aircraft profile exceeds 128 KiB".into());
+                }
+                let json = std::str::from_utf8(bytes).map_err(|error| error.to_string())?;
+                AircraftProfile::parse(json).map(Self::Legacy)
+            }
+            2 => AircraftProfileV2::from_bytes(bytes)
+                .map(Self::Jet)
+                .map_err(|error| error.to_string()),
+            version => Err(format!("unsupported aircraft profile version {version}")),
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Legacy(profile) => &profile.id,
+            Self::Jet(profile) => profile.id(),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Legacy(profile) => &profile.dynamics.name,
+            Self::Jet(profile) => profile.configuration().airframe().name(),
+        }
+    }
+
+    pub fn model_path(&self) -> &str {
+        match self {
+            Self::Legacy(profile) => &profile.model.path,
+            Self::Jet(profile) => &profile.model().path,
+        }
+    }
+
+    pub fn model_fit(&self) -> ModelFit {
+        match self {
+            Self::Legacy(profile) => profile.model_fit(),
+            Self::Jet(profile) => {
+                let model = profile.model();
+                ModelFit::new(
+                    ModelAxis::parse(&model.forward).expect("validated axis"),
+                    ModelAxis::parse(&model.up).expect("validated axis"),
+                    Meters(model.length_m.get()),
+                )
+                .expect("validated axes")
+            }
+        }
+    }
+
+    pub fn pilot_controls(&self, approach: bool) -> PilotControls {
+        match self {
+            Self::Legacy(profile) => profile.pilot_controls(approach),
+            Self::Jet(profile) => {
+                let controls = profile.controls();
+                let mut result = PilotControls::default();
+                result.aileron =
+                    AxisState::new(controls.surface_rate.get(), controls.centering_rate.get());
+                result.elevator = AxisState::new(
+                    controls
+                        .elevator_rate
+                        .unwrap_or(controls.surface_rate)
+                        .get(),
+                    controls
+                        .elevator_centering_rate
+                        .unwrap_or(controls.centering_rate)
+                        .get(),
+                );
+                result.rudder =
+                    AxisState::new(controls.surface_rate.get(), controls.centering_rate.get());
+                result.throttle = RampAxis::new(
+                    if approach {
+                        controls.approach_throttle.get()
+                    } else {
+                        0.0
+                    },
+                    controls.throttle_rate.get(),
+                );
+                result.flaps = RampAxis::new(
+                    if approach {
+                        controls.approach_flaps.get()
+                    } else {
+                        0.0
+                    },
+                    controls.flap_rate.get(),
+                );
+                result.trim = ElevatorTrim::new(
+                    if approach {
+                        controls.approach_trim.get()
+                    } else {
+                        controls.default_trim.get()
+                    },
+                    controls.trim_rate.get(),
+                );
+                result
+            }
+        }
+    }
+
+    pub fn camera_eye(&self) -> [Meters; 3] {
+        match self {
+            Self::Legacy(profile) => profile.camera_eye_m.map(Meters),
+            Self::Jet(profile) => profile.camera_eye(),
+        }
+    }
+
+    pub fn engine_kind(&self) -> flightsim_audio::EngineKind {
+        use flightsim_audio::{EngineKind, EngineSpec, TurbineSpec};
+        match self {
+            Self::Legacy(profile) => {
+                EngineKind::parse(&profile.engine_sound).expect("validated engine sound")
+            }
+            Self::Jet(profile) => match profile.engine_sound() {
+                EngineSound::Piston => EngineKind::Piston(EngineSpec::default()),
+                EngineSound::Turbine => {
+                    let base = TurbineSpec::default();
+                    EngineKind::Turbine(TurbineSpec {
+                        afterburner_threshold: 1.0,
+                        afterburner_exhaust_speed: base.military_exhaust_speed,
+                        ..base
+                    })
+                }
+            },
+        }
+    }
+
+    pub fn is_jet(&self) -> bool {
+        matches!(self, Self::Jet(_))
+    }
+
+    pub fn legacy(&self) -> Option<&AircraftProfile> {
+        match self {
+            Self::Legacy(profile) => Some(profile),
+            Self::Jet(_) => None,
+        }
+    }
+
+    pub fn jet(&self) -> Option<&AircraftProfileV2> {
+        match self {
+            Self::Legacy(_) => None,
+            Self::Jet(profile) => Some(profile),
+        }
+    }
+
+    /// Compatibility helper for legacy simulation/replay paths. Callers must
+    /// dispatch jets first; a jet never fabricates a legacy propeller config.
+    pub fn configuration(&self) -> AircraftConfig {
+        self.legacy()
+            .expect("legacy configuration requires explicit profile dispatch")
+            .configuration()
+    }
+
+    /// Initial approach pose only, using the selected profile's validated hints.
+    /// No trim, stability, or real-aircraft performance claim is implied.
+    pub fn approach_state(
+        &self,
+        runway: &flightsim_world::Runway,
+        distance: Meters,
+        glideslope: Radians,
+    ) -> RigidBodyState {
+        match self {
+            Self::Legacy(profile) => profile.approach_state(runway, distance, glideslope),
+            Self::Jet(profile) => {
+                let controls = profile.controls();
+                let state = flightsim_sim::approach_state(
+                    runway,
+                    distance,
+                    glideslope,
+                    MetersPerSecond(controls.approach_speed_mps.get()),
+                );
+                RigidBodyState::from_geodetic(
+                    state.geodetic(),
+                    Attitude::new(
+                        Radians::ZERO,
+                        Radians(controls.approach_pitch_rad.get()),
+                        state.attitude().yaw,
+                    ),
+                    state.velocity_ned(),
+                )
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -248,6 +484,279 @@ impl AircraftProfile {
             return Err("invalid aircraft control or approach setting".into());
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+
+    const JET_JSON: &str =
+        include_str!("../../../docs/examples/aircraft-profiles-v2/numerical-jet.json");
+    const LEGACY_JSON: &str = include_str!("../../../assets/aircraft/light_single.json");
+
+    #[test]
+    fn selection_keeps_builtin_and_external_legacy_metadata_and_controls() {
+        for id in ["light-single", "swift-sport"] {
+            let selected = SelectedAircraftProfile::builtin(id).unwrap();
+            let legacy = AircraftProfile::builtin(id).unwrap();
+            assert!(!selected.is_jet());
+            assert!(selected.legacy().is_some());
+            assert!(selected.jet().is_none());
+            assert_eq!(selected.id(), legacy.id);
+            assert_eq!(selected.name(), legacy.dynamics.name);
+            assert_eq!(selected.model_path(), legacy.model.path);
+            assert_eq!(selected.model_fit(), legacy.model_fit());
+            assert_eq!(selected.camera_eye(), legacy.camera_eye_m.map(Meters));
+            assert_eq!(
+                selected.engine_kind(),
+                flightsim_audio::EngineKind::parse(&legacy.engine_sound).unwrap()
+            );
+            for approach in [false, true] {
+                let selected_controls = selected.pilot_controls(approach);
+                let legacy_controls = legacy.pilot_controls(approach);
+                assert_eq!(selected_controls.aileron, legacy_controls.aileron);
+                assert_eq!(selected_controls.elevator, legacy_controls.elevator);
+                assert_eq!(selected_controls.rudder, legacy_controls.rudder);
+                assert_eq!(selected_controls.throttle, legacy_controls.throttle);
+                assert_eq!(selected_controls.flaps, legacy_controls.flaps);
+                assert_eq!(
+                    selected_controls.trim.value().to_bits(),
+                    legacy_controls.trim.value().to_bits()
+                );
+            }
+        }
+        let external = SelectedAircraftProfile::from_bytes(LEGACY_JSON.as_bytes()).unwrap();
+        assert!(external.legacy().is_some());
+        assert_eq!(external.id(), "light-single");
+        assert!(SelectedAircraftProfile::load("unknown-jet").is_err());
+    }
+
+    #[test]
+    fn external_jet_selection_needs_no_model_asset_and_exposes_validated_metadata() {
+        let selected = SelectedAircraftProfile::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/examples/aircraft-profiles-v2/numerical-jet.json"
+        ))
+        .unwrap();
+        assert!(selected.is_jet());
+        assert!(selected.legacy().is_none());
+        assert!(selected.jet().is_some());
+        assert_eq!(selected.id(), "numerical-jet-fixture");
+        assert_eq!(
+            selected.name(),
+            "Numerical jet profile fixture (not a real aircraft)"
+        );
+        assert_eq!(
+            selected.model_path(),
+            "aircraft/unprovided_numerical_jet_fixture.glb"
+        );
+        assert_eq!(selected.model_fit().forward, ModelAxis::NegativeX);
+        assert_eq!(selected.model_fit().up, ModelAxis::PositiveY);
+    }
+
+    #[test]
+    fn dispatch_keeps_distinct_exact_v2_and_ordinary_v1_numeric_bits() {
+        let selected = SelectedAircraftProfile::from_bytes(JET_JSON.as_bytes()).unwrap();
+        let aero = selected.jet().unwrap().configuration().aero().definition();
+        assert_eq!(
+            aero.knots[0].aero.pitch_rate_q.to_bits(),
+            0xc03e_6666_6666_6667
+        );
+        assert_eq!(
+            aero.knots[0].aero.yaw_rate_p.to_bits(),
+            (-0.0_f64).to_bits()
+        );
+
+        let legacy = LEGACY_JSON.replace(
+            "\"pitch_rate_q\": -12.4",
+            "\"pitch_rate_q\": -30.400000000000002",
+        );
+        let selected = SelectedAircraftProfile::from_bytes(legacy.as_bytes()).unwrap();
+        assert_eq!(
+            selected.configuration().aero.pitch_rate_q.to_bits(),
+            0xc03e_6666_6666_6666
+        );
+        assert_eq!(
+            selected.configuration().aero.pitch_rate_q.to_bits(),
+            AircraftProfile::parse(&legacy)
+                .unwrap()
+                .configuration()
+                .aero
+                .pitch_rate_q
+                .to_bits()
+        );
+    }
+
+    #[test]
+    fn jet_metadata_adapter_retains_exact_numbers_signed_zero_and_subnormals() {
+        // Just above the halfway point between 1 and its next binary64 value.
+        let halfway_above = "1.00000000000000011102230246251565404236316680908203126";
+        let json = JET_JSON
+            .replace(
+                "\"length_m\": 8.3",
+                &format!("\"length_m\": {halfway_above}"),
+            )
+            .replace(
+                "\"surface_rate\": 2.5",
+                &format!("\"surface_rate\": {halfway_above}"),
+            )
+            .replace("\"default_trim\": 0.09", "\"default_trim\": -0.0")
+            .replace(
+                "    0.6,\n    -0.25,\n    -0.9",
+                "    -0.0,\n    4.9406564584124654e-324,\n    -0.9",
+            );
+        let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+        assert_eq!(
+            selected.model_fit().target_length.get().to_bits(),
+            0x3ff0_0000_0000_0001
+        );
+        assert_eq!(
+            selected.pilot_controls(false).aileron,
+            AxisState::new(f64::from_bits(0x3ff0_0000_0000_0001), 1.8)
+        );
+        assert_eq!(
+            selected.pilot_controls(false).trim.value().to_bits(),
+            (-0.0_f64).to_bits()
+        );
+        let eye = selected.camera_eye();
+        assert_eq!(eye[0].get().to_bits(), (-0.0_f64).to_bits());
+        assert_eq!(eye[1].get().to_bits(), 1);
+    }
+
+    #[test]
+    fn version_dispatch_preserves_each_serialized_size_boundary() {
+        let mut legacy = LEGACY_JSON.as_bytes().to_vec();
+        legacy.resize(usize::try_from(MAX_PROFILE_BYTES).unwrap(), b' ');
+        assert!(
+            SelectedAircraftProfile::from_bytes(&legacy)
+                .unwrap()
+                .legacy()
+                .is_some()
+        );
+        legacy.push(b' ');
+        assert!(
+            SelectedAircraftProfile::from_bytes(&legacy)
+                .unwrap_err()
+                .contains("128 KiB")
+        );
+
+        let mut jet = JET_JSON.as_bytes().to_vec();
+        jet.resize(flightsim_sim::aircraft_profile::MAX_PROFILE_BYTES, b' ');
+        assert!(SelectedAircraftProfile::from_bytes(&jet).unwrap().is_jet());
+        jet.push(b' ');
+        assert!(
+            SelectedAircraftProfile::from_bytes(&jet)
+                .unwrap_err()
+                .contains("1 MiB")
+        );
+    }
+
+    #[test]
+    fn dispatch_requires_explicit_integer_version_and_keeps_strict_jet_errors() {
+        for version in ["2.0", "2e0", "\"2\"", "null", "3", "-1"] {
+            let invalid =
+                JET_JSON.replacen("\"version\": 2", &format!("\"version\": {version}"), 1);
+            assert!(
+                SelectedAircraftProfile::from_bytes(invalid.as_bytes()).is_err(),
+                "{version}"
+            );
+        }
+        for (old, new) in [
+            ("\"version\": 2,", "\"version\": 2, \"version\": 2,"),
+            ("\"version\": 2,", ""),
+            ("\"revision\": 1", "\"revision\": 2"),
+            ("\"kind\": \"dry_jet_table\"", "\"kind\": \"piston\""),
+            ("\"length_m\": 8.3", "\"length_m\": 8.3, \"length_m\": 8.3"),
+            ("\"length_m\": 8.3", "\"length_m\": 8.3, \"unknown\": 1"),
+            ("\"length_m\": 8.3", "\"length_m\": 1e9999"),
+            ("\"length_m\": 8.3", "\"length_m\": 1e-9999"),
+        ] {
+            let invalid = JET_JSON.replacen(old, new, 1);
+            assert!(
+                SelectedAircraftProfile::from_bytes(invalid.as_bytes()).is_err(),
+                "{new}"
+            );
+        }
+        assert!(
+            SelectedAircraftProfile::from_bytes(format!("{JET_JSON} null").as_bytes()).is_err()
+        );
+        assert!(SelectedAircraftProfile::from_bytes(&[0xff]).is_err());
+        let nested = format!("{}0{}", "[".repeat(129), "]".repeat(129));
+        let invalid = JET_JSON.replace("\"length_m\": 8.3", &format!("\"length_m\": {nested}"));
+        assert!(
+            SelectedAircraftProfile::from_bytes(invalid.as_bytes())
+                .unwrap_err()
+                .contains("nesting")
+        );
+
+        // Version is a root key, independent of order, escaped spelling, or a
+        // similarly named key nested inside dynamics.
+        let reordered = JET_JSON.replacen("\"version\": 2,", "", 1);
+        let reordered = format!(
+            "{}, \"\\u0076ersion\": 2 }}",
+            reordered.trim_end().strip_suffix('}').unwrap()
+        );
+        assert!(
+            SelectedAircraftProfile::from_bytes(reordered.as_bytes())
+                .unwrap()
+                .is_jet()
+        );
+    }
+
+    #[test]
+    fn jet_input_defaults_optional_pitch_rates_and_approach_pose_are_applied() {
+        use flightsim_core::{Degrees, NauticalMiles};
+        let json = JET_JSON
+            .replace("    \"elevator_rate\": 0.25,\n", "")
+            .replace("    \"elevator_centering_rate\": 5.0,\n", "");
+        let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+        let parked = selected.pilot_controls(false);
+        assert_eq!(parked.elevator, AxisState::new(2.5, 1.8));
+        assert_eq!(parked.throttle.value().to_bits(), 0.0_f64.to_bits());
+        assert_eq!(parked.flaps.value().to_bits(), 0.0_f64.to_bits());
+        assert_eq!(parked.trim.value().to_bits(), 0.09_f64.to_bits());
+        let approach = selected.pilot_controls(true);
+        assert_eq!(
+            approach.throttle.value().to_bits(),
+            0.39155148_f64.to_bits()
+        );
+        assert_eq!(approach.flaps.value().to_bits(), 1.0_f64.to_bits());
+        assert_eq!(approach.trim.value().to_bits(), 0.15570889_f64.to_bits());
+        let runway = flightsim_world::Runway::synthetic();
+        let distance = NauticalMiles(1.5).to_meters();
+        let glideslope = Degrees(3.0).to_radians();
+        let state = selected.approach_state(&runway, distance, glideslope);
+        let expected =
+            flightsim_sim::approach_state(&runway, distance, glideslope, MetersPerSecond(35.0));
+        assert!((state.position.0 - expected.position.0).length() < 1e-6);
+        assert!((state.velocity - expected.velocity).length() < 1e-9);
+        assert!((state.attitude().pitch.get() - -0.07269918).abs() < 1e-9);
+    }
+
+    #[test]
+    fn jet_turbine_sound_is_dry_at_every_accepted_throttle() {
+        let selected = SelectedAircraftProfile::from_bytes(JET_JSON.as_bytes()).unwrap();
+        let flightsim_audio::EngineKind::Turbine(spec) = selected.engine_kind() else {
+            panic!("fixture declares turbine sound");
+        };
+        for throttle in [0.0, 0.5, 0.9, 0.99, 1.0] {
+            assert_eq!(
+                spec.afterburner_fraction(throttle).to_bits(),
+                0.0_f64.to_bits()
+            );
+            assert!(spec.exhaust_speed(throttle) <= spec.military_exhaust_speed);
+        }
+        let piston = JET_JSON.replace(
+            "\"engine_sound\": \"turbine\"",
+            "\"engine_sound\": \"piston\"",
+        );
+        let selected = SelectedAircraftProfile::from_bytes(piston.as_bytes()).unwrap();
+        assert!(selected.is_jet());
+        assert!(matches!(
+            selected.engine_kind(),
+            flightsim_audio::EngineKind::Piston(_)
+        ));
     }
 }
 

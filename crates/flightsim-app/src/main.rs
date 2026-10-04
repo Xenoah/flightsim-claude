@@ -66,7 +66,9 @@ mod airport_drape_runtime;
 mod cloud_runtime;
 mod distance_runtime;
 mod distribution;
+mod flight_session;
 mod graphics_runtime;
+use flight_session::{FlightSession, PreparedJetSession};
 mod region_runtime;
 mod render_metrics;
 mod replay_policy;
@@ -79,6 +81,8 @@ mod windows_readback_diagnostic;
 use replay_runtime::ReplayPlayback;
 #[cfg(test)]
 mod controls_runtime_tests;
+#[cfg(test)]
+mod jet_runtime_tests;
 #[cfg(test)]
 mod replay_migration_tests;
 #[cfg(test)]
@@ -265,7 +269,7 @@ struct Startup {
     weather: weather_runtime::Options,
     traffic: traffic_runtime::Options,
     traffic_error: Option<String>,
-    aircraft: aircraft_profile::AircraftProfile,
+    aircraft: aircraft_profile::SelectedAircraftProfile,
     aircraft_choice: Option<String>,
     aircraft_error: Option<String>,
     input_config: Option<PathBuf>,
@@ -383,11 +387,11 @@ impl Default for Startup {
         // スロットルを開ければそのまま離陸できる。以前の既定
         // （35.553,139.781）は滑走路から横に 75 m 外れていた。
         let runway = Runway::synthetic();
-        let aircraft = aircraft_profile::AircraftProfile::builtin(distribution::DEFAULT_AIRCRAFT)
-            .expect("validated default aircraft profile");
+        let aircraft =
+            aircraft_profile::SelectedAircraftProfile::builtin(distribution::DEFAULT_AIRCRAFT)
+                .expect("validated default aircraft profile");
         let model_fit = aircraft.model_fit();
-        let engine_sound = flightsim_audio::EngineKind::parse(&aircraft.engine_sound)
-            .expect("validated profile engine sound");
+        let engine_sound = aircraft.engine_kind();
         Self {
             world: world_runtime::WorldOptions::default(),
             clouds_were_given: false,
@@ -457,7 +461,7 @@ impl Default for Startup {
 
 /// シミュレーション本体。
 #[derive(Resource)]
-struct FlightSimulation(Simulation<BoxedSource>);
+struct FlightSimulation(FlightSession);
 
 #[derive(Resource, Debug, Clone, Copy)]
 struct TowerViewAnchor(Geodetic);
@@ -592,8 +596,18 @@ fn main() -> bevy::app::AppExit {
         std::process::exit(2);
     }
     let replay_requested = startup.replay.is_some();
-    let recording = resolve_flight_sources(&mut startup, &mut diagnostics);
-    if replay_requested && recording.is_none() {
+    let (recording, jet_player) = if startup.aircraft.is_jet() {
+        match flight_session::resolve_jet_sources(&mut startup, &mut diagnostics) {
+            Ok(player) => (None, player),
+            Err(error) => {
+                eprintln!("cannot start jet: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
+    } else {
+        (resolve_flight_sources(&mut startup, &mut diagnostics), None)
+    };
+    if replay_requested && recording.is_none() && jet_player.is_none() {
         eprintln!("cannot start replay: {}", diagnostics.0.join("; "));
         std::process::exit(2);
     }
@@ -629,6 +643,17 @@ fn main() -> bevy::app::AppExit {
         {
             clock.utc = flightsim_render::JulianDate(recording.environment().start_epoch);
         }
+        if let Some(player) = &jet_player {
+            let epoch = player
+                .recording()
+                .conditions()
+                .environment
+                .conditions
+                .start_epoch;
+            if epoch > 0.0 {
+                clock.utc = flightsim_render::JulianDate(epoch);
+            }
+        }
         clock
     };
     if let Some(recording) = recording.as_ref()
@@ -661,6 +686,7 @@ fn main() -> bevy::app::AppExit {
         }
     };
     if recording.is_none()
+        && jet_player.is_none()
         && let Err(error) = weather_runtime::resolve_departure(&mut startup)
     {
         eprintln!("{error}");
@@ -668,7 +694,18 @@ fn main() -> bevy::app::AppExit {
     }
     let clouds = startup.clouds;
     let engine_sound = startup.engine_sound;
-    let conditions = recording_conditions(&startup, &clock);
+    let conditions = (!startup.aircraft.is_jet()).then(|| recording_conditions(&startup, &clock));
+    let jet_session = if startup.aircraft.is_jet() {
+        match flight_session::prepare_startup(&startup, &clock, jet_player) {
+            Ok(session) => Some(session),
+            Err(error) => {
+                eprintln!("cannot prepare jet flight: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
+    } else {
+        None
+    };
     let playback = recording.map(ReplayPlayback::new);
     let mut data_attribution = world_runtime::data_attribution(&startup);
     if let Some(credit) = scenery_runtime.attribution() {
@@ -687,7 +724,7 @@ fn main() -> bevy::app::AppExit {
         };
     let input_diagnostics_visible = startup.input_diagnostics;
     let mut camera_rig = CameraRig::default();
-    camera_rig.eye_offset = startup.aircraft.camera_eye_m.map(Meters);
+    camera_rig.eye_offset = startup.aircraft.camera_eye();
     let mut plugins = DefaultPlugins.set(asset_plugin).set(WindowPlugin {
         primary_window: (!headless).then(|| Window {
             title: "flightsim-claude".to_owned(),
@@ -713,6 +750,11 @@ fn main() -> bevy::app::AppExit {
     } else {
         flightsim_ui::TutorialState::default()
     };
+    let guidance = if startup.aircraft.is_jet() {
+        flight_session::jet_guidance()
+    } else {
+        flightsim_ui::FlightGuidance::default()
+    };
     let mut app = App::new();
     app.add_plugins(plugins)
         .add_plugins((
@@ -724,6 +766,7 @@ fn main() -> bevy::app::AppExit {
             flightsim_audio::FlightAudioPlugin,
         ))
         .insert_resource(tutorial_state)
+        .insert_resource(guidance)
         .init_resource::<StallWarningStatus>()
         .insert_resource(world_runtime)
         .insert_resource(scenery_runtime)
@@ -756,9 +799,6 @@ fn main() -> bevy::app::AppExit {
             visible: input_diagnostics_visible,
             ..default()
         })
-        .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
-            conditions,
-        )))
         .insert_resource(flightsim_audio::AudioSettings {
             engine: engine_sound,
             ..flightsim_audio::AudioSettings::default()
@@ -814,7 +854,10 @@ fn main() -> bevy::app::AppExit {
                 report_landings
                     .after(advance_simulation)
                     .before(flightsim_ui::update_landing_report_display),
-                adjust_time_rate.run_if(world_runtime::flight_controls_active),
+                adjust_time_rate
+                    .before(control_flight)
+                    .before(advance_simulation)
+                    .run_if(world_runtime::flight_controls_active),
                 toggle_tutorial.run_if(world_runtime::flight_controls_active),
                 update_airport_lights,
                 control_replay
@@ -855,6 +898,14 @@ fn main() -> bevy::app::AppExit {
         app.add_plugins(flightsim_input::NativeControllersPlugin);
     }
 
+    if let Some(conditions) = conditions {
+        app.insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
+            conditions,
+        )));
+    }
+    if let Some(session) = jet_session {
+        app.insert_resource(PreparedJetSession(Some(session)));
+    }
     if let Some(playback) = playback {
         app.insert_resource(playback);
     }
@@ -909,7 +960,7 @@ fn application_help() -> &'static str {
 --screenshot-delay SECONDS                     Finite delay in 0..600\n\
 --windows-readback-diagnostic                   Opt-in bounded readback evidence\n\n\
 Flight keys: M world map, W/S pitch, A/D roll, Q/E yaw, PageUp/PageDown throttle,\n\
-[ / ] trim, F/G flaps, Space brakes, C camera, Esc pause, R restart,\n\
+[ / ] trim, F/G flaps, Space brakes, B jet parking brake, C camera, Esc pause, R restart,\n\
 F1 water (Shift+F1 light), F2 local detail distance (Shift+F2 standard), F3 clouds (Shift+F3 light), F4 graphics (Shift+F4 light), F9 save replay, F10 controller diagnostics, F11 next device page, F12 leave LAN (offline map: next pending weather)."
 }
 
@@ -973,8 +1024,16 @@ fn resolve_replay(
             return None;
         }
     };
-    let recording = match flightsim_sim::ReplayFile::read_from(&mut std::io::BufReader::new(file)) {
-        Ok(recording) => recording,
+    let recording = match flightsim_sim::replay_v4::ModelReplayFile::read_from(
+        &mut std::io::BufReader::new(file),
+    ) {
+        Ok(flightsim_sim::replay_v4::ModelReplayFile::Existing(recording)) => recording,
+        Ok(flightsim_sim::replay_v4::ModelReplayFile::V4(_)) => {
+            diagnostics
+                .0
+                .push("replay v4 requires its matching profile-v2 jet aircraft".into());
+            return None;
+        }
         Err(error) => {
             diagnostics
                 .0
@@ -1047,7 +1106,20 @@ fn recording_conditions(
     startup: &Startup,
     clock: &flightsim_render::TimeOfDay,
 ) -> flightsim_sim::CurrentConditions {
-    let environment = flightsim_sim::EnvironmentConditions {
+    let environment = environment_conditions(startup, clock);
+    let mut conditions = flightsim_sim::CurrentConditions::for_aircraft(
+        &startup.aircraft.configuration(),
+        environment,
+    );
+    conditions.weather = startup.weather.selection;
+    conditions
+}
+
+fn environment_conditions(
+    startup: &Startup,
+    clock: &flightsim_render::TimeOfDay,
+) -> flightsim_sim::EnvironmentConditions {
+    flightsim_sim::EnvironmentConditions {
         start: startup.start,
         heading: startup.heading,
         wind: startup.wind,
@@ -1066,13 +1138,7 @@ fn recording_conditions(
         } else {
             0
         },
-    };
-    let mut conditions = flightsim_sim::CurrentConditions::for_aircraft(
-        &startup.aircraft.configuration(),
-        environment,
-    );
-    conditions.weather = startup.weather.selection;
-    conditions
+    }
 }
 
 /// Reserve a replay name atomically. An existence check followed by File::create
@@ -1605,7 +1671,7 @@ fn parse_arguments_from(
         startup.traffic_error = Some("--host and --join are mutually exclusive".into());
     }
     if let Some(choice) = &startup.aircraft_choice {
-        match aircraft_profile::AircraftProfile::load(choice) {
+        match aircraft_profile::SelectedAircraftProfile::load(choice) {
             Ok(profile) => startup.aircraft = profile,
             Err(error) => startup.aircraft_error = Some(error),
         }
@@ -1613,7 +1679,7 @@ fn parse_arguments_from(
     let profile_fit = startup.aircraft.model_fit();
     let (requested_model, forward, up) = if requested_model.is_none() && !placeholder {
         (
-            Some(startup.aircraft.model.path.clone()),
+            Some(startup.aircraft.model_path().to_owned()),
             forward.or(Some(profile_fit.forward)),
             up.or(Some(profile_fit.up)),
         )
@@ -1625,8 +1691,14 @@ fn parse_arguments_from(
     startup.model = model;
     startup.model_fit = fit;
     if !engine_was_given {
-        startup.engine_sound = flightsim_audio::EngineKind::parse(&startup.aircraft.engine_sound)
-            .expect("validated profile engine sound");
+        startup.engine_sound = startup.aircraft.engine_kind();
+    }
+    if startup.aircraft.is_jet()
+        && let flightsim_audio::EngineKind::Turbine(mut spec) = startup.engine_sound
+    {
+        spec.afterburner_threshold = 1.0;
+        spec.afterburner_exhaust_speed = spec.military_exhaust_speed;
+        startup.engine_sound = flightsim_audio::EngineKind::Turbine(spec);
     }
 
     apply_difficulty(&mut startup);
@@ -2140,10 +2212,11 @@ const fn shows_exterior(mode: ViewMode) -> bool {
 /// 中からは自分の胴体で視界が塞がる。
 fn update_model_visibility(
     mode: Res<ViewMode>,
+    startup: Option<Res<Startup>>,
     mut models: Query<&mut Visibility, (With<ExteriorModel>, Without<InteriorModel>)>,
     mut interior: Query<&mut Visibility, (With<InteriorModel>, Without<ExteriorModel>)>,
 ) {
-    let exterior_wanted = if shows_exterior(*mode) {
+    let exterior_wanted = if shows_exterior(*mode) || startup.is_some_and(|s| s.aircraft.is_jet()) {
         Visibility::Inherited
     } else {
         Visibility::Hidden
@@ -2203,6 +2276,7 @@ fn update_airport_lights(
 fn startup_tutorial_visibility(startup: &Startup) -> flightsim_ui::TutorialVisibility {
     flightsim_ui::TutorialVisibility(
         startup.difficulty.shows_tutorial()
+            && !startup.aircraft.is_jet()
             && startup.replay.is_none()
             && startup.approach.is_none()
             && startup.world.fly_height.is_none(),
@@ -2218,10 +2292,11 @@ fn startup_tutorial_visibility(startup: &Startup) -> flightsim_ui::TutorialVisib
 /// 戻したときは古い段階ではなく今の段階が出る。
 fn toggle_tutorial(
     keyboard: Res<ButtonInput<KeyCode>>,
+    startup: Option<Res<Startup>>,
     playback: Option<Res<ReplayPlayback>>,
     mut visibility: ResMut<flightsim_ui::TutorialVisibility>,
 ) {
-    if playback.is_some() {
+    if playback.is_some() || startup.as_ref().is_some_and(|s| s.aircraft.is_jet()) {
         visibility.0 = false;
         return;
     }
@@ -2241,15 +2316,21 @@ fn toggle_tutorial(
 /// `,` で遅く、`.` で速く。日の出を待つのに実時間を使わせない。
 fn adjust_time_rate(
     keyboard: Res<ButtonInput<KeyCode>>,
+    startup: Option<Res<Startup>>,
+    mut simulation: Option<ResMut<FlightSimulation>>,
     paused: Res<flightsim_ui::Paused>,
     playback: Option<Res<ReplayPlayback>>,
     mut clock: ResMut<flightsim_render::TimeOfDay>,
 ) {
     // 一時停止中は触らせない。ここで倍率を変えると、再開時に復元する値と
     // 食い違って**押した設定が黙って消える**。
-    if paused.is_paused() || playback.is_some() {
+    if paused.is_paused()
+        || playback.is_some()
+        || simulation.as_ref().is_some_and(|s| s.0.is_replay())
+    {
         return;
     }
+    let previous_rate = clock.rate;
     if keyboard.just_pressed(KeyCode::Period) {
         clock.rate = clock.rate.faster();
         info!("time rate: {}x", clock.rate.0);
@@ -2257,6 +2338,18 @@ fn adjust_time_rate(
     if keyboard.just_pressed(KeyCode::Comma) {
         clock.rate = clock.rate.slower();
         info!("time rate: {}x", clock.rate.0);
+    }
+    if clock.rate != previous_rate
+        && !startup
+            .as_deref()
+            .is_some_and(|startup| startup.clouds_were_given)
+        && let Some(simulation) = simulation.as_deref_mut()
+        && let FlightSession::JetLive {
+            recording_error, ..
+        } = &mut simulation.0
+        && recording_error.is_none()
+    {
+        *recording_error = Some("RECORDING STOPPED: sun rate changed; F9 saves the last valid prefix; R starts a new recording".into());
     }
 }
 
@@ -2266,9 +2359,32 @@ fn adjust_time_rate(
 /// not present in format v1 and cannot be reconstructed.
 fn sync_replay_clock(
     playback: Option<ResMut<ReplayPlayback>>,
+    simulation: Option<ResMut<FlightSimulation>>,
     mut clock: ResMut<flightsim_render::TimeOfDay>,
     mut origin: Local<Option<flightsim_render::JulianDate>>,
 ) {
+    if let Some(mut simulation) = simulation
+        && let FlightSession::JetReplay { player, fault, .. } = &mut simulation.0
+    {
+        clock.rate = flightsim_render::TimeRate::PAUSED;
+        if fault.is_some() {
+            return;
+        }
+        let conditions = player.recording().conditions().environment.conditions;
+        let epoch = *origin.get_or_insert(if conditions.start_epoch > 0.0 {
+            flightsim_render::JulianDate(conditions.start_epoch)
+        } else {
+            clock.utc
+        });
+        if let Some(next) =
+            replay_visual_epoch(epoch, player.simulation().elapsed(), conditions.time_rate)
+        {
+            clock.utc = next;
+        } else {
+            *fault = Some("JET REPLAY STOPPED: visual clock exceeds its supported range".into());
+        }
+        return;
+    }
     let Some(mut playback) = playback else {
         return;
     };
@@ -2331,7 +2447,7 @@ fn control_flight(
     mut simulation: ResMut<FlightSimulation>,
     mut controls: ResMut<PilotControls>,
     mut sampled_input: ResMut<SampledPilotInput>,
-    mut recorder: ResMut<FlightRecorder>,
+    mut recorder: Option<ResMut<FlightRecorder>>,
     mut clock: ResMut<flightsim_render::TimeOfDay>,
     mut tutorial: ResMut<flightsim_ui::TutorialState>,
     mut landing: ResMut<flightsim_ui::LandingReportState>,
@@ -2341,10 +2457,17 @@ fn control_flight(
     // `--time-rate 60` で夜明けを待っていた人を、一時停止のたびに
     // 実時間へ引き戻すことになる。
     mut rate_before_pause: Local<Option<flightsim_render::TimeRate>>,
-    scenery_reset: Option<ResMut<scenery_runtime::SceneryReset>>,
+    (scenery_reset, jet_hud_reset): (
+        Option<ResMut<scenery_runtime::SceneryReset>>,
+        Option<ResMut<JetHudReset>>,
+    ),
 ) {
-    if playback.is_some() {
+    if playback.is_some() || simulation.0.is_replay() {
         return;
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyB) {
+        simulation.0.queue_parking_toggle();
     }
 
     // 墜落中は止められない。**止まっているものを止めても何も起きず、
@@ -2371,18 +2494,42 @@ fn control_flight(
     }
 
     if keyboard.just_pressed(KeyCode::KeyR) {
+        let jet_replacement = if simulation.0.is_jet() {
+            let mut restart_clock = *clock;
+            if paused.is_paused() {
+                restart_clock.rate =
+                    rate_before_pause.unwrap_or(flightsim_render::TimeRate::REAL_TIME);
+            }
+            match FlightSession::prepare_jet(&startup, &restart_clock, *start) {
+                Ok(session) => Some(session),
+                Err(error) => {
+                    error!("cannot restart jet: {error}");
+                    return;
+                }
+            }
+        } else {
+            None
+        };
         if let Some(mut reset) = scenery_reset {
             reset.request();
         }
         rig.reset();
-        restart_flight(
-            &start,
-            &mut simulation,
-            &mut controls,
-            &mut recorder,
-            &mut tutorial,
-            &mut landing,
-        );
+        if let Some(session) = jet_replacement {
+            simulation.0 = session;
+            if let Some(mut reset) = jet_hud_reset {
+                reset.0 = true;
+            }
+            *landing = default();
+        } else {
+            restart_flight(
+                &start,
+                &mut simulation,
+                &mut controls,
+                recorder.as_deref_mut().expect("legacy recorder"),
+                &mut tutorial,
+                &mut landing,
+            );
+        }
         // Aircraft-specific rates and trim survive repeated restarts. A drop
         // scenario is not an approach and must not acquire approach power/flaps.
         *controls = world_runtime::initial_controls(&startup);
@@ -2403,7 +2550,9 @@ fn control_flight(
                 .unwrap_or(flightsim_render::TimeRate::REAL_TIME);
         }
         paused.0 = false;
-        refresh_recording_clock(&mut recorder, &clock);
+        if let Some(recorder) = recorder.as_deref_mut() {
+            refresh_recording_clock(recorder, &clock);
+        }
         info!("restarted");
     }
 }
@@ -2472,13 +2621,61 @@ fn control_replay(
     mut commands: Commands,
     mut landing: ResMut<flightsim_ui::LandingReportState>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    recorder: Res<FlightRecorder>,
+    recorder: Option<Res<FlightRecorder>>,
     startup: Option<Res<Startup>>,
     mut simulation: ResMut<FlightSimulation>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut rig: ResMut<CameraRig>,
     scenery_reset: Option<ResMut<scenery_runtime::SceneryReset>>,
 ) {
+    if simulation.0.is_jet() {
+        match &mut simulation.0 {
+            FlightSession::JetLive { recorder, .. } => {
+                if keyboard.just_pressed(KeyCode::F9) {
+                    if startup.as_deref().is_some_and(|s| s.clouds_were_given) {
+                        warn!("{}", replay_policy::MANUAL_CLOUD_DIAGNOSTIC);
+                        return;
+                    }
+                    match flight_session::save_jet_recording(&recorder.export()) {
+                        Ok(path) => info!("saved jet replay to {}", path.display()),
+                        Err(error) => error!("cannot save jet replay: {error}"),
+                    }
+                }
+            }
+            FlightSession::JetReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                if keyboard.just_pressed(KeyCode::F5) && fault.is_none() && !player.finished() {
+                    player.set_paused(!player.paused());
+                }
+                if keyboard.just_pressed(KeyCode::F6) {
+                    player.set_speed(player.speed() / 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F7) {
+                    player.set_speed(player.speed() * 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F8) {
+                    *pending_seek = Some(
+                        pending_seek
+                            .or(player.seek_target())
+                            .unwrap_or(player.cursor())
+                            .saturating_sub(1200),
+                    );
+                    if let Some(mut reset) = scenery_reset {
+                        reset.request();
+                    }
+                    rig.reset();
+                    *landing = default();
+                    commands.remove_resource::<flightsim_ui::LandingReport>();
+                }
+            }
+            FlightSession::Legacy(_) => unreachable!(),
+        }
+        return;
+    }
     let Some(mut playback) = playback else {
         if keyboard.just_pressed(KeyCode::F9) {
             if startup
@@ -2495,7 +2692,7 @@ fn control_replay(
                 warn!("{}", replay_policy::MANUAL_CLOUD_DIAGNOSTIC);
                 return;
             }
-            save_recording(recorder.0.recording());
+            save_recording(recorder.as_ref().expect("legacy recorder").0.recording());
         }
         return;
     };
@@ -2525,7 +2722,7 @@ fn control_replay(
         rig.reset();
         *landing = default();
         commands.remove_resource::<flightsim_ui::LandingReport>();
-        playback.rewind(&mut simulation.0);
+        playback.rewind(simulation.0.legacy_mut());
     }
 }
 
@@ -2574,11 +2771,23 @@ struct StallWarningStatus {
     reference: Option<(u64, u64, Option<Radians>)>,
 }
 
+/// Discard display history only when the jet's flight history is reconstructed.
+/// Start pending so the first jet HUD frame also describes the actual start.
+#[derive(Resource)]
+struct JetHudReset(bool);
+
+impl Default for JetHudReset {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
 /// Publish and consume the same completed physics state in one Update, including
 /// the audio-thread bridge and all HUD readers. Shared resources alone do not
 /// specify which writer or reader runs first in Bevy's schedule.
 fn configure_flight_presentation(app: &mut App) {
-    app.init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
+    app.init_resource::<JetHudReset>()
+        .init_resource::<flightsim_render::graphics_quality::GraphicsQuality>()
         .init_resource::<flightsim_render::cloud_volume::CloudQuality>()
         .init_resource::<flightsim_render::cloud_volume::CloudVolumeDiagnostics>()
         .init_resource::<distance_runtime::DrawDistanceSettings>()
@@ -2602,6 +2811,41 @@ fn configure_flight_presentation(app: &mut App) {
 }
 
 impl StallWarningStatus {
+    fn update_jet(
+        &mut self,
+        simulation: &flightsim_sim::model_simulation::JetSimulation,
+        flaps: f64,
+        angle: Radians,
+        valid: bool,
+    ) {
+        let presentation = simulation.presentation();
+        let peak = presentation.aero_coefficients.as_ref().and_then(|aero| {
+            flightsim_fdm::aero::positive_stall_peak_angle(
+                aero,
+                simulation.config().airframe().geometry(),
+                flaps,
+            )
+        });
+        self.reference = None;
+        self.unavailable = peak.is_none();
+        let Some(peak) = peak else {
+            self.active = false;
+            return;
+        };
+        if !valid || !angle.is_finite() {
+            self.active = false;
+            return;
+        }
+        let fraction = angle.get().abs() / peak.get();
+        if self.active {
+            if fraction < STALL_WARNING_RELEASE {
+                self.active = false;
+            }
+        } else if fraction >= STALL_WARNING_FRACTION {
+            self.active = true;
+        }
+    }
+
     fn update(
         &mut self,
         config: &flightsim_fdm::AircraftConfig,
@@ -2669,12 +2913,22 @@ fn publish_sound(
     // 再生中は流している側の出力を映す。手元の操縦桿ではない
     // （HUD と同じ理由。`publish_hud` を参照）。
     let throttle = playback.as_ref().map_or_else(
-        || controls.throttle.value(),
+        || {
+            simulation
+                .0
+                .last_controls()
+                .map_or_else(|| controls.throttle.value(), |c| c.throttle())
+        },
         |playback| playback.last_controls.throttle(),
     );
 
     let flaps = playback.as_ref().map_or_else(
-        || controls.flaps.value(),
+        || {
+            simulation
+                .0
+                .last_controls()
+                .map_or_else(|| controls.flaps.value(), |c| c.flaps())
+        },
         |playback| playback.last_controls.flaps(),
     );
     let crashed = simulation.0.crashed() || simulation.0.diverged();
@@ -2690,7 +2944,16 @@ fn publish_sound(
     } else {
         (Radians::ZERO, false)
     };
-    warning.update(simulation.0.config(), flaps, angle, valid);
+    if let Some(jet) = simulation.0.jet() {
+        // A paused, completed or seeking replay still has an actual aircraft
+        // state to inspect. Transport muting must not erase its visual warning;
+        // terminal/reproduction failures still invalidate warning presentation.
+        let failed = jet.terminal().is_some()
+            || matches!(&simulation.0, FlightSession::JetReplay { player, .. } if player.faulted());
+        warning.update_jet(jet, flaps, angle, valid && !failed);
+    } else {
+        warning.update(simulation.0.config(), flaps, angle, valid);
+    }
 
     *sound = flightsim_audio::AircraftSound {
         throttle,
@@ -2698,7 +2961,8 @@ fn publish_sound(
         // 壊れた機体は失速しない。**止まっているのに警報が鳴り続けない。**
         stall_warning: warning.active,
         // 一時停止と墜落では黙る。動いていないのに音がするのは変。
-        muted: paused.is_paused()
+        muted: simulation.0.audio_paused()
+            || paused.is_paused()
             || crashed
             || map_capture.is_some_and(|capture| capture.captured)
             || playback.as_ref().is_some_and(|p| p.audio_paused()),
@@ -2715,7 +2979,16 @@ fn publish_crash(
     mut notice: ResMut<flightsim_ui::CrashNotice>,
     mut reported: Local<bool>,
 ) {
-    notice.set_replay(playback.is_some());
+    notice.set_replay(playback.is_some() || simulation.0.is_replay());
+    if simulation.0.is_jet() {
+        if let Some(message) = simulation.0.terminal_message() {
+            notice.set(flight_session::ascii_notice(&message));
+        } else {
+            notice.clear();
+        }
+        *reported = false;
+        return;
+    }
     if simulation.0.diverged() {
         if !*reported {
             notice.set("SIMULATION STOPPED: numerical failure");
@@ -2751,9 +3024,44 @@ fn publish_crash(
 /// 再生状態を UI へ渡す。
 fn publish_replay_status(
     playback: Option<Res<ReplayPlayback>>,
+    simulation: Option<Res<FlightSimulation>>,
     startup: Option<Res<Startup>>,
     mut status: ResMut<flightsim_ui::ReplayStatus>,
 ) {
+    if let Some(simulation) = simulation
+        && simulation.0.is_jet()
+    {
+        let notice = Some(flight_session::jet_notice(
+            &simulation.0,
+            startup.as_deref(),
+        ));
+        let next = match &simulation.0 {
+            FlightSession::JetReplay {
+                player,
+                fault,
+                total,
+                ..
+            } => flightsim_ui::ReplayStatus {
+                active: true,
+                paused: player.paused(),
+                speed: player.speed(),
+                elapsed: player.simulation().elapsed(),
+                total: *total,
+                seeking: player.seeking(),
+                fault: fault.clone(),
+                finished: player.finished(),
+                notice,
+            },
+            _ => flightsim_ui::ReplayStatus {
+                notice,
+                ..default()
+            },
+        };
+        if *status != next {
+            *status = next;
+        }
+        return;
+    }
     let next = playback.map_or_else(
         || flightsim_ui::ReplayStatus {
             notice: startup
@@ -2792,6 +3100,11 @@ fn report_landings(
     mut seen: Local<u32>,
     mut was_seeking: Local<bool>,
 ) {
+    if simulation.0.is_jet() {
+        *landing = default();
+        commands.remove_resource::<flightsim_ui::LandingReport>();
+        return;
+    }
     let count = simulation.0.touchdown_count();
     let seeking = playback.as_ref().is_some_and(|p| p.is_seeking());
     if seeking || *was_seeking || count < *seen {
@@ -2921,6 +3234,7 @@ fn setup(
     startup: Res<Startup>,
     camera_rig: Res<CameraRig>,
     playback: Option<Res<ReplayPlayback>>,
+    mut prepared_jet: Option<ResMut<PreparedJetSession>>,
     config: Res<TerrainRenderConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut terrain_tiles: ResMut<TerrainTiles>,
@@ -2932,7 +3246,8 @@ fn setup(
 ) {
     info!(
         "aircraft: {} ({})",
-        startup.aircraft.dynamics.name, startup.aircraft.id
+        startup.aircraft.name(),
+        startup.aircraft.id()
     );
     commands.insert_resource(world_runtime::initial_controls(&startup));
     info!("difficulty: {}", startup.difficulty.name());
@@ -2987,87 +3302,95 @@ fn setup(
         position: startup.start,
         heading: startup.heading,
     };
-    let simulation = if let Some(playback) = playback {
-        let state = playback.initial_state();
-        start_condition = StartCondition::InFlight(state);
-        Simulation::from_state(
-            startup.aircraft.configuration(),
-            state,
-            terrain,
-            GroundSampler::default(),
-        )
-    } else if let Some(height) = startup.world.fly_height {
-        let mut terrain = terrain;
-        let state = world_runtime::airborne_state(&startup, &mut terrain, height);
-        start_condition = StartCondition::InFlight(state);
-        Simulation::from_state(
-            startup.aircraft.configuration(),
-            state,
-            terrain,
-            GroundSampler::default(),
-        )
-    } else if let Some(miles) = startup.approach {
-        let state = startup.aircraft.approach_state(
-            &runway,
-            flightsim_core::NauticalMiles(miles).to_meters(),
-            Degrees(3.0).to_radians(),
-        );
-        start_condition = StartCondition::InFlight(state);
-        Simulation::from_state(
-            startup.aircraft.configuration(),
-            state,
-            terrain,
-            GroundSampler::default(),
-        )
+    let simulation = if let Some(prepared) = prepared_jet.as_mut() {
+        let (session, condition) = prepared.0.take().expect("prepared jet session used once");
+        start_condition = condition;
+        session
     } else {
-        match startup.drop_height {
-            // 開発用: 空中に静止 spawn して落とす。接地記録 → 評価 → 表示の
-            // 経路を、手で飛ばさずに通すため。
-            Some(height) => {
-                let sampler = GroundSampler::default();
-                let mut probe = Terrain::new(
-                    make_source(&startup),
-                    8 * 1024 * 1024,
-                    world_runtime::terrain_levels(&startup),
-                );
-                let ground = sampler.sample(&mut probe, startup.start);
-                let state = flightsim_fdm::RigidBodyState::from_geodetic(
-                    Geodetic::new(
-                        startup.start.latitude,
-                        startup.start.longitude,
-                        Meters(ground.elevation.get() + height),
-                    ),
-                    flightsim_core::Attitude::new(
-                        flightsim_core::Radians::ZERO,
-                        flightsim_core::Radians::ZERO,
-                        startup.heading,
-                    ),
-                    flightsim_core::Ned::new(0.0, 0.0, 0.0),
-                );
-                start_condition = StartCondition::InFlight(state);
-                Simulation::from_state(
-                    startup.aircraft.configuration(),
-                    state,
-                    terrain,
-                    GroundSampler::default(),
-                )
-            }
-            None => Simulation::parked(
+        let simulation = if let Some(playback) = playback {
+            let state = playback.initial_state();
+            start_condition = StartCondition::InFlight(state);
+            Simulation::from_state(
                 startup.aircraft.configuration(),
-                startup.start,
-                startup.heading,
+                state,
                 terrain,
                 GroundSampler::default(),
-            ),
-        }
-    };
+            )
+        } else if let Some(height) = startup.world.fly_height {
+            let mut terrain = terrain;
+            let state = world_runtime::airborne_state(&startup, &mut terrain, height);
+            start_condition = StartCondition::InFlight(state);
+            Simulation::from_state(
+                startup.aircraft.configuration(),
+                state,
+                terrain,
+                GroundSampler::default(),
+            )
+        } else if let Some(miles) = startup.approach {
+            let state = startup.aircraft.approach_state(
+                &runway,
+                flightsim_core::NauticalMiles(miles).to_meters(),
+                Degrees(3.0).to_radians(),
+            );
+            start_condition = StartCondition::InFlight(state);
+            Simulation::from_state(
+                startup.aircraft.configuration(),
+                state,
+                terrain,
+                GroundSampler::default(),
+            )
+        } else {
+            match startup.drop_height {
+                // 開発用: 空中に静止 spawn して落とす。接地記録 → 評価 → 表示の
+                // 経路を、手で飛ばさずに通すため。
+                Some(height) => {
+                    let sampler = GroundSampler::default();
+                    let mut probe = Terrain::new(
+                        make_source(&startup),
+                        8 * 1024 * 1024,
+                        world_runtime::terrain_levels(&startup),
+                    );
+                    let ground = sampler.sample(&mut probe, startup.start);
+                    let state = flightsim_fdm::RigidBodyState::from_geodetic(
+                        Geodetic::new(
+                            startup.start.latitude,
+                            startup.start.longitude,
+                            Meters(ground.elevation.get() + height),
+                        ),
+                        flightsim_core::Attitude::new(
+                            flightsim_core::Radians::ZERO,
+                            flightsim_core::Radians::ZERO,
+                            startup.heading,
+                        ),
+                        flightsim_core::Ned::new(0.0, 0.0, 0.0),
+                    );
+                    start_condition = StartCondition::InFlight(state);
+                    Simulation::from_state(
+                        startup.aircraft.configuration(),
+                        state,
+                        terrain,
+                        GroundSampler::default(),
+                    )
+                }
+                None => Simulation::parked(
+                    startup.aircraft.configuration(),
+                    startup.start,
+                    startup.heading,
+                    terrain,
+                    GroundSampler::default(),
+                ),
+            }
+        };
 
-    let mut simulation = simulation;
-    simulation.set_wind(startup.wind);
-    simulation.set_turbulence(startup.turbulence);
-    simulation
-        .set_climate(startup.world.climate_date())
-        .expect("climate data validated before startup");
+        let mut simulation = simulation;
+        simulation.set_wind(startup.wind);
+        simulation.set_turbulence(startup.turbulence);
+        simulation
+            .set_climate(startup.world.climate_date())
+            .expect("climate data validated before startup");
+
+        FlightSession::Legacy(simulation)
+    };
 
     commands.insert_resource(startup.view);
 
@@ -3536,7 +3859,8 @@ fn setup(
                     .id(),
             ]
         }
-        None => flightsim_render::placeholder_parts(simulation.config())
+        None => simulation
+            .placeholder_parts()
             .into_iter()
             .map(|part| {
                 commands
@@ -3559,7 +3883,11 @@ fn setup(
     // コックピット内装。**目の位置を渡す**（重心基準に置くと、目を
     // 動かしたときに顔が計器盤にめり込む）。
     let mut parts = parts;
-    let interior = flightsim_render::cockpit::interior_parts(camera_rig.eye_offset);
+    let interior = if startup.aircraft.is_jet() {
+        Vec::new()
+    } else {
+        flightsim_render::cockpit::interior_parts(camera_rig.eye_offset)
+    };
     info!("cockpit: {} interior parts", interior.len());
     for part in interior {
         parts.push(
@@ -3683,6 +4011,8 @@ fn suspend_pilot_controls(
         || simulation.0.crashed()
         || simulation.0.diverged()
         || playback.is_some()
+        || simulation.0.is_replay()
+        || simulation.0.terminal_message().is_some()
         || unfocused
     {
         controls.release_transient_controls();
@@ -3701,20 +4031,47 @@ fn advance_simulation(
     sampled_input: Res<SampledPilotInput>,
     paused: Res<flightsim_ui::Paused>,
     mut simulation: ResMut<FlightSimulation>,
-    mut recorder: ResMut<FlightRecorder>,
+    mut recorder: Option<ResMut<FlightRecorder>>,
     startup: Option<Res<Startup>>,
     playback: Option<ResMut<ReplayPlayback>>,
     mut aircraft: Query<(&mut WorldPosition, &mut WorldOrientation), With<Aircraft>>,
+    jet_hud_reset: Option<ResMut<JetHudReset>>,
 ) {
-    if paused.is_paused() || simulation.0.diverged() {
+    if paused.is_paused() || (!simulation.0.is_jet() && simulation.0.diverged()) {
         // **物理も記録も進めない。** 止めている間に記録が伸びると、
         // 再生したときに何もしていない時間が入る。
         return;
     }
     let frame_time = Seconds(time.delta_secs_f64());
+    if simulation.0.is_jet() {
+        // Each bounded seek batch reconstructs historical states, including the
+        // final batch (after which seeking() is already false). No live speed
+        // or altitude change is a reason to reset ordinary HUD smoothing.
+        if simulation.0.seeking()
+            && let Some(mut reset) = jet_hud_reset
+        {
+            reset.0 = true;
+        }
+        let record = startup.as_deref().is_none_or(|s| !s.clouds_were_given);
+        simulation
+            .0
+            .advance_jet(frame_time, &mut controls, &sampled_input, record);
+        if simulation.0.fault().is_some() {
+            return;
+        }
+        let pose = simulation.0.interpolated();
+        if replay_runtime::validate_replay_position(pose.position).is_err() {
+            return;
+        }
+        for (mut position, mut orientation) in &mut aircraft {
+            position.0 = pose.position;
+            orientation.0 = pose.orientation;
+        }
+        return;
+    }
     let diverged = match playback {
         Some(mut playback) => {
-            let newly_stopped = playback.tick(&mut simulation.0, frame_time);
+            let newly_stopped = playback.tick(simulation.0.legacy_mut(), frame_time);
             if playback.fault.is_some() {
                 // Keep the last trustworthy transform on every faulted update,
                 // not only the update that first detected the failure.
@@ -3725,6 +4082,7 @@ fn advance_simulation(
         None => {
             simulation
                 .0
+                .legacy_mut()
                 .advance_with_controls(frame_time, |fixed_dt, before| {
                     controls.update_from_sample(fixed_dt, &sampled_input);
                     let input = controls.to_control_inputs();
@@ -3734,7 +4092,11 @@ fn advance_simulation(
                     if startup.as_deref().is_none_or(|startup| {
                         region_runtime::replay_allowed(startup) && !startup.clouds_were_given
                     }) {
-                        recorder.0.record(fixed_dt, input, Some(before));
+                        recorder.as_deref_mut().expect("legacy recorder").0.record(
+                            fixed_dt,
+                            input,
+                            Some(before),
+                        );
                     }
                     input
                 })
@@ -3796,6 +4158,7 @@ fn configure_camera_tracking(app: &mut App) {
 )]
 fn update_camera(
     time: Res<Time>,
+    simulation: Option<Res<FlightSimulation>>,
     mode: Res<ViewMode>,
     origin: Res<RenderOrigin>,
     tower: Res<TowerViewAnchor>,
@@ -3805,7 +4168,8 @@ fn update_camera(
     mut camera: Query<&mut Transform, With<Camera3d>>,
     aircraft: Query<&Transform, (With<Aircraft>, Without<Camera3d>)>,
 ) {
-    let seeking = playback.as_ref().is_some_and(|p| p.is_seeking());
+    let seeking = playback.as_ref().is_some_and(|p| p.is_seeking())
+        || simulation.as_ref().is_some_and(|s| s.0.seeking());
     if origin.is_changed() && !origin.is_added() {
         let anchor = origin.0.anchor();
         info!(
@@ -4145,13 +4509,22 @@ fn publish_hud(
     ),
     sun: Res<SunDirection>,
     mut hud: ResMut<HudState>,
-    warning: Res<StallWarningStatus>,
+    (warning, jet_hud_reset, smoothing): (
+        Res<StallWarningStatus>,
+        Option<ResMut<JetHudReset>>,
+        Option<ResMut<flightsim_ui::HudSmoothing>>,
+    ),
 ) {
     // 再生中に手元の操縦桿を映すと、機体が加速しているのにスロットル 0% と
     // 出る。**表示は今飛んでいる機体のものでなければ意味がない。**
-    let playback_active = playback.is_some();
+    let playback_active = playback.is_some() || simulation.0.is_replay();
     let shown = playback.map_or_else(
-        || (controls.throttle.value(), controls.flaps.value()),
+        || {
+            simulation.0.last_controls().map_or_else(
+                || (controls.throttle.value(), controls.flaps.value()),
+                |c| (c.throttle(), c.flaps()),
+            )
+        },
         |playback| {
             (
                 playback.last_controls.throttle(),
@@ -4188,7 +4561,7 @@ fn publish_hud(
             controls.trim.value()
         },
         // 脚の長さぶん余裕を見る。重心の対地高度なので接地時でも 1 m 前後ある。
-        on_ground: agl.get() < flightsim_sim::gear_height(simulation.0.config()).get() + 0.3,
+        on_ground: simulation.0.on_ground(),
         terrain_available: ground.from_terrain,
         view_mode: mode.name(),
         graphics_quality: quality.name(),
@@ -4215,6 +4588,14 @@ fn publish_hud(
             }
         },
     };
+    if simulation.0.is_jet()
+        && let Some(mut reset) = jet_hud_reset
+        && reset.0
+        && let Some(mut smoothing) = smoothing
+    {
+        smoothing.reset(&hud);
+        reset.0 = false;
+    }
 }
 
 #[cfg(test)]
@@ -4253,7 +4634,7 @@ mod tests {
             .insert_resource(ViewMode::Cockpit)
             .insert_resource(RenderOrigin::new(start))
             .insert_resource(TowerViewAnchor(start))
-            .insert_resource(FlightSimulation(simulation))
+            .insert_resource(FlightSimulation(simulation.into()))
             .insert_resource(CameraRig::default())
             .add_systems(Update, move_aircraft.in_set(RenderSet::Transforms));
         configure_camera_tracking(&mut app);

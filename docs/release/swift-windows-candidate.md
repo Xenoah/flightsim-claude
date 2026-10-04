@@ -47,6 +47,7 @@ SHA-256/size of its actual checked-out bytes separately. The versioned
 `scripts/replay-candidate-contract.json` freezes the reviewed implementation as
 whole-file SHA-256 values, including replay codecs/identity/player/weather,
 app acceptance/runtime/main/profile wiring, new-flight/weather/region helpers,
+typed flight-session/model-aware replay dispatch, default UI guidance,
 the actual persistent UI/map ownership and the regression tests used by this
 recipe. The exact required path set is checked;
 missing/extra entries fail. All listed raw Git blobs and the contract file itself
@@ -76,6 +77,13 @@ external asset set is exactly `assets/aircraft/swift_sport.glb` and
 project and world-data notices. No recursive `assets/` copy, Light Single GLB,
 Light Single external JSON, Swift Blender source, secrets or regional data pack
 is added. The Light Single profile remains embedded for legacy identity.
+
+Explicit external profile-v2/replay-v4 support in the native app does not add a
+jet to this package or qualify one through Swift's tests. Swift and Light still
+use the legacy model/replay path; Swift rejects v4 recordings. Extracted identity
+and exported successful evidence must name commercial-staging, Swift's exact
+default model and sole bundled aircraft, Windows/x86_64/MSVC, and literal false
+release authorization. Identical metadata with a different model is rejected.
 
 The stager's review-blocked exit 1 is allowed only with a coherent blocked report
 containing exclusively outstanding review records. Any unexpected status or
@@ -150,6 +158,8 @@ Changing an independent anchor requires its own compatibility review. An approve
 pin migration is source acceptance, not Windows qualification; run this complete
 recipe on the exact integrated source again. See the
 [migration evidence](../qa/replay-candidate-contract-2026-10-04.md).
+The [native dispatch binding review](../qa/replay-candidate-native-jet-pin-review-2026-10-04.md)
+records the subsequent explicit v2/v4 boundary and retained Swift-only scope.
 
 ## CI trigger and evidence boundary
 
@@ -177,8 +187,17 @@ the following exact `RUST_LOG` selectors, recorded with the run:
 info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,wgpu_core::command::transfer=trace,wgpu_hal::dx12=debug,bevy_app::task_pool_plugin=trace
 ```
 
-Any primary default Swift capture failure triggers **one** fresh diagnostic
-process. It uses the same extracted executable SHA-256, build/features, scene,
+By default, a primary default Swift capture failure ends acceptance without
+launching another process. The failed report retains the primary command,
+180-second timeout, launch settings and hash-bound log; no diagnostic files are
+produced. This is also the automatic candidate workflow's behavior.
+
+An explicitly authorized investigation can pass `--diagnose-readback` to this
+Python checker to request **at most one** fresh diagnostic process after primary
+failure. This flag is disabled by default and does not enable a probe after
+primary success. For example, add it to the candidate invocation above only for
+the particular investigation being requested. It uses the same extracted
+executable SHA-256, build/features, scene,
 WARP settings, unrelated working directory, asset-isolation environment, trace
 selectors, screenshot delay and 180-second watchdog. Its capture command adds
 only `--windows-readback-diagnostic` and uses a separate PNG destination. Both
@@ -187,8 +206,16 @@ There is no third launch, timeout extension or diagnostic retry. Primary success
 does not run the probe. Failure to verify the executable or prepare evidence
 stops the diagnostic safely while preserving the original failure.
 
-The opt-in probe runs only after the ordinary window screenshot is requested.
-It performs one small independent GPU submission/readback and observes a
+The completed [Windows v2 investigation](../qa/windows-readback-diagnostic-2026-10-04.md#completed-windows-v2-observation-and-opt-in-boundary)
+does not authorize repeated diagnostic runs or establish a production rendering
+fix. Subsequent source pushes keep the ordinary screenshot acceptance gate;
+they do not opt into the secondary diagnostic.
+
+The explicitly enabled v2 probe includes a shader-free 4×4 pre-scene clear/copy
+and at most six sparse ordinary-scene queue callbacks, as detailed in that
+investigation. The existing late probe arms only after the ordinary window
+screenshot is requested. It performs one small independent GPU submission/readback
+and observes a
 separate async task through start, pending, external signal and resume. The log
 records map-registration entry and return separately, map result, pixel
 validation, queue callback, callback phase and cancellation. After at least five
@@ -203,8 +230,9 @@ All machine-readable events use the `FS_READBACK_PROBE` prefix on stderr. The
 harness derives `diagnostic-readback.json` from the sanitized
 `diagnostic-readback.log`; the app supplies no JSON evidence. Parsing permits
 only known events, exact field sets, canonical bounded values and consistent
-causal ordering. There are at most 32 events of at most 1,024 characters each;
-the derived JSON is limited to 64 KiB. Its terminal summary must match the
+causal ordering. The historical v1 protocol permits at most 32 events and v2 at
+most 64, each at most 1,024 characters; the derived JSON is limited to 64 KiB.
+Its terminal summary must match the
 preceding observations. Late cleanup callbacks remain visible in the event list
 but cannot change frozen observations or prove success. A missing summary is
 valid partial evidence, including an early screenshot exit or a poll that never

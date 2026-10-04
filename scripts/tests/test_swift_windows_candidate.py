@@ -34,6 +34,13 @@ SWIFT_LOG = ("INFO aircraft: Swift Sport (generic) (swift-sport)\n"
 LEGACY_LOG = ("INFO aircraft: Light Single (generic) (light-single)\n"
               "INFO Screenshot saved to capture.png\nBatch capture complete: status 0\n"
               + candidate.LEGACY_NOTICE + "\n")
+SWIFT_DISTRIBUTION = {
+    "schema_version": 1, "package": "flightsim-app", "package_version": "0.0.0-fixture",
+    "profile": "commercial-staging", "region_downloads": False,
+    "default_aircraft": "swift-sport", "default_model": "aircraft/swift_sport.glb",
+    "bundled_aircraft": ["swift-sport"], "release_authorized": False,
+    "target_os": "windows", "target_arch": "x86_64", "target_env": "msvc",
+}
 
 
 def readback_fixture(outcome):
@@ -145,7 +152,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
                            cwd=self.root, check=True, capture_output=True)
 
     def test_extracted_and_staged_identity_require_literal_offline_false(self):
-        info = {"profile": "commercial-staging", "region_downloads": False}
+        info = dict(SWIFT_DISTRIBUTION)
         candidate.validate_distribution(info, dict(info))
         for value in (True, None, 0, 0.0, "false", [], {}):
             changed = {**info, "region_downloads": value}
@@ -277,6 +284,8 @@ class CandidateAcceptanceTests(unittest.TestCase):
         repo, _ = self.source_fixture()
         # Deliberate semantic mutations, committed in a disposable repository:
         # source qualification must reject these before any candidate is built.
+        # The v2 mutation still targets the unchanged v1 decoder: explicit v2
+        # admission belongs to SelectedAircraftProfile's separate decoder only.
         mutations = (
             ("crates/flightsim-sim/Cargo.toml", b'default-run = "flightsim-headless"\n', b''),
             ("crates/flightsim-sim/Cargo.toml", b'features = ["raw_value"]',
@@ -291,6 +300,48 @@ class CandidateAcceptanceTests(unittest.TestCase):
             ("crates/flightsim-sim/src/replay/identity.rs",
              b'Self::Complete(recorded) if recorded == AircraftIdentity::for_config(config) => {',
              b'Self::Complete(_) => {'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_native_dispatch_review_rejects_model_routing_and_legacy_adapter_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-app/src/aircraft_profile.rs", b'1 => {', b'1 | 2 => {'),
+            ("crates/flightsim-app/src/aircraft_profile.rs",
+             b'AircraftProfile::builtin(id).map(Self::Legacy)',
+             b'AircraftProfile::builtin("light-single").map(Self::Legacy)'),
+            ("crates/flightsim-app/src/flight_session.rs", b'Self::Legacy(s) => s.airspeed(),',
+             b'Self::Legacy(_) => MetersPerSecond::ZERO,'),
+            ("crates/flightsim-app/src/flight_session.rs",
+             b's.agl().get() < flightsim_sim::gear_height(s.config()).get() + 0.3',
+             b's.agl().get() < flightsim_sim::gear_height(s.config()).get() + 0.6'),
+            ("crates/flightsim-sim/src/replay_v4.rs", b'prefix.extend(version.to_le_bytes());',
+             b'prefix.extend(version.to_be_bytes());'),
+            ("crates/flightsim-sim/src/replay_v4.rs",
+             b'recording.conditions.identity == ModelIdentity::for_jet(&config),', b'true,'),
+            ("crates/flightsim-ui/src/lib.rs", b'tutorial_enabled: true,', b'tutorial_enabled: false,'),
+            ("crates/flightsim-app/src/main.rs",
+             b'if simulation.0.is_jet()\n        && let Some(mut reset) = jet_hud_reset',
+             b'if true\n        && let Some(mut reset) = jet_hud_reset'),
+            ("crates/flightsim-app/src/main.rs",
+             b'warning.update_jet(jet, flaps, angle, valid && !failed);',
+             b'warning.update_jet(jet, flaps, angle, valid && !simulation.0.audio_paused());'),
+            ("crates/flightsim-app/src/main.rs",
+             b'warning.update_jet(jet, flaps, angle, valid && !failed);',
+             b'warning.update_jet(jet, flaps, angle, valid);'),
+            ("crates/flightsim-ui/src/replay.rs", b'display: Display::None,', b'display: Display::Flex,'),
+            ("crates/flightsim-ui/src/replay.rs",
+             b'flex_basis: Val::Px(240.0),\n            flex_grow: 1.0,\n            flex_shrink: 0.0,',
+             b'flex_basis: Val::Px(240.0),\n            flex_grow: 1.0,\n            flex_shrink: 1.0,'),
         )
         for relative, old, new in mutations:
             path = repo / relative
@@ -390,7 +441,9 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_swift_image_requires_success_model_fit_and_extracted_asset_path(self):
         candidate.validate_smoke(SWIFT_LOG, 0, model=True)
         for broken, code in ((SWIFT_LOG, 2),
+                             (SWIFT_LOG.replace("(swift-sport)", "(kestrel-jet-trainer)"), 0),
                              (SWIFT_LOG.replace("extracted/swift-candidate/", "developer-copy/"), 0),
+                             (SWIFT_LOG.replace("swift_sport.glb", "kestrel_jet_trainer.glb"), 0),
                              (SWIFT_LOG.replace("swift_sport.glb", "swift_sport.glb.backup"), 0),
                              (SWIFT_LOG.replace("7.12", "8.30"), 0),
                              (SWIFT_LOG.replace("1.0000", "0.8578"), 0),
@@ -580,11 +633,35 @@ class CandidateAcceptanceTests(unittest.TestCase):
                       replay_contract=candidate.REPLAY_CONTRACT_ID,
                       replay_contract_sha256=source["replay_contract_sha256"],
                       legacy_replay={"fingerprint": candidate.LEGACY_FINGERPRINT},
-                      distribution={"region_downloads": False}, limits=[candidate.LEGACY_LIMIT],
+                      distribution=dict(SWIFT_DISTRIBUTION), limits=[candidate.LEGACY_LIMIT],
                       replay_tests={name: {"status": "passed", "test": test}
                                     for name, test in candidate.REPLAY_ACCEPTANCE_TESTS.items()})
         self.seal_report(evidence, report)
         return evidence, source, report
+
+    def test_swift_evidence_cannot_qualify_jet_selection_or_another_distribution(self):
+        evidence, _, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        mutations = [(field, None) for field in SWIFT_DISTRIBUTION if field != "region_downloads"]
+        mutations.extend([
+            ("default_aircraft", "kestrel-jet-trainer"),
+            ("default_model", "aircraft/kestrel_jet_trainer.glb"),
+            ("bundled_aircraft", ["swift-sport", "kestrel-jet-trainer"]),
+            ("bundled_aircraft", ["kestrel-jet-trainer"]),
+            ("profile", "development"), ("target_os", "linux"), ("target_env", "gnu"),
+            ("target_arch", "aarch64"), ("schema_version", True), ("schema_version", 1.0),
+            ("release_authorized", 0), ("release_authorized", True), ("package_version", ""),
+        ])
+        for field, value in mutations:
+            changed = {**SWIFT_DISTRIBUTION, field: value}
+            if value is None:
+                del changed[field]
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(ValueError, "Swift-only"):
+                candidate.validate_distribution(changed, dict(changed))
+            altered = {**report, "distribution": changed}
+            self.seal_report(evidence, altered)
+            with self.subTest(exported_field=field, value=value), self.assertRaisesRegex(ValueError, "Swift-only"):
+                candidate.validate_evidence(evidence)
 
     def test_success_requires_complete_consistent_source_and_contract_evidence(self):
         evidence, source, report = self.successful_evidence_fixture()
@@ -641,6 +718,15 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "requires Windows"):
                 candidate.run_candidate(ROOT, "a" * 40, self.root / "work", self.root / "evidence")
         self.assertFalse((self.root / "work").exists())
+
+    def test_cli_readback_diagnostic_requires_explicit_opt_in(self):
+        args = ["--repo", str(ROOT), "--expected-source", "a" * 40,
+                "--work", str(self.root / "work"), "--evidence", str(self.root / "evidence")]
+        for flags, enabled in (([], False), (["--diagnose-readback"], True)):
+            with self.subTest(enabled=enabled), patch.object(candidate, "run_candidate") as run:
+                self.assertEqual(candidate.main(args + flags), 0)
+                run.assert_called_once_with(ROOT.resolve(), "a" * 40, (self.root / "work").resolve(),
+                                            (self.root / "evidence").resolve(), diagnose_readback=enabled)
 
     def capture_fixture(self, first="timeout", probe="success", probe_events="complete"):
         work, evidence = self.root / "capture-work", self.root / "capture-evidence"
@@ -706,16 +792,63 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.seal_report(evidence, report)
         candidate.validate_evidence(evidence)
 
-    def test_successful_probe_cannot_turn_primary_timeout_into_acceptance(self):
+    def test_default_primary_failure_does_not_launch_probe(self):
+        root = self.root
+        for first in ("timeout", "error", "failure", "bad_log", "invalid_png", "missing_png"):
+            self.root = root / first
+            self.root.mkdir()
+            with self.subTest(first=first):
+                run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(first=first)
+                with patch.object(candidate, "record_readback_probe") as probe:
+                    with self.assertRaises(candidate.CAPTURE_ERRORS) as failed:
+                        candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                    probe.assert_not_called()
+                if first in ("timeout", "error"):
+                    self.assertIs(failed.exception, primary)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][1]["timeout"], 180)
+                self.assertEqual(report["status"], "failed")
+                self.assertEqual(report["checks"], {})
+                self.assertEqual(report["primary_capture_failure"]["message"],
+                                 candidate.sanitize(str(failed.exception), ROOT, work))
+                self.assertNotIn("diagnostics", report)
+                self.assertFalse((evidence / candidate.PNG_NAME).exists())
+                self.assertFalse(any((directory / name).exists() for directory in (work, evidence) for name in (
+                    candidate.PROBE_LOG_NAME, candidate.PROBE_JSON_NAME, candidate.PROBE_PNG_NAME)))
+                self.finish_failed_capture(evidence, report)
+
+    def test_primary_only_failure_evidence_keeps_identity_and_failure_guards(self):
+        run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+        self.finish_failed_capture(evidence, report)
+        for key, value in (("timeout_seconds", 181), ("log_sha256", "0" * 64),
+                           ("command", candidate.diagnostic_capture_command("other.exe", "other.png")),
+                           ("message", "different failure")):
+            changed = json.loads(json.dumps(report))
+            changed["primary_capture_failure"][key] = value
+            self.seal_report(evidence, changed)
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                candidate.validate_evidence(evidence)
+        self.seal_report(evidence, report)
+        (evidence / candidate.PROBE_LOG_NAME).write_text("unexpected probe", encoding="utf-8")
+        self.seal_report(evidence, report)
+        with self.assertRaisesRegex(ValueError, "lack a primary failure/probe record"):
+            candidate.validate_evidence(evidence)
+
+    def test_explicit_opt_in_runs_one_bounded_probe_and_preserves_primary_failure(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
         self.assertEqual(report["status"], "failed")
         self.assertEqual(report["checks"], {})
         probe = report["diagnostics"]["readback_probe"]
         self.assertEqual(probe["status"], "captured")
+        self.assertEqual(probe["attempts"], 1)
+        self.assertEqual(probe["timeout_seconds"], 180)
+        self.assertEqual(probe["executable_sha256"], report["executable_sha256"])
         self.assertFalse(probe["qualifies_acceptance"])
         self.assertFalse((evidence / candidate.PNG_NAME).exists())
         self.assertTrue((evidence / candidate.PROBE_PNG_NAME).exists())
@@ -728,7 +861,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_probe_timeout_is_single_and_partial_images_never_enter_evidence(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="timeout", probe_events="no_summary")
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
         self.assertEqual(report["diagnostics"]["readback_probe"]["status"], "timed_out")
@@ -741,13 +874,19 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertFalse(document["observations"]["gpu_completion_observed"])
 
     def test_primary_success_never_launches_probe(self):
-        run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="success")
-        candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
-        self.assertEqual(len(calls), 1)
-        self.assertNotIn("diagnostics", report)
-        self.assertIn("default_swift", report["checks"])
-        self.assertFalse(any((evidence / name).exists() for name in (
-            candidate.PROBE_LOG_NAME, candidate.PROBE_JSON_NAME, candidate.PROBE_PNG_NAME)))
+        root = self.root
+        for enabled in (False, True):
+            self.root = root / str(enabled)
+            self.root.mkdir()
+            with self.subTest(diagnose_readback=enabled):
+                run, app, cwd, work, evidence, report, calls, _ = self.capture_fixture(first="success")
+                candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report,
+                                                diagnose_readback=enabled)
+                self.assertEqual(len(calls), 1)
+                self.assertNotIn("diagnostics", report)
+                self.assertIn("default_swift", report["checks"])
+                self.assertFalse(any((evidence / name).exists() for name in (
+                    candidate.PROBE_LOG_NAME, candidate.PROBE_JSON_NAME, candidate.PROBE_PNG_NAME)))
 
     def test_non_timeout_primary_capture_failures_also_get_exactly_one_probe(self):
         root = self.root
@@ -757,7 +896,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.subTest(first=first):
                 run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(first=first)
                 with self.assertRaises((ValueError, OSError)) as failed:
-                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
                 if first == "error":
                     self.assertIs(failed.exception, primary)
                 self.assertEqual(len(calls), 2)
@@ -777,7 +916,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
 
         with patch.object(candidate, "digest", side_effect=fail_probe_preparation):
             with self.assertRaises(subprocess.TimeoutExpired) as failed:
-                candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 1)
         self.assertEqual(report["checks"], {})
@@ -787,7 +926,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_both_launcher_errors_without_output_still_export_honest_evidence(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(first="error", probe="error")
         with self.assertRaises(OSError) as failed:
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
         self.finish_failed_capture(evidence, report)
@@ -821,7 +960,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.subTest(outcome=outcome):
                 run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure", probe_events=outcome)
                 with self.assertRaises(subprocess.TimeoutExpired) as failed:
-                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
                 self.assertIs(failed.exception, primary)
                 self.assertEqual(len(calls), 2)
                 probe = report["diagnostics"]["readback_probe"]
@@ -859,7 +998,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.subTest(outcome=outcome), patch(__name__ + ".readback_fixture", return_value=log):
                 run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe="failure")
                 with self.assertRaises(subprocess.TimeoutExpired) as failed:
-                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
                 self.assertIs(failed.exception, primary)
                 self.assertEqual(len(calls), 2)
                 self.assertEqual(report["checks"], {})
@@ -872,7 +1011,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_no_summary_png_is_only_nonqualifying_capture_evidence(self):
         run, app, cwd, work, evidence, report, _, primary = self.capture_fixture(probe_events="empty")
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.finish_failed_capture(evidence, report)
         self.assertIsNone(candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["summary"])
@@ -1010,7 +1149,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.subTest(result=result, startup=startup), patch(__name__ + ".readback_fixture", return_value=log):
                 run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe=result)
                 with self.assertRaises(subprocess.TimeoutExpired) as failed:
-                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
                 self.assertIs(failed.exception, primary)
                 self.assertEqual(len(calls), 2)
                 self.assertEqual(report["checks"], {})
@@ -1100,7 +1239,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_diagnostic_png_requires_own_valid_proof_and_unchanged_log(self):
         run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired):
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.finish_failed_capture(evidence, report)
         probe = report["diagnostics"]["readback_probe"]
         probe["rust_log"] = "info"
@@ -1140,7 +1279,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_diagnostic_json_tampering_is_rejected_even_after_rehash(self):
         run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired):
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.finish_failed_capture(evidence, report)
         path = evidence / candidate.PROBE_JSON_NAME
         original = path.read_text()
@@ -1162,7 +1301,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_malformed_probe_log_cannot_hide_primary_error_or_export_png(self):
         run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe_events="malformed")
         with self.assertRaises(subprocess.TimeoutExpired) as failed:
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.assertIs(failed.exception, primary)
         self.assertEqual(len(calls), 2)
         self.assertFalse((evidence / candidate.PROBE_PNG_NAME).exists())
@@ -1174,7 +1313,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_probe_identity_mutations_cannot_change_launcher_or_acceptance(self):
         run, app, cwd, work, evidence, report, _, _ = self.capture_fixture()
         with self.assertRaises(subprocess.TimeoutExpired):
-            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+            candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report, diagnose_readback=True)
         self.finish_failed_capture(evidence, report)
         for key, value in (("qualifies_acceptance", True), ("qualifies_acceptance", 0), ("attempts", 2),
                            ("attempts", True), ("timeout_seconds", 181), ("executable_sha256", "0" * 64),
@@ -1214,7 +1353,7 @@ class CandidateWorkflowTests(unittest.TestCase):
                         "GIT_CONFIG_VALUE_0: 'false'", "GIT_CONFIG_KEY_1: core.eol", "GIT_CONFIG_VALUE_1: 'lf'"):
             self.assertIn(setting, text)
         for forbidden in ("contents: write", "uses: Swatinem/rust-cache", "uses: actions/cache",
-                          "gh release", "git tag", "workflow_dispatch:"):
+                          "gh release", "git tag", "workflow_dispatch:", "--diagnose-readback"):
             self.assertNotIn(forbidden, text)
         block = text.split("          path: |\n", 1)[1].split("          if-no-files-found:", 1)[0]
         names = {line.strip().rsplit("/", 1)[1] for line in block.splitlines() if line.strip()}

@@ -110,7 +110,7 @@ mod tests {
             metadata["region_downloads"].as_bool(),
             Some(cfg!(feature = "region-downloads"))
         );
-        assert_eq!(metadata["default_aircraft"], startup.aircraft.id);
+        assert_eq!(metadata["default_aircraft"], startup.aircraft.id());
         assert_eq!(metadata["default_model"], startup.model.unwrap());
         assert_eq!(metadata["release_authorized"], false);
         assert_eq!(startup.model_fit, startup.aircraft.model_fit());
@@ -119,7 +119,7 @@ mod tests {
         } else {
             "light-single"
         };
-        assert_eq!(startup.aircraft.id, expected);
+        assert_eq!(startup.aircraft.id(), expected);
         assert_eq!(info().to_string(), info().to_string());
     }
 
@@ -186,7 +186,7 @@ mod tests {
             "light-single".to_owned(),
             "--no-model".to_owned(),
         ]);
-        assert_eq!(startup.aircraft.id, "light-single");
+        assert_eq!(startup.aircraft.id(), "light-single");
         assert!(startup.model.is_none());
         let light = flightsim_fdm::AircraftConfig::light_single();
         assert_eq!(

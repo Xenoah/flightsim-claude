@@ -2,8 +2,8 @@
 //! See docs/replay-v4.md for independently encoded field order and semantics.
 use crate::model_identity::ModelIdentity;
 use crate::model_simulation::{
-    JET_FIXED_DT, JET_SIMULATION_REVISION, JetAdvance, JetEnvironment, JetSimulation,
-    JetTerminalEvent, JetTerrain,
+    JET_FIXED_DT, JET_SIMULATION_REVISION, JetAdvance, JetEnvironment, JetPresentationSnapshot,
+    JetSimulation, JetTerminalEvent, JetTerrain,
 };
 use crate::replay::current::{
     read_environment, read_header, read_weather, weather_length, write_environment, write_weather,
@@ -553,21 +553,32 @@ impl JetRecorder {
         }
         Ok(())
     }
+    /// Export an independently owned, valid recording through the most recent
+    /// accepted report. Does not close the recorder or add temporary checkpoints
+    /// to ongoing recording. Empty and frame-zero terminal exports are valid.
+    #[must_use]
+    pub fn export(&self) -> JetRecording {
+        let mut recording = self.recording.clone();
+        Self::append_final_checkpoint(&mut recording, self.last);
+        recording
+    }
     #[must_use]
     pub fn finish(mut self) -> JetRecording {
-        let n = self.recording.count();
-        if self
-            .recording
+        Self::append_final_checkpoint(&mut self.recording, self.last);
+        self.recording
+    }
+    fn append_final_checkpoint(recording: &mut JetRecording, last: RigidBodyState) {
+        let n = recording.count();
+        if recording
             .checkpoints
             .last()
             .is_none_or(|key| key.frame != n)
         {
-            self.recording.checkpoints.push(Keyframe {
+            recording.checkpoints.push(Keyframe {
                 frame: n,
-                state: self.last,
+                state: last,
             });
         }
-        self.recording
     }
 }
 
@@ -921,10 +932,12 @@ pub struct JetReplayPlayer {
     simulation: JetSimulation,
     cursor: u32,
     paused: bool,
+    speed: f64,
     accumulator: Seconds,
     seek_target: Option<u32>,
     finished: bool,
     faulted: bool,
+    interpolate: bool,
 }
 impl JetReplayPlayer {
     /// Validate complete identity before any reproduction. Terminal-at-zero is
@@ -950,10 +963,12 @@ impl JetReplayPlayer {
             simulation,
             cursor: 0,
             paused: false,
+            speed: 1.0,
             accumulator: Seconds::ZERO,
             seek_target: None,
             finished: false,
             faulted: false,
+            interpolate: false,
         };
         if player.recording.count() == 0 {
             player.settle_end()?;
@@ -963,6 +978,58 @@ impl JetReplayPlayer {
     #[must_use]
     pub const fn simulation(&self) -> &JetSimulation {
         &self.simulation
+    }
+    #[must_use]
+    pub const fn recording(&self) -> &JetRecording {
+        &self.recording
+    }
+    /// Last committed effective input. Frame zero has no committed input,
+    /// including a rejected frame-zero terminal, so it returns neutral controls.
+    #[must_use]
+    pub fn last_controls(&self) -> ControlInputs {
+        self.cursor
+            .checked_sub(1)
+            .and_then(|cursor| self.recording.controls.get(cursor as usize))
+            .copied()
+            .unwrap_or_else(ControlInputs::neutral)
+    }
+    #[must_use]
+    pub const fn speed(&self) -> f64 {
+        self.speed
+    }
+    /// Dimensionless playback rate, clamped to the existing replay range.
+    /// NaN resets to 1x; infinities select their corresponding bound.
+    pub const fn set_speed(&mut self, speed: f64) {
+        self.speed = if speed.is_nan() {
+            1.0
+        } else {
+            speed.clamp(replay::MIN_SPEED, replay::MAX_SPEED)
+        };
+    }
+    #[must_use]
+    pub const fn seek_target(&self) -> Option<u32> {
+        self.seek_target
+    }
+    /// Interpolation comes from playback's own fraction, never the unused live
+    /// fixed-step accumulator. Stopped/seek poses show the last committed state.
+    #[must_use]
+    pub fn interpolated(&self) -> crate::InterpolatedState {
+        let alpha = if !self.interpolate
+            || self.paused
+            || self.finished
+            || self.faulted
+            || self.seeking()
+            || self.cursor == self.recording.count()
+        {
+            1.0
+        } else {
+            (self.accumulator.get() / JET_FIXED_DT.get()).clamp(0.0, 1.0)
+        };
+        self.simulation.interpolated_with_alpha(alpha)
+    }
+    #[must_use]
+    pub fn presentation(&self) -> JetPresentationSnapshot {
+        self.simulation.presentation_with_pose(self.interpolated())
     }
     #[must_use]
     pub const fn cursor(&self) -> u32 {
@@ -986,9 +1053,13 @@ impl JetReplayPlayer {
     }
     pub const fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
+        if paused {
+            self.interpolate = false;
+        }
     }
     /// At most 240 actual attempts per call. Nonfinite/negative time is rejected;
-    /// one call admits at most 0.25 s and never accumulates paused/final time.
+    /// one call admits at most 0.25 real seconds, scaled by bounded speed, and
+    /// never accumulates paused/final time. Terminal work shares the same cap.
     /// # Errors
     /// Divergent checkpoints, unexpected success/rejection or invalid time.
     pub fn advance(&mut self, frame_time: Seconds) -> Result<u32, ReplayError> {
@@ -1009,7 +1080,7 @@ impl JetReplayPlayer {
             None,
             "must be finite and nonnegative",
         )?;
-        self.accumulator += Seconds(frame_time.get().min(0.25));
+        self.accumulator += Seconds(frame_time.get().min(0.25) * self.speed);
         let result = self.advance_due();
         if result.is_err() {
             self.faulted = true;
@@ -1029,6 +1100,7 @@ impl JetReplayPlayer {
                 break;
             }
             self.step_success()?;
+            self.interpolate = true;
             self.accumulator = Seconds((self.accumulator.get() - JET_FIXED_DT.get()).max(0.0));
             work += 1;
         }
@@ -1114,6 +1186,7 @@ impl JetReplayPlayer {
         self.accumulator = Seconds::ZERO;
         self.finished = false;
         self.faulted = false;
+        self.interpolate = false;
         self.seek_target = Some(target);
         self.continue_seek()
     }

@@ -136,13 +136,25 @@ pub struct Radians(pub f64);
   the current frame at once; reports and physical time count only executed steps,
   and the remaining terminal frame budget is discarded (ADR-0004).
 - Replay aircraft identity includes the FDM model revision as well as configuration.
-  New app recordings use complete identity in v3. Old-physics identities remain
+  New legacy-aircraft app recordings use complete identity in v3. Old-physics identities remain
   rejected; v1/v2 partial evidence requires explicit supported-baseline opt-in and
   a persistent missing-yaw notice. No format, duration or stored identity is upgraded.
   Modeled-weather v3 restores exact validated parameters and executed simulation
   time before render preparation. Weather CLI and manual replay cloud overrides
   are blocked before startup mutation. Live manual cloud overrides visibly disable recording/F9;
   see [the replay policy](docs/replay-identity.md).
+- Opt-in exact profile-v2 dry jets use an app-owned typed flight session and
+  [replay v4](docs/replay-v4.md). Live owns one transactional `JetSimulation`
+  and recorder; playback owns one `JetReplayPlayer` and reads its simulation.
+  No legacy propeller configuration is synthesized. Fixed-step control proposals
+  and parking toggles commit only after a successful whole step. Unsupported
+  live starts and regional sources fail before replacing the current flight;
+  explicit terminal-at-zero v4 evidence remains reproducible. Source support is
+  limited to bundled global or matching flat-zero terrain. Recording errors
+  close an authentic exportable prefix without freezing live flight. A live
+  visual-rate change also closes recording because v4 stores one initial rate.
+  New flight/restart starts a new recorder; formats and old physics remain
+  unchanged. See [native jet integration and limits](docs/jet-native-app.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
 - 補間は描画のみに影響し、物理状態を書き戻さない。
 - 乱流の時刻は実行した各固定ステップで進める。描画フレーム末尾の時刻を

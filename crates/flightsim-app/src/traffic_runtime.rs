@@ -110,7 +110,9 @@ pub(super) fn setup_traffic_meshes(
     if runtime.synthetic.is_some() {
         runtime.synthetic = Some(SyntheticTraffic::new(simulation.0.state().geodetic()));
     }
-    let parts = flightsim_render::aircraft::placeholder_parts(simulation.0.config())
+    let parts = simulation
+        .0
+        .placeholder_parts()
         .into_iter()
         .map(|p| (meshes.add(p.mesh), p.transform))
         .collect();

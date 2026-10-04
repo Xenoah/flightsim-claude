@@ -51,7 +51,7 @@ pub(super) fn control_app(id: &str) -> App {
         .insert_resource(FlightRecorder(flightsim_sim::CurrentRecorder::new(
             conditions,
         )))
-        .insert_resource(FlightSimulation(simulation))
+        .insert_resource(FlightSimulation(simulation.into()))
         .add_systems(
             Update,
             advance_simulation.run_if(world_runtime::flight_controls_active),
@@ -141,7 +141,7 @@ fn live_fixed_step_recording_replays_and_rewinds_through_actual_app_path() {
         );
         app.world_mut()
             .resource_scope(|world, mut playback: Mut<ReplayPlayback>| {
-                playback.rewind(&mut world.resource_mut::<FlightSimulation>().0);
+                playback.rewind(world.resource_mut::<FlightSimulation>().0.legacy_mut());
             });
         for _ in 0..190 {
             tick(
@@ -579,7 +579,7 @@ fn restart_after_sampling_clears_held_commands_before_first_recorded_step() {
         position: startup.start,
         heading: startup.heading,
     };
-    let expected_trim = startup.aircraft.controls.default_trim;
+    let expected_trim = startup.aircraft.legacy().unwrap().controls.default_trim;
     let mut keyboard = ButtonInput::default();
     keyboard.press(KeyCode::KeyR);
     keyboard.press(KeyCode::KeyS);

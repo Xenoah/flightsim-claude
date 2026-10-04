@@ -172,12 +172,14 @@ pub(super) fn configure(app: &mut App) {
         );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn select_pending_weather(
     startup: Res<Startup>,
     mut map: ResMut<WorldMapState>,
     capture: Res<world_runtime::MapCapture>,
     actions: Res<WorldMapActions>,
     playback: Option<Res<ReplayPlayback>>,
+    simulation: Option<Res<FlightSimulation>>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut pending: ResMut<PendingWeather>,
 ) {
@@ -188,7 +190,12 @@ fn select_pending_weather(
     let was_plain = pending.was_plain;
     pending.was_plain = map.new_flight_controls_active();
     let lan = startup.traffic.host.is_some() || startup.traffic.join.is_some();
-    let selectable = playback.is_none() && !lan && !startup.clouds_were_given;
+    let replay = playback.is_some()
+        || startup.replay.is_some()
+        || simulation
+            .as_ref()
+            .is_some_and(|simulation| simulation.0.is_replay());
+    let selectable = !replay && !lan && !startup.clouds_were_given;
     if capture.captured
         && !lan
         && selectable
@@ -200,11 +207,20 @@ fn select_pending_weather(
         // A map-owned F12 must never also leave a LAN session or leak on Close.
         keys.clear_just_pressed(KeyCode::F12);
     }
-    map.weather_note = if playback.is_some() {
-        format!(
-            "{} | recorded weather\nNew-flight weather selection unavailable",
-            crate::cloud_runtime::source_label(&startup)
-        )
+    map.weather_note = if replay {
+        let label = simulation
+            .as_ref()
+            .and_then(|simulation| simulation.0.jet_environment())
+            .map_or_else(
+                || crate::cloud_runtime::source_label(&startup),
+                |environment| {
+                    crate::cloud_runtime::effective_source_label(
+                        Some(environment.weather),
+                        Some(&startup),
+                    )
+                },
+            );
+        format!("{label} | recorded weather\nNew-flight weather selection unavailable")
     } else if lan {
         "Weather selection unavailable in LAN\nCurrent flight weather is retained".into()
     } else if startup.clouds_were_given {
@@ -221,15 +237,20 @@ pub(super) fn publish_weather(
     playback: Option<Res<ReplayPlayback>>,
     mut weather: ResMut<RenderWeather>,
 ) {
-    let selection = playback.as_ref().map_or_else(
+    let selection = simulation.0.jet_environment().map_or_else(
         || {
-            startup
-                .as_ref()
-                .map_or(WeatherSelection::Legacy, |startup| {
-                    startup.weather.selection
-                })
+            playback.as_ref().map_or_else(
+                || {
+                    startup
+                        .as_ref()
+                        .map_or(WeatherSelection::Legacy, |startup| {
+                            startup.weather.selection
+                        })
+                },
+                |playback| playback.player.recording().weather(),
+            )
         },
-        |playback| playback.player.recording().weather(),
+        |environment| environment.weather,
     );
     let next = RenderWeather {
         selection,
@@ -248,10 +269,86 @@ mod tests {
         controls_runtime_tests::{control_app, tick},
         parse_arguments_from,
     };
+    use bevy::ecs::system::RunSystemOnce;
     use flightsim_core::{Meters, Seconds};
     use flightsim_input::PilotKeys;
     use flightsim_world::{DemTile, HeightGrid, MemoryTileSource, Terrain, TileId};
     use std::time::Duration;
+
+    #[test]
+    fn jet_replay_publishes_recorded_weather_and_blocks_pending_selection() {
+        use crate::flight_session::FlightSession;
+        use flightsim_core::Radians;
+        use flightsim_sim::{
+            aircraft_profile::AircraftProfileV2,
+            model_simulation::{JetEnvironment, JetSimulation},
+            replay_v4::{JetRecorder, JetReplayPlayer},
+        };
+        let profile = AircraftProfileV2::parse(include_str!(
+            "../../../docs/examples/aircraft-profiles-v2/numerical-jet.json"
+        ))
+        .unwrap();
+        let recorded = WeatherSelection::Modeled(
+            WeatherScenario::from_preset(
+                WeatherPreset::Snow,
+                Geodetic::from_degrees(0.0, 0.0, 0.0),
+                919,
+            )
+            .unwrap(),
+        );
+        let environment = JetEnvironment {
+            weather: recorded,
+            ..Default::default()
+        };
+        let simulation = JetSimulation::parked(
+            profile.configuration().clone(),
+            Geodetic::from_degrees(0.0, 0.0, 0.0),
+            Radians::ZERO,
+            environment,
+        )
+        .unwrap();
+        let recording = JetRecorder::new(&simulation).unwrap().finish();
+        let player = JetReplayPlayer::new(profile.configuration().clone(), recording).unwrap();
+        let mut world = World::new();
+        world.insert_resource(FlightSimulation(FlightSession::replay(player)));
+        let startup = Startup {
+            aircraft: crate::aircraft_profile::SelectedAircraftProfile::Jet(profile),
+            ..Default::default()
+        };
+        world.insert_resource(startup);
+        world.init_resource::<RenderWeather>();
+        world.init_resource::<WorldMapState>();
+        world.resource_mut::<WorldMapState>().visible = true;
+        world.init_resource::<world_runtime::MapCapture>();
+        world.resource_mut::<world_runtime::MapCapture>().captured = true;
+        world.init_resource::<WorldMapActions>();
+        world
+            .resource_mut::<WorldMapActions>()
+            .new_flight_shortcuts_available = true;
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F12);
+        world.init_resource::<PendingWeather>();
+        world.run_system_once(select_pending_weather).unwrap();
+        world.run_system_once(publish_weather).unwrap();
+        assert!(!world.contains_resource::<ReplayPlayback>());
+        assert_eq!(world.resource::<RenderWeather>().selection, recorded);
+        assert_eq!(world.resource::<RenderWeather>().elapsed, Seconds::ZERO);
+        assert_eq!(world.resource::<PendingWeather>().requested, None);
+        assert!(
+            world
+                .resource::<WorldMapState>()
+                .weather_note
+                .starts_with("MODELED SNOW")
+        );
+        assert!(
+            world
+                .resource::<WorldMapState>()
+                .weather_note
+                .contains("recorded weather")
+        );
+    }
 
     const PRESETS: [WeatherPreset; 6] = [
         WeatherPreset::Clear,

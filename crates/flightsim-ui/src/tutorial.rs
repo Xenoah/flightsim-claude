@@ -407,6 +407,7 @@ pub fn spawn_tutorial_prompt(mut commands: Commands) {
 pub fn update_tutorial_prompt(
     hud: Res<HudState>,
     visibility: Res<TutorialVisibility>,
+    guidance: Option<Res<crate::FlightGuidance>>,
     paused: Res<crate::pause::Paused>,
     crashed: Res<crate::crash::CrashNotice>,
     mut state: ResMut<TutorialState>,
@@ -417,6 +418,7 @@ pub fn update_tutorial_prompt(
     // 出しておいて押しても何も起きないと、案内ではなく不具合に見える。
     // 状態機械は裏で進み続けるので、再開したときは今の段階が出る。
     let show = visibility.0
+        && guidance.as_ref().is_none_or(|value| value.tutorial_enabled)
         && !paused.is_paused()
         && !crashed.is_crashed()
         && stage != TutorialStage::Complete;
@@ -995,6 +997,34 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn aircraft_policy_suppresses_legacy_cues_even_when_pilot_enables_guide() {
+        let mut app = App::new();
+        app.insert_resource(hud(true, 0.0, 0.0, 0.0, 0.0))
+            .init_resource::<TutorialVisibility>()
+            .init_resource::<TutorialState>()
+            .init_resource::<crate::Paused>()
+            .init_resource::<crate::CrashNotice>()
+            .insert_resource(crate::FlightGuidance {
+                live_help: None,
+                tutorial_enabled: false,
+            })
+            .add_systems(Startup, spawn_tutorial_prompt)
+            .add_systems(Update, update_tutorial_prompt);
+        for _ in 0..3 {
+            app.world_mut().resource_mut::<TutorialVisibility>().0 = true;
+            app.update();
+            let world = app.world_mut();
+            let mut query = world.query_filtered::<&Visibility, With<TutorialPrompt>>();
+            assert_eq!(*query.single(world).unwrap(), Visibility::Hidden);
+        }
+        app.insert_resource(crate::FlightGuidance::default());
+        app.update();
+        let world = app.world_mut();
+        let mut query = world.query_filtered::<&Visibility, With<TutorialPrompt>>();
+        assert_eq!(*query.single(world).unwrap(), Visibility::Visible);
     }
 
     // --- 字形・文言 ---
