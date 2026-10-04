@@ -8,8 +8,11 @@ pub mod baseline;
 use flightsim_core::{
     Ecef, LocalFrame, Radians, RadiansPerSecond, RadiansPerSecondSquared, Seconds,
 };
+use flightsim_fdm as cedar_witness_fdm;
 use flightsim_fdm::turboprop::{self as law1, near_static as law2};
 use flightsim_fdm::{ControlInputs, Environment, RigidBodyState};
+#[path = "../../../flightsim-fdm/tests/support/cedar_boundary_witness.rs"]
+mod cedar_boundary_witness;
 use glam::{DQuat, DVec3};
 use serde::Deserialize;
 use serde_json::{Value, json, value::RawValue};
@@ -92,15 +95,13 @@ pub fn boundary_witness(config: &law2::TurbopropAircraftConfig) -> Value {
         matches!(error.reason, law1::TurbopropFailureReason::OutsidePropellerDomain(d)
         if d.advance_ratio == law1::AxisStatus::Below)
     );
-    assert_eq!(
-        error
-            .diagnostics
-            .values()
-            .advance_ratio
-            .unwrap()
-            .0
-            .to_bits(),
-        (-4.878_198_680_520_810_5e-6_f64).to_bits()
+    cedar_boundary_witness::assert_rejection(
+        old.config(),
+        start,
+        controls,
+        &env,
+        error,
+        -4.878_198_680_520_810_5e-6,
     );
     assert_eq!(
         baseline::state_bits(old.state()),
@@ -108,6 +109,7 @@ pub fn boundary_witness(config: &law2::TurbopropAircraftConfig) -> Value {
     );
     let mut new = law2::TurbopropFlightDynamics::new(config.clone(), start).unwrap();
     let accepted = new.step(Seconds(1.0 / 120.0), controls, &env).unwrap();
+    assert_eq!(accepted.substeps, cedar_boundary_witness::SUBSTEPS);
     json!({"law1_error":format!("{error:?}"), "law1_rollback_all_16_words":true,
         "initial":baseline::state_json(&start), "law2_substeps":accepted.substeps,
         "law2_endpoint":baseline::state_json(new.state())})

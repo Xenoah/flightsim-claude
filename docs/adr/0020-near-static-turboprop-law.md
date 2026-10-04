@@ -120,9 +120,16 @@ paired rows are interpolated at runtime. Tests also use simple independent
 numerical maps, positive/negative shaft rotation, scalar power/torque/energy
 oracles and explicit adjacent-outside domains.
 
-The exact law-1 K2/substep2 rejection with J=-4.8781986805208105e-6 remains pinned
-bitwise, together with complete rollback. Law 2 must accept that identical
-attempt without editing physical state, controls, wind, gear or surface forces.
+The exact law-1 K2/substep2 negative-domain rejection and complete rollback
+remain pinned on every platform. The historical J=-4.8781986805208105e-6 bit
+reference is scoped to its x86_64 Linux GNU arithmetic. Every platform also
+checks all nine optional diagnostic words against an independently reconstructed
+same-runtime law-1 K2 state, including J computed directly from its signed body
+velocity and absolute spin. This test-only observer uses public force queries
+and explicit RK4/state updates, never the production step or private integrator.
+The exact fixture inputs and physical bounds stay unchanged; no cross-platform
+numerical tolerance is introduced. Law 2 must accept that identical attempt in
+six substeps without editing physical state, controls, wind, gear or surface forces.
 That one-step result is provisional. Aircraft acceptance additionally needs the
 original 25 m/s braking scenario through an extended near-static interval,
 brake release and renewed acceleration, 120/240/480/960 Hz convergence, every

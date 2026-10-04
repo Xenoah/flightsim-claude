@@ -1,6 +1,9 @@
 //! Original numerical fixtures. None are measured engine/aircraft data.
 use super::*;
+use crate as cedar_witness_fdm;
 use crate::turboprop as law1;
+#[path = "../../../tests/support/cedar_boundary_witness.rs"]
+mod cedar_boundary_witness;
 use flightsim_core::{Meters, MetersPerSecond, Newtons};
 use law1::{
     GovernorDefinition, PowerCellDefinition, PropellerConvention, PropellerDefinition,
@@ -171,20 +174,18 @@ fn cedar_exact_law1_boundary_remains_rejected_and_law2_executes_same_input() {
         matches!(error.reason, law1::TurbopropFailureReason::OutsidePropellerDomain(d)
         if d.advance_ratio == AxisStatus::Below && d.blade_pitch == AxisStatus::Within)
     );
-    assert_eq!(
-        error
-            .diagnostics
-            .values()
-            .advance_ratio
-            .unwrap()
-            .0
-            .to_bits(),
-        (-4.878_198_680_520_810_5e-6_f64).to_bits()
+    cedar_boundary_witness::assert_rejection(
+        old.config(),
+        state,
+        controls,
+        &environment,
+        error,
+        -4.878_198_680_520_810_5e-6,
     );
     assert_eq!(state_bits(old.state()), state_bits(&state));
     let mut new = TurbopropFlightDynamics::new(cedar(), state).unwrap();
     let report = new.step(dt, controls, &environment).unwrap();
-    assert!(report.substeps >= 3 && report.substeps <= MAX_TURBOPROP_SUBSTEPS);
+    assert_eq!(report.substeps, cedar_boundary_witness::SUBSTEPS);
     assert_ne!(state_bits(new.state()), state_bits(&state));
     assert!(new.state().rigid_body.is_finite());
 }

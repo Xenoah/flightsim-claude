@@ -81,7 +81,11 @@ weighted Endpoint, are retained in the full evidence. Across all rates:
 - 8,496 negative-stage records, from 558,000 total observed stage evaluations
 
 The exact original law-1 fixture still rejects K2/internal substep 2 at
-J=-4.8781986805208105e-6, preserving all 16 state words. Law 2 accepts that
+J=-4.8781986805208105e-6 in the original x86_64 Linux GNU evidence, preserving
+all 16 state words. Cross-platform tests retain exact input identity and use the
+[independent same-runtime stage witness](near-static-turboprop-law2-2026-10-04.md#cross-platform-derived-output-witness-correction)
+for derived signed J and diagnostics; the Linux output pin remains scoped to
+that platform. Law 2 accepts that
 identical physical state, controls and environment in six substeps. This witness
 is preserved alongside, rather than substituted for, the full trajectories.
 

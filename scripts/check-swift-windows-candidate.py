@@ -145,6 +145,7 @@ NEAR_STATIC_FOUNDATION_PATHS = {
     'crates/flightsim-fdm/src/turboprop/runtime.rs',
     'crates/flightsim-fdm/src/turboprop/tests.rs',
     'crates/flightsim-fdm/src/turbulence.rs',
+    'crates/flightsim-fdm/tests/support/cedar_boundary_witness.rs',
     'crates/flightsim-sim/examples/cedar_near_static_qualification.rs',
     'crates/flightsim-sim/examples/support/cedar_law1_baseline.rs',
     'crates/flightsim-sim/examples/support/cedar_near_static.rs',

@@ -9,8 +9,8 @@ replay codec, app or preset added.
 ## Verified result
 
 The original Cedar boundary remains a law-1 rejection at K2, internal substep 2,
-with exact J bits for -4.8781986805208105e-6 and all 16 original state words
-unchanged. Explicit law 2 accepts the identical 1/120 s attempt. The fixture's
+with exact historical Linux GNU J bits for -4.8781986805208105e-6 and all
+16 original state words unchanged. Explicit law 2 accepts the identical 1/120 s attempt. The fixture's
 state, calm environment, full brakes, engine state and contact configuration
 are unchanged. This is one-step pure-FDM evidence, not a completed calm-stop,
 aircraft, native application, empirical or stationary-parking qualification.
@@ -138,3 +138,65 @@ its `acceptance.json` receipt has SHA-256
 They retain exact commands, all 85 result groups, source hashes, the independent
 harness and original production-profile input. This is same-build local
 foundation acceptance, with the aircraft and host gates above still open.
+
+## Cross-platform derived-output witness correction
+
+Windows core CI for `fc9750d701fc0508dc4b374c4903920a0fa35e91`
+([run 37234646790, job 111531224096](https://github.com/Xenoah/flightsim-claude/actions/runs/37234646790/job/111531224096))
+passed 130 of 131 FDM unit tests, including all 589 recovered component bits.
+The one failure was the historical Linux output assertion after the expected
+K2/substep-2 `OutsidePropellerDomain(Below, Within)` rejection already passed:
+
+- Linux reference J: `bed475ed0aff54c1` (-4.8781986805208105e-6)
+- Windows observed J: `bed475ed05f3e017` (-4.878198608830617e-6)
+- Absolute difference: approximately 7.16902e-14
+
+This is a derived trajectory value, not a fixture input token. Contact forces
+use ECEF-to-geodetic altitude, trigonometric local frames and near-zero friction;
+those intermediate calculations are not promised bit-identical across system
+math implementations. The log establishes platform-dependent derived arithmetic,
+but does not isolate one particular library function as the cause. No JSON
+newline, float decoder, production law or tolerance is changed.
+
+The test-only witness now reconstructs two complete law-1 RK4 substeps and the
+third substep's K2 state using the public derivative, turbine and governor APIs.
+It holds one governor sample per substep, applies the analytic turbine response,
+normalizes each offset quaternion, and evaluates each accepted endpoint. Its
+substep size is exactly `(1/120)/6`, independently pinned against the accepted
+law-2 report. It uses the caller's unchanged environment at every evaluation,
+including the distinction between moving local ground and a held ground plane.
+It calls neither `step` nor the private integrator and never reads law-2 output
+to construct the reference. This is an independent integration/diagnostic
+witness using shared law-1 force functions, not an independent physical model.
+
+On every platform, independently computed signed J must be finite and strictly
+negative and must match the failed full-step diagnostic bit for bit. Direct
+law-1 evaluation of that reconstructed K2 state must have the identical domain
+reason and all nine optional diagnostic words, preserving absence and signed
+zero. Stage K2/substep 2, all 16 rollback words, component inventory and original
+physical input identity remain exact. Law 2 must accept the original attempt in
+six substeps. The historical output bit pins remain additional regressions on
+x86_64 Linux GNU. Windows receives the same independent witness, with no widened
+numerical tolerance and no ignored test.
+
+The same correction covers the qualification helper, the replay-v6 bare-FDM
+boundary, and its held-plane law-1/v5 witness. The held-plane latitude/longitude
+reference is similarly scoped to Linux GNU while its exact same-runtime
+geodetic, host, direct-FDM and replay identity comparisons run everywhere. Other
+new exact comparisons were inspected: they compare source identity, same-runtime
+trajectories/diagnostics, authored domain edges or algebraic endpoint values.
+The existing negative-flow limits and their adjacent-outside rejection tests
+are unchanged. All original fixtures, recorded evidence and v3/v4/v5/v6 codecs
+remain unchanged.
+
+Local validation of this correction (Linux GNU, Rust 1.93.0, existing shared
+build target, offline, `-j2`, warnings denied):
+
+- All 236 FDM tests passed, including the 14 near-static unit tests
+- All 3 Cedar qualification tests and 28 near-static v6 replay tests passed
+- All 14 profile-v4, 11 v6 codec and 8 near-static identity tests passed
+- FDM and sim `cargo clippy --all-targets -- -D warnings` passed
+- `cargo fmt --all --check`, architecture checks and `git diff --check` passed
+
+These are local Linux results. A new Windows CI run is still required before
+claiming that the corrected cross-platform assertions pass on Windows.

@@ -70,7 +70,8 @@ whose ratio underflows after negative J is established (mask 0x1ff). Structural
 subnormal/zero bit preservation is separately tested; no codec repair is allowed.
 
 The original Cedar full-state boundary is copied bit-for-bit from the accepted
-fixture. The original bare-FDM `still_air` oracle retains J bits
+fixture. On the original x86_64 Linux GNU platform, the bare-FDM `still_air`
+oracle retains J bits
 `bed475ed0aff54c1` (-4.8781986805208105e-6). The unchanged v5 host instead samples
 an explicit held ground plane; its corresponding oracle retains J bits
 `bed475ed0b07234a` (-4.878198680954174e-6). Both reject at K2/substep 2. These are
@@ -78,7 +79,13 @@ distinct exact environmental contexts, not a tolerance comparison or a physics
 change. The complete held-plane error is checked against direct old-law FDM
 evaluation and reproduced exactly by schema-3/v5 playback. Law 2 accepts the
 same host initial state, controls and held-plane context, records under schema
-4/version 6 and reproduces it. A separate 3,600-step Cedar continuation records
+4/version 6 and reproduces it. These historical derived J and geographic words
+are not cross-platform input identity. Every platform now additionally uses the
+[independent same-runtime law-1 stage witness](near-static-turboprop-law2-2026-10-04.md#cross-platform-derived-output-witness-correction),
+with exact signed-J/diagnostic equality, domain reason and whole-state rollback.
+The original output pins remain x86_64 Linux GNU regressions; all fixture bytes
+and host/replay exact comparisons remain unchanged.
+A separate 3,600-step Cedar continuation records
 20 seconds of braked idle and 10 seconds of brake release with a gradual 0..0.4
 throttle ramp, then replays and rewinds complete host history.
 
