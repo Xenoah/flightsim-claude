@@ -19,6 +19,9 @@
 !/assets/aircraft/swift_sport.glb
 !/assets/aircraft/swift_sport.json
 !/assets/aircraft/swift_sport.blend
+!/assets/aircraft/meadow_trainer.glb
+!/assets/aircraft/meadow_trainer.json
+!/assets/aircraft/meadow_trainer.blend
 
 # API キー。**中身を絶対にコミットしない。**
 # 書き方は .env.example を参照（そちらは追跡する）。

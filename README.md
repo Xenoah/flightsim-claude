@@ -66,6 +66,9 @@ cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flight
   **Light Single と Swift Sport の 2 機種を選択可能**。版付き JSON で FDM・外形・
   視点・音・入力レートを切り替える。Swift Sport は本リポジトリで Blender により制作し、
   再生成スクリプト・編集用 `.blend`・`.glb` を同梱する。実機性能の認証モデルではない
+  追加の [Meadow Trainer](docs/aircraft/meadow-trainer.md) は独自制作の高翼機外形で、
+  `--aircraft assets/aircraft/meadow_trainer.json` から選ぶ。Light Single と同じ数値の
+  飛行特性・操作設定を使う外観の選択肢であり、新しい実機性能モデルではない
 - **機体モデルの取得** — Meshy の API から取ってくるオフライン CLI。API キーは `.env`
   から読み、**引数では受け取らない**（コマンドラインはプロセス一覧とシェル履歴に残る）
 - **合成飛行場とゲームループ** — 引数なしで滑走路の中心線上から始まり、離陸して

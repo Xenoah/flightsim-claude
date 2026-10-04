@@ -5,7 +5,7 @@
   "root_package": "flightsim-app",
   "cargo_lock_sha256": "665fc4221e9df86fac3d26a33c75ad3ea2d58cc2d42bdcde70c8d45444533db3",
   "metadata_sha256": "371f99c4b70b7943edcf33dbdaad7073a86436ea41980cdb8c84e99104d04a9a",
-  "asset_manifest_sha256": "8a71d5e970fa3fe2cd4949b60962a5dde3fef9a2d10b691b3139218c0c8b1e4d",
+  "asset_manifest_sha256": "bd6c47141551072924154207fc125053f5c4fc63779225344a13951a9f55dcf8",
   "supplement_manifest_sha256": "2f9ea61d636ba36059b24d5a3923c4ac03048410024a06e5239100b507255332",
   "scope": "Conservative normal/build dependency closure of target-filtered Cargo metadata; excludes dev-only edges, not proof of final linkage or exhaustive nested-source licensing",
   "review_status": "not_reviewed",

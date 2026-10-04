@@ -183,3 +183,16 @@ data were transformed into a compact offline atlas; no NOAA endorsement is impli
 These are reanalysis climatology, not live weather, forecast or airport observations.
 Cloud fraction is a reanalysis field. Temperature altitude adjustment, broad biome
 labels, cloud-layer geometry and snow/ice visual cues are modeled approximations.
+
+## Original Meadow Trainer exterior (2026-10-04)
+
+`assets/aircraft/meadow_trainer.glb`, its editable `.blend`, and
+`tools/blender/build_meadow_trainer.py` are original procedural geometry/materials
+created for this project in Blender 4.3.2. No downloaded model, Meshy output,
+texture, logo, blueprint or branded aircraft is included. These new original
+files, their studio previews, and external JSON profile use this repository's
+MIT OR Apache-2.0 license. The profile reuses Light Single's existing numeric
+dynamics and controls exactly; it does not add newly calibrated real-aircraft
+performance data. See [provenance, axes and validation](docs/aircraft/meadow-trainer.md).
+This addition does not alter the existing models' terms or the commercial
+candidate's asset allowlist, and does not constitute release or rights clearance.

@@ -59,6 +59,7 @@ jobs:
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts/tests -v
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts -p 'test_pack_global_terrain.py' -v
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" schemas/tests/test_aircraft_profile_schema.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" tools/blender/validate_meadow_trainer.py
           # These boundary tests fetch no geospatial source data and require no HDF5.
 
   # 純 Rust 側（core / fdm / world / sim / tilegen）。

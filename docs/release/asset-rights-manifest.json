@@ -122,6 +122,54 @@
         "crates/flightsim-tilegen/tests/pbf_hostile_probe.rs"
       ],
       "notes": "400-byte synthetic test fixture; do not mistake it for a real OSM-derived airport pack or ship it as world data."
+    },
+    {
+      "id": "assets-aircraft-meadow_trainer-glb",
+      "path": "assets/aircraft/meadow_trainer.glb",
+      "delivery": "source_only",
+      "sha256": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+      "bytes": 140864,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "tools/blender/build_meadow_trainer.py",
+        "tools/blender/validate_meadow_trainer.py",
+        "docs/aircraft/meadow-trainer.md",
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Original generic high-wing exterior and external profile; numeric Light Single dynamics reused. Recorded for source distribution only. Not included in either binary packaging allowlist or the Swift-only candidate."
+    },
+    {
+      "id": "assets-aircraft-meadow_trainer-json",
+      "path": "assets/aircraft/meadow_trainer.json",
+      "delivery": "source_only",
+      "sha256": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+      "bytes": 2739,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "tools/blender/build_meadow_trainer.py",
+        "tools/blender/validate_meadow_trainer.py",
+        "docs/aircraft/meadow-trainer.md",
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Original generic high-wing exterior and external profile; numeric Light Single dynamics reused. Recorded for source distribution only. Not included in either binary packaging allowlist or the Swift-only candidate."
+    },
+    {
+      "id": "assets-aircraft-meadow_trainer-blend",
+      "path": "assets/aircraft/meadow_trainer.blend",
+      "delivery": "source_only",
+      "sha256": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+      "bytes": 148936,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
+      "sources": [
+        "tools/blender/build_meadow_trainer.py",
+        "tools/blender/validate_meadow_trainer.py",
+        "docs/aircraft/meadow-trainer.md",
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Original generic high-wing exterior and external profile; numeric Light Single dynamics reused. Recorded for source distribution only. Not included in either binary packaging allowlist or the Swift-only candidate."
     }
   ],
   "dependency_assets": [
