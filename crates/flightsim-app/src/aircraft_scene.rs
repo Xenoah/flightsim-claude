@@ -84,7 +84,7 @@ pub(super) fn spawn(
             parts.push(entity.id());
         }
     }
-    let interior = if startup.aircraft.is_jet() {
+    let interior = if startup.aircraft.uses_bounded_model() {
         Vec::new()
     } else {
         flightsim_render::cockpit::interior_parts(startup.aircraft.camera_eye())
@@ -337,7 +337,7 @@ impl AircraftScene {
             if world.get::<StagedExterior>(entity).is_some() {
                 world.entity_mut(entity).remove::<StagedExterior>().insert((
                     ExteriorModel,
-                    if shows_exterior(mode) || startup.aircraft.is_jet() {
+                    if shows_exterior(mode) || startup.aircraft.uses_bounded_model() {
                         Visibility::Inherited
                     } else {
                         Visibility::Hidden

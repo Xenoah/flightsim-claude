@@ -1,5 +1,7 @@
 //! Transactional simulation for the explicit turboprop model. Legacy simulation is untouched.
 mod parked;
+mod presentation;
+pub use presentation::TurbopropPresentationSnapshot;
 
 use crate::{
     FlightLog, GroundPlane, GroundSampler, Touchdown,

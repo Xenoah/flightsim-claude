@@ -158,6 +158,12 @@ fn recorder_bytes(app: &App) -> Vec<u8> {
             .write_to(&mut bytes)
             .unwrap(),
         FlightSession::JetReplay { player, .. } => player.recording().write_to(&mut bytes).unwrap(),
+        FlightSession::TurbopropLive { recorder, .. } => {
+            recorder.export().write_to(&mut bytes).unwrap()
+        }
+        FlightSession::TurbopropReplay { player, .. } => {
+            player.recording().write_to(&mut bytes).unwrap()
+        }
     }
     bytes
 }
@@ -199,7 +205,7 @@ fn assert_target(app: &mut App, index: usize, old_root: Entity) {
         world
             .resource::<flightsim_ui::FlightGuidance>()
             .tutorial_enabled,
-        !choice.profile.is_jet()
+        choice.profile.is_legacy()
     );
     assert!(!world.resource::<flightsim_ui::CrashNotice>().is_crashed());
     assert!(!world.resource::<StallWarningStatus>().active);
@@ -209,15 +215,15 @@ fn assert_target(app: &mut App, index: usize, old_root: Entity) {
         Seconds::ZERO
     );
     assert_eq!(world.resource::<FlightSimulation>().0.log().landings, 0);
-    let jet = choice.profile.is_jet();
-    assert_eq!(world.contains_resource::<FlightRecorder>(), !jet);
+    let bounded = choice.profile.uses_bounded_model();
+    assert_eq!(world.contains_resource::<FlightRecorder>(), !bounded);
     let interior = world
         .query_filtered::<Entity, With<InteriorModel>>()
         .iter(world)
         .count();
-    assert_eq!(interior == 0, jet);
+    assert_eq!(interior == 0, bounded);
     assert!(!world.resource::<flightsim_ui::Paused>().is_paused());
-    if jet {
+    if bounded {
         assert_eq!(
             world.resource::<FlightSimulation>().0.parking_brake(),
             Some((false, false))
@@ -407,43 +413,49 @@ fn close_weather_destination_month_and_reselection_invalidate_delayed_jet_withou
 
 #[test]
 #[cfg(not(feature = "commercial-staging"))]
-fn raw_or_selected_regions_reject_target_jet_before_consuming_request_or_mutating_old_flight() {
+fn raw_or_selected_regions_reject_bounded_targets_before_consuming_request_or_mutating_old_flight()
+{
     let mut app = app(startup());
+    app.world_mut().resource_mut::<AircraftPicker>().entries[0].choice =
+        Some(AircraftChoice::current(&turboprop_startup()));
     let old_root = active_root(&mut app);
     let before = recorder_bytes(&app);
     let old_weather = app.world().resource::<Startup>().weather.selection;
-    for raw in [false, true] {
-        app.world_mut().resource_mut::<Startup>().tiles = raw.then(|| PathBuf::from("raw-terrain"));
-        let selected = (!raw).then(|| "fixture.region@1.0.0".to_owned());
-        app.world_mut()
-            .resource_mut::<WorldMapState>()
-            .regions
-            .selected = selected.clone();
-        app.world_mut()
-            .resource_mut::<weather_runtime::PendingWeather>()
-            .requested = Some(WeatherPreset::Snow);
-        let request = submit(&mut app, 3);
-        app.update();
-        assert_eq!(
-            app.world().resource::<WorldMapActions>().start_at,
-            Some(request)
-        );
-        assert_eq!(
-            app.world().resource::<WorldMapState>().regions.selected,
-            selected
-        );
-        assert_eq!(active_root(&mut app), old_root);
-        assert_eq!(recorder_bytes(&app), before);
-        assert_eq!(
-            app.world().resource::<Startup>().weather.selection,
-            old_weather
-        );
-        assert!(
-            app.world()
-                .resource::<WorldMapState>()
-                .navigation_note
-                .contains("Jet flights")
-        );
+    for target in [3, 0] {
+        for raw in [false, true] {
+            app.world_mut().resource_mut::<Startup>().tiles =
+                raw.then(|| PathBuf::from("raw-terrain"));
+            let selected = (!raw).then(|| "fixture.region@1.0.0".to_owned());
+            app.world_mut()
+                .resource_mut::<WorldMapState>()
+                .regions
+                .selected = selected.clone();
+            app.world_mut()
+                .resource_mut::<weather_runtime::PendingWeather>()
+                .requested = Some(WeatherPreset::Snow);
+            let request = submit(&mut app, target);
+            app.update();
+            assert_eq!(
+                app.world().resource::<WorldMapActions>().start_at,
+                Some(request)
+            );
+            assert_eq!(
+                app.world().resource::<WorldMapState>().regions.selected,
+                selected
+            );
+            assert_eq!(active_root(&mut app), old_root);
+            assert_eq!(recorder_bytes(&app), before);
+            assert_eq!(
+                app.world().resource::<Startup>().weather.selection,
+                old_weather
+            );
+            assert!(
+                app.world()
+                    .resource::<WorldMapState>()
+                    .navigation_note
+                    .contains("Aircraft")
+            );
+        }
     }
 }
 
@@ -1204,4 +1216,334 @@ fn valid_wrong_preset_file_is_unavailable_without_reinterpreting_launch_profile(
         assert_eq!(launch.model, startup.model);
         assert!(!launch.profile.is_jet());
     }
+}
+
+fn turboprop_startup() -> Startup {
+    let mut startup = startup();
+    startup.aircraft = aircraft_profile::SelectedAircraftProfile::Turboprop(
+        flightsim_sim::aircraft_profile_v3::AircraftProfileV3::parse(include_str!(
+            "../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+        ))
+        .unwrap(),
+    );
+    startup.aircraft_choice = Some(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+        )
+        .into(),
+    );
+    // An explicit launch model override avoids implying a qualified turboprop asset.
+    startup.model = Some("aircraft/swift_sport.glb".into());
+    startup.model_fit = startup.aircraft.model_fit();
+    startup.engine_sound = startup.aircraft.engine_kind();
+    startup
+}
+
+#[test]
+fn v3_launch_is_explicit_only_and_never_adds_a_commercial_or_named_preset() {
+    let mut startup = turboprop_startup();
+    let picker = AircraftPicker::new(&startup);
+    if cfg!(feature = "commercial-staging") {
+        assert_eq!(picker.entries.len(), 1);
+        assert_eq!(picker.entries[0].view.label, "Swift Sport");
+        assert!(
+            picker.entries[0]
+                .choice
+                .as_ref()
+                .unwrap()
+                .profile
+                .is_legacy()
+        );
+    } else {
+        assert_eq!(picker.entries.len(), 4);
+        let launch = picker.entries[0].choice.as_ref().unwrap();
+        assert!(launch.profile.is_turboprop());
+        assert_eq!(launch.model, startup.model);
+        assert_eq!(launch.sound, startup.engine_sound);
+        assert!(picker.target_uses_bounded_model(0));
+        startup.aircraft_choice = None;
+        let implicit = AircraftPicker::new(&startup);
+        assert!(!implicit.available(0));
+        assert!(
+            implicit.entries[0]
+                .view
+                .note
+                .contains("explicit --aircraft")
+        );
+    }
+    assert!(
+        picker
+            .entries
+            .iter()
+            .all(|entry| !entry.view.label.contains("Cedar"))
+    );
+}
+
+#[test]
+fn valid_v3_cannot_spoof_a_legacy_catalog_row_with_matching_id_and_model() {
+    let temporary = TemporaryAssets::new();
+    temporary.copy_originals();
+    let json = include_str!("../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json")
+        .replace("numerical-turboprop-fixture", "swift-sport")
+        .replace(
+            "aircraft/unprovided_numerical_turboprop_fixture.glb",
+            "aircraft/swift_sport.glb",
+        );
+    std::fs::write(temporary.0.join("aircraft/swift_sport.json"), json).unwrap();
+    let mut startup = startup();
+    startup.assets = Some(temporary.0.clone());
+    let picker = AircraftPicker::new(&startup);
+    let row = usize::from(!cfg!(feature = "commercial-staging"));
+    assert!(!picker.available(row));
+    assert!(picker.entries[row].view.note.contains("does not match"));
+}
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn all_turboprop_transition_directions_commit_complete_owners_and_v5_identity() {
+    use flightsim_sim::replay_v5::{TurbopropRecording, TurbopropReplayPlayer};
+    let mut app = app(turboprop_startup());
+    for target in [1, 0, 3, 0, 2, 0, 0] {
+        let old_root = active_root(&mut app);
+        app.world_mut().resource_mut::<StallWarningStatus>().active = true;
+        app.world_mut()
+            .resource_mut::<flightsim_ui::CrashNotice>()
+            .set("old terminal");
+        submit(&mut app, target);
+        app.update();
+        assert_eq!(active_root(&mut app), old_root);
+        finish(&mut app);
+        assert_target(&mut app, target, old_root);
+        if target == 0 {
+            let session = &app.world().resource::<FlightSimulation>().0;
+            assert!(!session.is_jet());
+            let actual = session.turboprop().unwrap().state();
+            let authored = app
+                .world()
+                .resource::<Startup>()
+                .aircraft
+                .turboprop()
+                .unwrap()
+                .running_start();
+            assert_eq!(
+                actual.turbine_fraction.get().to_bits(),
+                authored.turbine_fraction().get().to_bits()
+            );
+            assert_eq!(
+                actual.shaft_rad_s.get().to_bits(),
+                authored.shaft_speed().get().to_bits()
+            );
+            assert_eq!(
+                actual.blade_pitch_rad.get().to_bits(),
+                authored.blade_pitch().get().to_bits()
+            );
+            advance_one(&mut app);
+            let bytes = recorder_bytes(&app);
+            let recording = TurbopropRecording::read_from(&mut bytes.as_slice()).unwrap();
+            let config = app
+                .world()
+                .resource::<Startup>()
+                .aircraft
+                .turboprop()
+                .unwrap()
+                .configuration()
+                .clone();
+            assert_eq!(recording.conditions().identity.schema, 3);
+            assert_eq!(recording.conditions().identity.kind, 3);
+            assert!(!recording.controls().is_empty());
+            let mut replay = TurbopropReplayPlayer::new(config, recording).unwrap();
+            replay.advance(Seconds(1.0)).unwrap();
+            assert!(replay.finished());
+            assert!(flightsim_sim::replay_v5::state_bits_equal(
+                replay.simulation().state(),
+                app.world()
+                    .resource::<FlightSimulation>()
+                    .0
+                    .turboprop()
+                    .unwrap()
+                    .state(),
+            ));
+        }
+    }
+}
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn turboprop_pending_forces_commit_exactly_before_wind_aware_start_and_v5_capture() {
+    use conditions_runtime::{PendingConditions, PhysicalConditions};
+    use flightsim_sim::replay_v5::TurbopropRecording;
+    let mut app = app(turboprop_startup());
+    submit(&mut app, 1);
+    finish(&mut app);
+    let mut desired = app.world().resource::<Startup>().clone();
+    desired.wind = flightsim_sim::Wind {
+        from: Radians(1.2345678901234567),
+        speed: flightsim_core::MetersPerSecond(9.876543210987654),
+    };
+    desired.turbulence = flightsim_fdm::Turbulence::light(u64::MAX - 37);
+    desired.wind_was_given = true;
+    desired.turbulence_was_given = true;
+    let desired = PhysicalConditions::from_startup(&desired);
+    app.world_mut().init_resource::<PendingConditions>();
+    app.world_mut()
+        .resource_mut::<PendingConditions>()
+        .selection = Some(desired);
+    let before = recorder_bytes(&app);
+    let previous = PhysicalConditions::from_startup(app.world().resource::<Startup>());
+    submit(&mut app, 0);
+    world_runtime::apply_world_map_start(app.world_mut());
+    assert_eq!(recorder_bytes(&app), before);
+    assert_eq!(
+        PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+        previous
+    );
+    finish(&mut app);
+    assert_eq!(
+        PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+        desired
+    );
+    let startup = app.world().resource::<Startup>();
+    let mut calm = startup.clone();
+    calm.wind = flightsim_sim::Wind::CALM;
+    let calm = world_runtime::prepare_world_map_flight(calm, request(0, 0), None).unwrap();
+    let delta = app
+        .world()
+        .resource::<FlightSimulation>()
+        .0
+        .state()
+        .velocity_ned()
+        .0
+        - calm.simulation.state().velocity_ned().0;
+    assert!((delta - desired.wind.to_ned().0).length() < 1e-8);
+    let bytes = recorder_bytes(&app);
+    let recording = TurbopropRecording::read_from(&mut bytes.as_slice()).unwrap();
+    assert_eq!(
+        recording.conditions().environment.conditions.wind,
+        desired.wind
+    );
+    assert_eq!(
+        recording.conditions().environment.conditions.turbulence,
+        desired.turbulence
+    );
+}
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn turboprop_cancelled_staging_and_rejected_environment_keep_existing_flight_exact() {
+    let mut app = app(turboprop_startup());
+    submit(&mut app, 1);
+    finish(&mut app);
+    let old_root = active_root(&mut app);
+    let before = recorder_bytes(&app);
+    let previous_startup = app.world().resource::<Startup>().clone();
+    let previous_controls = app.world().resource::<PilotControls>().to_control_inputs();
+    submit(&mut app, 0);
+    world_runtime::apply_world_map_start(app.world_mut());
+    let staged = match &app
+        .world()
+        .resource::<AircraftPicker>()
+        .pending
+        .as_ref()
+        .unwrap()
+        .phase
+    {
+        Phase::Model { scene, .. } => scene.root,
+        _ => panic!("turboprop candidate must prepare before publishing"),
+    };
+    app.world_mut()
+        .resource_mut::<WorldMapActions>()
+        .invalidate_start();
+    world_runtime::apply_world_map_start(app.world_mut());
+    assert!(app.world().get_entity(staged).is_err());
+    assert_eq!(active_root(&mut app), old_root);
+    assert_eq!(recorder_bytes(&app), before);
+    assert_eq!(
+        app.world().resource::<Startup>().aircraft.id(),
+        previous_startup.aircraft.id()
+    );
+    assert_eq!(
+        app.world().resource::<PilotControls>().to_control_inputs(),
+        previous_controls
+    );
+    app.world_mut().resource_mut::<Startup>().time_rate = f64::NAN;
+    let request = submit(&mut app, 0);
+    world_runtime::apply_world_map_start(app.world_mut());
+    assert_eq!(active_root(&mut app), old_root);
+    assert_eq!(recorder_bytes(&app), before);
+    assert_eq!(
+        app.world().resource::<WorldMapActions>().start_at,
+        Some(request)
+    );
+    assert!(matches!(
+        app.world()
+            .resource::<AircraftPicker>()
+            .pending
+            .as_ref()
+            .unwrap()
+            .phase,
+        Phase::Failed
+    ));
+    assert!(
+        app.world()
+            .resource::<WorldMapState>()
+            .navigation_note
+            .contains("Cannot start")
+    );
+}
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn opt_in_numerical_profile_loads_original_cedar_static_model_without_a_preset() {
+    // This is a loader/presentation test only. Physical coefficients remain the
+    // numerical fixture; no Cedar flight qualification is implied.
+    let mut startup = turboprop_startup();
+    startup.model = Some("aircraft/experimental/cedar_turboprop_experimental.glb".into());
+    startup.model_fit = ModelFit::new(
+        flightsim_render::ModelAxis::parse("+z").unwrap(),
+        flightsim_render::ModelAxis::parse("+y").unwrap(),
+        Meters(9.6),
+    )
+    .unwrap();
+    let mut app = app(startup);
+    assert!(app.world().resource::<FlightSimulation>().0.is_turboprop());
+    let world = app.world_mut();
+    assert_eq!(
+        world
+            .query::<&Name>()
+            .iter(world)
+            .filter(|name| name.as_str() == "Cedar propeller assembly")
+            .count(),
+        1
+    );
+    assert!(world.query::<&Mesh3d>().iter(world).count() > 0);
+    assert!(
+        world
+            .query::<&GlobalTransform>()
+            .iter(world)
+            .all(|transform| transform.affine().is_finite())
+    );
+    assert!(
+        world
+            .resource::<AircraftPicker>()
+            .entries
+            .iter()
+            .all(|entry| !entry.view.label.contains("Cedar"))
+    );
+    assert_eq!(
+        world
+            .resource::<PilotControls>()
+            .aileron_trim
+            .value()
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        world
+            .resource::<PilotControls>()
+            .rudder_trim
+            .value()
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
 }

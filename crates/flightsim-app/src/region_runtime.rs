@@ -694,12 +694,10 @@ pub(super) fn credits(manifest: &flightsim_content::Manifest) -> String {
 
 /// Inspect every source-selection stage without consuming a Start or changing
 /// a worker's generation, cancellation state or selected package.
-pub(super) fn jet_start_error(world: &World) -> Option<&'static str> {
+pub(super) fn bounded_start_error(world: &World) -> Option<&'static str> {
     let startup = world.resource::<Startup>();
     if startup.tiles.is_some() {
-        return Some(
-            "Jet flights support bundled global or flat-zero terrain; remove --tiles before starting",
-        );
+        return Some("Aircraft requires global or flat terrain\nRemove --tiles before starting");
     }
     let regional = startup.active_region.is_some()
         || startup.regions.select.is_some()
@@ -712,7 +710,13 @@ pub(super) fn jet_start_error(world: &World) -> Option<&'static str> {
                     || runtime.pending.is_some()
                     || runtime.ready.is_some()
             });
-    regional.then_some("Jet flights: regional terrain unsupported\nFlight and region are unchanged")
+    regional.then_some("Aircraft: regional terrain unsupported\nFlight and region are unchanged")
+}
+
+/// Compatibility name for existing jet callers; policy is shared by both
+/// explicitly bounded physical families.
+pub(super) fn jet_start_error(world: &World) -> Option<&'static str> {
+    bounded_start_error(world)
 }
 
 /// Resolve an explicit Start without changing the current flight. A package Start
@@ -720,7 +724,7 @@ pub(super) fn jet_start_error(world: &World) -> Option<&'static str> {
 pub(super) fn take_start(
     world: &mut World,
 ) -> Option<(WorldMapStart, Option<Arc<InstalledPackage>>)> {
-    let jet = world.resource::<Startup>().aircraft.is_jet();
+    let jet = world.resource::<Startup>().aircraft.uses_bounded_model();
     take_start_for_target(world, jet)
 }
 
@@ -733,9 +737,9 @@ pub(super) fn start_is_pending(world: &World) -> bool {
 /// Dispatch against the snapshotted target, never the previous active family.
 pub(super) fn take_start_for_target(
     world: &mut World,
-    target_is_jet: bool,
+    target_uses_bounded_model: bool,
 ) -> Option<(WorldMapStart, Option<Arc<InstalledPackage>>)> {
-    if target_is_jet && let Some(error) = jet_start_error(world) {
+    if target_uses_bounded_model && let Some(error) = jet_start_error(world) {
         world.resource_mut::<WorldMapState>().regions.error = error.into();
         return None;
     }
@@ -1011,7 +1015,7 @@ mod tests {
                 assert!(!cancel.load(Ordering::Relaxed));
                 let map = world.resource::<WorldMapState>();
                 assert!(map.visible);
-                assert!(map.navigation_note.starts_with("Jet flights"));
+                assert!(map.navigation_note.starts_with("Aircraft"));
                 if stage != 0 {
                     let rendered = flightsim_ui::world_map::format_world_map_text(
                         flightsim_ui::world_map::WorldMapText::Navigation,
@@ -1029,6 +1033,189 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn rejected_turboprop_map_start_preserves_all_regional_selection_stages() {
+        let temp = TestDirectory::new();
+        let package = Arc::new(imported(&temp));
+        for picker_target in [false, true] {
+            if picker_target && cfg!(feature = "commercial-staging") {
+                continue;
+            }
+            for stage in 0..7 {
+                let mut world = world(&temp);
+                let profile =
+                    flightsim_sim::aircraft_profile_v3::AircraftProfileV3::parse(include_str!(
+                        "../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+                    ))
+                    .unwrap();
+                world.resource_mut::<Startup>().aircraft =
+                    aircraft_profile::SelectedAircraftProfile::Turboprop(profile);
+                world.resource_mut::<Startup>().aircraft_choice = Some("controlled-v3.json".into());
+                world.resource_mut::<Startup>().model = None;
+                let request = start();
+                if picker_target {
+                    world.resource_mut::<Startup>().assets =
+                        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets"));
+                    crate::aircraft_picker_runtime::initialize(&mut world);
+                    // The snapshotted launch target stays turboprop even if the
+                    // current flight is a legacy aircraft.
+                    world.resource_mut::<Startup>().aircraft =
+                        aircraft_profile::SelectedAircraftProfile::builtin("swift-sport").unwrap();
+                }
+                let (sender, receiver) = mpsc::sync_channel(1);
+                let cancel = Arc::new(AtomicBool::new(false));
+                match stage {
+                    0 => world.resource_mut::<Startup>().tiles = Some(temp.0.join("raw-tiles")),
+                    1 => world.resource_mut::<Startup>().active_region = Some(Arc::clone(&package)),
+                    2 => world.resource_mut::<RegionRuntime>().selected = Some(KEY.into()),
+                    3 => {
+                        world.resource_mut::<RegionRuntime>().pending = Some(Worker {
+                            generation: 0,
+                            cancel: Arc::clone(&cancel),
+                            progress: Arc::new(Mutex::new(None)),
+                            receiver: Mutex::new(receiver),
+                        });
+                    }
+                    4 => {
+                        world.resource_mut::<RegionRuntime>().ready =
+                            Some((start(), Arc::clone(&package)));
+                    }
+                    5 => world.resource_mut::<RegionRuntime>().initial_selection = Some(KEY.into()),
+                    6 => world.resource_mut::<WorldMapState>().regions.selected = Some(KEY.into()),
+                    _ => unreachable!(),
+                }
+                let mut active_source = world.resource::<Startup>().clone();
+                active_source.aircraft =
+                    aircraft_profile::SelectedAircraftProfile::builtin("swift-sport").unwrap();
+                active_source.active_region = Some(Arc::clone(&package));
+                active_source.tiles = None;
+                let active = Simulation::parked(
+                    active_source.aircraft.configuration(),
+                    start().position,
+                    active_source.heading,
+                    Terrain::new(make_source(&active_source), 1024 * 1024, 9..=9),
+                    GroundSampler::default(),
+                );
+                world.resource_mut::<FlightSimulation>().0 = active.into();
+                world.resource_mut::<TerrainStreaming>().source = make_source(&active_source);
+                let source_height = |world: &World| {
+                    let tile = world
+                        .resource::<FlightSimulation>()
+                        .0
+                        .legacy()
+                        .unwrap()
+                        .terrain()
+                        .source()
+                        .load(TileId::new(9, 900, 180))
+                        .unwrap()
+                        .unwrap();
+                    tile.grid().sample_at(1, 1).get().to_bits()
+                };
+                let physical_height = source_height(&world);
+                assert_eq!(physical_height, 350.0_f64.to_bits());
+                let rendered_height = world
+                    .resource::<TerrainStreaming>()
+                    .source
+                    .load(TileId::new(9, 900, 180))
+                    .unwrap()
+                    .unwrap()
+                    .grid()
+                    .sample_at(1, 1)
+                    .get()
+                    .to_bits();
+                let before = *world.resource::<FlightSimulation>().0.state();
+                let startup = world.resource::<Startup>().clone();
+                let runtime = world.resource::<RegionRuntime>();
+                let generation = runtime.generation;
+                let selected = runtime.selected.clone();
+                let initial = runtime.initial_selection.clone();
+                let was_pending = runtime.pending.is_some();
+                let was_ready = runtime.ready.is_some();
+                world.resource_mut::<WorldMapActions>().start_at = Some(request);
+                world_runtime::apply_world_map_start(&mut world);
+                assert_eq!(
+                    world.resource::<WorldMapActions>().start_at,
+                    Some(request),
+                    "stage {stage}, picker target {picker_target}"
+                );
+                assert_eq!(*world.resource::<FlightSimulation>().0.state(), before);
+                assert_eq!(source_height(&world), physical_height);
+                assert_eq!(
+                    world
+                        .resource::<TerrainStreaming>()
+                        .source
+                        .load(TileId::new(9, 900, 180))
+                        .unwrap()
+                        .unwrap()
+                        .grid()
+                        .sample_at(1, 1)
+                        .get()
+                        .to_bits(),
+                    rendered_height
+                );
+
+                assert_eq!(world.resource::<Startup>().start, startup.start);
+                assert_eq!(world.resource::<Startup>().tiles, startup.tiles);
+                assert_eq!(
+                    world.resource::<Startup>().weather.selection,
+                    startup.weather.selection
+                );
+                assert_eq!(
+                    world
+                        .resource::<Startup>()
+                        .active_region
+                        .as_ref()
+                        .map(|p| p.identity()),
+                    startup.active_region.as_ref().map(|p| p.identity())
+                );
+                let runtime = world.resource::<RegionRuntime>();
+                assert_eq!(runtime.generation, generation);
+                assert_eq!(runtime.selected, selected);
+                assert_eq!(runtime.initial_selection, initial);
+                assert_eq!(runtime.pending.is_some(), was_pending);
+                assert_eq!(runtime.ready.is_some(), was_ready);
+                assert!(!cancel.load(Ordering::Relaxed));
+                let map = world.resource::<WorldMapState>();
+                assert!(map.visible);
+                assert!(map.navigation_note.starts_with("Aircraft"));
+                if stage != 0 {
+                    let rendered = flightsim_ui::world_map::format_world_map_text(
+                        flightsim_ui::world_map::WorldMapText::Navigation,
+                        map,
+                        &flightsim_ui::WorldMapRaster::default(),
+                    );
+                    assert_eq!(rendered, map.navigation_note);
+                    assert!(rendered.contains("regional terrain unsupported"));
+                    assert!(rendered.contains("Flight and region are unchanged"));
+                }
+                // Direct consumers share the guard and also retain the request.
+                assert!(take_start_for_target(&mut world, true).is_none());
+                assert_eq!(world.resource::<WorldMapActions>().start_at, Some(request));
+                drop(sender);
+            }
+        }
+    }
+    #[test]
+    fn turboprop_direct_preparation_cannot_erase_active_or_supplied_region() {
+        let temp = TestDirectory::new();
+        let package = Arc::new(imported(&temp));
+        let mut startup = world(&temp).resource::<Startup>().clone();
+        startup.aircraft = aircraft_profile::SelectedAircraftProfile::Turboprop(
+            flightsim_sim::aircraft_profile_v3::AircraftProfileV3::parse(include_str!(
+                "../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+            ))
+            .unwrap(),
+        );
+        startup.active_region = Some(Arc::clone(&package));
+        assert!(world_runtime::prepare_world_map_flight(startup.clone(), start(), None).is_err());
+        assert_eq!(
+            startup.active_region.as_ref().unwrap().identity(),
+            package.identity()
+        );
+        startup.active_region = None;
+        assert!(world_runtime::prepare_world_map_flight(startup, start(), Some(package)).is_err());
+    }
+
     #[test]
     fn late_region_inspection_cannot_activate_a_different_aircraft_or_request_generation() {
         let temp = TestDirectory::new();

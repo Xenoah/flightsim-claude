@@ -4,6 +4,7 @@ use flightsim_fdm::{AircraftConfig, RigidBodyState, definition::AircraftDefiniti
 use flightsim_input::{AxisState, ElevatorTrim, PilotControls, RampAxis};
 use flightsim_render::{ModelAxis, ModelFit};
 use flightsim_sim::aircraft_profile::{AircraftProfileV2, EngineSound};
+use flightsim_sim::aircraft_profile_v3::AircraftProfileV3;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::{Component, Path};
@@ -20,6 +21,7 @@ const MAX_PROFILE_BYTES: u64 = 128 * 1024;
 pub(super) enum SelectedAircraftProfile {
     Legacy(AircraftProfile),
     Jet(AircraftProfileV2),
+    Turboprop(AircraftProfileV3),
 }
 
 impl From<AircraftProfile> for SelectedAircraftProfile {
@@ -53,7 +55,7 @@ impl SelectedAircraftProfile {
         // Only the integer version is decoded here. Derived unknown-field
         // handling uses IgnoredAny, so physical/metadata number tokens are
         // skipped without f64 conversion, Value, or enum-content buffering.
-        // Both actual decoders receive the same original bounded bytes.
+        // Every actual decoder receives the same original bounded bytes.
         #[derive(Deserialize)]
         struct VersionProbe {
             version: u16,
@@ -71,6 +73,9 @@ impl SelectedAircraftProfile {
             2 => AircraftProfileV2::from_bytes(bytes)
                 .map(Self::Jet)
                 .map_err(|error| error.to_string()),
+            3 => AircraftProfileV3::from_bytes(bytes)
+                .map(Self::Turboprop)
+                .map_err(|error| error.to_string()),
             version => Err(format!("unsupported aircraft profile version {version}")),
         }
     }
@@ -79,6 +84,7 @@ impl SelectedAircraftProfile {
         match self {
             Self::Legacy(profile) => &profile.id,
             Self::Jet(profile) => profile.id(),
+            Self::Turboprop(profile) => profile.id(),
         }
     }
 
@@ -86,6 +92,7 @@ impl SelectedAircraftProfile {
         match self {
             Self::Legacy(profile) => &profile.dynamics.name,
             Self::Jet(profile) => profile.configuration().airframe().name(),
+            Self::Turboprop(profile) => profile.configuration().airframe().name(),
         }
     }
 
@@ -93,14 +100,15 @@ impl SelectedAircraftProfile {
         match self {
             Self::Legacy(profile) => &profile.model.path,
             Self::Jet(profile) => &profile.model().path,
+            Self::Turboprop(profile) => &profile.model().path,
         }
     }
 
     pub fn model_fit(&self) -> ModelFit {
         match self {
             Self::Legacy(profile) => profile.model_fit(),
-            Self::Jet(profile) => {
-                let model = profile.model();
+            Self::Jet(_) | Self::Turboprop(_) => {
+                let model = self.bounded_model().expect("bounded profile");
                 ModelFit::new(
                     ModelAxis::parse(&model.forward).expect("validated axis"),
                     ModelAxis::parse(&model.up).expect("validated axis"),
@@ -114,8 +122,8 @@ impl SelectedAircraftProfile {
     pub fn pilot_controls(&self, approach: bool) -> PilotControls {
         match self {
             Self::Legacy(profile) => profile.pilot_controls(approach),
-            Self::Jet(profile) => {
-                let controls = profile.controls();
+            Self::Jet(_) | Self::Turboprop(_) => {
+                let controls = self.bounded_controls().expect("bounded profile");
                 let mut result = PilotControls::default();
                 result.aileron =
                     AxisState::new(controls.surface_rate.get(), controls.centering_rate.get());
@@ -164,6 +172,7 @@ impl SelectedAircraftProfile {
         match self {
             Self::Legacy(profile) => profile.camera_eye_m.map(Meters),
             Self::Jet(profile) => profile.camera_eye(),
+            Self::Turboprop(profile) => profile.camera_eye(),
         }
     }
 
@@ -173,18 +182,56 @@ impl SelectedAircraftProfile {
             Self::Legacy(profile) => {
                 EngineKind::parse(&profile.engine_sound).expect("validated engine sound")
             }
-            Self::Jet(profile) => match profile.engine_sound() {
-                EngineSound::Piston => EngineKind::Piston(EngineSpec::default()),
-                EngineSound::Turbine => {
-                    let base = TurbineSpec::default();
-                    EngineKind::Turbine(TurbineSpec {
-                        afterburner_threshold: 1.0,
-                        afterburner_exhaust_speed: base.military_exhaust_speed,
-                        ..base
-                    })
+            Self::Jet(_) | Self::Turboprop(_) => {
+                match self.bounded_sound().expect("bounded profile") {
+                    EngineSound::Piston => EngineKind::Piston(EngineSpec::default()),
+                    EngineSound::Turbine => {
+                        let base = TurbineSpec::default();
+                        EngineKind::Turbine(TurbineSpec {
+                            afterburner_threshold: 1.0,
+                            afterburner_exhaust_speed: base.military_exhaust_speed,
+                            ..base
+                        })
+                    }
                 }
-            },
+            }
         }
+    }
+
+    fn bounded_model(&self) -> Option<&flightsim_sim::aircraft_profile::ModelDefinition> {
+        match self {
+            Self::Legacy(_) => None,
+            Self::Jet(profile) => Some(profile.model()),
+            Self::Turboprop(profile) => Some(profile.model()),
+        }
+    }
+
+    pub fn bounded_controls(&self) -> Option<&flightsim_sim::aircraft_profile::ControlDefinition> {
+        match self {
+            Self::Legacy(_) => None,
+            Self::Jet(profile) => Some(profile.controls()),
+            Self::Turboprop(profile) => Some(profile.controls()),
+        }
+    }
+
+    fn bounded_sound(&self) -> Option<EngineSound> {
+        match self {
+            Self::Legacy(_) => None,
+            Self::Jet(profile) => Some(profile.engine_sound()),
+            Self::Turboprop(profile) => Some(profile.engine_sound()),
+        }
+    }
+
+    pub fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy(_))
+    }
+
+    pub fn uses_bounded_model(&self) -> bool {
+        matches!(self, Self::Jet(_) | Self::Turboprop(_))
+    }
+
+    pub fn is_turboprop(&self) -> bool {
+        matches!(self, Self::Turboprop(_))
     }
 
     pub fn is_jet(&self) -> bool {
@@ -194,19 +241,26 @@ impl SelectedAircraftProfile {
     pub fn legacy(&self) -> Option<&AircraftProfile> {
         match self {
             Self::Legacy(profile) => Some(profile),
-            Self::Jet(_) => None,
+            Self::Jet(_) | Self::Turboprop(_) => None,
         }
     }
 
     pub fn jet(&self) -> Option<&AircraftProfileV2> {
         match self {
-            Self::Legacy(_) => None,
+            Self::Legacy(_) | Self::Turboprop(_) => None,
             Self::Jet(profile) => Some(profile),
         }
     }
 
+    pub fn turboprop(&self) -> Option<&AircraftProfileV3> {
+        match self {
+            Self::Legacy(_) | Self::Jet(_) => None,
+            Self::Turboprop(profile) => Some(profile),
+        }
+    }
+
     /// Compatibility helper for legacy simulation/replay paths. Callers must
-    /// dispatch jets first; a jet never fabricates a legacy propeller config.
+    /// dispatch bounded families first; neither fabricates a legacy config.
     pub fn configuration(&self) -> AircraftConfig {
         self.legacy()
             .expect("legacy configuration requires explicit profile dispatch")
@@ -223,8 +277,8 @@ impl SelectedAircraftProfile {
     ) -> RigidBodyState {
         match self {
             Self::Legacy(profile) => profile.approach_state(runway, distance, glideslope),
-            Self::Jet(profile) => {
-                let controls = profile.controls();
+            Self::Jet(_) | Self::Turboprop(_) => {
+                let controls = self.bounded_controls().expect("bounded profile");
                 let state = flightsim_sim::approach_state(
                     runway,
                     distance,
@@ -493,6 +547,8 @@ mod selection_tests {
 
     const JET_JSON: &str =
         include_str!("../../../docs/examples/aircraft-profiles-v2/numerical-jet.json");
+    const TURBOPROP_JSON: &str =
+        include_str!("../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json");
     const LEGACY_JSON: &str = include_str!("../../../assets/aircraft/light_single.json");
 
     #[test]
@@ -501,6 +557,9 @@ mod selection_tests {
             let selected = SelectedAircraftProfile::builtin(id).unwrap();
             let legacy = AircraftProfile::builtin(id).unwrap();
             assert!(!selected.is_jet());
+            assert!(!selected.is_turboprop());
+            assert!(selected.is_legacy());
+            assert!(!selected.uses_bounded_model());
             assert!(selected.legacy().is_some());
             assert!(selected.jet().is_none());
             assert_eq!(selected.id(), legacy.id);
@@ -556,6 +615,101 @@ mod selection_tests {
     }
 
     #[test]
+    fn external_v3_selection_dispatches_exactly_without_a_preset_or_model_asset() {
+        let selected = SelectedAircraftProfile::load(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+        ))
+        .unwrap();
+        assert!(selected.is_turboprop());
+        assert!(selected.uses_bounded_model());
+        assert!(!selected.is_jet());
+        assert!(!selected.is_legacy());
+        assert!(selected.jet().is_none());
+        assert!(selected.legacy().is_none());
+        assert_eq!(selected.id(), "numerical-turboprop-fixture");
+        assert_eq!(
+            selected.name(),
+            "Numerical turboprop fixture (original synthetic data)"
+        );
+        assert_eq!(
+            selected.model_path(),
+            "aircraft/unprovided_numerical_turboprop_fixture.glb"
+        );
+        assert_eq!(selected.model_fit().forward, ModelAxis::NegativeX);
+        assert_eq!(selected.model_fit().up, ModelAxis::PositiveY);
+        let profile = selected.turboprop().unwrap();
+        let aero = profile.configuration().aero().definition();
+        assert_eq!(
+            aero.knots[0].aero.pitch_rate_q.to_bits(),
+            0xc03e_6666_6666_6667
+        );
+        assert_eq!(
+            aero.knots[0].aero.yaw_rate_p.to_bits(),
+            (-0.0_f64).to_bits()
+        );
+        assert_eq!(
+            profile.running_start().turbine_fraction().get().to_bits(),
+            (-0.0_f64).to_bits()
+        );
+        assert_eq!(
+            profile.running_start().shaft_speed().get().to_bits(),
+            180.0_f64.to_bits()
+        );
+        assert_eq!(
+            profile.running_start().blade_pitch().get().to_bits(),
+            0.3_f64.to_bits()
+        );
+        assert!(SelectedAircraftProfile::builtin("numerical-turboprop-fixture").is_err());
+        assert!(SelectedAircraftProfile::builtin("cedar-turboprop").is_err());
+    }
+
+    #[test]
+    fn v3_dispatch_keeps_strict_schema_kind_revision_and_number_admission() {
+        for (old, new) in [
+            ("\"version\": 3", "\"version\": 3.0"),
+            ("\"version\": 3", "\"version\": 3e0"),
+            ("\"version\": 3", "\"version\": 2"),
+            ("\"revision\": 1", "\"revision\": 2"),
+            ("running_turboprop_table", "dry_jet_table"),
+            ("\"shaft_rad_s\": 180.0", "\"shaft_rad_s\": 1e9999"),
+            ("\"shaft_rad_s\": 180.0", "\"shaft_rad_s\": 1e-9999"),
+            (
+                "\"turbine_fraction\": -0.0",
+                "\"turbine_fraction\": -0.0, \"turbine_fraction\": 0.0",
+            ),
+            (
+                "\"blade_pitch_rad\": 0.3",
+                "\"blade_pitch_rad\": 0.3, \"unexpected\": 1",
+            ),
+        ] {
+            assert!(TURBOPROP_JSON.contains(old));
+            let invalid = TURBOPROP_JSON.replacen(old, new, 1);
+            assert!(
+                SelectedAircraftProfile::from_bytes(invalid.as_bytes()).is_err(),
+                "{new}"
+            );
+        }
+        assert!(
+            SelectedAircraftProfile::from_bytes(format!("{TURBOPROP_JSON} null").as_bytes())
+                .is_err()
+        );
+        let mut bytes = TURBOPROP_JSON.as_bytes().to_vec();
+        bytes.resize(flightsim_sim::aircraft_profile_v3::MAX_PROFILE_BYTES, b' ');
+        assert!(
+            SelectedAircraftProfile::from_bytes(&bytes)
+                .unwrap()
+                .is_turboprop()
+        );
+        bytes.push(b' ');
+        assert!(
+            SelectedAircraftProfile::from_bytes(&bytes)
+                .unwrap_err()
+                .contains("1 MiB")
+        );
+    }
+
+    #[test]
     fn dispatch_keeps_distinct_exact_v2_and_ordinary_v1_numeric_bits() {
         let selected = SelectedAircraftProfile::from_bytes(JET_JSON.as_bytes()).unwrap();
         let aero = selected.jet().unwrap().configuration().aero().definition();
@@ -589,57 +743,59 @@ mod selection_tests {
     }
 
     #[test]
-    fn jet_metadata_adapter_retains_exact_numbers_signed_zero_and_subnormals() {
-        // Just above the halfway point between 1 and its next binary64 value.
-        let halfway_above = "1.00000000000000011102230246251565404236316680908203126";
-        // Exercise both checkout styles without parsing or reserializing numbers.
-        for newline in ["\n", "\r\n"] {
-            let mut json = JET_JSON.replace("\r\n", "\n").replace('\n', newline);
-            for (before, after) in [
-                (
-                    "\"length_m\": 8.3",
-                    format!("\"length_m\": {halfway_above}"),
-                ),
-                (
-                    "\"surface_rate\": 2.5",
-                    format!("\"surface_rate\": {halfway_above}"),
-                ),
-                (
-                    "\"default_trim\": 0.09",
-                    "\"default_trim\": -0.0".to_owned(),
-                ),
-                (
-                    "    0.6,\n    -0.25,\n    -0.9",
-                    "    -0.0,\n    4.9406564584124654e-324,\n    -0.9".to_owned(),
-                ),
-            ] {
-                let before = before.replace('\n', newline);
-                let after = after.replace('\n', newline);
+    fn bounded_metadata_adapter_retains_exact_numbers_signed_zero_and_subnormals() {
+        for fixture in [JET_JSON, TURBOPROP_JSON] {
+            // Just above the halfway point between 1 and its next binary64 value.
+            let halfway_above = "1.00000000000000011102230246251565404236316680908203126";
+            // Exercise both checkout styles without parsing or reserializing numbers.
+            for newline in ["\n", "\r\n"] {
+                let mut json = fixture.replace("\r\n", "\n").replace('\n', newline);
+                for (before, after) in [
+                    (
+                        "\"length_m\": 8.3",
+                        format!("\"length_m\": {halfway_above}"),
+                    ),
+                    (
+                        "\"surface_rate\": 2.5",
+                        format!("\"surface_rate\": {halfway_above}"),
+                    ),
+                    (
+                        "\"default_trim\": 0.09",
+                        "\"default_trim\": -0.0".to_owned(),
+                    ),
+                    (
+                        "    0.6,\n    -0.25,\n    -0.9",
+                        "    -0.0,\n    4.9406564584124654e-324,\n    -0.9".to_owned(),
+                    ),
+                ] {
+                    let before = before.replace('\n', newline);
+                    let after = after.replace('\n', newline);
+                    assert_eq!(
+                        json.matches(&before).count(),
+                        1,
+                        "missing fixture: {before:?}"
+                    );
+                    json = json.replacen(&before, &after, 1);
+                    assert!(!json.contains(&before));
+                    assert!(json.contains(&after));
+                }
+                let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
                 assert_eq!(
-                    json.matches(&before).count(),
-                    1,
-                    "missing fixture: {before:?}"
+                    selected.model_fit().target_length.get().to_bits(),
+                    0x3ff0_0000_0000_0001
                 );
-                json = json.replacen(&before, &after, 1);
-                assert!(!json.contains(&before));
-                assert!(json.contains(&after));
+                assert_eq!(
+                    selected.pilot_controls(false).aileron,
+                    AxisState::new(f64::from_bits(0x3ff0_0000_0000_0001), 1.8)
+                );
+                assert_eq!(
+                    selected.pilot_controls(false).trim.value().to_bits(),
+                    (-0.0_f64).to_bits()
+                );
+                let eye = selected.camera_eye();
+                assert_eq!(eye[0].get().to_bits(), (-0.0_f64).to_bits());
+                assert_eq!(eye[1].get().to_bits(), 1);
             }
-            let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
-            assert_eq!(
-                selected.model_fit().target_length.get().to_bits(),
-                0x3ff0_0000_0000_0001
-            );
-            assert_eq!(
-                selected.pilot_controls(false).aileron,
-                AxisState::new(f64::from_bits(0x3ff0_0000_0000_0001), 1.8)
-            );
-            assert_eq!(
-                selected.pilot_controls(false).trim.value().to_bits(),
-                (-0.0_f64).to_bits()
-            );
-            let eye = selected.camera_eye();
-            assert_eq!(eye[0].get().to_bits(), (-0.0_f64).to_bits());
-            assert_eq!(eye[1].get().to_bits(), 1);
         }
     }
 
@@ -724,67 +880,75 @@ mod selection_tests {
     }
 
     #[test]
-    fn jet_input_defaults_optional_pitch_rates_and_approach_pose_are_applied() {
-        use flightsim_core::{Degrees, NauticalMiles};
-        for newline in ["\n", "\r\n"] {
-            let mut json = JET_JSON.replace("\r\n", "\n").replace('\n', newline);
-            for optional_field in [
-                "    \"elevator_rate\": 0.25,\n",
-                "    \"elevator_centering_rate\": 5.0,\n",
-            ] {
-                let optional_field = optional_field.replace('\n', newline);
-                assert_eq!(json.matches(&optional_field).count(), 1);
-                json = json.replacen(&optional_field, "", 1);
-                assert!(!json.contains(&optional_field));
+    fn bounded_input_defaults_optional_pitch_rates_and_approach_pose_are_applied() {
+        for fixture in [JET_JSON, TURBOPROP_JSON] {
+            use flightsim_core::{Degrees, NauticalMiles};
+            for newline in ["\n", "\r\n"] {
+                let mut json = fixture.replace("\r\n", "\n").replace('\n', newline);
+                for optional_field in [
+                    "    \"elevator_rate\": 0.25,\n",
+                    "    \"elevator_centering_rate\": 5.0,\n",
+                ] {
+                    let optional_field = optional_field.replace('\n', newline);
+                    assert_eq!(json.matches(&optional_field).count(), 1);
+                    json = json.replacen(&optional_field, "", 1);
+                    assert!(!json.contains(&optional_field));
+                }
+                let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
+                let parked = selected.pilot_controls(false);
+                assert_eq!(parked.elevator, AxisState::new(2.5, 1.8));
+                assert_eq!(parked.throttle.value().to_bits(), 0.0_f64.to_bits());
+                assert_eq!(parked.flaps.value().to_bits(), 0.0_f64.to_bits());
+                assert_eq!(parked.trim.value().to_bits(), 0.09_f64.to_bits());
+                let approach = selected.pilot_controls(true);
+                assert_eq!(
+                    approach.throttle.value().to_bits(),
+                    0.39155148_f64.to_bits()
+                );
+                assert_eq!(approach.flaps.value().to_bits(), 1.0_f64.to_bits());
+                assert_eq!(approach.trim.value().to_bits(), 0.15570889_f64.to_bits());
+                let runway = flightsim_world::Runway::synthetic();
+                let distance = NauticalMiles(1.5).to_meters();
+                let glideslope = Degrees(3.0).to_radians();
+                let state = selected.approach_state(&runway, distance, glideslope);
+                let expected = flightsim_sim::approach_state(
+                    &runway,
+                    distance,
+                    glideslope,
+                    MetersPerSecond(35.0),
+                );
+                assert!((state.position.0 - expected.position.0).length() < 1e-6);
+                assert!((state.velocity - expected.velocity).length() < 1e-9);
+                assert!((state.attitude().pitch.get() - -0.07269918).abs() < 1e-9);
             }
-            let selected = SelectedAircraftProfile::from_bytes(json.as_bytes()).unwrap();
-            let parked = selected.pilot_controls(false);
-            assert_eq!(parked.elevator, AxisState::new(2.5, 1.8));
-            assert_eq!(parked.throttle.value().to_bits(), 0.0_f64.to_bits());
-            assert_eq!(parked.flaps.value().to_bits(), 0.0_f64.to_bits());
-            assert_eq!(parked.trim.value().to_bits(), 0.09_f64.to_bits());
-            let approach = selected.pilot_controls(true);
-            assert_eq!(
-                approach.throttle.value().to_bits(),
-                0.39155148_f64.to_bits()
-            );
-            assert_eq!(approach.flaps.value().to_bits(), 1.0_f64.to_bits());
-            assert_eq!(approach.trim.value().to_bits(), 0.15570889_f64.to_bits());
-            let runway = flightsim_world::Runway::synthetic();
-            let distance = NauticalMiles(1.5).to_meters();
-            let glideslope = Degrees(3.0).to_radians();
-            let state = selected.approach_state(&runway, distance, glideslope);
-            let expected =
-                flightsim_sim::approach_state(&runway, distance, glideslope, MetersPerSecond(35.0));
-            assert!((state.position.0 - expected.position.0).length() < 1e-6);
-            assert!((state.velocity - expected.velocity).length() < 1e-9);
-            assert!((state.attitude().pitch.get() - -0.07269918).abs() < 1e-9);
         }
     }
 
     #[test]
-    fn jet_turbine_sound_is_dry_at_every_accepted_throttle() {
-        let selected = SelectedAircraftProfile::from_bytes(JET_JSON.as_bytes()).unwrap();
-        let flightsim_audio::EngineKind::Turbine(spec) = selected.engine_kind() else {
-            panic!("fixture declares turbine sound");
-        };
-        for throttle in [0.0, 0.5, 0.9, 0.99, 1.0] {
-            assert_eq!(
-                spec.afterburner_fraction(throttle).to_bits(),
-                0.0_f64.to_bits()
+    fn bounded_turbine_sound_is_dry_at_every_accepted_throttle() {
+        for fixture in [JET_JSON, TURBOPROP_JSON] {
+            let selected = SelectedAircraftProfile::from_bytes(fixture.as_bytes()).unwrap();
+            let flightsim_audio::EngineKind::Turbine(spec) = selected.engine_kind() else {
+                panic!("fixture declares turbine sound");
+            };
+            for throttle in [0.0, 0.5, 0.9, 0.99, 1.0] {
+                assert_eq!(
+                    spec.afterburner_fraction(throttle).to_bits(),
+                    0.0_f64.to_bits()
+                );
+                assert!(spec.exhaust_speed(throttle) <= spec.military_exhaust_speed);
+            }
+            let piston = fixture.replace(
+                "\"engine_sound\": \"turbine\"",
+                "\"engine_sound\": \"piston\"",
             );
-            assert!(spec.exhaust_speed(throttle) <= spec.military_exhaust_speed);
+            let selected = SelectedAircraftProfile::from_bytes(piston.as_bytes()).unwrap();
+            assert!(selected.uses_bounded_model());
+            assert!(matches!(
+                selected.engine_kind(),
+                flightsim_audio::EngineKind::Piston(_)
+            ));
         }
-        let piston = JET_JSON.replace(
-            "\"engine_sound\": \"turbine\"",
-            "\"engine_sound\": \"piston\"",
-        );
-        let selected = SelectedAircraftProfile::from_bytes(piston.as_bytes()).unwrap();
-        assert!(selected.is_jet());
-        assert!(matches!(
-            selected.engine_kind(),
-            flightsim_audio::EngineKind::Piston(_)
-        ));
     }
 }
 

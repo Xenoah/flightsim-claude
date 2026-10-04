@@ -47,11 +47,9 @@ pub struct ReplayBannerPanel;
 /// warning, including N/A. A narrow viewport stacks the notice below the HUD
 /// instead of shrinking, clipping, or covering critical instrument text.
 /// Schedule after `spawn_hud`; standalone use without a HUD remains supported.
-pub fn spawn_replay_banner(mut commands: Commands, hud: Query<&ChildOf, With<crate::HudText>>) {
-    if let Ok(hud) = hud.single() {
-        commands
-            .entity(hud.parent())
-            .with_children(spawn_banner_content);
+pub fn spawn_replay_banner(mut commands: Commands, side: Query<Entity, With<crate::HudSide>>) {
+    if let Ok(side) = side.single() {
+        commands.entity(side).with_children(spawn_banner_content);
     } else {
         commands
             .spawn(Node {
@@ -70,6 +68,7 @@ fn spawn_banner_content(top: &mut ChildSpawnerCommands) {
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
         Node {
             display: Display::None,
+            grid_row: GridPlacement::start(1),
             flex_basis: Val::Px(240.0),
             flex_grow: 1.0,
             flex_shrink: 0.0,

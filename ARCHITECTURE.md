@@ -135,6 +135,11 @@ pub struct Radians(pub f64);
   frames and frozen states create no input/recording steps. Crash/divergence ends
   the current frame at once; reports and physical time count only executed steps,
   and the remaining terminal frame budget is discarded (ADR-0004).
+- Pilot-owned lateral trims start at zero and hold only explicit J/L, U/O input;
+  Shift selects fine adjustment and K resets both. Fixed-step proposals include
+  those settings and record the effective surfaces. Zero trim bypasses new
+  arithmetic; focus/map/pause release retains settings and new flight/restart
+  resets them. No profile schema or automatic torque compensation is added.
 - Replay aircraft identity includes the FDM model revision as well as configuration.
   New legacy-aircraft app recordings use complete identity in v3. Old-physics identities remain
   rejected; v1/v2 partial evidence requires explicit supported-baseline opt-in and
@@ -163,9 +168,12 @@ pub struct Radians(pub f64);
   Its separate pure host and [replay v5](docs/replay-v5.md) preserve complete
   endpoints, controller/clock/contact history and exact report provenance.
   Seek reconstructs from frame zero within 240 attempts, including terminal
-  probes. This does not select a new app aircraft or reuse replay v1–v4 for
-  engine state. App integration and authored flight checks are required before
-  exposing a turboprop preset. See
+  probes. Explicit external profile-v3 app selection owns a typed live simulation
+  or one full-state v5 replay player. The body-only render bridge does not discard
+  engine state. No turboprop preset is exposed until authored qualification;
+  commercial staging remains Swift-only. Read-only presentation and explicit
+  lateral trim are described in [app integration](docs/turboprop-native-app.md).
+  Existing replay v1–v4 never substitutes for full-state recording. See
   [ADR-0018](docs/adr/0018-bounded-running-turboprop.md) and
   [ADR-0019](docs/adr/0019-turboprop-full-state-replay-v5.md).
 - ストリーミングは1フレームの処理量に上限を持つ（フレームスパイク防止）。
@@ -411,6 +419,12 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 | `flightsim-audio` | 出力に連動するエンジン音、対気速度に連動する風切り音、迎角で鳴る失速警報 |
 | `flightsim-net` | 決定論的な合成交通、補間、bounded UDP の作成・参加・退出・再接続 |
 | `flightsim-app` | 上記の統合、合成飛行場または OSM の最寄り滑走路と 15 km 圏の地上設備、風・乱流・時刻・雲層・着陸練習、2 機体 profile、難易度、同一 build replay、windowed/offscreen capture CLI |
+
+HUD instruments and the notice/help/log column share one measured body above
+the wrapping attribution footer. Small windows retain flight-control keys in a
+compact reference, with complete aircraft guidance available in the existing
+paused state. Instrument, notice and help font sizes remain unchanged. See
+[ADR-0021](docs/adr/0021-measured-flight-help-layout.md).
 
 雲描画は独立した Off / Light / High / Ultra 設定を持つ（F3、Shift+F3 で Light）。
 Light は従来の 2 枚の PBR 平面・256² マスク・雲中 fog を保ち、マスクの雲量を

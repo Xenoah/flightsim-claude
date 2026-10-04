@@ -211,14 +211,11 @@ fn select_pending_weather(
     map.weather_note = if replay {
         let label = simulation
             .as_ref()
-            .and_then(|simulation| simulation.0.jet_environment())
+            .and_then(|simulation| simulation.0.weather_selection())
             .map_or_else(
                 || crate::cloud_runtime::source_label(&startup),
                 |environment| {
-                    crate::cloud_runtime::effective_source_label(
-                        Some(environment.weather),
-                        Some(&startup),
-                    )
+                    crate::cloud_runtime::effective_source_label(Some(environment), Some(&startup))
                 },
             );
         format!("{label} | recorded weather\nNew-flight weather selection unavailable")
@@ -238,21 +235,18 @@ pub(super) fn publish_weather(
     playback: Option<Res<ReplayPlayback>>,
     mut weather: ResMut<RenderWeather>,
 ) {
-    let selection = simulation.0.jet_environment().map_or_else(
-        || {
-            playback.as_ref().map_or_else(
-                || {
-                    startup
-                        .as_ref()
-                        .map_or(WeatherSelection::Legacy, |startup| {
-                            startup.weather.selection
-                        })
-                },
-                |playback| playback.player.recording().weather(),
-            )
-        },
-        |environment| environment.weather,
-    );
+    let selection = simulation.0.weather_selection().unwrap_or_else(|| {
+        playback.as_ref().map_or_else(
+            || {
+                startup
+                    .as_ref()
+                    .map_or(WeatherSelection::Legacy, |startup| {
+                        startup.weather.selection
+                    })
+            },
+            |playback| playback.player.recording().weather(),
+        )
+    });
     let next = RenderWeather {
         selection,
         elapsed: simulation.0.elapsed(),
@@ -275,6 +269,91 @@ mod tests {
     use flightsim_input::PilotKeys;
     use flightsim_world::{DemTile, HeightGrid, MemoryTileSource, Terrain, TileId};
     use std::time::Duration;
+
+    #[test]
+    #[cfg(not(feature = "commercial-staging"))]
+    fn typed_v5_player_publishes_recorded_weather_and_rejects_pending_change() {
+        let mut startup = crate::turboprop_lifecycle_tests::startup();
+        let initial = crate::FlightSession::prepare_bounded(
+            &startup,
+            &flightsim_render::TimeOfDay::default(),
+            crate::turboprop_lifecycle_tests::start(),
+        )
+        .unwrap();
+        let expected = WeatherSelection::Modeled(
+            WeatherScenario::from_preset(WeatherPreset::Snow, initial.state().geodetic(), 919)
+                .unwrap(),
+        );
+        let simulation =
+            flightsim_sim::turboprop_simulation::TurbopropSimulation::from_supported_state(
+                startup
+                    .aircraft
+                    .turboprop()
+                    .unwrap()
+                    .configuration()
+                    .clone(),
+                *initial.turboprop().unwrap().state(),
+                flightsim_sim::turboprop_simulation::TurbopropEnvironment {
+                    weather: expected,
+                    ..default()
+                },
+                flightsim_fdm::ControlInputs::neutral(),
+            )
+            .unwrap();
+        let record = flightsim_sim::replay_v5::TurbopropRecorder::new(&simulation)
+            .unwrap()
+            .finish();
+        let player = flightsim_sim::replay_v5::TurbopropReplayPlayer::new(
+            startup
+                .aircraft
+                .turboprop()
+                .unwrap()
+                .configuration()
+                .clone(),
+            record,
+        )
+        .unwrap();
+        startup.weather.requested = Some(WeatherPreset::Clear);
+        startup.weather.selection = WeatherSelection::Legacy;
+        let mut world = World::new();
+        world.insert_resource(startup);
+        world.insert_resource(FlightSimulation(crate::FlightSession::replay_turboprop(
+            player,
+        )));
+        world.init_resource::<RenderWeather>();
+        world.init_resource::<WorldMapState>();
+        world.resource_mut::<WorldMapState>().visible = true;
+        world.init_resource::<world_runtime::MapCapture>();
+        world.resource_mut::<world_runtime::MapCapture>().captured = true;
+        world.init_resource::<WorldMapActions>();
+        world
+            .resource_mut::<WorldMapActions>()
+            .new_flight_shortcuts_available = true;
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F12);
+        world.init_resource::<PendingWeather>();
+        world.run_system_once(select_pending_weather).unwrap();
+        world.run_system_once(publish_weather).unwrap();
+        assert_eq!(world.resource::<RenderWeather>().selection, expected);
+        assert_eq!(
+            world.resource::<PendingWeather>().requested,
+            Some(WeatherPreset::Clear)
+        );
+        assert!(
+            world
+                .resource::<WorldMapState>()
+                .weather_note
+                .starts_with("MODELED SNOW")
+        );
+        assert!(
+            world
+                .resource::<WorldMapState>()
+                .weather_note
+                .contains("recorded weather")
+        );
+    }
 
     #[test]
     fn jet_replay_publishes_recorded_weather_and_blocks_pending_selection() {

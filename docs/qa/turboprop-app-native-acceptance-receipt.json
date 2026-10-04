@@ -1,0 +1,123 @@
+{
+  "date_utc": "2026-10-04",
+  "status": "scoped native app acceptance passed",
+  "reviewed_source": "a416af1112ee5765f453d157263013366c2d5639",
+  "final_runtime_source": "0b1e973ebbbee36a29ba26b2710e60a7dbecfdac",
+  "final_binary_sha256": "00ad54410c76c882653730ceee849a4600eb243987d5635deab878db69f48788",
+  "native_environment": "Linux cloud desktop, CPU llvmpipe, optimized dev build with region-downloads; no hardware-GPU or frame-performance claim",
+  "native_cases": [
+    32,
+    34,
+    35,
+    36,
+    38
+  ],
+  "superseded_or_uncredited": {
+    "33": "Intermediate help placement and transparent pause panel, corrected before acceptance",
+    "37": "Operator used unknown --aircraft-profile flag; pre-scene exit2, corrected to documented --aircraft FILE"
+  },
+  "swift": {
+    "swift_frames": 178120,
+    "swift_stored_checkpoints": 1487,
+    "swift_rewind_all_frame_state_comparisons": 178126,
+    "swift_final_state_limit": "V3 does not store final checkpoints for these files. All 1487 stored 104-byte states match, and all 178126 reconstructed states including initial states match the rewind. Final uncheckpointed tails are determinism evidence, not comparison with an independently stored native final state."
+  },
+  "cedar": {
+    "cedar_frames": 20617,
+    "cedar_stored_checkpoints": 172
+  },
+  "evidence_pack_files": [
+    {
+      "path": "expansion/logs/help-layout-before-32.json",
+      "bytes": 1499,
+      "sha256": "ebe499d000ea3eb7eac54d3e651904ff1bcd593749e48e68b9669e0ecec13605"
+    },
+    {
+      "path": "expansion/logs/help-layout-clear-scene-34.json",
+      "bytes": 1486,
+      "sha256": "71dbc38d61b8fbaa05555cb75c2b421c330916886eaefb629497c612309d08b1"
+    },
+    {
+      "path": "expansion/logs/turboprop-app-native-35.json",
+      "bytes": 1610,
+      "sha256": "8671da1575a489f07ad544c71d7d1f101fd063a0de754ede6dfaefb2946522a0"
+    },
+    {
+      "path": "expansion/logs/trim-reset-native-36.json",
+      "bytes": 1467,
+      "sha256": "215b565f6f6e612caa78792eda34652e23c971e986eaed45182b44885ec2f3e7"
+    },
+    {
+      "path": "expansion/logs/turboprop-replay-native-38.json",
+      "bytes": 1636,
+      "sha256": "27a7eb28c0144251177037338246c47d0be07e0efb4fff26b9c739f172e1c9e4"
+    },
+    {
+      "path": "expansion/captures/help-layout-before-32.png",
+      "bytes": 977902,
+      "sha256": "214704154c737c7849080de3584c4a035a14b24accf81d02a52f811823ea6b5a"
+    },
+    {
+      "path": "expansion/captures/help-layout-clear-scene-34.png",
+      "bytes": 987773,
+      "sha256": "2f93ba5aefa36e5efbf491f5a2525bd54fc07c45688a6954c655dd0f39c6317b"
+    },
+    {
+      "path": "expansion/captures/turboprop-app-native-35.png",
+      "bytes": 960543,
+      "sha256": "f26fd2724ebe09460b7a9030c742ca7286c35e6d8b503c30916c5d63317f0cec"
+    },
+    {
+      "path": "expansion/captures/trim-reset-native-36.png",
+      "bytes": 985616,
+      "sha256": "a9d4dc8f5b100bc148f5359aa9754b98bdeefca393aeb8a73af6702b03a7e7d7"
+    },
+    {
+      "path": "expansion/captures/turboprop-replay-native-38.png",
+      "bytes": 930945,
+      "sha256": "58c61e5f3c0b2e00a97ea30e6747d4b4fee07c28cbeccb3d2e1d2b1d75de6857"
+    },
+    {
+      "path": "mod-foundations/native-replay-independent-review/acceptance.json",
+      "bytes": 29597,
+      "sha256": "e2cf3f6887f0cf6895795853145bd9e708e9fd2b4c8e0709c8e523eb30e0dde8"
+    },
+    {
+      "path": "mod-foundations/native-replay-independent-review/source-binding.json",
+      "bytes": 25516,
+      "sha256": "3309a02ec713bf1377092294b070c101a9af6579ffb45315354c5389288ec736"
+    },
+    {
+      "path": "mod-foundations/native-replay-independent-review/swift-runtime-results.jsonl",
+      "bytes": 13564,
+      "sha256": "c5532840627c5a91a76f054f253926b149d53364caafcff4117c1972cda8b580"
+    },
+    {
+      "path": "mod-foundations/native-replay-independent-review/swift_replay_probe.rs",
+      "bytes": 7040,
+      "sha256": "b7df996851943fa3cf6dd4fbad5813421f6fdca1df062f11a1469569dca94f3c"
+    },
+    {
+      "path": "mod-foundations/app-help-native-build/independent-input-107.log",
+      "bytes": 9013,
+      "sha256": "2bd0ea63b6d1aa363682170f2c1fbe8a03941aa3cf527f114c65850d3f53015f"
+    },
+    {
+      "path": "mod-foundations/app-help-native-36/native-result.json",
+      "bytes": 726,
+      "sha256": "872a23dccc26ca0f4b82d278540e439e58e84ffaea3762627347278ba5aab360"
+    },
+    {
+      "path": "mod-foundations/turboprop-replay-native-38/native-result.json",
+      "bytes": 2870,
+      "sha256": "2e6091debbe453bc3248e4b164ba37d651c4e8f3c4df52ff7a5197ccd118355f"
+    }
+  ],
+  "limitations": [
+    "Cedar is an explicitly selected experimental profile, absent from picker and commercial candidate",
+    "Static rotor, generic synthetic audio; no acoustic or real-aircraft fidelity claim",
+    "Native flight stayed within law1 support but was manually trimmed, not hands-off handling qualification",
+    "Small world-map modal still overflows at640x480; separate fix pending",
+    "Exact new-head Windows qualification and binary rights gates remain independent"
+  ]
+}

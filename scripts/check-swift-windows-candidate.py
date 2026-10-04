@@ -102,6 +102,19 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-ui/src/wind_settings_tests.rs",
     "crates/flightsim-sim/tests/wind_force_contract.rs",
     "crates/flightsim-sim/tests/wind_replay_rewind.rs",
+    # The development-only turboprop entry points own admission before any
+    # source/session read. Explicit lateral trim also runs on the Swift path;
+    # its zero-bias compatibility and input schema witnesses remain required.
+    "crates/flightsim-app/src/turboprop_session.rs",
+    "crates/flightsim-app/src/turboprop_runtime_tests.rs",
+    "crates/flightsim-app/src/turboprop_lifecycle_tests.rs",
+    "crates/flightsim-input/src/lib.rs",
+    "crates/flightsim-input/src/lateral_trim_regression.rs",
+    "crates/flightsim-input/tests/fixtures/legacy-input-v1.json",
+    # The full reference now delegates to a scrollable pause panel. Bind that
+    # implementation and the actual wrapped-footer layout witness together.
+    "crates/flightsim-ui/src/pause.rs",
+    "crates/flightsim-ui/src/attribution_layout_tests.rs",
 }
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.

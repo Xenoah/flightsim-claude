@@ -70,6 +70,7 @@ mod distance_runtime;
 mod distribution;
 mod flight_session;
 mod graphics_runtime;
+mod turboprop_session;
 use flight_session::{FlightSession, PreparedJetSession};
 mod conditions_runtime;
 mod region_runtime;
@@ -91,6 +92,10 @@ mod replay_migration_tests;
 #[cfg(test)]
 mod runtime_tests;
 mod traffic_runtime;
+#[cfg(all(test, not(feature = "commercial-staging")))]
+mod turboprop_lifecycle_tests;
+#[cfg(all(test, not(feature = "commercial-staging")))]
+mod turboprop_runtime_tests;
 mod world_runtime;
 
 /// 進入練習を始めるときのスロットル。
@@ -599,18 +604,31 @@ fn main() -> bevy::app::AppExit {
         std::process::exit(2);
     }
     let replay_requested = startup.replay.is_some();
-    let (recording, jet_player) = if startup.aircraft.is_jet() {
+    let (recording, jet_player, turboprop_player) = if startup.aircraft.is_jet() {
         match flight_session::resolve_jet_sources(&mut startup, &mut diagnostics) {
-            Ok(player) => (None, player),
+            Ok(player) => (None, player, None),
             Err(error) => {
                 eprintln!("cannot start jet: {error}");
                 return bevy::app::AppExit::error();
             }
         }
+    } else if startup.aircraft.is_turboprop() {
+        match turboprop_session::resolve_sources(&mut startup, &mut diagnostics) {
+            Ok(player) => (None, None, player),
+            Err(error) => {
+                eprintln!("cannot start turboprop: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
     } else {
-        (resolve_flight_sources(&mut startup, &mut diagnostics), None)
+        (
+            resolve_flight_sources(&mut startup, &mut diagnostics),
+            None,
+            None,
+        )
     };
-    if replay_requested && recording.is_none() && jet_player.is_none() {
+    if replay_requested && recording.is_none() && jet_player.is_none() && turboprop_player.is_none()
+    {
         eprintln!("cannot start replay: {}", diagnostics.0.join("; "));
         std::process::exit(2);
     }
@@ -646,16 +664,28 @@ fn main() -> bevy::app::AppExit {
         {
             clock.utc = flightsim_render::JulianDate(recording.environment().start_epoch);
         }
-        if let Some(player) = &jet_player {
-            let epoch = player
-                .recording()
-                .conditions()
-                .environment
-                .conditions
-                .start_epoch;
-            if epoch > 0.0 {
-                clock.utc = flightsim_render::JulianDate(epoch);
-            }
+        let bounded_epoch = jet_player
+            .as_ref()
+            .map(|player| {
+                player
+                    .recording()
+                    .conditions()
+                    .environment
+                    .conditions
+                    .start_epoch
+            })
+            .or_else(|| {
+                turboprop_player.as_ref().map(|player| {
+                    player
+                        .recording()
+                        .conditions()
+                        .environment
+                        .conditions
+                        .start_epoch
+                })
+            });
+        if let Some(epoch) = bounded_epoch.filter(|epoch| *epoch > 0.0) {
+            clock.utc = flightsim_render::JulianDate(epoch);
         }
         clock
     };
@@ -690,6 +720,7 @@ fn main() -> bevy::app::AppExit {
     };
     if recording.is_none()
         && jet_player.is_none()
+        && turboprop_player.is_none()
         && let Err(error) = weather_runtime::resolve_departure(&mut startup)
     {
         eprintln!("{error}");
@@ -697,12 +728,23 @@ fn main() -> bevy::app::AppExit {
     }
     let clouds = startup.clouds;
     let engine_sound = startup.engine_sound;
-    let conditions = (!startup.aircraft.is_jet()).then(|| recording_conditions(&startup, &clock));
-    let jet_session = if startup.aircraft.is_jet() {
+    let conditions = startup
+        .aircraft
+        .is_legacy()
+        .then(|| recording_conditions(&startup, &clock));
+    let bounded_session = if startup.aircraft.is_jet() {
         match flight_session::prepare_startup(&startup, &clock, jet_player) {
             Ok(session) => Some(session),
             Err(error) => {
                 eprintln!("cannot prepare jet flight: {error}");
+                return bevy::app::AppExit::error();
+            }
+        }
+    } else if startup.aircraft.is_turboprop() {
+        match turboprop_session::prepare_startup(&startup, &clock, turboprop_player) {
+            Ok(session) => Some(session),
+            Err(error) => {
+                eprintln!("cannot prepare turboprop flight: {error}");
                 return bevy::app::AppExit::error();
             }
         }
@@ -753,11 +795,7 @@ fn main() -> bevy::app::AppExit {
     } else {
         flightsim_ui::TutorialState::default()
     };
-    let guidance = if startup.aircraft.is_jet() {
-        flight_session::jet_guidance()
-    } else {
-        flightsim_ui::FlightGuidance::default()
-    };
+    let guidance = flight_session::guidance_for(&startup.aircraft);
     let mut app = App::new();
     app.add_plugins(plugins)
         .add_plugins((
@@ -908,7 +946,7 @@ fn main() -> bevy::app::AppExit {
             conditions,
         )));
     }
-    if let Some(session) = jet_session {
+    if let Some(session) = bounded_session {
         app.insert_resource(PreparedJetSession(Some(session)));
     }
     if let Some(playback) = playback {
@@ -952,7 +990,7 @@ fn application_help() -> &'static str {
 --cloud-cover 0..1 --cloud-base M --cloud-top M --cloud-visibility M\n\
 --engine turbine|piston                        Sound override\n\
 --model ASSET.glb --model-forward AXIS --model-up AXIS | --no-model\n\
---replay FILE.fsreplay                          Replay selected aircraft (complete v3 identity)\n\
+--replay FILE.fsreplay                          Replay matching aircraft (legacy v3 / jet v4 / turboprop v5)\n\
 --legacy-replay-compatibility                   Assume supported v1/v2 baseline; yaw_rate_p unknown\n\
 --input-config FILE.json --input-diagnostics    Load mappings/show values\n\
 --native-controllers                           Opt-in native HOTAS channels\n\
@@ -1677,7 +1715,10 @@ fn parse_arguments_from(
     }
     if let Some(choice) = &startup.aircraft_choice {
         match aircraft_profile::SelectedAircraftProfile::load(choice) {
-            Ok(profile) => startup.aircraft = profile,
+            Ok(profile) => match distribution::validate_profile_start(&profile) {
+                Ok(()) => startup.aircraft = profile,
+                Err(error) => startup.aircraft_error = Some(error),
+            },
             Err(error) => startup.aircraft_error = Some(error),
         }
     }
@@ -1698,7 +1739,7 @@ fn parse_arguments_from(
     if !engine_was_given {
         startup.engine_sound = startup.aircraft.engine_kind();
     }
-    if startup.aircraft.is_jet()
+    if startup.aircraft.uses_bounded_model()
         && let flightsim_audio::EngineKind::Turbine(mut spec) = startup.engine_sound
     {
         spec.afterburner_threshold = 1.0;
@@ -2221,11 +2262,12 @@ fn update_model_visibility(
     mut models: Query<&mut Visibility, (With<ExteriorModel>, Without<InteriorModel>)>,
     mut interior: Query<&mut Visibility, (With<InteriorModel>, Without<ExteriorModel>)>,
 ) {
-    let exterior_wanted = if shows_exterior(*mode) || startup.is_some_and(|s| s.aircraft.is_jet()) {
-        Visibility::Inherited
-    } else {
-        Visibility::Hidden
-    };
+    let exterior_wanted =
+        if shows_exterior(*mode) || startup.is_some_and(|s| s.aircraft.uses_bounded_model()) {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     let interior_wanted = if shows_exterior(*mode) {
         Visibility::Hidden
     } else {
@@ -2281,7 +2323,7 @@ fn update_airport_lights(
 fn startup_tutorial_visibility(startup: &Startup) -> flightsim_ui::TutorialVisibility {
     flightsim_ui::TutorialVisibility(
         startup.difficulty.shows_tutorial()
-            && !startup.aircraft.is_jet()
+            && startup.aircraft.is_legacy()
             && startup.replay.is_none()
             && startup.approach.is_none()
             && startup.world.fly_height.is_none(),
@@ -2301,7 +2343,11 @@ fn toggle_tutorial(
     playback: Option<Res<ReplayPlayback>>,
     mut visibility: ResMut<flightsim_ui::TutorialVisibility>,
 ) {
-    if playback.is_some() || startup.as_ref().is_some_and(|s| s.aircraft.is_jet()) {
+    if playback.is_some()
+        || startup
+            .as_ref()
+            .is_some_and(|s| s.aircraft.uses_bounded_model())
+    {
         visibility.0 = false;
         return;
     }
@@ -2351,6 +2397,9 @@ fn adjust_time_rate(
         && let Some(simulation) = simulation.as_deref_mut()
         && let FlightSession::JetLive {
             recording_error, ..
+        }
+        | FlightSession::TurbopropLive {
+            recording_error, ..
         } = &mut simulation.0
         && recording_error.is_none()
     {
@@ -2368,27 +2417,43 @@ fn sync_replay_clock(
     mut clock: ResMut<flightsim_render::TimeOfDay>,
     mut origin: Local<Option<flightsim_render::JulianDate>>,
 ) {
-    if let Some(mut simulation) = simulation
-        && let FlightSession::JetReplay { player, fault, .. } = &mut simulation.0
-    {
-        clock.rate = flightsim_render::TimeRate::PAUSED;
-        if fault.is_some() {
+    if let Some(mut simulation) = simulation {
+        let replay = match &mut simulation.0 {
+            FlightSession::JetReplay { player, fault, .. } => Some((
+                player.recording().conditions().environment.conditions,
+                player.simulation().elapsed(),
+                fault,
+                "JET",
+            )),
+            FlightSession::TurbopropReplay { player, fault, .. } => Some((
+                player.recording().conditions().environment.conditions,
+                player.simulation().elapsed(),
+                fault,
+                "TURBOPROP",
+            )),
+            FlightSession::Legacy(_)
+            | FlightSession::JetLive { .. }
+            | FlightSession::TurbopropLive { .. } => None,
+        };
+        if let Some((conditions, elapsed, fault, family)) = replay {
+            clock.rate = flightsim_render::TimeRate::PAUSED;
+            if fault.is_some() {
+                return;
+            }
+            let epoch = *origin.get_or_insert(if conditions.start_epoch > 0.0 {
+                flightsim_render::JulianDate(conditions.start_epoch)
+            } else {
+                clock.utc
+            });
+            if let Some(next) = replay_visual_epoch(epoch, elapsed, conditions.time_rate) {
+                clock.utc = next;
+            } else {
+                *fault = Some(format!(
+                    "{family} REPLAY STOPPED: visual clock exceeds its supported range"
+                ));
+            }
             return;
         }
-        let conditions = player.recording().conditions().environment.conditions;
-        let epoch = *origin.get_or_insert(if conditions.start_epoch > 0.0 {
-            flightsim_render::JulianDate(conditions.start_epoch)
-        } else {
-            clock.utc
-        });
-        if let Some(next) =
-            replay_visual_epoch(epoch, player.simulation().elapsed(), conditions.time_rate)
-        {
-            clock.utc = next;
-        } else {
-            *fault = Some("JET REPLAY STOPPED: visual clock exceeds its supported range".into());
-        }
-        return;
     }
     let Some(mut playback) = playback else {
         return;
@@ -2499,16 +2564,16 @@ fn control_flight(
     }
 
     if keyboard.just_pressed(KeyCode::KeyR) {
-        let jet_replacement = if simulation.0.is_jet() {
+        let bounded_replacement = if simulation.0.uses_bounded_model() {
             let mut restart_clock = *clock;
             if paused.is_paused() {
                 restart_clock.rate =
                     rate_before_pause.unwrap_or(flightsim_render::TimeRate::REAL_TIME);
             }
-            match FlightSession::prepare_jet(&startup, &restart_clock, *start) {
+            match FlightSession::prepare_bounded(&startup, &restart_clock, *start) {
                 Ok(session) => Some(session),
                 Err(error) => {
-                    error!("cannot restart jet: {error}");
+                    error!("cannot restart bounded-model flight: {error}");
                     return;
                 }
             }
@@ -2519,7 +2584,7 @@ fn control_flight(
             reset.request();
         }
         rig.reset();
-        if let Some(session) = jet_replacement {
+        if let Some(session) = bounded_replacement {
             simulation.0 = session;
             if let Some(mut reset) = jet_hud_reset {
                 reset.0 = true;
@@ -2633,7 +2698,7 @@ fn control_replay(
     mut rig: ResMut<CameraRig>,
     scenery_reset: Option<ResMut<scenery_runtime::SceneryReset>>,
 ) {
-    if simulation.0.is_jet() {
+    if simulation.0.uses_bounded_model() {
         match &mut simulation.0 {
             FlightSession::JetLive { recorder, .. } => {
                 if keyboard.just_pressed(KeyCode::F9) {
@@ -2648,6 +2713,48 @@ fn control_replay(
                 }
             }
             FlightSession::JetReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                if keyboard.just_pressed(KeyCode::F5) && fault.is_none() && !player.finished() {
+                    player.set_paused(!player.paused());
+                }
+                if keyboard.just_pressed(KeyCode::F6) {
+                    player.set_speed(player.speed() / 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F7) {
+                    player.set_speed(player.speed() * 2.0);
+                }
+                if keyboard.just_pressed(KeyCode::F8) {
+                    *pending_seek = Some(
+                        pending_seek
+                            .or(player.seek_target())
+                            .unwrap_or(player.cursor())
+                            .saturating_sub(1200),
+                    );
+                    if let Some(mut reset) = scenery_reset {
+                        reset.request();
+                    }
+                    rig.reset();
+                    *landing = default();
+                    commands.remove_resource::<flightsim_ui::LandingReport>();
+                }
+            }
+            FlightSession::TurbopropLive { recorder, .. } => {
+                if keyboard.just_pressed(KeyCode::F9) {
+                    if startup.as_deref().is_some_and(|s| s.clouds_were_given) {
+                        warn!("{}", replay_policy::MANUAL_CLOUD_DIAGNOSTIC);
+                        return;
+                    }
+                    match turboprop_session::save_recording(&recorder.export()) {
+                        Ok(path) => info!("saved turboprop replay to {}", path.display()),
+                        Err(error) => error!("cannot save turboprop replay: {error}"),
+                    }
+                }
+            }
+            FlightSession::TurbopropReplay {
                 player,
                 fault,
                 pending_seek,
@@ -2776,7 +2883,8 @@ struct StallWarningStatus {
     reference: Option<(u64, u64, Option<Radians>)>,
 }
 
-/// Discard display history when a flight is replaced or jet history reconstructed.
+/// Discard display history when a flight is replaced or bounded-model history reconstructed.
+/// The historic resource name is retained for the jet and turboprop transaction paths.
 /// Start pending so the first HUD frame also describes the actual start.
 #[derive(Resource)]
 struct JetHudReset(bool);
@@ -2828,6 +2936,41 @@ impl StallWarningStatus {
     fn update_jet(
         &mut self,
         simulation: &flightsim_sim::model_simulation::JetSimulation,
+        flaps: f64,
+        angle: Radians,
+        valid: bool,
+    ) {
+        let presentation = simulation.presentation();
+        let peak = presentation.aero_coefficients.as_ref().and_then(|aero| {
+            flightsim_fdm::aero::positive_stall_peak_angle(
+                aero,
+                simulation.config().airframe().geometry(),
+                flaps,
+            )
+        });
+        self.reference = None;
+        self.unavailable = peak.is_none();
+        let Some(peak) = peak else {
+            self.active = false;
+            return;
+        };
+        if !valid || !angle.is_finite() {
+            self.active = false;
+            return;
+        }
+        let fraction = angle.get().abs() / peak.get();
+        if self.active {
+            if fraction < STALL_WARNING_RELEASE {
+                self.active = false;
+            }
+        } else if fraction >= STALL_WARNING_FRACTION {
+            self.active = true;
+        }
+    }
+
+    fn update_turboprop(
+        &mut self,
+        simulation: &flightsim_sim::turboprop_simulation::TurbopropSimulation,
         flaps: f64,
         angle: Radians,
         valid: bool,
@@ -2965,6 +3108,10 @@ fn publish_sound(
         let failed = jet.terminal().is_some()
             || matches!(&simulation.0, FlightSession::JetReplay { player, .. } if player.faulted());
         warning.update_jet(jet, flaps, angle, valid && !failed);
+    } else if let Some(turboprop) = simulation.0.turboprop() {
+        let failed = turboprop.terminal().is_some()
+            || matches!(&simulation.0, FlightSession::TurbopropReplay { player, .. } if player.faulted());
+        warning.update_turboprop(turboprop, flaps, angle, valid && !failed);
     } else {
         warning.update(simulation.0.config(), flaps, angle, valid);
     }
@@ -2994,7 +3141,7 @@ fn publish_crash(
     mut reported: Local<bool>,
 ) {
     notice.set_replay(playback.is_some() || simulation.0.is_replay());
-    if simulation.0.is_jet() {
+    if simulation.0.uses_bounded_model() {
         if let Some(message) = simulation.0.terminal_message() {
             notice.set(flight_session::ascii_notice(&message));
         } else {
@@ -3040,17 +3187,35 @@ fn publish_replay_status(
     playback: Option<Res<ReplayPlayback>>,
     simulation: Option<Res<FlightSimulation>>,
     startup: Option<Res<Startup>>,
+    controls: Option<Res<PilotControls>>,
     mut status: ResMut<flightsim_ui::ReplayStatus>,
 ) {
     if let Some(simulation) = simulation
-        && simulation.0.is_jet()
+        && simulation.0.uses_bounded_model()
     {
-        let notice = Some(flight_session::jet_notice(
-            &simulation.0,
-            startup.as_deref(),
-        ));
+        let notice = Some(if simulation.0.is_turboprop() {
+            turboprop_session::notice(&simulation.0, startup.as_deref())
+        } else {
+            flight_session::jet_notice(&simulation.0, startup.as_deref())
+        });
         let next = match &simulation.0 {
             FlightSession::JetReplay {
+                player,
+                fault,
+                total,
+                ..
+            } => flightsim_ui::ReplayStatus {
+                active: true,
+                paused: player.paused(),
+                speed: player.speed(),
+                elapsed: player.simulation().elapsed(),
+                total: *total,
+                seeking: player.seeking(),
+                fault: fault.clone(),
+                finished: player.finished(),
+                notice,
+            },
+            FlightSession::TurbopropReplay {
                 player,
                 fault,
                 total,
@@ -3071,6 +3236,7 @@ fn publish_replay_status(
                 ..default()
             },
         };
+        let next = with_lateral_trim_notice(next, controls.as_deref(), simulation.0.is_turboprop());
         if *status != next {
             *status = next;
         }
@@ -3096,9 +3262,37 @@ fn publish_replay_status(
             notice: playback.identity_notice().map(str::to_owned),
         },
     );
+    let next = with_lateral_trim_notice(next, controls.as_deref(), false);
     if *status != next {
         *status = next;
     }
+}
+
+/// Show pilot-owned lateral trim only during live flight. Replay already carries
+/// the effective surfaces and must not label them with the current pilot settings.
+fn with_lateral_trim_notice(
+    mut status: flightsim_ui::ReplayStatus,
+    controls: Option<&PilotControls>,
+    always_show: bool,
+) -> flightsim_ui::ReplayStatus {
+    if !status.active
+        && let Some(controls) = controls
+        && (always_show
+            || controls.aileron_trim.value() != 0.0
+            || controls.rudder_trim.value() != 0.0)
+    {
+        let trim = format!(
+            "ROLL TRIM {:+.5} | YAW TRIM {:+.5} [J/L U/O 0.01/s; Shift 0.002/s; K reset]",
+            controls.aileron_trim.value(),
+            controls.rudder_trim.value(),
+        );
+        status.notice = Some(
+            status
+                .notice
+                .map_or_else(|| trim.clone(), |notice| format!("{notice} | {trim}")),
+        );
+    }
+    status
 }
 
 /// 新しい接地を着陸評価へ流す。
@@ -3114,7 +3308,7 @@ fn report_landings(
     mut seen: Local<u32>,
     mut was_seeking: Local<bool>,
 ) {
-    if simulation.0.is_jet() {
+    if simulation.0.uses_bounded_model() {
         *landing = default();
         commands.remove_resource::<flightsim_ui::LandingReport>();
         return;
@@ -3316,7 +3510,10 @@ fn setup(
         heading: startup.heading,
     };
     let simulation = if let Some(prepared) = prepared_jet.as_mut() {
-        let (session, condition) = prepared.0.take().expect("prepared jet session used once");
+        let (session, condition) = prepared
+            .0
+            .take()
+            .expect("prepared bounded-model session used once");
         start_condition = condition;
         session
     } else {
@@ -3984,13 +4181,13 @@ fn advance_simulation(
     mut aircraft: Query<(&mut WorldPosition, &mut WorldOrientation), With<Aircraft>>,
     jet_hud_reset: Option<ResMut<JetHudReset>>,
 ) {
-    if paused.is_paused() || (!simulation.0.is_jet() && simulation.0.diverged()) {
+    if paused.is_paused() || (simulation.0.legacy().is_some() && simulation.0.diverged()) {
         // **物理も記録も進めない。** 止めている間に記録が伸びると、
         // 再生したときに何もしていない時間が入る。
         return;
     }
     let frame_time = Seconds(time.delta_secs_f64());
-    if simulation.0.is_jet() {
+    if simulation.0.uses_bounded_model() {
         // Each bounded seek batch reconstructs historical states, including the
         // final batch (after which seeking() is already false). No live speed
         // or altitude change is a reason to reset ordinary HUD smoothing.
@@ -4002,7 +4199,7 @@ fn advance_simulation(
         let record = startup.as_deref().is_none_or(|s| !s.clouds_were_given);
         simulation
             .0
-            .advance_jet(frame_time, &mut controls, &sampled_input, record);
+            .advance_bounded(frame_time, &mut controls, &sampled_input, record);
         if simulation.0.fault().is_some() {
             return;
         }

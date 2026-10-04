@@ -447,7 +447,9 @@ class CandidateAcceptanceTests(unittest.TestCase):
             ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
              b'if cfg!(feature = "commercial-staging") && file != "swift_sport.json" {', b'if false {'),
             ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
-             b'profile.is_jet() != (file == "kestrel_jet_trainer.json")', b'false'),
+             b'!profile.is_jet()', b'false'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'!profile.is_legacy()', b'false'),
             ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
              b'actions.generation == self.request.generation', b'true'),
             ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
@@ -567,6 +569,111 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 candidate.source_inputs(repo, expected)
             path.write_bytes(original)
             self.commit_source_fixture(repo)
+
+    def test_app_turboprop_admission_and_explicit_trim_cannot_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-app/src/distribution.rs",
+             b'cfg!(feature = "commercial-staging") && profile.is_turboprop()',
+             b'false && profile.is_turboprop()'),
+            ("crates/flightsim-app/src/turboprop_session.rs",
+             b') -> Result<FlightSession, String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<FlightSession, String> {'),
+            ("crates/flightsim-app/src/turboprop_session.rs",
+             b') -> Result<Option<TurbopropReplayPlayer>, String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<Option<TurbopropReplayPlayer>, String> {'),
+            ("crates/flightsim-app/src/turboprop_session.rs",
+             b') -> Result<(FlightSession, StartCondition), String> {\n    crate::distribution::validate_profile_start(&startup.aircraft)?;',
+             b') -> Result<(FlightSession, StartCondition), String> {'),
+            ("crates/flightsim-input/src/lib.rs", b'if self.value == 0.0 {', b'if false {'),
+            ("crates/flightsim-input/src/lib.rs",
+             b'pub const FINE_RATE: f64 = 0.002;', b'pub const FINE_RATE: f64 = 0.02;'),
+            ("crates/flightsim-input/src/lib.rs",
+             b'let lateral_trim_enabled = !keyboard.any_pressed(shortcut_modifiers);',
+             b'let lateral_trim_enabled = keyboard.any_pressed(shortcut_modifiers);'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_help_reference_cannot_lose_replay_authority_or_scroll_bounds(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-ui/src/pause.rs", b'let full = if replay {', b'let full = if false {'),
+            ("crates/flightsim-ui/src/pause.rs",
+             b'&& status.as_ref().is_none_or(|value| !value.is_changed())', b'&& true'),
+            ("crates/flightsim-ui/src/pause.rs",
+             b'if !paused.is_paused() {', b'if false {'),
+            ("crates/flightsim-ui/src/pause.rs",
+             b'(position.y + delta).clamp(0.0, max)', b'position.y + delta'),
+            ("crates/flightsim-ui/src/tutorial.rs",
+             b'&& replay.as_ref().is_none_or(|status| !status.active)', b'&& true'),
+            ("crates/flightsim-app/src/turboprop_session.rs",
+             b'Esc pause / complete controls', b'Esc pause'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_app_help_sources_cannot_be_omitted_or_rehashed_away(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        paths = (
+            "crates/flightsim-app/src/turboprop_session.rs",
+            "crates/flightsim-app/src/turboprop_runtime_tests.rs",
+            "crates/flightsim-app/src/turboprop_lifecycle_tests.rs",
+            "crates/flightsim-input/src/lib.rs",
+            "crates/flightsim-input/src/lateral_trim_regression.rs",
+            "crates/flightsim-input/tests/fixtures/legacy-input-v1.json",
+            "crates/flightsim-ui/src/pause.rs",
+            "crates/flightsim-ui/src/attribution_layout_tests.rs",
+        )
+        for relative in paths:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
 
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()

@@ -370,34 +370,42 @@ pub struct TutorialPrompt;
 
 /// チュートリアル表示欄を作る。
 ///
-/// 既存の HUD（左上の計器・左下の操作説明・右上の着陸評価・右下の飛行記録）
-/// のどれとも重ならないよう、画面上部に横幅いっぱいの透明なコンテナを置き、
-/// その中でテキストだけを中央寄せする。左右の端に置く既存要素とは
-/// 水平方向で重ならず、`top` も左上計器列の開始位置より下げてあるので
-/// 縦方向でも視線の導線が別れる。
-pub fn spawn_tutorial_prompt(mut commands: Commands) {
-    commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(56.0),
-            left: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
-        .with_children(|parent| {
-            parent.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(1.0, 0.95, 0.55)),
-                TextLayout::new_with_justify(Justify::Center),
-                Visibility::Hidden,
-                TutorialPrompt,
-            ));
-        });
+/// HUD と同じ右列で計測し、警告・操作説明と重ならない高さを予約する。
+/// 単独利用時も従来どおり画面上部に表示できる。
+pub fn spawn_tutorial_prompt(mut commands: Commands, side: Query<Entity, With<crate::HudSide>>) {
+    let parent = if let Ok(side) = side.single() {
+        side
+    } else {
+        commands
+            .spawn(Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(56.0),
+                left: Val::Px(12.0),
+                right: Val::Px(12.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            })
+            .id()
+    };
+    commands.entity(parent).with_children(|parent| {
+        parent.spawn((
+            Text::new(""),
+            TextFont {
+                font_size: 20.0,
+                ..default()
+            },
+            TextColor(Color::srgb(1.0, 0.95, 0.55)),
+            TextLayout::new_with_justify(Justify::Center),
+            Node {
+                display: Display::None,
+                grid_row: GridPlacement::start(2),
+                min_width: Val::Px(0.0),
+                ..default()
+            },
+            Visibility::Hidden,
+            TutorialPrompt,
+        ));
+    });
 }
 
 /// チュートリアル表示を更新する。
@@ -408,22 +416,30 @@ pub fn update_tutorial_prompt(
     hud: Res<HudState>,
     visibility: Res<TutorialVisibility>,
     guidance: Option<Res<crate::FlightGuidance>>,
-    paused: Res<crate::pause::Paused>,
-    crashed: Res<crate::crash::CrashNotice>,
+    (paused, crashed, replay): (
+        Res<crate::pause::Paused>,
+        Res<crate::crash::CrashNotice>,
+        Option<Res<crate::ReplayStatus>>,
+    ),
     mut state: ResMut<TutorialState>,
-    mut query: Query<(&mut Text, &mut Visibility), With<TutorialPrompt>>,
+    mut query: Query<(&mut Text, &mut Visibility, &mut Node), With<TutorialPrompt>>,
 ) {
     let stage = state.0.update(&hud);
     // **止まっている間と壊れている間は指示を出さない。** 「PageUp を押せ」と
     // 出しておいて押しても何も起きないと、案内ではなく不具合に見える。
     // 状態機械は裏で進み続けるので、再開したときは今の段階が出る。
     let show = visibility.0
+        && replay.as_ref().is_none_or(|status| !status.active)
         && guidance.as_ref().is_none_or(|value| value.tutorial_enabled)
         && !paused.is_paused()
         && !crashed.is_crashed()
         && stage != TutorialStage::Complete;
 
-    for (mut text, mut node_visibility) in &mut query {
+    for (mut text, mut node_visibility, mut node) in &mut query {
+        let display = if show { Display::Flex } else { Display::None };
+        if node.display != display {
+            node.display = display;
+        }
         if show {
             **text = tutorial_prompt(stage, &hud).to_owned();
             *node_visibility = Visibility::Visible;
@@ -1009,6 +1025,7 @@ mod tests {
             .init_resource::<crate::CrashNotice>()
             .insert_resource(crate::FlightGuidance {
                 live_help: None,
+                compact_live_help: None,
                 tutorial_enabled: false,
             })
             .add_systems(Startup, spawn_tutorial_prompt)

@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "status": "automated_integration_checks_passed_native_not_run",
+  "baseline": "9b7caf1583e01620add4d6bbb8445c66d1b76efd",
+  "accepted_pure_dependencies": [
+    "0ac6892bb25100347ea521d28220680830c5d5fe",
+    "e416fb6b6d42aeffe4021c4e167ab75b002e3239",
+    "47915f46cf0b9ec3b1427aa3ca5f97f0daf25602"
+  ],
+  "counts_overlap_do_not_sum": true,
+  "checks": {
+    "bevy_tests": {
+      "command": "cargo test -j 2 --offline -p flightsim-app -p flightsim-input -p flightsim-ui -p flightsim-render",
+      "status": "passed",
+      "log_file": "turboprop-app-bevy-tests.log",
+      "sha256": "06817cee0899badf9fb3396ddb50802ebe368d6e575e06955fa1e775fc86f669",
+      "suites": 21,
+      "passed": 1112,
+      "failed": 0,
+      "ignored": 3,
+      "ignored_tests": [
+        "test scenery_runtime::tests::optional_real_region_build_reports_cpu_work_and_respects_scene_caps ... ignored, set FLIGHTSIM_SCENERY_FIXTURE and FLIGHTSIM_SCENERY_TILES to an optional regional sample",
+        "test haneda_ground_and_approach_have_no_missing_runway_footprint ... ignored, requires the documented external normalized Copernicus Haneda tiles",
+        "test measure_bounded_planning_transaction_costs ... ignored, manual quiet-window latency evidence; allocates worst-cut real meshes"
+      ]
+    },
+    "pure_tests": {
+      "command": "cargo test -j 2 --offline -p flightsim-core -p flightsim-fdm -p flightsim-world -p flightsim-sim -p flightsim-tilegen",
+      "status": "passed",
+      "log_file": "turboprop-app-pure-tests.log",
+      "sha256": "90980ceeec5b6583e755700f9ec4d29b4e7d7f55001b726b1f76fcd3e8bc5e12",
+      "suites": 84,
+      "passed": 1179,
+      "failed": 0,
+      "ignored": 0,
+      "ignored_tests": []
+    },
+    "final_app_audio_tests": {
+      "command": "cargo test -j 2 --offline -p flightsim-app -p flightsim-audio",
+      "status": "passed",
+      "log_file": "turboprop-app-audio-final-tests.log",
+      "sha256": "94829ede398b0ef3df2699f9baa06029612a24b9ed018a6349ac5b5b7a9be34b",
+      "suites": 4,
+      "passed": 444,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_tests": [
+        "test scenery_runtime::tests::optional_real_region_build_reports_cpu_work_and_respects_scene_caps ... ignored, set FLIGHTSIM_SCENERY_FIXTURE and FLIGHTSIM_SCENERY_TILES to an optional regional sample"
+      ]
+    },
+    "commercial_tests": {
+      "command": "cargo test -j 2 --offline -p flightsim-app --features commercial-staging",
+      "status": "passed",
+      "log_file": "turboprop-app-commercial-tests.log",
+      "sha256": "311624485ea12bc362afc7b69995a4e76400a83ed7619ad9afa9d2f045871854",
+      "suites": 2,
+      "passed": 319,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_tests": [
+        "test scenery_runtime::tests::optional_real_region_build_reports_cpu_work_and_respects_scene_caps ... ignored, set FLIGHTSIM_SCENERY_FIXTURE and FLIGHTSIM_SCENERY_TILES to an optional regional sample"
+      ]
+    },
+    "region_download_tests": {
+      "command": "cargo test -j 2 --offline -p flightsim-app -p flightsim-content -p flightsim-assetgen --features flightsim-app/region-downloads --all-targets",
+      "status": "passed",
+      "log_file": "turboprop-app-region-tests.log",
+      "sha256": "22e656339c86527a94fcaa9fec9297b830bba5db91593820542dde5a6d82f6d9",
+      "suites": 6,
+      "passed": 445,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_tests": [
+        "test scenery_runtime::tests::optional_real_region_build_reports_cpu_work_and_respects_scene_caps ... ignored, set FLIGHTSIM_SCENERY_FIXTURE and FLIGHTSIM_SCENERY_TILES to an optional regional sample"
+      ]
+    },
+    "workspace_clippy": {
+      "command": "cargo clippy -j 2 --offline --workspace --all-targets -- -D warnings",
+      "status": "passed",
+      "log_file": "turboprop-app-clippy.log",
+      "sha256": "03898ac434f1795a00a6dc20854157a2446d06cc2078e7e5aa0ee3ec9801583c"
+    },
+    "region_clippy": {
+      "command": "cargo clippy -j 2 --offline -p flightsim-app -p flightsim-content -p flightsim-assetgen --features flightsim-app/region-downloads --all-targets -- -D warnings",
+      "status": "passed",
+      "log_file": "turboprop-app-region-clippy.log",
+      "sha256": "89a6c09ed6cd9ac1d5071321380755ab9bc89b33191760ca7e8038bc84f90d4f"
+    },
+    "commercial_clippy": {
+      "command": "cargo clippy -j 2 --offline -p flightsim-app --features commercial-staging,region-downloads --all-targets -- -D warnings",
+      "status": "passed",
+      "log_file": "turboprop-app-commercial-clippy.log",
+      "sha256": "ef21bc762dc3fa1427d881f75d315d7e2bb5d33bbdb7788ef982d447117badd0"
+    },
+    "rustdoc": {
+      "command": "RUSTDOCFLAGS=\"-D warnings\" cargo doc -j 2 --workspace --features flightsim-app/region-downloads --no-deps --document-private-items",
+      "status": "passed",
+      "log_file": "turboprop-app-doc.log",
+      "sha256": "704733c1ef564a8037759f08d4f1d215c271fb6d63aa9bd9ab4f879507f8ad04"
+    },
+    "architecture": {
+      "command": "bash scripts/check-architecture.sh",
+      "status": "passed",
+      "log_file": "turboprop-app-architecture.log",
+      "sha256": "277c025522371f3d487608a83a0c4c1b5e0f054c744b7a9453f3b0caca3a4513"
+    },
+    "format": {
+      "command": "cargo fmt --all --check",
+      "status": "passed",
+      "log_file": "turboprop-app-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "source_sha256": {
+    "crates/flightsim-app/src/aircraft_picker_runtime.rs": "6d6e5ef47cf40b17b107eeda6199f9e99d4d8705a181cec025cbf321159e5ee2",
+    "crates/flightsim-app/src/aircraft_picker_tests.rs": "00670ade1a1fc90f269d6a2581a0b458fa3e0bd5abf5721831875566406f7bd4",
+    "crates/flightsim-app/src/aircraft_profile.rs": "dfefe58a95324f00c0c5dae04c3788cf282afda523890bf2545ed477c50627dd",
+    "crates/flightsim-app/src/aircraft_scene.rs": "23cdbd0bc5fde9182c3704827fb997f68225c524871f0a00819642a93eb53f60",
+    "crates/flightsim-app/src/conditions_runtime_tests.rs": "2aa51fe30f603e276ed4422b59e61316fb00872afbade0771755ad732273bc5c",
+    "crates/flightsim-app/src/distribution.rs": "8c21414aa1010612d819a36a0221b8e55bb7d616179057db0fc98f56d923277a",
+    "crates/flightsim-app/src/flight_session.rs": "2fabb10afd147eab46b2106516059829eadcbe8484fe33cb4e202765588702fe",
+    "crates/flightsim-app/src/main.rs": "75b4f7e11868fe5fdea91a404fde7cefdfaa707f9b5a88daf0ba0e773ac64563",
+    "crates/flightsim-app/src/region_runtime.rs": "6d06b5c7ae3d3b4552e22c730acd981bb3952db34d2222fa3a942303000e38b6",
+    "crates/flightsim-app/src/turboprop_lifecycle_tests.rs": "c2da2927ea0fe40692a247179dd8fff330f491bb0c916b708240f13a0373a689",
+    "crates/flightsim-app/src/turboprop_runtime_tests.rs": "f404cb0492532c3dd26dd276c612ef801a8bb31233f313982f95de0566fb4732",
+    "crates/flightsim-app/src/turboprop_session.rs": "778fd794900817af2d1ebce2d6798ffb8e236a4a37d2288247fcadc99cc02b42",
+    "crates/flightsim-app/src/weather_runtime.rs": "f69143a9a1d4a331d9cec83b3c30ecced9b1a176005abc4d2b69867e8db12996",
+    "crates/flightsim-app/src/world_runtime.rs": "a1fa1f6af600dc71e2aab7a5b7acc544df8487a8df01bbecabb3809db0860f5e",
+    "crates/flightsim-input/src/lateral_trim_regression.rs": "4410efbb1ca35064264918c0219ccc06f0197988b7a64fc2e2cc562201fff938",
+    "crates/flightsim-input/src/lib.rs": "78b556e7c6faee72c63ea30d9baeecf14d5cb401f51b1dd78ae4ea3f79a8f35f",
+    "crates/flightsim-input/tests/fixtures/legacy-input-v1.json": "b3139b961b09d01a6931d3326d0af7703e28b2ad2d42c711d908eb44c6181e1b",
+    "crates/flightsim-sim/src/turboprop_simulation/mod.rs": "6ffe095b3e63317e29ca21bce676d1ef8ddb06641f737de0c07cdddab2cf2002",
+    "crates/flightsim-sim/src/turboprop_simulation/parked.rs": "ef980a662e7e6518ff3f6ef8e6753998467f1ea38529f4353af73620889fa067",
+    "crates/flightsim-sim/src/turboprop_simulation/presentation.rs": "188892c9446ebde9492b23a876fdf65de98ffe1ab367981e831d59cc8cf96caa",
+    "crates/flightsim-ui/src/top_layout_tests.rs": "d72bcd6afb5137c70ddaa5ec02059a895773b766f312b74fdb32dfac27f6b4fa"
+  },
+  "unchanged_original_replay_goldens": 21,
+  "unchanged_source_groups": [
+    "crates/flightsim-core",
+    "crates/flightsim-fdm",
+    "crates/flightsim-world",
+    "assets",
+    "schemas",
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/flightsim-sim/src/replay.rs",
+    "crates/flightsim-sim/src/replay",
+    "crates/flightsim-sim/src/replay_v4.rs",
+    "crates/flightsim-sim/src/model_simulation",
+    "crates/flightsim-sim/src/simulation.rs",
+    "scripts",
+    ".github"
+  ],
+  "cedar_physical_profile_added": false,
+  "cedar_picker_added": false,
+  "native_run": false,
+  "publication_run": false
+}

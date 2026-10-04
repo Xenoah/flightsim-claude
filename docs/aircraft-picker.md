@@ -22,7 +22,10 @@ asset directory. Unavailable presets show a reason. There is no asset download,
 aircraft archive importer or recursive discovery. Meadow and Kestrel remain JSON
 path choices at the command line; the existing `--list-aircraft` list is unchanged.
 The commercial-staging picker offers only Swift. Its packaging allowlists, default
-and explicit CLI inspection exceptions remain unchanged.
+and existing v1/v2 CLI inspection exceptions remain unchanged.
+Commercial-staging rejects new profile-v3 live/replay startup while pure library
+inspection remains available. An explicit development profile-v3 launch is available through its Launch row;
+there is no Cedar or other turboprop preset. See [turboprop sessions](turboprop-native-app.md).
 
 Selection changes are previews. **M, Esc or Close cancels preparation** and keeps
 the current aircraft, weather and recording. Changing aircraft, departure, month
@@ -32,19 +35,20 @@ On failure, the previous usable flight remains and the choices remain available
 for correction. Save the current recording with F9 before starting a replacement
 if you want to preserve it.
 
-Jet selection rejects raw `--tiles` and active, selected or pending regional
+Jet and explicit turboprop selection reject raw `--tiles` and active, selected or pending regional
 packages before changing them. Clear a selected package explicitly; an active
 package flight selected in the map must first start a supported global legacy
 flight before selecting Kestrel. A launch with `--region` still requires restarting
 without that flag; the picker does not erase the explicit launch restriction.
-A flat-zero jet cannot switch to a legacy map flight with global terrain
+A flat-zero jet or turboprop cannot switch to a legacy map flight with global terrain
 off; restart with global terrain enabled. The picker does not override these
 source contracts or turn unsupported terrain into a different physical surface.
 
 Replay displays its recorded aircraft as locked. Neither aircraft selection nor
 map preview can replace its recorded identity. New legacy flights record v3;
-new jet flights record v4, subject to the existing manual-cloud and regional
-recording restrictions. Profile/replay schemas and physical models are unchanged.
+new jet flights record v4, and explicit turboprop flights record full-state v5,
+subject to the existing manual-cloud and regional recording restrictions.
+Existing profile/replay schemas and physical laws retain their meanings.
 
 Preparation validates the complete scene and its fit before replacing the aircraft.
 Invalid or empty GLBs, missing scene 0, failed dependencies and scenes containing

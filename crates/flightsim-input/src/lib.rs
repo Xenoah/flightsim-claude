@@ -237,14 +237,40 @@ pub struct PilotKeys {
     pub trim_up: bool,
     /// トリムを機首下げ側へ（速い速度で釣り合う）。
     pub trim_down: bool,
+    pub aileron_trim_right: bool,
+    pub aileron_trim_left: bool,
+    pub rudder_trim_right: bool,
+    pub rudder_trim_left: bool,
+    /// Hold Shift for finer lateral trim adjustment.
+    pub lateral_trim_fine: bool,
+    /// Explicitly reset both lateral trims; takes precedence over adjustment.
+    pub lateral_trim_reset: bool,
 }
 
 impl PilotKeys {
-    /// Sample physical keyboard state once. Native events shorter than a
-    /// rendered frame can be missed; this is a state sample, not a timestamped
-    /// event history. The app decides when the sampled state may drive flight.
+    /// Sample physical keyboard state once. Rate controls use held keys; the
+    /// instantaneous lateral-trim reset also accepts this frame's press edge.
+    /// Shortcut-modifier edges suppress a released reset tap for this frame.
+    /// This is not a timestamped event history or a queue across no-step frames.
+    /// The app decides when the sampled state may drive flight.
     #[must_use]
     pub fn from_keyboard(keyboard: &ButtonInput<KeyCode>) -> Self {
+        // Do not turn editor/OS shortcuts such as Ctrl+L into persistent trim.
+        // The app separately suppresses the entire sample during UI capture.
+        let shortcut_modifiers = [
+            KeyCode::ControlLeft,
+            KeyCode::ControlRight,
+            KeyCode::AltLeft,
+            KeyCode::AltRight,
+            KeyCode::SuperLeft,
+            KeyCode::SuperRight,
+        ];
+        let lateral_trim_enabled = !keyboard.any_pressed(shortcut_modifiers);
+        // Bevy's frame-local sets cannot order a shortcut and a released tap.
+        // Reject that new edge path conservatively; held-K behavior is unchanged.
+        let lateral_trim_reset_edge = keyboard.just_pressed(KeyCode::KeyK)
+            && !keyboard.any_just_pressed(shortcut_modifiers)
+            && !keyboard.any_just_released(shortcut_modifiers);
         Self {
             roll_right: keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD),
             roll_left: keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA),
@@ -258,6 +284,13 @@ impl PilotKeys {
             // トリム。**手を離しても釣り合う速度を決める。**
             trim_up: keyboard.pressed(KeyCode::BracketRight),
             trim_down: keyboard.pressed(KeyCode::BracketLeft),
+            aileron_trim_right: lateral_trim_enabled && keyboard.pressed(KeyCode::KeyL),
+            aileron_trim_left: lateral_trim_enabled && keyboard.pressed(KeyCode::KeyJ),
+            rudder_trim_right: lateral_trim_enabled && keyboard.pressed(KeyCode::KeyO),
+            rudder_trim_left: lateral_trim_enabled && keyboard.pressed(KeyCode::KeyU),
+            lateral_trim_fine: keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
+            lateral_trim_reset: lateral_trim_enabled
+                && (keyboard.pressed(KeyCode::KeyK) || lateral_trim_reset_edge),
             flaps_extend: keyboard.pressed(KeyCode::KeyF),
             flaps_retract: keyboard.pressed(KeyCode::KeyG),
             brakes: keyboard.pressed(KeyCode::Space),
@@ -388,6 +421,56 @@ impl ElevatorTrim {
     }
 }
 
+/// Small, explicit aileron or rudder bias retained until the pilot changes it.
+/// It has no aircraft, throttle, attitude, or automatic centering input.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct LateralTrim {
+    value: f64,
+}
+
+impl LateralTrim {
+    /// Maximum normalized surface bias in either direction.
+    pub const LIMIT: f64 = 0.2;
+    /// Normalized bias per simulated second at ordinary adjustment speed.
+    pub const RATE: f64 = 0.01;
+    /// Shift adjustment speed: 1/60000 normalized bias per 120 Hz step.
+    pub const FINE_RATE: f64 = 0.002;
+
+    #[must_use]
+    pub const fn value(self) -> f64 {
+        self.value
+    }
+
+    /// Set an explicit bounded normalized bias. New-flight defaults are zero.
+    pub fn set(&mut self, value: f64) {
+        self.value = if value.is_nan() {
+            0.0
+        } else {
+            value.clamp(-Self::LIMIT, Self::LIMIT)
+        };
+    }
+
+    /// Opposing keys cancel; release retains the exact stored bias.
+    pub fn update(&mut self, dt: Seconds, right: bool, left: bool, fine: bool) {
+        let elapsed = valid_elapsed(dt).get();
+        let direction = f64::from(i8::from(right) - i8::from(left));
+        if elapsed > 0.0 && direction.abs() > 0.0 {
+            let rate = if fine { Self::FINE_RATE } else { Self::RATE };
+            self.set(self.value + direction * rate * elapsed);
+        }
+    }
+
+    fn apply(self, surface: f64) -> f64 {
+        // Both signs of zero must bypass addition AND clamping. In particular,
+        // adding +0 would erase a legacy -0 surface before ControlInputs sees it.
+        if self.value == 0.0 {
+            surface
+        } else {
+            sanitise(surface + self.value)
+        }
+    }
+}
+
 /// 操縦入力の現在値。
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct PilotControls {
@@ -398,6 +481,8 @@ pub struct PilotControls {
     pub flaps: RampAxis,
     /// 昇降舵トリム。**中立へ戻らない。**
     pub trim: ElevatorTrim,
+    pub aileron_trim: LateralTrim,
+    pub rudder_trim: LateralTrim,
     brakes: f64,
 }
 
@@ -412,6 +497,8 @@ impl Default for PilotControls {
             // フラップは 5 秒で全展開。
             flaps: RampAxis::new(0.0, 0.2),
             trim: ElevatorTrim::default(),
+            aileron_trim: LateralTrim::default(),
+            rudder_trim: LateralTrim::default(),
             brakes: 0.0,
         }
     }
@@ -420,7 +507,7 @@ impl Default for PilotControls {
 impl PilotControls {
     /// Release momentary control displacement when the application suspends
     /// flight input (for example a modal or focus loss). Power, flap position
-    /// and elevator trim are persistent pilot settings and remain unchanged.
+    /// and all three trims are persistent pilot settings and remain unchanged.
     ///
     /// This does not pause flight, trim the aircraft, alter its state, or clear
     /// device samples. The application owns suspension and resume policy; an
@@ -441,6 +528,7 @@ impl PilotControls {
             .update(dt, keys.throttle_up, keys.throttle_down);
         self.flaps.update(dt, keys.flaps_extend, keys.flaps_retract);
         self.trim.update(dt, keys.trim_up, keys.trim_down);
+        self.update_lateral_trims(dt, keys);
         // ブレーキは踏んでいる間だけ。中間状態を持たせても操作感が悪くなるだけ。
         self.brakes = f64::from(u8::from(keys.brakes));
     }
@@ -469,6 +557,7 @@ impl PilotControls {
         // Trim belongs to the keyboard in both paths. It must keep working even
         // when no gamepad is connected: this method is the runtime entry point.
         self.trim.update(dt, keys.trim_up, keys.trim_down);
+        self.update_lateral_trims(dt, keys);
 
         if gamepad.is_some() && gamepad::is_axis_touched(gp.left_stick_x, mappings.aileron.deadzone)
         {
@@ -582,16 +671,37 @@ impl PilotControls {
             sample.flaps,
         );
         self.trim.update(dt, keys.trim_up, keys.trim_down);
+        self.update_lateral_trims(dt, keys);
         self.brakes = sample.brake.max(f64::from(u8::from(keys.brakes)));
+    }
+
+    fn update_lateral_trims(&mut self, dt: Seconds, keys: PilotKeys) {
+        if keys.lateral_trim_reset {
+            self.aileron_trim.set(0.0);
+            self.rudder_trim.set(0.0);
+        } else {
+            self.aileron_trim.update(
+                dt,
+                keys.aileron_trim_right,
+                keys.aileron_trim_left,
+                keys.lateral_trim_fine,
+            );
+            self.rudder_trim.update(
+                dt,
+                keys.rudder_trim_right,
+                keys.rudder_trim_left,
+                keys.lateral_trim_fine,
+            );
+        }
     }
 
     /// FDM へ渡す形にする。
     #[must_use]
     pub fn to_control_inputs(self) -> ControlInputs {
         ControlInputs::new(
-            self.aileron.value(),
+            self.effective_aileron(),
             self.effective_elevator(),
-            self.rudder.value(),
+            self.effective_rudder(),
             self.throttle.value(),
             self.flaps.value(),
         )
@@ -606,6 +716,18 @@ impl PilotControls {
     #[must_use]
     pub fn effective_elevator(self) -> f64 {
         sanitise(self.elevator.value() + self.trim.value())
+    }
+
+    /// Pilot roll input plus explicit aileron trim, bounded to surface travel.
+    #[must_use]
+    pub fn effective_aileron(self) -> f64 {
+        self.aileron_trim.apply(self.aileron.value())
+    }
+
+    /// Pilot yaw input plus explicit rudder trim, bounded to surface travel.
+    #[must_use]
+    pub fn effective_rudder(self) -> f64 {
+        self.rudder_trim.apply(self.rudder.value())
     }
 }
 
@@ -754,6 +876,9 @@ pub fn cycle_view_mode(
 
 #[cfg(test)]
 mod keyboard_regression;
+
+#[cfg(test)]
+mod lateral_trim_regression;
 
 #[cfg(test)]
 mod tests {

@@ -78,6 +78,9 @@ pub use world_map::{
 pub struct FlightGuidance {
     /// Complete replacement for the live help panel; `None` keeps legacy help.
     pub live_help: Option<String>,
+    /// Short flight-key reference for small windows. The full text remains
+    /// available while paused; custom hosts may omit this to retain their text.
+    pub compact_live_help: Option<String>,
     /// Whether the original light-aircraft tutorial is applicable.
     ///
     /// This is independent of the pilot's hide/show preference. The app may
@@ -89,6 +92,7 @@ impl Default for FlightGuidance {
     fn default() -> Self {
         Self {
             live_help: None,
+            compact_live_help: None,
             tutorial_enabled: true,
         }
     }
@@ -333,8 +337,15 @@ pub struct DataAttributionDisplay;
 #[derive(Component)]
 struct HudBottom;
 
-#[derive(Component)]
-struct HudBottomPanels;
+/// Measured flight area above the attribution footer, also used by pause UI.
+#[derive(Component, Debug)]
+#[doc(hidden)]
+pub struct HudBody;
+
+/// Notices, guidance and the log share the space beside the instruments.
+#[derive(Component, Debug)]
+#[doc(hidden)]
+pub struct HudSide;
 
 /// Final UI readers of committed flight state. Hosts order this set after
 /// their exclusive new-flight transaction and state publishers.
@@ -378,8 +389,10 @@ impl Plugin for FlightsimUiPlugin {
             // `ResMut<TutorialVisibility>::toggle` を呼べば繋がる。
             .init_resource::<TutorialState>()
             .init_resource::<TutorialVisibility>()
-            .add_systems(Startup, spawn_tutorial_prompt)
+            .add_systems(Startup, spawn_tutorial_prompt.after(spawn_hud))
             .add_systems(Update, update_tutorial_prompt)
+            .add_systems(Update, pause::update_pause_reference)
+            .add_systems(Update, pause::scroll_pause_reference)
             // 再生中の表示。app が `ReplayStatus` を埋めなければ出ない。
             .init_resource::<replay::ReplayStatus>()
             .add_systems(Startup, replay::spawn_replay_banner.after(spawn_hud))
@@ -389,7 +402,7 @@ impl Plugin for FlightsimUiPlugin {
             )
             // 一時停止。app が `Esc` で `Paused` を切り替える。
             .init_resource::<pause::Paused>()
-            .add_systems(Startup, pause::spawn_pause_overlay)
+            .add_systems(Startup, pause::spawn_pause_overlay.after(spawn_hud))
             .add_systems(
                 Update,
                 pause::update_pause_overlay.in_set(FlightDisplaySystems),
@@ -416,47 +429,14 @@ impl Plugin for FlightsimUiPlugin {
 
 /// HUD を組み立てる。
 pub fn spawn_hud(mut commands: Commands) {
-    // Measure the instruments and notices in the same layout pass. A percentage
-    // inset on an independent banner can cover the EAS stall warning. The HUD
-    // keeps its original font and origin; notices use the remaining space and
-    // wrap below it when the viewport cannot accommodate two readable columns.
-    commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(12.0),
-            right: Val::Px(12.0),
-            flex_wrap: FlexWrap::Wrap,
-            align_items: AlignItems::FlexStart,
-            column_gap: Val::Px(12.0),
-            row_gap: Val::Px(8.0),
-            ..default()
-        })
-        .with_children(|top| {
-            top.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: 18.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.85, 1.0, 0.85)),
-                Node {
-                    max_width: Val::Percent(100.0),
-                    flex_shrink: 0.0,
-                    ..default()
-                },
-                HudText,
-            ));
-        });
-
-    // Keep help and the flight log in one row above the footer. Flex layout
-    // reserves its actual wrapped height in the same layout pass, including
-    // narrow windows and attribution/replay changes. With no credit, the row
-    // retains the legacy 12-pixel bottom/side margins.
+    // One bounded root reserves the footer's actual wrapped height. Instruments
+    // and the side column share the remaining height, so adding a HUD row can
+    // never push through an independently bottom-anchored help panel.
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
+                top: Val::Px(12.0),
                 bottom: Val::Px(12.0),
                 left: Val::Px(12.0),
                 right: Val::Px(12.0),
@@ -466,51 +446,95 @@ pub fn spawn_hud(mut commands: Commands) {
             },
             HudBottom,
         ))
-        .with_children(|bottom| {
-            bottom
-                .spawn((
+        .with_children(|root| {
+            root.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_grow: 1.0,
+                    min_height: Val::Px(0.0),
+                    flex_wrap: FlexWrap::Wrap,
+                    align_items: AlignItems::Stretch,
+                    column_gap: Val::Px(12.0),
+                    row_gap: Val::Px(8.0),
+                    ..default()
+                },
+                HudBody,
+            ))
+            .with_children(|body| {
+                body.spawn((
+                    Text::new(""),
+                    TextFont {
+                        font_size: 18.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.85, 1.0, 0.85)),
                     Node {
-                        width: Val::Percent(100.0),
-                        flex_wrap: FlexWrap::Wrap,
-                        align_items: AlignItems::FlexEnd,
-                        column_gap: Val::Px(12.0),
+                        max_width: Val::Percent(100.0),
+                        flex_shrink: 0.0,
+                        align_self: AlignSelf::FlexStart,
+                        ..default()
+                    },
+                    HudText,
+                ));
+                body.spawn((
+                    Node {
+                        display: Display::Grid,
+                        flex_basis: Val::Px(240.0),
+                        flex_grow: 1.0,
+                        flex_shrink: 0.0,
+                        min_width: Val::Px(0.0),
+                        max_width: Val::Percent(100.0),
+                        grid_template_columns: vec![GridTrack::flex(1.0)],
+                        grid_template_rows: vec![
+                            GridTrack::auto(),
+                            GridTrack::auto(),
+                            GridTrack::flex(1.0),
+                            GridTrack::auto(),
+                        ],
                         row_gap: Val::Px(8.0),
                         ..default()
                     },
-                    HudBottomPanels,
+                    HudSide,
                 ))
-                .with_children(|panels| {
-                    panels.spawn((
+                .with_children(|side| {
+                    side.spawn((
                         Text::new(help_text()),
                         TextFont {
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::srgba(0.8, 0.85, 0.9, 0.75)),
+                        TextColor(Color::srgba(0.8, 0.85, 0.9, 0.9)),
                         Node {
+                            grid_row: GridPlacement::start(3),
+                            align_self: AlignSelf::End,
+                            // Keep the content-sized block at the screen edge,
+                            // leaving the centered aircraft/flight scene clear.
+                            justify_self: JustifySelf::End,
                             max_width: Val::Percent(100.0),
                             min_width: Val::Px(0.0),
                             ..default()
                         },
                         HudHelp,
                     ));
-                    panels.spawn((
+                    side.spawn((
                         Text::new(""),
                         TextFont {
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::srgba(0.85, 0.9, 0.85, 0.7)),
+                        TextColor(Color::srgba(0.85, 0.9, 0.85, 0.85)),
                         Node {
+                            grid_row: GridPlacement::start(4),
+                            justify_self: JustifySelf::End,
                             max_width: Val::Percent(100.0),
                             min_width: Val::Px(0.0),
-                            margin: UiRect::left(Val::Auto),
                             ..default()
                         },
                         HudLog,
                     ));
                 });
-            bottom.spawn((
+            });
+            root.spawn((
                 Text::new(""),
                 TextFont {
                     font_size: 12.0,
@@ -581,12 +605,26 @@ LANDINGS {:>6}",
 pub fn update_help_for_replay(
     status: Res<ReplayStatus>,
     guidance: Option<Res<FlightGuidance>>,
+    cameras: Query<&Camera>,
     mut help: Query<&mut Text, With<HudHelp>>,
 ) {
-    let desired = if status.active {
-        "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nM .............. world map (preview only)\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay.".to_owned()
+    let compact = compact_hud(&cameras);
+    let desired = if status.active && compact {
+        "F5 pause/resume; F6/F7 speed; F8 -10s\nC view; M preview; F12 leave LAN\nF10/F11 input diagnostics\nReplay: flight controls ignored".to_owned()
+    } else if status.active {
+        replay_help_text().to_owned()
     } else if let Some(custom) = guidance.as_ref().and_then(|value| value.live_help.as_ref()) {
-        custom.clone()
+        if compact {
+            guidance
+                .as_ref()
+                .and_then(|value| value.compact_live_help.as_ref())
+                .unwrap_or(custom)
+                .clone()
+        } else {
+            custom.clone()
+        }
+    } else if compact {
+        compact_help_text().to_owned()
     } else {
         help_text()
     };
@@ -597,19 +635,37 @@ pub fn update_help_for_replay(
     }
 }
 
+pub(crate) const fn replay_help_text() -> &'static str {
+    "REPLAY CONTROLS\nF5 ............. pause / resume\nF6 / F7 ........ playback speed\nF8 ............. back 10 seconds\nC .............. change view\nM .............. world map (preview only)\nF10 / F11 ...... input diagnostics\nF12 ............ leave LAN\n\nFlight controls are ignored in replay."
+}
+
+/// Keep the original font sizes. A compact reference leaves room for measured
+/// notices at small viewports, including a resize before the next layout pass.
+fn compact_hud(cameras: &Query<&Camera>) -> bool {
+    cameras
+        .iter()
+        .filter(|camera| camera.is_active)
+        .filter_map(Camera::logical_viewport_size)
+        .any(|size| size.x < 900.0 || size.y < 600.0)
+}
+
+fn compact_help_text() -> &'static str {
+    "S/Down up; W/Up down; A/D roll\nLeft/Right roll; Q/E rudder\nPageUp/Down throttle; F/G flaps\n[/] trim; Space brakes; C view\nJ/L roll trim; U/O yaw trim\nShift fine; K reset roll/yaw\nH guide; M map; ,/. time\nR restart; F9 save; F10/11 inputs\nEsc pause / complete controls"
+}
+
 /// 操作説明。
 #[must_use]
 pub fn help_text() -> String {
     [
         "S/Down: pull up; W/Up: push down (pitch)",
-        "A/D or Left/Right . roll",
-        "Q/E ............... rudder",
+        "A/D or Left/Right: roll; Q/E: rudder",
         "PageUp/PageDown ... throttle (stays set)",
         "F/G ............... flaps out / in",
         "[ / ] ............. trim nose down/up (stays set)",
+        "J/L: roll trim; U/O: yaw trim (stays set)",
+        "Shift: fine roll/yaw trim; K: reset roll/yaw trim",
         "Space ............. wheel brakes",
-        "C ................. change view",
-        "H ................. hide / show the guide",
+        "C: change view; H: hide / show the guide",
         "M ................. world map / new flight",
         ", / . ............. time faster / slower",
         "Esc ............... pause",
@@ -724,9 +780,27 @@ pub fn update_hud(
 }
 
 /// 飛行記録の表示を更新する。
-pub fn update_flight_log_display(state: Res<HudState>, mut query: Query<&mut Text, With<HudLog>>) {
+pub fn update_flight_log_display(
+    state: Res<HudState>,
+    cameras: Query<&Camera>,
+    mut query: Query<&mut Text, With<HudLog>>,
+) {
+    let mut log = format_flight_log(state.log);
+    if compact_hud(&cameras) {
+        // Preserve all four values and their units; use the side column's
+        // width instead of spending four rows at a 480-pixel window height.
+        let short = log
+            .replace("AIRBORNE", "AIR TIME")
+            .replace("DISTANCE", "DIST")
+            .replace("PEAK AGL", "PEAK");
+        let lines: Vec<_> = short
+            .lines()
+            .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+            .collect();
+        log = format!("{}  {}\n{}  {}", lines[0], lines[1], lines[2], lines[3]);
+    }
     for mut text in &mut query {
-        **text = format_flight_log(state.log);
+        **text = log.clone();
     }
 }
 
@@ -1308,6 +1382,7 @@ mod tests {
         let custom = "DRY JET\nB: parking brake\nZero throttle is engine idle.";
         app.insert_resource(FlightGuidance {
             live_help: Some(custom.to_owned()),
+            compact_live_help: None,
             tutorial_enabled: false,
         });
         for _ in 0..3 {

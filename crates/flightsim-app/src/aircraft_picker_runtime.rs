@@ -118,13 +118,22 @@ impl AircraftPicker {
         // dynamics and explicit model/no-model/sound overrides. Do not dedupe by
         // profile ID or label: neither establishes complete physical identity.
         if !cfg!(feature = "commercial-staging") {
+            let opted_in = !startup.aircraft.is_turboprop()
+                || startup
+                    .aircraft_choice
+                    .as_ref()
+                    .is_some_and(|path| path.ends_with(".json"));
             entries.push(Entry {
                 view: WorldMapAircraftChoice {
                     label: format!("Launch: {}", startup.aircraft.name()),
-                    note: "Launch profile with its model and sound choices".into(),
-                    available: true,
+                    note: if opted_in {
+                        "Launch profile with its model and sound choices".into()
+                    } else {
+                        "Unavailable: turboprop requires an explicit --aircraft JSON profile".into()
+                    },
+                    available: opted_in,
                 },
-                choice: Some(AircraftChoice::current(startup)),
+                choice: opted_in.then(|| AircraftChoice::current(startup)),
             });
         }
         for (file, label, note) in [
@@ -160,7 +169,11 @@ impl AircraftPicker {
                 let expected_model = format!("aircraft/{}.glb", file.trim_end_matches(".json"));
                 if profile.id() != expected_id
                     || profile.model_path() != expected_model
-                    || profile.is_jet() != (file == "kestrel_jet_trainer.json")
+                    || if file == "kestrel_jet_trainer.json" {
+                        !profile.is_jet()
+                    } else {
+                        !profile.is_legacy()
+                    }
                 {
                     return Err("Installed profile does not match this aircraft preset; use an explicit CLI profile".into());
                 }
@@ -194,11 +207,11 @@ impl AircraftPicker {
             pending: None,
         }
     }
-    pub fn target_is_jet(&self, index: usize) -> bool {
+    pub fn target_uses_bounded_model(&self, index: usize) -> bool {
         self.entries
             .get(index)
             .and_then(|e| e.choice.as_ref())
-            .is_some_and(|choice| choice.profile.is_jet())
+            .is_some_and(|choice| choice.profile.uses_bounded_model())
     }
     pub fn available(&self, index: usize) -> bool {
         self.entries
@@ -292,8 +305,8 @@ pub(super) fn apply(world: &mut World) {
             world.insert_resource(picker);
             return;
         }
-        let error = if pending.startup.aircraft.is_jet() {
-            region_runtime::jet_start_error(world).map(str::to_owned)
+        let error = if pending.startup.aircraft.uses_bounded_model() {
+            region_runtime::bounded_start_error(world).map(str::to_owned)
         } else if !pending.startup.world.global_terrain {
             Some("Preview only: global terrain is off\nRestart with --global-terrain on".into())
         } else {
@@ -305,7 +318,7 @@ pub(super) fn apply(world: &mut World) {
             fail(world, &mut pending, error);
         }
         if matches!(pending.phase, Phase::Region) {
-            let resolved = if pending.startup.aircraft.is_jet() {
+            let resolved = if pending.startup.aircraft.uses_bounded_model() {
                 Some((pending.request, None))
             } else {
                 region_runtime::take_start_for_target(world, false)

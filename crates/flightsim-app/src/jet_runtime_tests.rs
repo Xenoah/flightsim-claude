@@ -359,6 +359,28 @@ fn jet_idle_parking_brake_has_measured_contact_creep_without_a_position_lock() {
 fn jet_guidance_and_notices_are_ascii_and_do_not_claim_prop_rotation_or_landing_grade() {
     let guidance = flight_session::jet_guidance();
     let help = guidance.live_help.unwrap();
+    let compact = guidance.compact_live_help.unwrap();
+    assert!(compact.is_ascii());
+    for key in [
+        "W/S",
+        "A/D",
+        "Q/E",
+        "PageUp/Down",
+        "F/G",
+        "[/]",
+        "Space/B",
+        "J/L",
+        "U/O",
+        "Shift",
+        "K reset",
+        "C view",
+        "M map",
+        "R restart",
+        "F9",
+        "Esc",
+    ] {
+        assert!(compact.contains(key), "compact jet reference lost {key}");
+    }
     assert!(!guidance.tutorial_enabled && help.is_ascii());
     assert!(!help.contains("75 kt"));
     let app = app(airborne(50.0));

@@ -1,4 +1,4 @@
-//! App-owned model dispatch. A replay owns exactly one jet simulation.
+//! App-owned explicit three-family dispatch. Each replay owns its only simulation.
 use crate::{BoxedSource, StartCondition, Startup};
 use bevy::prelude::*;
 use flightsim_core::{Geodetic, Meters, MetersPerSecond, Radians, Seconds};
@@ -8,6 +8,8 @@ use flightsim_sim::{
     Simulation,
     model_simulation::{JetEnvironment, JetSimulation, JetTerrain},
     replay_v4::{JetRecorder, JetReplayPlayer},
+    replay_v5::{TurbopropRecorder, TurbopropReplayPlayer},
+    turboprop_simulation::TurbopropSimulation,
 };
 
 pub(super) enum FlightSession {
@@ -23,6 +25,21 @@ pub(super) enum FlightSession {
     },
     JetReplay {
         player: JetReplayPlayer,
+        fault: Option<String>,
+        pending_seek: Option<u32>,
+        total: Seconds,
+    },
+    TurbopropLive {
+        simulation: TurbopropSimulation,
+        recorder: TurbopropRecorder,
+        parking_brake: bool,
+        pending_parking_toggle: bool,
+        last_controls: ControlInputs,
+        recording_error: Option<String>,
+        fault: Option<String>,
+    },
+    TurbopropReplay {
+        player: TurbopropReplayPlayer,
         fault: Option<String>,
         pending_seek: Option<u32>,
         total: Seconds,
@@ -47,6 +64,15 @@ impl FlightSession {
         }
     }
 
+    pub fn replay_turboprop(player: TurbopropReplayPlayer) -> Self {
+        let total = player.recording().duration();
+        Self::TurbopropReplay {
+            player,
+            total,
+            fault: None,
+            pending_seek: None,
+        }
+    }
     pub fn prepare_jet(
         startup: &Startup,
         clock: &flightsim_render::TimeOfDay,
@@ -104,18 +130,78 @@ impl FlightSession {
         })
     }
     pub fn is_jet(&self) -> bool {
-        !matches!(self, Self::Legacy(_))
+        matches!(self, Self::JetLive { .. } | Self::JetReplay { .. })
+    }
+    pub fn is_turboprop(&self) -> bool {
+        matches!(
+            self,
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. }
+        )
+    }
+    pub fn uses_bounded_model(&self) -> bool {
+        matches!(
+            self,
+            Self::JetLive { .. }
+                | Self::JetReplay { .. }
+                | Self::TurbopropLive { .. }
+                | Self::TurbopropReplay { .. }
+        )
+    }
+    pub fn prepare_bounded(
+        startup: &Startup,
+        clock: &flightsim_render::TimeOfDay,
+        start: StartCondition,
+    ) -> Result<Self, String> {
+        match &startup.aircraft {
+            crate::aircraft_profile::SelectedAircraftProfile::Jet(_) => {
+                Self::prepare_jet(startup, clock, start)
+            }
+            crate::aircraft_profile::SelectedAircraftProfile::Turboprop(_) => {
+                crate::turboprop_session::prepare(startup, clock, start)
+            }
+            crate::aircraft_profile::SelectedAircraftProfile::Legacy(_) => {
+                Err("bounded session requires an explicit jet or turboprop profile".into())
+            }
+        }
+    }
+    pub fn turboprop(&self) -> Option<&TurbopropSimulation> {
+        match self {
+            Self::TurbopropLive { simulation, .. } => Some(simulation),
+            Self::TurbopropReplay { player, .. } => Some(player.simulation()),
+            _ => None,
+        }
+    }
+    pub fn model_conditions(&self) -> Option<flightsim_sim::replay::EnvironmentConditions> {
+        match self {
+            Self::JetLive { simulation, .. } => Some(simulation.environment().conditions),
+            Self::JetReplay { player, .. } => Some(player.simulation().environment().conditions),
+            Self::TurbopropLive { simulation, .. } => Some(simulation.environment().conditions),
+            Self::TurbopropReplay { player, .. } => {
+                Some(player.simulation().environment().conditions)
+            }
+            Self::Legacy(_) => None,
+        }
+    }
+    pub fn weather_selection(&self) -> Option<flightsim_sim::weather::WeatherSelection> {
+        match self {
+            Self::JetLive { simulation, .. } => Some(simulation.environment().weather),
+            Self::JetReplay { player, .. } => Some(player.simulation().environment().weather),
+            Self::TurbopropLive { simulation, .. } => Some(simulation.environment().weather),
+            Self::TurbopropReplay { player, .. } => Some(player.simulation().environment().weather),
+            Self::Legacy(_) => None,
+        }
     }
     pub fn is_replay(&self) -> bool {
-        matches!(self, Self::JetReplay { .. })
+        matches!(self, Self::JetReplay { .. } | Self::TurbopropReplay { .. })
     }
     pub fn jet(&self) -> Option<&JetSimulation> {
         match self {
-            Self::Legacy(_) => None,
+            Self::Legacy(_) | Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => None,
             Self::JetLive { simulation, .. } => Some(simulation),
             Self::JetReplay { player, .. } => Some(player.simulation()),
         }
     }
+    #[cfg(test)]
     pub fn jet_environment(&self) -> Option<JetEnvironment> {
         self.jet().map(JetSimulation::environment)
     }
@@ -142,12 +228,17 @@ impl FlightSession {
             Self::Legacy(s) => s.state(),
             Self::JetLive { simulation, .. } => simulation.state(),
             Self::JetReplay { player, .. } => player.simulation().state(),
+            Self::TurbopropLive { simulation, .. } => &simulation.state().rigid_body,
+            Self::TurbopropReplay { player, .. } => &player.simulation().state().rigid_body,
         }
     }
     pub fn elapsed(&self) -> Seconds {
         match self {
             Self::Legacy(s) => s.elapsed(),
-            _ => self.jet().unwrap().elapsed(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().elapsed(),
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().elapsed()
+            }
         }
     }
     pub fn interpolated(&self) -> flightsim_sim::InterpolatedState {
@@ -155,12 +246,17 @@ impl FlightSession {
             Self::Legacy(s) => s.interpolated(),
             Self::JetLive { simulation, .. } => simulation.interpolated(),
             Self::JetReplay { player, .. } => player.interpolated(),
+            Self::TurbopropLive { simulation, .. } => simulation.interpolated(),
+            Self::TurbopropReplay { player, .. } => player.interpolated(),
         }
     }
     pub fn ground(&self) -> flightsim_sim::GroundPlane {
         match self {
             Self::Legacy(s) => s.ground(),
-            _ => self.jet().unwrap().snapshot().ground,
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().snapshot().ground,
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().snapshot().ground
+            }
         }
     }
     pub fn agl(&self) -> Meters {
@@ -172,44 +268,61 @@ impl FlightSession {
     pub fn wind(&self) -> flightsim_sim::Wind {
         match self {
             Self::Legacy(s) => s.wind(),
-            _ => self.jet_environment().unwrap().conditions.wind,
+            _ => self.model_conditions().unwrap().wind,
         }
     }
     #[cfg(test)]
     pub fn climate(&self) -> Option<flightsim_world::ClimateDate> {
         match self {
             Self::Legacy(s) => s.climate(),
-            _ => self.jet_environment().unwrap().conditions.climate_date,
+            _ => self.model_conditions().unwrap().climate_date,
         }
     }
     pub fn climate_sample(&self) -> Option<flightsim_world::ClimateSample> {
         match self {
             Self::Legacy(s) => s.climate_sample(),
-            _ => self.jet().unwrap().climate_sample(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().climate_sample(),
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().climate_sample()
+            }
         }
     }
     pub fn atmosphere_sample(&self) -> flightsim_fdm::AtmosphereSample {
         match self {
             Self::Legacy(s) => s.atmosphere_sample(),
-            _ => self.jet().unwrap().atmosphere_sample(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => {
+                self.jet().unwrap().atmosphere_sample()
+            }
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().atmosphere_sample()
+            }
         }
     }
     pub fn aero_angles(&self) -> flightsim_fdm::AeroAngles {
         match self {
             Self::Legacy(s) => s.aero_angles(),
-            _ => self.jet().unwrap().aero_angles(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().aero_angles(),
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().aero_angles()
+            }
         }
     }
     pub fn airspeed(&self) -> MetersPerSecond {
         match self {
             Self::Legacy(s) => s.airspeed(),
-            _ => self.jet().unwrap().airspeed(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().airspeed(),
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().airspeed()
+            }
         }
     }
     pub fn log(&self) -> flightsim_sim::FlightLog {
         match self {
             Self::Legacy(s) => s.log(),
-            _ => self.jet().unwrap().log(),
+            Self::JetLive { .. } | Self::JetReplay { .. } => self.jet().unwrap().log(),
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().log()
+            }
         }
     }
     pub fn crash(&self) -> Option<&flightsim_sim::Crash> {
@@ -227,32 +340,60 @@ impl FlightSession {
     pub fn touchdown_count(&self) -> u32 {
         match self {
             Self::Legacy(s) => s.touchdown_count(),
-            _ => self.jet().unwrap().snapshot().touchdown_count,
+            Self::JetLive { .. } | Self::JetReplay { .. } => {
+                self.jet().unwrap().snapshot().touchdown_count
+            }
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().snapshot().touchdown_count
+            }
         }
     }
     pub fn last_touchdown(&self) -> Option<flightsim_sim::Touchdown> {
         match self {
             Self::Legacy(s) => s.last_touchdown().copied(),
-            _ => self.jet().unwrap().snapshot().last_touchdown,
+            Self::JetLive { .. } | Self::JetReplay { .. } => {
+                self.jet().unwrap().snapshot().last_touchdown
+            }
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().snapshot().last_touchdown
+            }
         }
     }
     pub fn on_ground(&self) -> bool {
         match self {
             Self::Legacy(s) => s.agl().get() < flightsim_sim::gear_height(s.config()).get() + 0.3,
-            _ => self.jet().unwrap().presentation().on_ground,
+            Self::JetLive { .. } | Self::JetReplay { .. } => {
+                self.jet().unwrap().presentation().on_ground
+            }
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().presentation().on_ground
+            }
         }
     }
     pub fn fault(&self) -> Option<&str> {
         match self {
             Self::Legacy(_) => None,
-            Self::JetLive { fault, .. } | Self::JetReplay { fault, .. } => fault.as_deref(),
+            Self::JetLive { fault, .. }
+            | Self::JetReplay { fault, .. }
+            | Self::TurbopropLive { fault, .. }
+            | Self::TurbopropReplay { fault, .. } => fault.as_deref(),
         }
     }
     pub fn terminal_message(&self) -> Option<String> {
         self.fault().map(str::to_owned).or_else(|| {
-            self.jet()?
-                .terminal()
-                .map(|event| format!("JET STOPPED at step {}: {}", event.cursor, event.failure))
+            if let Some(jet) = self.jet() {
+                jet.terminal()
+                    .map(|event| format!("JET STOPPED at step {}: {}", event.cursor, event.failure))
+            } else if let Some(turboprop) = self.turboprop() {
+                turboprop.terminal().map(|event| {
+                    format!(
+                        "TURBOPROP STOPPED at step {}: {}",
+                        event.cursor, event.failure
+                    )
+                })
+            } else {
+                None
+            }
         })
     }
     pub fn audio_paused(&self) -> bool {
@@ -274,20 +415,55 @@ impl FlightSession {
                     || player.faulted()
                     || fault.is_some()
             }
+            Self::TurbopropLive {
+                simulation, fault, ..
+            } => simulation.terminal().is_some() || fault.is_some(),
+            Self::TurbopropReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                pending_seek.is_some()
+                    || player.paused()
+                    || player.seeking()
+                    || player.finished()
+                    || player.faulted()
+                    || fault.is_some()
+            }
         }
     }
     pub fn seeking(&self) -> bool {
-        matches!(self, Self::JetReplay { player, pending_seek, .. } if pending_seek.is_some() || player.seeking())
+        match self {
+            Self::JetReplay {
+                player,
+                pending_seek,
+                ..
+            } => pending_seek.is_some() || player.seeking(),
+            Self::TurbopropReplay {
+                player,
+                pending_seek,
+                ..
+            } => pending_seek.is_some() || player.seeking(),
+            _ => false,
+        }
     }
     pub fn last_controls(&self) -> Option<ControlInputs> {
         match self {
             Self::Legacy(_) => None,
-            Self::JetLive { last_controls, .. } => Some(*last_controls),
+            Self::JetLive { last_controls, .. } | Self::TurbopropLive { last_controls, .. } => {
+                Some(*last_controls)
+            }
             Self::JetReplay { player, .. } => Some(player.last_controls()),
+            Self::TurbopropReplay { player, .. } => Some(player.last_controls()),
         }
     }
     pub fn queue_parking_toggle(&mut self) {
         if let Self::JetLive {
+            pending_parking_toggle,
+            ..
+        }
+        | Self::TurbopropLive {
             pending_parking_toggle,
             ..
         } = self
@@ -301,11 +477,16 @@ impl FlightSession {
                 parking_brake,
                 pending_parking_toggle,
                 ..
+            }
+            | Self::TurbopropLive {
+                parking_brake,
+                pending_parking_toggle,
+                ..
             } => Some((*parking_brake, *pending_parking_toggle)),
             _ => None,
         }
     }
-    pub fn advance_jet(
+    pub fn advance_bounded(
         &mut self,
         dt: Seconds,
         controls: &mut PilotControls,
@@ -386,6 +567,79 @@ impl FlightSession {
                     *fault = Some(format!("JET REPLAY RENDER STOPPED: {error}"));
                 }
             }
+            Self::TurbopropLive {
+                simulation,
+                recorder,
+                parking_brake,
+                pending_parking_toggle,
+                last_controls,
+                recording_error,
+                fault,
+            } => {
+                if fault.is_some() || simulation.terminal().is_some() {
+                    return;
+                }
+                let mut pilot = (
+                    *controls,
+                    *parking_brake,
+                    *pending_parking_toggle,
+                    *last_controls,
+                );
+                let report =
+                    simulation.advance_with_controller(dt, &mut pilot, |pilot, fixed_dt, _| {
+                        pilot.0.update_from_sample(fixed_dt, sample);
+                        if pilot.2 {
+                            pilot.1 = !pilot.1;
+                            pilot.2 = false;
+                        }
+                        let input = pilot.0.to_control_inputs();
+                        pilot.3 =
+                            input.with_brakes(input.brakes().max(if pilot.1 { 1.0 } else { 0.0 }));
+                        pilot.3
+                    });
+                *controls = pilot.0;
+                *parking_brake = pilot.1;
+                *pending_parking_toggle = pilot.2;
+                *last_controls = pilot.3;
+                if recording_allowed
+                    && recording_error.is_none()
+                    && report.attempted_steps() > 0
+                    && let Err(error) = recorder.record(&report)
+                {
+                    *recording_error = Some(format!(
+                        "RECORDING STOPPED: {error}; F9 saves the last valid prefix"
+                    ));
+                }
+                if let Err(error) = validate_model_state(&simulation.state().rigid_body) {
+                    *fault = Some(format!("TURBOPROP RENDER STOPPED: {error}"));
+                }
+            }
+            Self::TurbopropReplay {
+                player,
+                fault,
+                pending_seek,
+                ..
+            } => {
+                let result = if let Some(target) = pending_seek.take() {
+                    *fault = None;
+                    player.seek_to(target)
+                } else {
+                    if fault.is_some() {
+                        return;
+                    }
+                    if player.seeking() {
+                        player.continue_seek()
+                    } else {
+                        player.advance(dt)
+                    }
+                };
+                if let Err(error) = result {
+                    *fault = Some(format!("TURBOPROP REPLAY STOPPED: {error}"));
+                }
+                if let Err(error) = validate_model_state(&player.simulation().state().rigid_body) {
+                    *fault = Some(format!("TURBOPROP REPLAY RENDER STOPPED: {error}"));
+                }
+            }
             Self::Legacy(_) => unreachable!(),
         }
     }
@@ -400,16 +654,32 @@ impl FlightSession {
         if let Some(sim) = self.legacy() {
             return flightsim_render::placeholder_parts(sim.config());
         }
-        let geometry = self.jet().unwrap().config().airframe().geometry();
+        let geometry = match self {
+            Self::JetLive { .. } | Self::JetReplay { .. } => {
+                self.jet().unwrap().config().airframe().geometry()
+            }
+            Self::TurbopropLive { .. } | Self::TurbopropReplay { .. } => {
+                self.turboprop().unwrap().config().airframe().geometry()
+            }
+            Self::Legacy(_) => unreachable!(),
+        };
         vec![
             flightsim_render::aircraft::AircraftPart {
-                name: "generic jet body",
+                name: if self.is_jet() {
+                    "generic jet body"
+                } else {
+                    "numerical turboprop body"
+                },
                 mesh: Mesh::from(Cuboid::new(6.0, 0.9, 0.9)),
                 transform: Transform::default(),
                 color: Color::srgb(0.8, 0.85, 0.9),
             },
             flightsim_render::aircraft::AircraftPart {
-                name: "generic jet wing",
+                name: if self.is_jet() {
+                    "generic jet wing"
+                } else {
+                    "numerical turboprop wing"
+                },
                 mesh: Mesh::from(Cuboid::new(
                     geometry.mean_chord.get() as f32,
                     geometry.wing_span.get() as f32,
@@ -422,25 +692,46 @@ impl FlightSession {
     }
 }
 
-pub(super) fn validate_jet_sources(startup: &Startup) -> Result<(), String> {
+pub(super) fn validate_model_sources(startup: &Startup) -> Result<(), String> {
     if startup.tiles.is_some()
         || startup.active_region.is_some()
         || startup.regions.select.is_some()
     {
-        return Err("Jet flights support only bundled global terrain or explicit flat-zero terrain; remove --tiles and regional package selection".into());
+        return Err("Jet/turboprop flights support only bundled global terrain or explicit flat-zero terrain; remove --tiles and regional package selection".into());
     }
     Ok(())
 }
-pub(super) fn validate_jet_state(state: &RigidBodyState) -> Result<(), String> {
+pub(super) fn validate_model_state(state: &RigidBodyState) -> Result<(), String> {
     crate::replay_runtime::validate_replay_position(state.position).map_err(str::to_owned)?;
     if !state.is_finite()
         || !state.velocity.length_squared().is_finite()
         || !state.angular_velocity.length_squared().is_finite()
         || (state.orientation.length() - 1.0).abs() > 1e-9
     {
-        return Err("state has nonfinite magnitudes or a nonunit jet attitude".into());
+        return Err("state has nonfinite magnitudes or a nonunit model attitude".into());
     }
     Ok(())
+}
+
+pub(super) fn validate_jet_sources(startup: &Startup) -> Result<(), String> {
+    validate_model_sources(startup)
+}
+pub(super) fn validate_jet_state(state: &RigidBodyState) -> Result<(), String> {
+    validate_model_state(state)
+}
+
+pub(super) fn guidance_for(
+    profile: &crate::aircraft_profile::SelectedAircraftProfile,
+) -> flightsim_ui::FlightGuidance {
+    match profile {
+        crate::aircraft_profile::SelectedAircraftProfile::Jet(_) => jet_guidance(),
+        crate::aircraft_profile::SelectedAircraftProfile::Turboprop(_) => {
+            crate::turboprop_session::guidance()
+        }
+        crate::aircraft_profile::SelectedAircraftProfile::Legacy(_) => {
+            flightsim_ui::FlightGuidance::default()
+        }
+    }
 }
 
 /// Read and validate the complete v4 player before changing startup selection.
@@ -584,7 +875,7 @@ pub(super) fn save_jet_recording(
 }
 
 pub(super) fn jet_guidance() -> flightsim_ui::FlightGuidance {
-    flightsim_ui::FlightGuidance { tutorial_enabled: false, live_help: Some("DRY JET CONTROLS\nW/S pitch  A/D roll  Q/E yaw\nPageUp/= up  PageDown/- down (thrust)\n[ / ] trim  F/G flaps  Space service brake\nB parking brake  C camera\nEsc pause  R restart  F9 save replay\nM new flight / weather\n\nEngine runs at idle at 0% throttle.\nRelease parking brake before taxi.\nExperimental model; no landing grading.".into()) }
+    flightsim_ui::FlightGuidance { tutorial_enabled: false, compact_live_help: Some("W/S pitch; A/D roll; Q/E yaw\nPageUp/Down thrust; F/G flaps\n[/] trim; Space/B brakes\nJ/L roll trim; U/O yaw trim\nShift fine; K reset roll/yaw\nC view; M map; R restart; F9 save\nEsc pause / complete controls".into()), live_help: Some("DRY JET CONTROLS\nW/S pitch  A/D roll  Q/E yaw\nPageUp/= up  PageDown/- down (thrust)\n[ / ] trim  F/G flaps  Space service brake\nB parking brake  C camera\nJ/L roll trim  U/O yaw trim  K reset both\nShift + trim: fine (0.002/s); normal 0.01/s\nEsc pause  R restart  F9 save replay\nM new flight / weather\n\nEngine runs at idle at 0% throttle.\nRelease parking brake before taxi.\nExperimental model; no landing grading.".into()) }
 }
 
 pub(super) fn ascii_notice(message: &str) -> String {

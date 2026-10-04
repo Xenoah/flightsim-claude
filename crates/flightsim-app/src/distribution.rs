@@ -51,6 +51,17 @@ pub(super) fn aircraft_listing() -> &'static str {
     }
 }
 
+/// The new third family is development-only. Existing v1/v2 inspection rules
+/// and pure profile-v3/replay-v5 library APIs retain their meanings.
+pub(super) fn validate_profile_start(
+    profile: &crate::aircraft_profile::SelectedAircraftProfile,
+) -> Result<(), String> {
+    if cfg!(feature = "commercial-staging") && profile.is_turboprop() {
+        return Err("commercial-staging does not support profile-v3 turboprop live/replay startup; use a development build for this experimental family".into());
+    }
+    Ok(())
+}
+
 pub(super) fn adjacent_assets(executable: &Path) -> Option<PathBuf> {
     let candidate = executable.parent()?.join("assets");
     candidate.is_dir().then(|| candidate.canonicalize().ok())?
@@ -208,5 +219,86 @@ mod tests {
                 .check_reproducible_with(&sport.configuration())
                 .is_err()
         );
+    }
+    #[test]
+    fn development_v3_opt_in_and_commercial_startup_boundary_are_explicit() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+        );
+        // Read-only exact metadata inspection is available in either build.
+        let selected = crate::aircraft_profile::SelectedAircraftProfile::load(path).unwrap();
+        assert!(selected.is_turboprop());
+        for replay in [false, true] {
+            let mut args = vec![
+                "--aircraft".to_owned(),
+                path.to_owned(),
+                "--no-model".to_owned(),
+            ];
+            if replay {
+                args.extend(["--replay".into(), "must-not-be-opened.fsreplay".into()]);
+            }
+            let (startup, _) = crate::parse_arguments_from(args);
+            if cfg!(feature = "commercial-staging") {
+                assert_eq!(startup.aircraft.id(), "swift-sport");
+                assert!(
+                    startup
+                        .aircraft_error
+                        .as_ref()
+                        .unwrap()
+                        .contains("profile-v3 turboprop live/replay startup")
+                );
+            } else {
+                assert!(startup.aircraft.is_turboprop());
+                assert!(startup.aircraft_error.is_none());
+            }
+        }
+        for id in ["light-single", "swift-sport"] {
+            assert!(
+                validate_profile_start(
+                    &crate::aircraft_profile::SelectedAircraftProfile::builtin(id).unwrap()
+                )
+                .is_ok()
+            );
+        }
+        let jet = crate::aircraft_profile::SelectedAircraftProfile::Jet(
+            flightsim_sim::aircraft_profile::AircraftProfileV2::parse(include_str!(
+                "../../../assets/aircraft/kestrel_jet_trainer.json"
+            ))
+            .unwrap(),
+        );
+        assert!(validate_profile_start(&jet).is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "commercial-staging")]
+    fn commercial_v3_direct_start_gates_precede_source_reads_and_session_preparation() {
+        let mut startup = crate::Startup {
+            aircraft: crate::aircraft_profile::SelectedAircraftProfile::Turboprop(
+                flightsim_sim::aircraft_profile_v3::AircraftProfileV3::parse(include_str!(
+                    "../../../docs/examples/aircraft-profiles-v3/numerical-turboprop.json"
+                ))
+                .unwrap(),
+            ),
+            replay: Some("must-not-be-opened.fsreplay".into()),
+            tiles: Some("must-not-be-read".into()),
+            ..Default::default()
+        };
+        let before = format!("{startup:?}");
+        let error =
+            crate::turboprop_session::resolve_sources(&mut startup, &mut Default::default())
+                .unwrap_err();
+        assert!(error.contains("commercial-staging"));
+        assert_eq!(format!("{startup:?}"), before);
+        let result = crate::FlightSession::prepare_bounded(
+            &startup,
+            &flightsim_render::TimeOfDay::default(),
+            crate::StartCondition::Parked {
+                position: startup.start,
+                heading: startup.heading,
+            },
+        );
+        assert!(matches!(result, Err(error) if error.contains("commercial-staging")));
+        assert_eq!(format!("{startup:?}"), before);
     }
 }

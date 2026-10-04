@@ -87,6 +87,12 @@ does not guarantee recovery before ground contact. In a crash, use R to restart;
 Esc pauses the flight. H toggles the contextual guide. An explicit --approach
 start seeds approach guidance separately from a runway takeoff.
 
+Small windows show a compact flight-key reference beside the instruments.
+Press Esc during live flight for the complete aircraft-specific controls and
+display settings; use the mouse wheel to scroll that reference, then Esc to
+resume. The reference keeps its readable font size when the window is resized.
+Replay shows its own playback keys instead of live flight instructions.
+
 ## Basis and limits
 
 The current ground-rotation guidance uses **75 kt EAS**, a gentle input and

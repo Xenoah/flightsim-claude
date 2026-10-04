@@ -4,7 +4,8 @@
 loader for `running_turboprop_table`, [physical law revision 1](adr/0018-bounded-running-turboprop.md). It returns an
 immutable `TurbopropAircraftConfig`, presentation/input metadata and an explicit
 `RunningTurbopropStart`. It performs no asset read, warmup, flight initialization
-or app/replay dispatch. Existing profile v1/v2 decoders and replay v1–v4 retain
+or app/replay dispatch itself. The separate [opt-in app session](turboprop-native-app.md)
+and [replay v5](replay-v5.md) provide those boundaries. Existing profile v1/v2 decoders and replay v1–v4 retain
 their meanings; the v4 identity gate remains exclusively schema-2 dry jet.
 
 The public [JSON Schema](../schemas/aircraft-profile-v3.schema.json) describes
@@ -81,8 +82,8 @@ the reduced tensor is rejected before any assertion-based constructor call.
 is in `[0,1]`, shaft speed inside the relative-shaft interval and pitch inside
 governor stops. `running_start()` returns validated fraction and SI wrappers.
 These initial conditions are not solved equilibrium. No live time is advanced
-to settle the engine. A future session/replay integration must use and store the
-actual complete initial state and evaluate its actual environment explicitly.
+to settle the engine. The app/session integration uses and stores the actual complete initial state
+and evaluates its actual environment explicitly.
 
 Names, model axes/paths, sound aliases, control rates and camera metadata use
 the existing [v2 metadata semantics](aircraft-profile-v2.md#metadata-and-authoring-limits).
@@ -126,8 +127,9 @@ kind 3, FDM law 1; turbine/propeller/governor component schema 1 and isolated
 propeller convention 1. The unchanged Mach-aero component remains schema 1.
 No existing version is reused with a new meaning. The byte layout
 and its version meanings are fixed. The separate [replay v5 codec](replay-v5.md)
-now preserves the complete engine state; this profile loader itself performs no
-replay or app dispatch.
+now preserves the complete engine state and uses this schema-3 identity; the
+unchanged v4 gate cannot admit it. This profile loader itself performs no replay
+or app dispatch.
 
 Canonical bytes are little endian and preserve validated f64 bit patterns:
 

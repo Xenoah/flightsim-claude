@@ -249,3 +249,39 @@ fn explicit_field_choices_survive_later_difficulty_resolution() {
         0.0_f64.to_bits()
     );
 }
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn typed_v5_replay_rejects_wind_edits_without_a_legacy_replay_resource_or_cli_path() {
+    let startup = crate::turboprop_lifecycle_tests::startup();
+    let record = crate::turboprop_lifecycle_tests::recording(0);
+    let player = flightsim_sim::replay_v5::TurbopropReplayPlayer::new(
+        startup
+            .aircraft
+            .turboprop()
+            .unwrap()
+            .configuration()
+            .clone(),
+        record,
+    )
+    .unwrap();
+    let mut world = world(startup);
+    assert!(world.resource::<Startup>().replay.is_none());
+    let before = PhysicalConditions::from_startup(world.resource::<Startup>());
+    world.insert_resource(FlightSimulation(crate::FlightSession::replay_turboprop(
+        player,
+    )));
+    world.resource_mut::<WorldMapActions>().conditions = Some(WorldMapConditionsEdit {
+        wind_speed: Some(Knots(30.0)),
+        turbulence: Some(WorldMapTurbulence::Severe),
+        ..edit()
+    });
+    world.run_system_once(select_pending_conditions).unwrap();
+    assert!(!world.resource::<WorldMapState>().wind_settings.enabled);
+    assert_eq!(snapshot(&world, world.resource::<Startup>()), before);
+    assert_eq!(
+        PhysicalConditions::from_startup(world.resource::<Startup>()),
+        before
+    );
+    assert!(world.resource::<WorldMapActions>().conditions.is_none());
+}

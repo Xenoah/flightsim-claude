@@ -150,7 +150,7 @@ fn resizing_and_switching_replay_reserves_new_height_in_the_same_update() {
 }
 
 #[test]
-fn clearing_credit_restores_both_original_bottom_margins_without_changing_text() {
+fn clearing_credit_restores_log_bottom_margin_without_changing_help_text() {
     let size = UVec2::new(1280, 720);
     let mut app = layout_app(size, FULL_CREDIT, false);
     assert_footer_clear(&mut app, size);
@@ -160,9 +160,8 @@ fn clearing_credit_restores_both_original_bottom_margins_without_changing_text()
     let help = entity::<HudHelp>(world);
     let log = entity::<HudLog>(world);
     let footer = entity::<DataAttributionDisplay>(world);
-    for panel in [help, log] {
-        assert!((rect(world, panel).max.y - 708.0).abs() < 1.0);
-    }
+    assert!((rect(world, log).max.y - 708.0).abs() < 1.0);
+    assert!(rect(world, help).max.y <= rect(world, log).min.y - 7.0);
     assert_eq!(world.get::<Text>(help).unwrap().as_str(), help_text());
     assert_eq!(world.get::<Node>(footer).unwrap().display, Display::None);
     assert_eq!(world.get::<Visibility>(footer), Some(&Visibility::Hidden));
