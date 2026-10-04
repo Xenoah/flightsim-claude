@@ -769,6 +769,98 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
                     candidate.validate_evidence(evidence)
 
+    def test_responsive_map_rejects_scroll_modal_and_pointer_witness_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-ui/src/world_map.rs",
+             b'    layout.update(&state);', b'    let _ = &mut layout;'),
+            ("crates/flightsim-ui/src/world_map.rs",
+             b'WorldMapBody, ScrollSurface::Map, ScrollPosition::default()',
+             b'WorldMapBody, ScrollSurface::Credits, ScrollPosition::default()'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'size.x < 900.0 || size.y < 600.0', b'size.x < 640.0 || size.y < 480.0'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'AlignItems::Start', b'AlignItems::Center'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'* node.inverse_scale_factor()', b'* 1.0'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'let delta = if delta.is_finite() { delta } else { 0.0 };', b'let delta = delta;'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'state.visible.then_some(if state.wind_editor.is_some() {',
+             b'true.then_some(if state.wind_editor.is_some() {'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'active != Some(*surface) && *surface != ScrollSurface::Map',
+             b'active != Some(*surface)'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'if !opening {', b'if true {'),
+            ("crates/flightsim-ui/src/world_map_layout.rs",
+             b'(position.y + delta).clamp(0.0, max)', b'position.y + delta'),
+            ("crates/flightsim-ui/src/regions.rs",
+             b'ScrollSurface::Regions, ScrollPosition::default()',
+             b'ScrollSurface::Map, ScrollPosition::default()'),
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'super::ScrollSurface::Wind, ScrollPosition::default()',
+             b'super::ScrollSurface::Map, ScrollPosition::default()'),
+            ("crates/flightsim-ui/src/world_map_layout_tests.rs",
+             b'assert!(!bounds.contains(point));', b'assert!(bounds.contains(point));'),
+            ("crates/flightsim-ui/src/world_map_layout_tests.rs",
+             b'assert_eq!(position, before);', b'assert!(position >= 0.0);'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            # The pointer witness covers both clipped Start and clipped raster.
+            expected_count = 2 if old == b'assert!(!bounds.contains(point));' else 1
+            self.assertEqual(original.count(old), expected_count, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_responsive_map_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        paths = (
+            "crates/flightsim-ui/src/world_map.rs",
+            "crates/flightsim-ui/src/wind_settings.rs",
+            "crates/flightsim-ui/src/regions.rs",
+            "crates/flightsim-ui/src/world_map_layout.rs",
+            "crates/flightsim-ui/src/world_map_layout_tests.rs",
+        )
+        for relative in paths:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
         self.checkout_source_fixture(repo, "crlf")

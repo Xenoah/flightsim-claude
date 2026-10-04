@@ -265,6 +265,14 @@ temperature to the FDM; `render` applies procedural climate-derived surface cues
 `ui` presents a data-only modal world map; `app` coordinates explicit new flights.
 Neither the map preview nor render LOD mutates physical terrain or climate.
 
+The map's measured scroll body stacks its map/sidebar at narrow or short logical
+viewports. Credits, region/download controls and wind use their own bounded
+scroll surface; only the active modal consumes wheel input. Close resets map
+scroll, while child dismissal restores the map's place. Text sizes and the
+app-owned Start/Cancel and replay-lock contracts are unchanged. See
+[small-window map QA](docs/qa/world-map-small-window-2026-10-04.md).
+
+
 Map aircraft selection is an app-owned staged new-flight transaction
 ([ADR-0016](docs/adr/0016-transactional-new-flight-aircraft.md)). It snapshots the
 validated target profile, destination/month, weather and regional selection;

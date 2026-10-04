@@ -115,6 +115,12 @@ REPLAY_CONTRACT_PATHS = {
     # implementation and the actual wrapped-footer layout witness together.
     "crates/flightsim-ui/src/pause.rs",
     "crates/flightsim-ui/src/attribution_layout_tests.rs",
+    # The same staged map now delegates presentation to measured scroll/reflow
+    # helpers. Bind its child region controls and actual glyph/pointer witnesses;
+    # these pins do not change the app's transaction, replay or source admission.
+    "crates/flightsim-ui/src/regions.rs",
+    "crates/flightsim-ui/src/world_map_layout.rs",
+    "crates/flightsim-ui/src/world_map_layout_tests.rs",
 }
 # Separate pure law/profile/replay review; these pins grant no new app or
 # commercial aircraft admission. Retained forward and original-token inputs are

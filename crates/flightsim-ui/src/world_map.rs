@@ -16,6 +16,11 @@ use bevy::text::LineHeight;
 use bevy::ui::{FocusPolicy, RelativeCursorPosition};
 use flightsim_core::{Degrees, Geodetic, Meters};
 
+#[path = "world_map_layout.rs"]
+mod layout;
+pub use layout::MapLayout;
+use layout::{LayoutRole, ScrollSurface};
+
 #[path = "regions.rs"]
 mod regions;
 #[path = "wind_settings.rs"]
@@ -36,8 +41,8 @@ const RASTER_BYTES: usize = 720 * 360 * 4;
 const CREDIT_COLUMNS: usize = 96;
 const CREDIT_LINES_PER_PAGE: usize = 20;
 const MAX_CREDIT_CHARACTERS: usize = 16_384;
-// Layout budget for the supported 1280x720 viewport. The centered maximum
-// width also prevents wide windows from making the 2:1 map too tall.
+// Desktop widths retain the bounded 2:1 map. A measured scroll viewport
+// contains taller content, and narrow windows stack the two columns.
 const MAP_ROOT_PADDING: f32 = 16.0;
 const MAP_ROOT_GAP: f32 = 10.0;
 const MAP_HEADER_HEIGHT: f32 = 36.0;
@@ -638,7 +643,8 @@ pub enum WorldMapButton {
 }
 
 /// Spawn an opaque modal over existing HUDs. The map keeps a 2:1 aspect ratio;
-/// a 308-pixel sidebar and bounded descriptions target a 1280x720 viewport.
+/// the sidebar stacks below it in narrow windows. The measured body scrolls
+/// without shrinking controls or covering the wrapping header and footer.
 pub fn spawn_world_map(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
@@ -664,7 +670,8 @@ pub fn spawn_world_map(
         Name::new("World map"),
     )).with_children(|root| {
         root.spawn(Node {
-            width: percent(100.0), height: px(MAP_HEADER_HEIGHT), flex_shrink: 0.0,
+            width: percent(100.0), min_height: px(MAP_HEADER_HEIGHT), flex_shrink: 0.0,
+            flex_wrap: FlexWrap::Wrap, column_gap: px(12.0), row_gap: px(6.0),
             align_items: AlignItems::Center, justify_content: JustifyContent::SpaceBetween,
             ..default()
         }).with_children(|header| {
@@ -676,17 +683,23 @@ pub fn spawn_world_map(
         });
         root.spawn((Node {
             width: percent(100.0), flex_grow: 1.0, min_height: px(0.0),
-            column_gap: px(MAP_BODY_GAP), align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center, ..default()
-        }, WorldMapBody)).with_children(|body| {
+            flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(),
+            ..default()
+        }, WorldMapBody, ScrollSurface::Map, ScrollPosition::default())).with_children(|viewport| {
+          viewport.spawn((Node {
+            width: percent(100.0), min_height: percent(100.0), flex_shrink: 0.0,
+            column_gap: px(MAP_BODY_GAP), row_gap: px(MAP_BODY_GAP),
+            align_items: AlignItems::Center, justify_content: JustifyContent::Center,
+            ..default()
+          }, LayoutRole::MapContent)).with_children(|body| {
             body.spawn((Node {
                 flex_grow: 1.0, flex_basis: px(0.0), min_width: px(0.0),
-                max_width: px(MAP_COLUMN_MAX_WIDTH),
+                max_width: px(MAP_COLUMN_MAX_WIDTH), flex_shrink: 0.0,
                 flex_direction: FlexDirection::Column, row_gap: px(MAP_COLUMN_GAP), ..default()
-            }, WorldMapColumn)).with_children(|map_column| {
+            }, WorldMapColumn, LayoutRole::MapColumn)).with_children(|map_column| {
                 map_column.spawn((Text::new("90 N     CLICK TO SELECT A DEPARTURE POINT"), TextFont { font_size: 13.0, ..default() }, TextColor(MUTED)));
                 map_column.spawn((
-                    Node { width: percent(100.0), aspect_ratio: Some(2.0), overflow: Overflow::clip(), ..default() },
+                    Node { width: percent(100.0), aspect_ratio: Some(2.0), flex_shrink: 0.0, overflow: Overflow::clip(), ..default() },
                     ImageNode::new(image), RelativeCursorPosition::default(), Interaction::None,
                     WorldMapCanvas, WorldMapImage, FocusPolicy::Block,
                 )).with_children(|map| {
@@ -745,13 +758,10 @@ pub fn spawn_world_map(
                 });
             });
             body.spawn((Node {
-                // Resolve height against the bounded body. An auto-height column
-                // containing percentage-width text gets an inflated intrinsic
-                // cross size in Taffy, despite its final children fitting.
-                width: px(SIDEBAR_WIDTH), height: percent(100.0), min_height: px(0.0),
+                width: px(SIDEBAR_WIDTH), min_height: px(0.0),
                 flex_shrink: 0.0, flex_direction: FlexDirection::Column,
                 padding: UiRect::all(px(SIDEBAR_PADDING)), row_gap: px(SIDEBAR_GAP), ..default()
-            }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)), WorldMapSidebar)).with_children(|side| {
+            }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)), WorldMapSidebar, LayoutRole::Sidebar)).with_children(|side| {
                 side.spawn((Text::new("EXPLORE A REGION"), TextFont { font_size: 14.0, ..default() }, TextColor(ACCENT)));
                 side.spawn(Node { flex_wrap: FlexWrap::Wrap, column_gap: px(6.0), row_gap: px(6.0), ..default() }).with_children(|places| {
                     for (index, destination) in WORLD_MAP_DESTINATIONS.iter().enumerate() {
@@ -779,7 +789,8 @@ pub fn spawn_world_map(
                 spawn_map_text(side, WorldMapText::Navigation, 11.0, MUTED);
             });
         });
-        root.spawn((Text::new("Preview only until Start. A new flight resets the current flight recording.    M / Esc closes this map."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { height: px(MAP_FOOTER_HEIGHT), flex_shrink: 0.0, ..default() }));
+        });
+        root.spawn((Text::new("Mouse wheel: scroll. Preview only until Start. A new flight resets the current flight recording.    M / Esc closes this map."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { width: percent(100.0), min_height: px(MAP_FOOTER_HEIGHT), flex_shrink: 0.0, ..default() }));
         regions::spawn_regions(root);
         wind_settings::spawn_wind_settings(root);
         root.spawn((
@@ -796,22 +807,24 @@ pub fn spawn_world_map(
             overlay.spawn((Node {
                 width: percent(80.0), height: percent(82.0), padding: UiRect::all(px(22.0)),
                 flex_direction: FlexDirection::Column, row_gap: px(14.0),
-                overflow: Overflow::clip(), ..default()
-            }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)))).with_children(|panel| {
+                overflow: Overflow::scroll_y(), ..default()
+            }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)), ScrollSurface::Credits, ScrollPosition::default())).with_children(|panel| {
                 panel.spawn(Node {
                     width: percent(100.0), min_height: px(32.0), flex_shrink: 0.0,
                     align_items: AlignItems::Center, justify_content: JustifyContent::SpaceBetween,
+                    flex_wrap: FlexWrap::Wrap, row_gap: px(6.0),
                     ..default()
                 }).with_children(|header| {
                     header.spawn((Text::new("WORLD DATA CREDITS"), TextFont { font_size: 22.0, ..default() }, TextColor(TEXT)));
                     spawn_button(header, "Close credits", WorldMapButton::CloseCredits, px(120.0));
                 });
-                panel.spawn(Node { width: percent(100.0), flex_grow: 1.0, min_height: px(0.0), ..default() }).with_children(|body| {
+                panel.spawn(Node { width: percent(100.0), flex_grow: 1.0, flex_shrink: 0.0, ..default() }).with_children(|body| {
                     spawn_map_text(body, WorldMapText::Credits, 14.0, TEXT);
                 });
                 panel.spawn(Node {
                     width: percent(100.0), min_height: px(32.0), flex_shrink: 0.0,
                     justify_content: JustifyContent::SpaceBetween, align_items: AlignItems::Center,
+                    flex_wrap: FlexWrap::Wrap, row_gap: px(6.0),
                     ..default()
                 }).with_children(|footer| {
                     spawn_button(footer, "Previous page", WorldMapButton::PreviousCreditsPage, px(120.0));
@@ -820,8 +833,9 @@ pub fn spawn_world_map(
                     });
                     spawn_button(footer, "Next page", WorldMapButton::NextCreditsPage, px(120.0));
                 });
-                panel.spawn((Text::new("Esc: return to map. Source versions and complete licence details are also in ATTRIBUTION.md."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
+                panel.spawn((Text::new("Mouse wheel: scroll; Esc: return to map. Source versions and complete licence details are also in ATTRIBUTION.md."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
             });
+            layout::spawn_scroll_hint(overlay);
         });
     });
 }
@@ -839,10 +853,12 @@ fn spawn_map_text(parent: &mut ChildSpawnerCommands, kind: WorldMapText, size: f
             ..default()
         },
         LineHeight::Px(line_height),
+        TextLayout::new_with_linebreak(bevy::text::LineBreak::WordOrCharacter),
         TextColor(color),
         kind,
         Node {
             width: percent(100.0),
+            flex_shrink: 0.0,
             ..default()
         },
         FocusPolicy::Pass,
@@ -861,6 +877,7 @@ fn spawn_button(
             Node {
                 width,
                 min_height: px(MAP_BUTTON_HEIGHT),
+                flex_shrink: 0.0,
                 padding: UiRect::axes(px(5.0), px(5.0)),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
@@ -893,6 +910,7 @@ fn spawn_coordinate_button(
             Node {
                 width: percent(100.0),
                 min_height: px(MAP_BUTTON_HEIGHT),
+                flex_shrink: 0.0,
                 padding: UiRect::all(px(5.0)),
                 ..default()
             },
@@ -1456,7 +1474,9 @@ pub fn update_world_map(
     mut texts: Query<(&WorldMapText, &mut Text)>,
     mut markers: Query<(&WorldMapMarker, &mut Node, &mut Visibility), Without<WorldMapRoot>>,
     mut buttons: Query<(&WorldMapButton, &Interaction, &mut BackgroundColor)>,
+    mut layout: MapLayout,
 ) {
+    layout.update(&state);
     for mut visibility in &mut roots {
         *visibility = if state.visible {
             Visibility::Inherited
@@ -1767,6 +1787,14 @@ fn bounded_ascii(text: &str, columns: usize, lines: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(
+        clippy::float_cmp,
+        reason = "clamped and ignored scroll input must preserve exact offsets"
+    )]
+    mod layout_tests {
+        include!("world_map_layout_tests.rs");
+    }
 
     mod wind_settings_tests {
         include!("wind_settings_tests.rs");
@@ -2940,8 +2968,10 @@ mod tests {
                 ..default()
             },
             bevy::transform::TransformPlugin,
+            bevy::camera::visibility::VisibilityPlugin,
             bevy::ui::UiPlugin,
         ))
+        .init_asset::<Mesh>()
         .init_resource::<WorldMapRaster>()
         .insert_resource(state)
         .add_systems(Startup, spawn_world_map)

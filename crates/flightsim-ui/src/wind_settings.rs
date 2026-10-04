@@ -281,17 +281,17 @@ pub(super) fn spawn_wind_settings(root: &mut ChildSpawnerCommands) {
     )).with_children(|overlay| {
         overlay.spawn((Node {
             width: px(760.0), max_width: percent(94.0),
-            height: px(520.0), max_height: percent(94.0),
+            height: px(520.0), max_height: percent(90.0),
             padding: UiRect::all(px(22.0)), flex_direction: FlexDirection::Column,
-            row_gap: px(12.0), overflow: Overflow::clip(), ..default()
-        }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)))).with_children(|panel| {
-            panel.spawn((Text::new("NEW FLIGHT: WIND / TURBULENCE"), TextFont { font_size: 22.0, ..default() }, TextColor(TEXT)));
-            panel.spawn((Text::new("Authored conditions; applied only when you Start a new flight."), TextFont { font_size: 13.0, ..default() }, TextColor(MUTED)));
+            row_gap: px(12.0), overflow: Overflow::scroll_y(), ..default()
+        }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)), super::ScrollSurface::Wind, ScrollPosition::default())).with_children(|panel| {
+            panel.spawn((Text::new("NEW FLIGHT: WIND / TURBULENCE"), TextFont { font_size: 22.0, ..default() }, TextColor(TEXT), Node { flex_shrink: 0.0, ..default() }));
+            panel.spawn((Text::new("Authored conditions; applied only when you Start a new flight. Mouse wheel: scroll."), TextFont { font_size: 13.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
             spawn_coordinate_button(panel, WorldMapButton::Wind(WindSettingsButton::WindFrom), WorldMapText::Wind(WindSettingsText::WindFrom));
             spawn_coordinate_button(panel, WorldMapButton::Wind(WindSettingsButton::WindSpeed), WorldMapText::Wind(WindSettingsText::WindSpeed));
-            panel.spawn((Text::new("Click a field or Tab; type a value; Ctrl+A clears. Wind comes FROM the bearing."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED)));
+            panel.spawn((Text::new("Click a field or Tab; type a value; Ctrl+A clears. Wind comes FROM the bearing."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
             spawn_map_text(panel, WorldMapText::Wind(WindSettingsText::Turbulence), 13.0, ACCENT);
-            panel.spawn(Node { width: percent(100.0), column_gap: px(6.0), ..default() }).with_children(|presets| {
+            panel.spawn(Node { width: percent(100.0), column_gap: px(6.0), row_gap: px(6.0), flex_wrap: FlexWrap::Wrap, flex_shrink: 0.0, ..default() }).with_children(|presets| {
                 for (label, choice, width) in [
                     ("Keep current/custom", WindSettingsButton::CurrentTurbulence, 158.0),
                     ("Calm", WindSettingsButton::Turbulence(WorldMapTurbulence::Calm), 86.0),
@@ -302,7 +302,7 @@ pub(super) fn spawn_wind_settings(root: &mut ChildSpawnerCommands) {
                     spawn_button(presets, label, WorldMapButton::Wind(choice), px(width));
                 }
             });
-            panel.spawn((Text::new("Horizontal-component bounds: 0 / 1.5 / 3 / 6 m/s. Current seed is preserved.\nAuthored levels, not FAA intensity categories or METAR gust peaks.\nWind speed 0-300 kt is an input limit, not an aircraft operating limit."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED)));
+            panel.spawn((Text::new("Horizontal-component bounds: 0 / 1.5 / 3 / 6 m/s. Current seed is preserved.\nAuthored levels, not FAA intensity categories or METAR gust peaks.\nWind speed 0-300 kt is an input limit, not an aircraft operating limit."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
             spawn_map_text(panel, WorldMapText::Wind(WindSettingsText::Note), 12.0, TEXT);
             spawn_map_text(panel, WorldMapText::Wind(WindSettingsText::Error), 12.0, Color::srgb(1.0, 0.73, 0.34));
             panel.spawn(Node { flex_grow: 1.0, min_height: px(0.0), ..default() });
@@ -311,6 +311,7 @@ pub(super) fn spawn_wind_settings(root: &mut ChildSpawnerCommands) {
                 spawn_button(footer, "Apply [Enter]", WorldMapButton::Wind(WindSettingsButton::Apply), px(142.0));
             });
         });
+        super::layout::spawn_scroll_hint(overlay);
     });
 }
 

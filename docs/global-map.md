@@ -37,6 +37,14 @@ cargo run -p flightsim-app --release -- --map-credits
   flat-zero jets retain their explicit exception; the map never changes terrain
   underneath airport surfaces that were already placed for the legacy source
 
+Small windows keep the same text and control sizes. Below 900 logical pixels
+wide or 600 high, the map and settings stack in a bounded vertical scroll area;
+use the mouse wheel to reach aircraft, weather, coordinates and Start. The map
+header and recording warning remain outside this area. Credits, Regions and the
+wind editor also scroll when needed, with a visible scroll/return hint. Closing
+the map resets its scroll position; opening a child panel preserves your place
+on the map. PgUp/PgDn retain their existing aircraft/package actions.
+
 The map's MSL height is the coarse orthometric surface elevation `H`. The flight
 HUD's ALT is WGS84 ellipsoidal height `h`, not a QNH-adjusted barometric altimeter;
 these differ by geoid undulation `N` (`h = H + N`). AGL and `--fly` use height above

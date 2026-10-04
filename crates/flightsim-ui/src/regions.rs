@@ -1,5 +1,6 @@
 //! Bounded data-only regional package presentation for the world map.
 
+use super::layout::{LayoutRole, ScrollSurface};
 use super::{
     ACCENT, BUTTON, MUTED, TEXT, WorldMapButton, WorldMapText, bounded_ascii, spawn_button,
     spawn_map_text,
@@ -446,13 +447,14 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
     )).with_children(|overlay| {
         overlay.spawn((Node {
             width: px(1100.0), max_width: percent(96.0),
-            height: px(620.0), max_height: percent(94.0),
+            height: px(620.0), max_height: percent(90.0),
             padding: UiRect::all(px(20.0)),
             flex_direction: FlexDirection::Column, row_gap: px(8.0),
-            overflow: Overflow::clip(), ..default()
-        }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)))).with_children(|panel| {
+            overflow: Overflow::scroll_y(), ..default()
+        }, BackgroundColor(Color::srgb(0.045, 0.073, 0.103)), ScrollSurface::Regions, ScrollPosition::default())).with_children(|panel| {
             panel.spawn(Node {
-                width: percent(100.0), height: px(32.0), flex_shrink: 0.0,
+                width: percent(100.0), min_height: px(32.0), flex_shrink: 0.0,
+                flex_wrap: FlexWrap::Wrap, row_gap: px(6.0),
                 align_items: AlignItems::Center, column_gap: px(8.0),
                 ..default()
             }).with_children(|header| {
@@ -465,15 +467,15 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
             spawn_region_text(panel, RegionsText::Help, 12.0, MUTED);
             spawn_region_text(panel, RegionsText::Status, 13.0, ACCENT);
             spawn_region_text(panel, RegionsText::Selection, 12.0, TEXT);
-            panel.spawn(Node {
+            panel.spawn((Node {
                 width: percent(100.0), flex_grow: 1.0, min_height: px(0.0), column_gap: px(18.0),
-                ..default()
-            }).with_children(|columns| {
-                columns.spawn(Node {
+                row_gap: px(12.0), flex_shrink: 0.0, ..default()
+            }, LayoutRole::RegionColumns)).with_children(|columns| {
+                columns.spawn((Node {
                     width: percent(44.0), min_width: px(0.0),
                     flex_direction: FlexDirection::Column, row_gap: px(6.0),
                     ..default()
-                }).with_children(|list| {
+                }, LayoutRole::RegionList)).with_children(|list| {
                     spawn_region_text(list, RegionsText::ListTitle, 13.0, ACCENT);
                     list.spawn(Node {
                         width: percent(100.0), column_gap: px(6.0), flex_shrink: 0.0,
@@ -504,16 +506,16 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                         spawn_region_button(pages, "Next", RegionsButton::NextPage, px(90.0));
                     });
                 });
-                columns.spawn(Node {
+                columns.spawn((Node {
                     flex_grow: 1.0, flex_basis: px(0.0), min_width: px(0.0),
                     flex_direction: FlexDirection::Column, row_gap: px(6.0),
                     ..default()
-                }).with_children(|credits| {
+                }, LayoutRole::RegionCredits)).with_children(|credits| {
                     spawn_region_text(credits, RegionsText::CreditsTitle, 13.0, ACCENT);
-                    credits.spawn(Node {
-                        width: percent(100.0), flex_grow: 1.0, min_height: px(0.0),
+                    credits.spawn((Node {
+                        width: percent(100.0), flex_grow: 1.0, min_height: px(0.0), flex_shrink: 0.0,
                         overflow: Overflow::clip(), ..default()
-                    }).with_children(|text| spawn_region_text(text, RegionsText::Credits, 12.0, TEXT));
+                    }, LayoutRole::RegionCreditsText)).with_children(|text| spawn_region_text(text, RegionsText::Credits, 12.0, TEXT));
                     credits.spawn(Node {
                         width: percent(100.0), column_gap: px(8.0), align_items: AlignItems::Center,
                         ..default()
@@ -525,8 +527,9 @@ pub(super) fn spawn_regions(root: &mut ChildSpawnerCommands) {
                 });
             });
             spawn_region_text(panel, RegionsText::Store, 11.0, MUTED);
-            panel.spawn((Text::new("After import/download: select an INSTALLED package, then START NEW FLIGHT on the map. The current flight stays unchanged.\nRegion flights cannot save/load replays. Esc returns to map; M closes map and cancels work."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
+            panel.spawn((Text::new("Mouse wheel: scroll. After import/download: select an INSTALLED package, then START NEW FLIGHT on the map. The current flight stays unchanged.\nRegion flights cannot save/load replays. Esc returns to map; M closes map and cancels work."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { flex_shrink: 0.0, ..default() }));
         });
+        super::layout::spawn_scroll_hint(overlay);
     });
 }
 
