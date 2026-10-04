@@ -40,13 +40,18 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
+# The reviewed additive jet export changes this whole file, but no legacy FDM
+# body. Keep a literal full-file guard; the historical lib hash above never moves.
+REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "4d51cf4b5d62ce0f6bcc031df445225ac07c2bad0ed590c4b422ad6cca579462"
 # Whole files, not selected functions or text-normalized projections. Adding a
 # helper or changing any reviewed implementation requires a boundary review.
 REPLAY_CONTRACT_PATHS = {
     'assets/aircraft/light_single.json',
     'assets/aircraft/swift_sport.json',
     'crates/flightsim-fdm/src/aircraft.rs',
+    'crates/flightsim-fdm/src/landing_gear.rs',
     'crates/flightsim-fdm/src/lib.rs',
+    'crates/flightsim-sim/Cargo.toml',
     'crates/flightsim-sim/src/replay.rs',
     'crates/flightsim-sim/src/replay/identity.rs',
     'crates/flightsim-sim/src/replay/current.rs',
@@ -162,11 +167,12 @@ def validate_replay_contract(contract):
             "reviewed replay source boundary changed")
     require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in pins.values()),
             "invalid reviewed replay source digest")
-    # These profile/FDM inputs never migrated. main/profile wiring is separately
-    # reviewed; the old monolithic replay hash stays historical provenance only.
-    for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs",
-                 "crates/flightsim-fdm/src/lib.rs"):
+    # These physical inputs never migrated. The FDM module root only gained an
+    # additive export and retains its own strict reviewed whole-file guard.
+    for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs"):
         require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
+    require(pins["crates/flightsim-fdm/src/lib.rs"] == REVIEWED_ADDITIVE_FDM_LIB_SHA256,
+            "frozen reviewed FDM module input changed")
     return contract
 
 
@@ -401,6 +407,180 @@ def diagnostic_capture_command(executable, screenshot):
 
 
 def parse_readback_log(log):
+    """Accept historical v1 and bounded v2; neither protocol qualifies capture."""
+    lines = [line for line in ANSI.sub("", log).splitlines() if PROBE_PREFIX in line]
+    if lines and lines[0] == PROBE_PREFIX + " event=enabled version=2":
+        return parse_readback_log_v2(lines)
+    return parse_readback_log_v1(log)
+
+
+def parse_readback_log_v2(lines):
+    boolean = {"true", "false"}
+    elapsed = {"elapsed_ms": 180_000}
+    fields = {
+        "prescene_begin": {},
+        "prescene_submitted": elapsed,
+        "prescene_map_register_enter": elapsed,
+        "prescene_map_registered": elapsed,
+        "prescene_poll_enter": {"gpu_timeout_ms": {"5000"}, **elapsed},
+        "prescene_poll_return": {"status": PROBE_POLL_STATUSES, "wall_ms": 180_000, **elapsed},
+        "prescene_map_callback": {"result": {"ok", "error"}, "cancelled": boolean,
+                                  "phase": {"startup", "cleanup"}, **elapsed},
+        "prescene_pixels": {"valid": boolean, "count": {"16"}, **elapsed},
+        "prescene_summary": {"submitted": {"true"}, "map_callback": {"missing", "ok", "error"},
+                             "pixels": {"missing", "valid", "invalid"}, "poll": PROBE_POLL_STATUSES,
+                             "cleanup": {"true"}, **elapsed},
+        "scene_register": {"frame": {"1", "2", "4", "8", "16", "30"}, **elapsed},
+        "scene_callback": {"frame": {"1", "2", "4", "8", "16", "30"}, "cancelled": boolean,
+                           "phase": {"active", "deadline", "late_probe", "owner_teardown", "owner_released"}, **elapsed},
+        "scene_summary": {"registered": 6, "completed": 6, "cleanup": {"true"},
+                          "reason": {"late_probe", "deadline"}, **elapsed},
+    }
+    require(len(lines) <= 64, "v2 readback event count exceeds bound")
+    events, old_lines, seen = [], [], set()
+    prescene, registered, completed = {}, {}, {}
+    prescene_summary = scene_summary = late_summary = None
+    prescene_cleanup = scene_cleanup = False
+    scene_close_phase = None
+    predecessors = {
+        "prescene_submitted": "prescene_begin",
+        "prescene_map_register_enter": "prescene_submitted",
+        "prescene_map_registered": "prescene_map_register_enter",
+        "prescene_poll_enter": "prescene_map_registered",
+        "prescene_poll_return": "prescene_poll_enter",
+        "prescene_map_callback": "prescene_map_register_enter",
+        "prescene_pixels": "prescene_poll_return",
+        "prescene_summary": "prescene_poll_return",
+    }
+    for line in lines:
+        require(len(line) <= 1024 and line.startswith(PROBE_PREFIX + " "), "malformed readback event prefix/length")
+        record = {}
+        for token in line[len(PROBE_PREFIX) + 1:].split(" "):
+            require(re.fullmatch(r"[a-z_]+=[a-z0-9_]+", token), "malformed readback event field")
+            key, value = token.split("=", 1)
+            require(key not in record, "duplicate readback event field")
+            record[key] = value
+        event = record.pop("event", None)
+        if event not in fields:
+            # Feed unchanged old events through the original strict state machine.
+            # Only this exact version marker is normalized; unknown fields remain errors.
+            if event == "enabled":
+                require(record == {"version": "2"}, "invalid v2 enabled event")
+                old_lines.append(PROBE_PREFIX + " event=enabled")
+            else:
+                require(prescene_summary is not None, "late probe precedes pre-scene cleanup")
+                old_lines.append(line)
+                if event == "summary":
+                    late_summary = parse_readback_log_v1("\n".join(old_lines))["summary"]
+            events.append(event)
+            continue
+        require(set(record) == set(fields[event]), "unexpected v2 readback fields")
+        converted = {"event": event}
+        for key, allowed in fields[event].items():
+            value = record[key]
+            if type(allowed) is int:
+                require(re.fullmatch(r"0|[1-9][0-9]{0,6}", value) and int(value) <= allowed,
+                        "v2 readback integer exceeds bound")
+                converted[key] = int(value)
+            else:
+                require(value in allowed, "invalid v2 readback value")
+                converted[key] = int(value) if key == "frame" else value == "true" if allowed <= boolean else value
+        identity = (event, converted.get("frame"))
+        require(identity not in seen, "duplicate v2 readback event")
+        seen.add(identity)
+        if event.startswith("prescene_"):
+            if prescene_summary is not None or prescene_cleanup:
+                require(event == "prescene_summary" or (event == "prescene_map_callback" and converted["cancelled"]),
+                        "active pre-scene event after cleanup")
+            if event in predecessors:
+                require(predecessors[event] in prescene, "pre-scene causal predecessor missing")
+                prior = prescene[predecessors[event]]
+                require(converted["elapsed_ms"] >= prior.get("elapsed_ms", 0), "pre-scene time precedes predecessor")
+            if event == "prescene_poll_return":
+                interval = converted["elapsed_ms"] - prescene["prescene_poll_enter"]["elapsed_ms"]
+                require(converted["wall_ms"] <= interval + 1, "pre-scene poll wall time exceeds elapsed interval")
+            if event == "prescene_map_callback":
+                require(converted["cancelled"] == (converted["phase"] == "cleanup"), "pre-scene callback phase differs")
+                prescene_cleanup |= converted["cancelled"]
+            if event == "prescene_pixels":
+                callback = prescene.get("prescene_map_callback", {})
+                require(callback.get("result") == "ok", "pre-scene pixels lack successful map")
+                require(converted["elapsed_ms"] >= callback["elapsed_ms"], "pre-scene pixels precede map callback time")
+            if event == "prescene_summary":
+                require(converted["elapsed_ms"] >= max(item.get("elapsed_ms", 0) for item in prescene.values()),
+                        "pre-scene summary time precedes observations")
+                expected = prescene_observations(prescene)
+                require(converted["poll"] == expected["poll"] and converted["map_callback"] == expected["map_callback"]
+                        and converted["pixels"] == expected["pixels"], "pre-scene summary contradicts events")
+                prescene_summary = converted
+            if not converted.get("cancelled", False):
+                prescene[event] = converted
+        else:
+            require(prescene_summary is not None, "scene observation precedes pre-scene cleanup")
+            if scene_summary is not None or scene_cleanup:
+                require(event == "scene_summary" or (event == "scene_callback" and converted["cancelled"]),
+                        "active scene event after cleanup")
+            if event == "scene_register":
+                expected_frames = (1, 2, 4, 8, 16, 30)
+                require(len(registered) < 6 and converted["frame"] == expected_frames[len(registered)],
+                        "scene frame registration sequence differs")
+                require(converted["elapsed_ms"] < 60000, "scene registration after deadline")
+                if registered:
+                    require(converted["elapsed_ms"] >= next(reversed(registered.values()))["elapsed_ms"], "scene registration time regressed")
+                registered[converted["frame"]] = converted
+            elif event == "scene_callback":
+                frame = converted["frame"]
+                require(frame in registered and converted["elapsed_ms"] >= registered[frame]["elapsed_ms"],
+                        "scene callback precedes registration")
+                require(converted["cancelled"] == (converted["phase"] != "active"), "scene callback phase differs")
+                if scene_summary is not None:
+                    require(converted["phase"] in {scene_summary["reason"], "owner_released"},
+                            "scene callback contradicts cleanup reason")
+                if converted["phase"] == "deadline":
+                    require(converted["elapsed_ms"] >= 60000, "scene deadline callback before cutoff")
+                if converted["phase"] == "late_probe":
+                    require(late_summary is not None and converted["elapsed_ms"] >= late_summary["elapsed_ms"],
+                            "scene late callback lacks late-probe completion")
+                if converted["cancelled"]:
+                    scene_close_phase = converted["phase"] if scene_close_phase is None else scene_close_phase
+                scene_cleanup |= converted["cancelled"]
+                if not converted["cancelled"]:
+                    require(converted["elapsed_ms"] < 60000, "active scene callback after deadline")
+                    completed[frame] = converted
+            else:
+                require(scene_close_phase != "owner_teardown", "scene summary after owner teardown")
+                require(scene_close_phase != "deadline" or converted["reason"] == "deadline", "scene deadline reason differs")
+                require(converted["registered"] == len(registered) and converted["completed"] == len(completed),
+                        "scene summary contradicts observations")
+                require(converted["elapsed_ms"] >= max((item["elapsed_ms"] for item in (*registered.values(), *completed.values())), default=0),
+                        "scene summary time precedes observations")
+                require((converted["reason"] == "deadline" and converted["elapsed_ms"] >= 60000)
+                        or (converted["reason"] == "late_probe" and late_summary is not None
+                            and late_summary["elapsed_ms"] <= converted["elapsed_ms"] < 60000),
+                        "scene cleanup lacks deadline or late-probe completion")
+                scene_summary = converted
+        events.append(converted)
+    late = parse_readback_log_v1("\n".join(old_lines))
+    old_events = {record["event"]: record for record in late["events"]}
+    events = [({**old_events[event], **({"version": 2} if event == "enabled" else {})}
+               if isinstance(event, str) else event) for event in events]
+    return {"schema_version": 2, "protocol": PROBE_PREFIX + "/v2", "events": events,
+            "summary": late["summary"], "prescene_summary": prescene_summary, "scene_summary": scene_summary,
+            "observations": {**late["observations"], "prescene": prescene_observations(prescene),
+                             "scene": {"registered_frames": list(registered), "completed_frames": list(completed),
+                                       "completion_elapsed_ms": {str(frame): item["elapsed_ms"] for frame, item in completed.items()}}}}
+
+
+def prescene_observations(events):
+    poll = events.get("prescene_poll_return", {}).get("status", "entered_without_return" if "prescene_poll_enter" in events else "not_entered")
+    pixel = events.get("prescene_pixels")
+    pixels = ("valid" if pixel["valid"] else "invalid") if pixel else "missing"
+    return {"gpu_completion_observed": poll in {"wait_succeeded", "queue_empty"} or pixels == "valid",
+            "map_callback": events.get("prescene_map_callback", {}).get("result", "missing"),
+            "pixels": pixels, "poll": poll}
+
+
+def parse_readback_log_v1(log):
     """Strict bounded projection of diagnostic events, never an acceptance gate."""
     boolean = {"true", "false"}
     phase = {"normal", "poll", "after_poll", "cleanup"}

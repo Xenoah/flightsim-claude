@@ -1,5 +1,6 @@
 [package]
 name = "flightsim-sim"
+default-run = "flightsim-headless"
 description = "地形と飛行力学を結線し、固定ステップで回すヘッドレス統合層。"
 version.workspace = true
 edition.workspace = true
@@ -14,6 +15,9 @@ flightsim-fdm.workspace = true
 flightsim-world.workspace = true
 # RigidBodyState の角速度など、fdm の公開 API に現れる型を扱うため。
 glam.workspace = true
+serde = { version = "1", features = ["derive"] }
+# Additive raw-token access; do not enable float_roundtrip (legacy decoder contract).
+serde_json = { version = "1", features = ["raw_value"] }
 clap = { version = "4", features = ["derive"] }
 
 # 焼く側と読む側が同じ形式に合意していることを、統合テストで実際に飛んで確かめる。
@@ -28,3 +32,7 @@ path = "src/main.rs"
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "flightsim-jet-headless"
+path = "src/bin/jet-headless.rs"

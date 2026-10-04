@@ -61,11 +61,16 @@
 //! [ARCHITECTURE.md §2]: https://github.com/Xenoah/flightsim-claude/blob/main/ARCHITECTURE.md
 //! [ADR-0006]: https://github.com/Xenoah/flightsim-claude/blob/main/docs/adr/0006-simulation-integration-layer.md
 
+pub mod aircraft_profile;
 pub mod crash;
 pub mod director;
 pub mod flight;
 pub mod ground;
+pub mod jet_scenarios;
+pub mod model_identity;
+pub mod model_simulation;
 pub mod replay;
+pub mod replay_v4;
 pub mod simulation;
 pub mod weather;
 

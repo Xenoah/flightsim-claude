@@ -1,0 +1,215 @@
+{
+  "airframe": {
+    "name": "Numerical jet profile fixture (not a real aircraft)",
+    "mass_kg": 1043.0,
+    "inertia_kg_m2": [
+      1285.0,
+      1825.0,
+      2667.0,
+      0.0
+    ],
+    "wing_area_m2": 16.17,
+    "wing_span_m": 11.0,
+    "mean_chord_m": 1.49,
+    "landing_gear": [
+      {
+        "contact_m": [
+          1.6,
+          0,
+          1.0
+        ],
+        "spring_n_per_m": 120000.0,
+        "damping_ns_per_m": 13000.0,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      },
+      {
+        "contact_m": [
+          -0.8,
+          -1.3,
+          1.0
+        ],
+        "spring_n_per_m": 120000.0,
+        "damping_ns_per_m": 13000.0,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      },
+      {
+        "contact_m": [
+          -0.8,
+          1.3,
+          1.0
+        ],
+        "spring_n_per_m": 120000.0,
+        "damping_ns_per_m": 13000.0,
+        "max_stroke_m": 0.25,
+        "bottom_stop_travel_m": 0.05,
+        "max_recoil_mps": 0.5
+      }
+    ],
+    "rolling_friction": 0.015,
+    "braking_friction": 0.7,
+    "lateral_friction": 0.8,
+    "friction_transition_mps": 0.25
+  },
+  "thrust": {
+    "schema": 1,
+    "pressure_ratios": [
+      0.0,
+      1.0
+    ],
+    "temperature_ratios": [
+      0.5,
+      1.5
+    ],
+    "mach": [
+      0.0,
+      0.9
+    ],
+    "cells": [
+      {
+        "idle_n": 0.0,
+        "maximum_dry_n": 0.0
+      },
+      {
+        "idle_n": 0.0,
+        "maximum_dry_n": 0.0
+      },
+      {
+        "idle_n": 0.0,
+        "maximum_dry_n": 0.0
+      },
+      {
+        "idle_n": 0.0,
+        "maximum_dry_n": 0.0
+      },
+      {
+        "idle_n": -100.0,
+        "maximum_dry_n": 2500.0
+      },
+      {
+        "idle_n": -100.0,
+        "maximum_dry_n": 2500.0
+      },
+      {
+        "idle_n": -100.0,
+        "maximum_dry_n": 2500.0
+      },
+      {
+        "idle_n": -100.0,
+        "maximum_dry_n": 2500.0
+      }
+    ]
+  },
+  "aero": {
+    "schema": 1,
+    "knots": [
+      {
+        "mach": 0.0,
+        "aero": {
+          "lift_zero": 0.31,
+          "lift_alpha": 5.143,
+          "lift_flaps": 0.65,
+          "stall_angle_rad": 0.2792526803190927,
+          "stall_blend_rate": 50.0,
+          "drag_min": 0.031,
+          "oswald_efficiency": 0.75,
+          "drag_flaps": 0.06,
+          "side_beta": -0.31,
+          "side_rudder": 0.07835299999999999,
+          "roll_beta": -0.089,
+          "roll_rate_p": -0.47,
+          "roll_rate_r": 0.096,
+          "roll_aileron": 0.06212199999999999,
+          "roll_rudder": 0.0061592999999999995,
+          "pitch_zero": 0.015,
+          "pitch_alpha": -0.89,
+          "pitch_rate_q": -30.400000000000002,
+          "pitch_elevator": 0.55808,
+          "pitch_flaps": -0.12,
+          "yaw_beta": 0.065,
+          "yaw_rate_p": -0.0,
+          "yaw_rate_r": -0.099,
+          "yaw_aileron": -0.0018497,
+          "yaw_rudder": 0.027528299999999995
+        }
+      },
+      {
+        "mach": 0.9,
+        "aero": {
+          "lift_zero": 0.31,
+          "lift_alpha": 5.143,
+          "lift_flaps": 0.65,
+          "stall_angle_rad": 0.2792526803190927,
+          "stall_blend_rate": 50.0,
+          "drag_min": 0.031,
+          "oswald_efficiency": 0.75,
+          "drag_flaps": 0.06,
+          "side_beta": -0.31,
+          "side_rudder": 0.07835299999999999,
+          "roll_beta": -0.089,
+          "roll_rate_p": -0.47,
+          "roll_rate_r": 0.096,
+          "roll_aileron": 0.06212199999999999,
+          "roll_rudder": 0.0061592999999999995,
+          "pitch_zero": 0.015,
+          "pitch_alpha": -0.89,
+          "pitch_rate_q": -30.400000000000002,
+          "pitch_elevator": 0.55808,
+          "pitch_flaps": -0.12,
+          "yaw_beta": 0.065,
+          "yaw_rate_p": -0.0,
+          "yaw_rate_r": -0.099,
+          "yaw_aileron": -0.0018497,
+          "yaw_rudder": 0.027528299999999995
+        }
+      }
+    ]
+  },
+  "envelope": {
+    "pressure_ratio": [
+      0.01,
+      1.0
+    ],
+    "temperature_ratio": [
+      0.5,
+      1.5
+    ],
+    "mach": [
+      0.0,
+      0.9
+    ]
+  },
+  "initial_state_bits": [
+    4708606547855409152,
+    0,
+    0,
+    13835058055282163712,
+    0,
+    4630114580683989790,
+    0,
+    4604597865870880574,
+    0,
+    13827862258584597380,
+    0,
+    0,
+    0
+  ],
+  "precontact_state_bits": [
+    4708606484473810728,
+    0,
+    4652285968936379284,
+    13834943633811321382,
+    0,
+    4630101777619092779,
+    0,
+    4604596137857565182,
+    0,
+    13827864015572406469,
+    0,
+    4541274969797723775,
+    0
+  ]
+}

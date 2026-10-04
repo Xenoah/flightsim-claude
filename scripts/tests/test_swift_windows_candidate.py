@@ -73,6 +73,37 @@ def readback_fixture(outcome):
     return "".join("FS_READBACK_PROBE " + line + "\n" for line in lines)
 
 
+def readback_v2_fixture(startup="complete", scene=True, late=True):
+    """Independent v2 examples: elapsed times are local to their stated phase."""
+    lines = ["event=enabled version=2", "event=prescene_begin",
+             "event=prescene_submitted elapsed_ms=1",
+             "event=prescene_map_register_enter elapsed_ms=1",
+             "event=prescene_map_registered elapsed_ms=1",
+             "event=prescene_poll_enter gpu_timeout_ms=5000 elapsed_ms=1"]
+    if startup == "entered_without_return":
+        return "".join("FS_READBACK_PROBE " + line + "\n" for line in lines)
+    okay = startup == "complete"
+    if okay:
+        lines.append("event=prescene_map_callback result=ok cancelled=false phase=startup elapsed_ms=2")
+    lines.append("event=prescene_poll_return status=" + ("queue_empty wall_ms=2 elapsed_ms=3" if okay else "timeout wall_ms=5000 elapsed_ms=5001"))
+    if okay:
+        lines.append("event=prescene_pixels valid=true count=16 elapsed_ms=3")
+    else:
+        lines.append("event=prescene_map_callback result=error cancelled=true phase=cleanup elapsed_ms=5001")
+    lines.append("event=prescene_summary submitted=true map_callback=" + ("ok pixels=valid poll=queue_empty cleanup=true elapsed_ms=3" if okay else "missing pixels=missing poll=timeout cleanup=true elapsed_ms=5001"))
+    if scene:
+        for frame in (1, 2, 4, 8, 16, 30):
+            lines.append(f"event=scene_register frame={frame} elapsed_ms={frame * 1000}")
+            if okay:
+                lines.append(f"event=scene_callback frame={frame} cancelled=false phase=active elapsed_ms={frame * 1000 + 1}")
+    result = "".join("FS_READBACK_PROBE " + line + "\n" for line in lines)
+    if late:
+        result += readback_fixture("complete" if okay else "gpu_timeout").replace("FS_READBACK_PROBE event=enabled\n", "")
+    if scene:
+        result += "FS_READBACK_PROBE event=scene_summary registered=6 completed=" + ("6" if okay else "0") + " cleanup=true reason=" + ("late_probe elapsed_ms=45000\n" if late else "deadline elapsed_ms=60000\n")
+    return result
+
+
 class CandidateAcceptanceTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -103,6 +134,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
                          "0b783ceed247b984729021ae57c74b061936d627c04275a850e59079266a18c1")
         self.assertNotEqual(contract["source_sha256"]["crates/flightsim-sim/src/replay.rs"],
                             candidate.LEGACY_SOURCE_HASHES["crates/flightsim-sim/src/replay.rs"])
+        self.assertEqual(candidate.LEGACY_SOURCE_HASHES["crates/flightsim-fdm/src/lib.rs"],
+                         "a956e3046e906304e23e675d440ed20875ea5e47d1a3552158b8356f16b8ccc9")
+        self.assertNotEqual(candidate.REVIEWED_ADDITIVE_FDM_LIB_SHA256,
+                            candidate.LEGACY_SOURCE_HASHES["crates/flightsim-fdm/src/lib.rs"])
 
     def test_independent_reference_encoders_keep_all_existing_bytes_and_yaw_ambiguity(self):
         for script in ("replay_identity_reference.py", "replay_v3_reference.py"):
@@ -225,11 +260,48 @@ class CandidateAcceptanceTests(unittest.TestCase):
             candidate.write_json(path, changed)
             with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "boundary changed"):
                 candidate.load_replay_contract(repo)
-        changed = json.loads(json.dumps(original))
-        changed["source_sha256"]["assets/aircraft/light_single.json"] = "0" * 64
-        candidate.write_json(path, changed)
-        with self.assertRaisesRegex(ValueError, "frozen legacy input changed"):
-            candidate.load_replay_contract(repo)
+        for relative in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs"):
+            changed = json.loads(json.dumps(original))
+            changed["source_sha256"][relative] = "0" * 64
+            candidate.write_json(path, changed)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "frozen legacy input changed"):
+                candidate.load_replay_contract(repo)
+        for value in ("0" * 64, candidate.LEGACY_SOURCE_HASHES["crates/flightsim-fdm/src/lib.rs"]):
+            changed = json.loads(json.dumps(original))
+            changed["source_sha256"]["crates/flightsim-fdm/src/lib.rs"] = value
+            candidate.write_json(path, changed)
+            with self.subTest(fdm_lib=value), self.assertRaisesRegex(ValueError, "frozen reviewed FDM module input changed"):
+                candidate.load_replay_contract(repo)
+
+    def test_additive_jet_review_does_not_admit_legacy_behavior_or_feature_drift(self):
+        repo, _ = self.source_fixture()
+        # Deliberate semantic mutations, committed in a disposable repository:
+        # source qualification must reject these before any candidate is built.
+        mutations = (
+            ("crates/flightsim-sim/Cargo.toml", b'default-run = "flightsim-headless"\n', b''),
+            ("crates/flightsim-sim/Cargo.toml", b'features = ["raw_value"]',
+             b'features = ["raw_value", "float_roundtrip"]'),
+            ("crates/flightsim-fdm/src/landing_gear.rs", b'BOTTOM_OUT_STIFFNESS_MULTIPLIER: f64 = 6.0',
+             b'BOTTOM_OUT_STIFFNESS_MULTIPLIER: f64 = 7.0'),
+            ("crates/flightsim-sim/src/replay/current.rs", b'CURRENT_FORMAT_VERSION => Ok(Self::V3(',
+             b'CURRENT_FORMAT_VERSION | 4 => Ok(Self::V3('),
+            ("crates/flightsim-app/src/aircraft_profile.rs", b'if self.version != 1 {',
+             b'if self.version != 1 && self.version != 2 {'),
+            ("crates/flightsim-app/src/replay_policy.rs", b'if !legacy_opt_in {', b'if false {'),
+            ("crates/flightsim-sim/src/replay/identity.rs",
+             b'Self::Complete(recorded) if recorded == AircraftIdentity::for_config(config) => {',
+             b'Self::Complete(_) => {'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
 
     def test_all_expanded_helpers_and_independent_goldens_fail_on_committed_drift(self):
         repo, _ = self.source_fixture()
@@ -806,6 +878,146 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertIsNone(candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["summary"])
         self.assertTrue((evidence / candidate.PROBE_PNG_NAME).exists())
         self.assertEqual(report["checks"], {})
+
+    def test_v2_startup_partial_timeout_and_success_remain_separate_observations(self):
+        for outcome, expected in (("complete", (True, "ok", "valid", "queue_empty")),
+                                  ("timeout", (False, "missing", "missing", "timeout")),
+                                  ("entered_without_return", (False, "missing", "missing", "entered_without_return"))):
+            with self.subTest(outcome=outcome):
+                parsed = candidate.parse_readback_log(readback_v2_fixture(outcome, scene=False, late=False))
+                self.assertEqual((parsed["schema_version"], parsed["protocol"]), (2, "FS_READBACK_PROBE/v2"))
+                self.assertEqual(tuple(parsed["observations"]["prescene"][key] for key in
+                                       ("gpu_completion_observed", "map_callback", "pixels", "poll")), expected)
+                self.assertFalse(parsed["observations"]["gpu_completion_observed"])
+                self.assertIsNone(parsed["summary"])
+                self.assertIsNone(parsed["scene_summary"])
+        self.assertEqual(candidate.parse_readback_log(readback_fixture("complete"))["schema_version"], 1)
+
+    def test_v2_sparse_callbacks_allow_slow_frames_and_both_cleanup_triggers(self):
+        for late in (False, True):
+            with self.subTest(late=late):
+                parsed = candidate.parse_readback_log(readback_v2_fixture(late=late))
+                self.assertEqual(parsed["observations"]["scene"]["registered_frames"], [1, 2, 4, 8, 16, 30])
+                self.assertEqual(parsed["observations"]["scene"]["completed_frames"], [1, 2, 4, 8, 16, 30])
+                self.assertEqual(parsed["observations"]["scene"]["completion_elapsed_ms"]["30"], 30001)
+                self.assertEqual(parsed["scene_summary"]["reason"], "late_probe" if late else "deadline")
+        partial = readback_v2_fixture().split("FS_READBACK_PROBE event=scene_register frame=4", 1)[0]
+        parsed = candidate.parse_readback_log(partial)
+        self.assertEqual(parsed["observations"]["scene"]["registered_frames"], [1, 2])
+        self.assertIsNone(parsed["scene_summary"])
+        self.assertIsNone(parsed["summary"])
+
+    def test_v2_callbacks_can_be_synchronous_and_cancelled_callbacks_stay_inert(self):
+        original = readback_v2_fixture(scene=False, late=False)
+        callback = "FS_READBACK_PROBE event=prescene_map_callback result=ok cancelled=false phase=startup elapsed_ms=2\n"
+        synchronous = original.replace(callback, "").replace("FS_READBACK_PROBE event=prescene_map_registered",
+                          callback.replace("elapsed_ms=2", "elapsed_ms=1") + "FS_READBACK_PROBE event=prescene_map_registered")
+        self.assertEqual(candidate.parse_readback_log(synchronous)["observations"]["prescene"]["pixels"], "valid")
+        timed_out = readback_v2_fixture("timeout")
+        late_map = "FS_READBACK_PROBE event=prescene_map_callback result=error cancelled=true phase=cleanup elapsed_ms=5001\n"
+        timed_out = timed_out.replace(late_map, "") + late_map.replace("result=error", "result=ok").replace("elapsed_ms=5001", "elapsed_ms=50000")
+        for frame in (1, 2, 4, 8, 16, 30):
+            timed_out += f"FS_READBACK_PROBE event=scene_callback frame={frame} cancelled=true phase=owner_released elapsed_ms=50000\n"
+        parsed = candidate.parse_readback_log(timed_out)
+        self.assertEqual(parsed["observations"]["scene"]["completed_frames"], [])
+        self.assertEqual(parsed["prescene_summary"]["map_callback"], "missing")
+        self.assertFalse(parsed["observations"]["prescene"]["gpu_completion_observed"])
+        cancelled_before_summary = timed_out.replace("FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase=owner_released elapsed_ms=50000\n", "")
+        cancelled_before_summary = cancelled_before_summary.replace("FS_READBACK_PROBE event=scene_summary", "FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase=owner_released elapsed_ms=45000\nFS_READBACK_PROBE event=scene_summary")
+        self.assertEqual(candidate.parse_readback_log(cancelled_before_summary)["scene_summary"]["completed"], 0)
+
+    def test_v2_rejects_unknown_duplicate_unbounded_and_contradictory_events(self):
+        base = readback_v2_fixture()
+        changes = [
+            base.replace("version=2", "version=3"),
+            base.replace("version=2", "version=02"),
+            base.replace("version=2", "version=2 arbitrary=true"),
+            base.replace("event=prescene_begin", "event=prescene_unknown"),
+            base.replace("event=prescene_submitted", "event=prescene_submitted arbitrary=true"),
+            base.replace("gpu_timeout_ms=5000", "gpu_timeout_ms=5001"),
+            base.replace("wall_ms=2 elapsed_ms=3", "wall_ms=5000 elapsed_ms=3"),
+            base.replace("prescene_pixels valid=true count=16", "prescene_pixels valid=true count=15"),
+            base.replace("prescene_summary submitted=true map_callback=ok", "prescene_summary submitted=true map_callback=missing"),
+            base.replace("prescene_summary submitted=true map_callback=ok pixels=valid", "prescene_summary submitted=true map_callback=ok pixels=missing"),
+            base.replace("event=prescene_poll_return status=queue_empty", "event=prescene_poll_return status=timeout"),
+            base.replace("phase=startup", "phase=cleanup"),
+            base.replace("prescene_pixels valid=true count=16 elapsed_ms=3", "prescene_pixels valid=true count=16 elapsed_ms=1"),
+            base.replace("prescene_summary submitted=true map_callback=ok pixels=valid poll=queue_empty cleanup=true elapsed_ms=3", "prescene_summary submitted=true map_callback=ok pixels=valid poll=queue_empty cleanup=true elapsed_ms=2"),
+            base.replace("reason=late_probe elapsed_ms=45000", "reason=late_probe elapsed_ms=29000"),
+            base.replace("frame=30", "frame=31"),
+            base.replace("frame=2 ", "frame=4 "),
+            base.replace("registered=6 completed=6", "registered=6 completed=5"),
+            base.replace("registered=6 completed=6", "registered=7 completed=6"),
+            base.replace("reason=late_probe elapsed_ms=45000", "reason=deadline elapsed_ms=45000"),
+            base.replace("scene_register frame=30 elapsed_ms=30000", "scene_register frame=30 elapsed_ms=60000"),
+            base.replace("scene_callback frame=30 cancelled=false phase=active elapsed_ms=30001", "scene_callback frame=30 cancelled=false phase=active elapsed_ms=29999"),
+            base.replace("scene_callback frame=30 cancelled=false", "scene_callback frame=30 cancelled=true"),
+            base.replace("FS_READBACK_PROBE event=prescene_begin\n", ""),
+            base.replace("FS_READBACK_PROBE event=prescene_map_registered elapsed_ms=1\n", ""),
+            base.replace("FS_READBACK_PROBE event=prescene_poll_return status=queue_empty wall_ms=2 elapsed_ms=3\n", ""),
+            base.replace("FS_READBACK_PROBE event=scene_register frame=1 elapsed_ms=1000\n", ""),
+            base + "FS_READBACK_PROBE event=scene_register frame=1 elapsed_ms=46000\n",
+            base + "FS_READBACK_PROBE event=prescene_begin\n",
+            base + "FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase=owner_released elapsed_ms=180001\n",
+            readback_v2_fixture(late=False).replace("reason=deadline elapsed_ms=60000", "reason=late_probe elapsed_ms=60000"),
+        ]
+        for index, log in enumerate(changes):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                candidate.parse_readback_log(log)
+        with self.assertRaisesRegex(ValueError, "count exceeds bound"):
+            candidate.parse_readback_log("FS_READBACK_PROBE event=enabled version=2\n" * 65)
+
+    def test_v2_cutoff_and_late_summary_clocks_cannot_gain_false_credit(self):
+        prefix = readback_v2_fixture(scene=False, late=True)
+        with self.assertRaisesRegex(ValueError, "cleanup lacks deadline"):
+            candidate.parse_readback_log(prefix + "FS_READBACK_PROBE event=scene_summary registered=0 completed=0 cleanup=true reason=late_probe elapsed_ms=1\n")
+        log = readback_v2_fixture(late=False)
+        with self.assertRaisesRegex(ValueError, "active scene callback after deadline"):
+            candidate.parse_readback_log(log.replace("scene_callback frame=30 cancelled=false phase=active elapsed_ms=30001", "scene_callback frame=30 cancelled=false phase=active elapsed_ms=60000"))
+        late = log.replace("scene_callback frame=30 cancelled=false phase=active elapsed_ms=30001", "scene_callback frame=30 cancelled=true phase=deadline elapsed_ms=60000").replace("registered=6 completed=6", "registered=6 completed=5")
+        parsed = candidate.parse_readback_log(late)
+        self.assertEqual(parsed["observations"]["scene"]["completed_frames"], [1, 2, 4, 8, 16])
+        self.assertEqual(parsed["scene_summary"]["reason"], "deadline")
+        # Independent clocks use integer milliseconds; allow one ms of rounding.
+        quantized = readback_v2_fixture(scene=False, late=False).replace("wall_ms=2 elapsed_ms=3", "wall_ms=3 elapsed_ms=3")
+        self.assertEqual(candidate.parse_readback_log(quantized)["prescene_summary"]["poll"], "queue_empty")
+
+    def test_v2_owner_teardown_and_released_phases_allow_partial_evidence(self):
+        prefix = readback_v2_fixture(scene=False, late=False) + "FS_READBACK_PROBE event=scene_register frame=1 elapsed_ms=1000\n"
+        for phase in ("owner_teardown", "owner_released"):
+            log = prefix + f"FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase={phase} elapsed_ms=1001\n"
+            parsed = candidate.parse_readback_log(log)
+            self.assertIsNone(parsed["scene_summary"])
+            self.assertEqual(parsed["observations"]["scene"]["completed_frames"], [])
+        for phase in ("active", "deadline", "late_probe", "unknown"):
+            with self.subTest(phase=phase), self.assertRaises(ValueError):
+                candidate.parse_readback_log(prefix + f"FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase={phase} elapsed_ms=1001\n")
+        base = readback_v2_fixture("timeout")
+        for phase in ("owner_teardown", "deadline"):
+            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "cleanup reason"):
+                candidate.parse_readback_log(base + f"FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase={phase} elapsed_ms=60000\n")
+        for phase in ("late_probe", "owner_released"):
+            parsed = candidate.parse_readback_log(base + f"FS_READBACK_PROBE event=scene_callback frame=1 cancelled=true phase={phase} elapsed_ms=50000\n")
+            self.assertEqual(parsed["scene_summary"]["completed"], 0)
+
+    def test_v2_cannot_upgrade_primary_failure_or_upload_unproven_png(self):
+        root = self.root
+        cases = (("success", "complete"), ("timeout", "timeout"), ("timeout", "entered_without_return"), ("bad_log", "complete"))
+        for index, (result, startup) in enumerate(cases):
+            self.root = root / str(index)
+            self.root.mkdir()
+            log = readback_v2_fixture(startup)
+            with self.subTest(result=result, startup=startup), patch(__name__ + ".readback_fixture", return_value=log):
+                run, app, cwd, work, evidence, report, calls, primary = self.capture_fixture(probe=result)
+                with self.assertRaises(subprocess.TimeoutExpired) as failed:
+                    candidate.check_default_capture(run, ROOT, app, cwd, work, evidence, report)
+                self.assertIs(failed.exception, primary)
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(report["checks"], {})
+                self.assertIs(report["diagnostics"]["readback_probe"]["qualifies_acceptance"], False)
+                self.assertEqual((evidence / candidate.PROBE_PNG_NAME).exists(), result == "success")
+                self.finish_failed_capture(evidence, report)
+                self.assertEqual(candidate.readback_json(evidence / candidate.PROBE_JSON_NAME)["schema_version"], 2)
 
     def test_late_cancelled_callbacks_never_rewrite_summary_or_prove_completion(self):
         log = readback_fixture("gpu_timeout") + (

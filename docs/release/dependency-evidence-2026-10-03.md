@@ -58,6 +58,15 @@ those require their own exact target/feature collection and review.
 
 ## Review still required
 
+The later exact-numeric jet profile loader adds direct serde/serde_json edges to
+`flightsim-sim`. Fresh locked MSVC metadata and collection still produce exactly
+the same 359-package default application records, feature lists, embedded-asset
+records and notice bytes. `serde_json/raw_value` was already present in this
+application closure; no `float_roundtrip` feature was added. Only the lockfile
+and metadata bindings in the inventory changed. The separate optional-download
+collection likewise retains all 408 package records and its existing notices.
+Neither recollection changes the four unresolved records or review status.
+
 Retain declared license expressions exactly. `OR` permits selecting an offered
 alternative; `AND` requires both obligations. Relevant cases include
 `self_cell` (Apache-2.0 OR GPL-2.0-only), `unicode-ident` (an MIT/Apache option AND

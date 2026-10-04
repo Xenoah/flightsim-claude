@@ -110,6 +110,6 @@
         "review_status": "not_reviewed"
       }
     ],
-    "scope": "Existing locked dependencies; no new registry package versions. This optional feature is not enabled by the current application. If integrated, regenerate the complete target/feature-specific application inventory, including TLS, trust roots and URL/Unicode transitive dependencies. Not distribution or legal approval."
+    "scope": "Existing locked dependencies; no new registry package versions. This optional feature is not enabled by the application default. The explicit flightsim-app/region-downloads feature has its separate target/feature-specific inventory, including TLS, trust roots and URL/Unicode transitive dependencies; recollect that inventory after relevant changes. Not distribution or legal approval."
   }
 }

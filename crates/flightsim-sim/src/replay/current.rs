@@ -115,7 +115,7 @@ impl EnvironmentConditions {
         self
     }
 
-    fn check_world(self) -> Result<(), ReplayError> {
+    pub(crate) fn check_world(self) -> Result<(), ReplayError> {
         for (enabled, recorded, expected, detail) in [
             (
                 self.world_terrain,
@@ -581,7 +581,7 @@ impl ReplayFile {
     }
 }
 
-fn read_header<R: Read>(reader: &mut R) -> Result<u16, ReplayError> {
+pub(crate) fn read_header<R: Read>(reader: &mut R) -> Result<u16, ReplayError> {
     let mut magic = [0; 8];
     reader.read_exact(&mut magic)?;
     if magic != MAGIC {
@@ -624,7 +624,7 @@ fn validate_identity(identity: AircraftIdentity) -> Result<(), ReplayError> {
     Ok(())
 }
 
-fn write_environment<W: Write>(
+pub(crate) fn write_environment<W: Write>(
     writer: &mut W,
     e: &EnvironmentConditions,
 ) -> Result<(), ReplayError> {
@@ -653,7 +653,9 @@ fn write_environment<W: Write>(
     Ok(())
 }
 
-fn read_environment<R: Read>(reader: &mut R) -> Result<EnvironmentConditions, ReplayError> {
+pub(crate) fn read_environment<R: Read>(
+    reader: &mut R,
+) -> Result<EnvironmentConditions, ReplayError> {
     let start = Geodetic {
         latitude: Radians(read_f64(reader)?),
         longitude: Radians(read_f64(reader)?),
@@ -711,7 +713,7 @@ fn read_environment<R: Read>(reader: &mut R) -> Result<EnvironmentConditions, Re
     })
 }
 
-const fn weather_length(selection: WeatherSelection) -> u32 {
+pub(crate) const fn weather_length(selection: WeatherSelection) -> u32 {
     match selection {
         WeatherSelection::Legacy => 0,
         WeatherSelection::Modeled(scenario) => {
@@ -721,7 +723,10 @@ const fn weather_length(selection: WeatherSelection) -> u32 {
     }
 }
 
-fn write_weather<W: Write>(writer: &mut W, scenario: WeatherScenario) -> Result<(), ReplayError> {
+pub(crate) fn write_weather<W: Write>(
+    writer: &mut W,
+    scenario: WeatherScenario,
+) -> Result<(), ReplayError> {
     let p = scenario.parameters();
     writer.write_all(&p.parameter_schema.to_le_bytes())?;
     writer.write_all(&(p.source as u16).to_le_bytes())?;
@@ -767,7 +772,10 @@ fn weather_error(error: WeatherError) -> ReplayError {
     }
 }
 
-fn read_weather<R: Read>(reader: &mut R, length: u32) -> Result<WeatherScenario, ReplayError> {
+pub(crate) fn read_weather<R: Read>(
+    reader: &mut R,
+    length: u32,
+) -> Result<WeatherScenario, ReplayError> {
     require_valid(
         matches!(length, 62 | 86 | 96 | 120),
         "weather length",

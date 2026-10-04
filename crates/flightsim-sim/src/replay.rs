@@ -76,7 +76,7 @@ use glam::{DQuat, DVec3};
 
 use crate::simulation::Wind;
 
-mod current;
+pub(crate) mod current;
 pub mod identity;
 mod player;
 use player::PlaybackCursor;
@@ -1049,7 +1049,7 @@ impl Recording {
 
 /// Validate without changing the stored bits: repairing corruption would make a
 /// different flight appear to be the original recording.
-fn require_valid(
+pub(crate) fn require_valid(
     valid: bool,
     field: &'static str,
     frame: Option<u32>,
@@ -1070,7 +1070,7 @@ fn validate_conditions(conditions: &Conditions) -> Result<(), ReplayError> {
     validate_environment(&EnvironmentConditions::from(conditions))
 }
 
-fn validate_environment(conditions: &EnvironmentConditions) -> Result<(), ReplayError> {
+pub(crate) fn validate_environment(conditions: &EnvironmentConditions) -> Result<(), ReplayError> {
     require_valid(
         conditions.world_terrain == (conditions.terrain_fingerprint != 0),
         "terrain fingerprint",
@@ -1158,7 +1158,7 @@ fn frame_values(frame: &Frame) -> [f64; 7] {
     ]
 }
 
-fn validate_frame_values(values: &[f64; 7], frame: u32) -> Result<(), ReplayError> {
+pub(crate) fn validate_frame_values(values: &[f64; 7], frame: u32) -> Result<(), ReplayError> {
     require_valid(
         values[0].is_finite() && values[0] >= 0.0,
         "frame duration",
@@ -1197,7 +1197,7 @@ fn add_duration(elapsed: f64, frame: &Frame, index: u32) -> Result<f64, ReplayEr
     Ok(total)
 }
 
-fn validate_visual_time(
+pub(crate) fn validate_visual_time(
     start_epoch: f64,
     time_rate: f64,
     duration: f64,
@@ -1244,29 +1244,29 @@ fn validate_keyframe_state(state: &RigidBodyState, frame: u32) -> Result<(), Rep
     )
 }
 
-fn write_f64<W: Write>(writer: &mut W, value: f64) -> std::io::Result<()> {
+pub(crate) fn write_f64<W: Write>(writer: &mut W, value: f64) -> std::io::Result<()> {
     writer.write_all(&value.to_le_bytes())
 }
 
-fn read_f64<R: Read>(reader: &mut R) -> std::io::Result<f64> {
+pub(crate) fn read_f64<R: Read>(reader: &mut R) -> std::io::Result<f64> {
     let mut bytes = [0_u8; 8];
     reader.read_exact(&mut bytes)?;
     Ok(f64::from_le_bytes(bytes))
 }
 
-fn read_u64<R: Read>(reader: &mut R) -> std::io::Result<u64> {
+pub(crate) fn read_u64<R: Read>(reader: &mut R) -> std::io::Result<u64> {
     let mut bytes = [0_u8; 8];
     reader.read_exact(&mut bytes)?;
     Ok(u64::from_le_bytes(bytes))
 }
 
-fn read_u32<R: Read>(reader: &mut R) -> std::io::Result<u32> {
+pub(crate) fn read_u32<R: Read>(reader: &mut R) -> std::io::Result<u32> {
     let mut bytes = [0_u8; 4];
     reader.read_exact(&mut bytes)?;
     Ok(u32::from_le_bytes(bytes))
 }
 
-fn read_u16<R: Read>(reader: &mut R) -> std::io::Result<u16> {
+pub(crate) fn read_u16<R: Read>(reader: &mut R) -> std::io::Result<u16> {
     let mut bytes = [0_u8; 2];
     reader.read_exact(&mut bytes)?;
     Ok(u16::from_le_bytes(bytes))

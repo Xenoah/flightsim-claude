@@ -13,7 +13,7 @@ use bevy::render::render_resource::{
     TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
 };
 use bevy::render::renderer::{RenderDevice, RenderQueue, render_system};
-use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderSystems};
+use bevy::render::{Extract, ExtractSchedule, Render, RenderApp, RenderStartup, RenderSystems};
 use bevy::tasks::{AsyncComputeTaskPool, Task};
 use std::future::poll_fn;
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
@@ -23,6 +23,9 @@ use std::time::{Duration, Instant};
 const NORMAL_OBSERVATION: Duration = Duration::from_secs(5);
 const OBSERVATION_DEADLINE: Duration = Duration::from_secs(15);
 const GPU_WAIT_TIMEOUT: Duration = Duration::from_millis(250);
+const PRESCENE_GPU_WAIT: Duration = Duration::from_secs(5);
+const SCENE_OBSERVATION_DEADLINE: Duration = Duration::from_secs(60);
+const SCENE_FRAMES: [u64; 6] = [1, 2, 4, 8, 16, 30];
 const BUFFER_BYTES: u32 = 1024;
 const ROW_PITCH: u32 = 256;
 
@@ -43,14 +46,21 @@ pub(super) fn configure(app: &mut App) {
     };
     render_app
         .init_resource::<ProbeState>()
+        .init_resource::<SceneProbes>()
+        .add_systems(RenderStartup, prescene_probe)
         .add_systems(ExtractSchedule, extract_request)
         .add_systems(
             Render,
-            observe_probe
+            (
+                observe_scene_submissions,
+                observe_probe,
+                finish_scene_after_probe,
+            )
+                .chain()
                 .after(render_system)
                 .in_set(RenderSystems::Render),
         );
-    eprintln!("FS_READBACK_PROBE event=enabled");
+    eprintln!("FS_READBACK_PROBE event=enabled version=2");
 }
 
 #[derive(Resource, Default)]
@@ -106,14 +116,9 @@ fn lock_signals(signals: &Mutex<Signals>) -> MutexGuard<'_, Signals> {
 struct ActiveProbe {
     started: Instant,
     render_frames: u64,
-    buffer: Buffer,
-    texture: Texture,
-    // Contains the actual index returned by our queue.submit; never waits for an
-    // unrelated/latest submission and is consumed at most once.
-    wait: Option<PollType>,
+    marker: Marker,
     poll_status: &'static str,
     pixels: Option<bool>,
-    mapping: MappingLifecycle,
     shared: Arc<Mutex<Signals>>,
     task: Option<Task<()>>,
 }
@@ -156,6 +161,370 @@ fn release_mapping(mapping: &mut MappingLifecycle, destroy: impl FnOnce()) {
     destroy();
 }
 
+/// The pre-scene marker and the later marker reuse only this shader-free owned
+/// allocation/submission. They never overlap, and never change device creation.
+struct Marker {
+    buffer: Buffer,
+    texture: Texture,
+    // The actual queue.submit result, consumed once by a finite Wait.
+    wait: Option<PollType>,
+    mapping: MappingLifecycle,
+}
+
+impl Marker {
+    fn check_pixels(&mut self, callback: Option<bool>) -> Option<bool> {
+        self.mapping.observe_callback(callback);
+        if self.mapping != MappingLifecycle::Mapped {
+            return None;
+        }
+        let valid = {
+            let bytes = self.buffer.slice(..).get_mapped_range();
+            green_pixels(&bytes)
+        };
+        self.buffer.unmap();
+        self.mapping = MappingLifecycle::Unmapped;
+        Some(valid)
+    }
+
+    fn destroy(&mut self) {
+        if self.mapping == MappingLifecycle::Destroyed {
+            return;
+        }
+        release_mapping(&mut self.mapping, || self.buffer.destroy());
+        self.texture.destroy();
+        self.wait = None;
+    }
+}
+
+impl Drop for Marker {
+    fn drop(&mut self) {
+        self.destroy();
+    }
+}
+
+impl Drop for ActiveProbe {
+    fn drop(&mut self) {
+        // App teardown also freezes callbacks before the marker's Drop cancels
+        // a pending map. There is no terminal summary if observation was cut short.
+        let mut signals = lock_signals(&self.shared);
+        signals.closed = true;
+        signals.phase = Phase::Cleanup;
+        signals.waker = None;
+        drop(signals);
+        self.task = None;
+    }
+}
+
+fn wait_for_marker(device: &RenderDevice, wait: PollType) -> &'static str {
+    match device.poll(wait) {
+        Ok(status) if status.is_queue_empty() => "queue_empty",
+        Ok(status) if status.wait_finished() => "wait_succeeded",
+        Ok(_) => "unexpected_poll",
+        // PollError is not re-exported by Bevy. Pinned wgpu-types 27.0.1
+        // defines only Timeout and WrongSubmissionIndex; retain full Debug in
+        // the ordinary log without adding arbitrary structured fields.
+        Err(error) => {
+            warn!("readback diagnostic poll observation: {error:?}");
+            if format!("{error:?}") == "Timeout" {
+                "timeout"
+            } else {
+                "wrong_submission"
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct PresceneSignals {
+    closed: bool,
+    map_result: Option<bool>,
+}
+
+fn prescene_map_callback(shared: &Weak<Mutex<PresceneSignals>>, started: Instant, okay: bool) {
+    let result = if okay { "ok" } else { "error" };
+    let Some(shared) = shared.upgrade() else {
+        eprintln!(
+            "FS_READBACK_PROBE event=prescene_map_callback result={result} cancelled=true phase=cleanup elapsed_ms={}",
+            started.elapsed().as_millis()
+        );
+        return;
+    };
+    let mut signals = shared
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let phase = if signals.closed { "cleanup" } else { "startup" };
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_map_callback result={result} cancelled={} phase={phase} elapsed_ms={}",
+        signals.closed,
+        started.elapsed().as_millis()
+    );
+    if !signals.closed {
+        signals.map_result = Some(okay);
+    }
+}
+
+fn prescene_probe(
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+    mut scene: ResMut<SceneProbes>,
+) {
+    // Bevy 0.18.1 runs public RenderStartup once, before its first extract. Other
+    // startup systems can run too; this does not claim to be queue submission 1.
+    let started = Instant::now();
+    eprintln!("FS_READBACK_PROBE event=prescene_begin");
+    let mut marker = create_marker(&device, &queue, PRESCENE_GPU_WAIT);
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_submitted elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    // Declared after marker so unwinding drops this owner before GPU cancellation.
+    let shared = Arc::new(Mutex::new(PresceneSignals::default()));
+    let weak = Arc::downgrade(&shared);
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_map_register_enter elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    marker
+        .buffer
+        .slice(..)
+        .map_async(MapMode::Read, move |result| {
+            prescene_map_callback(&weak, started, result.is_ok());
+        });
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_map_registered elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_poll_enter gpu_timeout_ms=5000 elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    let poll_started = Instant::now();
+    let poll = wait_for_marker(
+        &device,
+        marker.wait.take().expect("new marker has one wait"),
+    );
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_poll_return status={poll} wall_ms={} elapsed_ms={}",
+        poll_started.elapsed().as_millis(),
+        started.elapsed().as_millis()
+    );
+    let result = shared
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .map_result;
+    let pixels = marker.check_pixels(result);
+    if let Some(valid) = pixels {
+        eprintln!(
+            "FS_READBACK_PROBE event=prescene_pixels valid={valid} count=16 elapsed_ms={}",
+            started.elapsed().as_millis()
+        );
+    }
+    // Freeze before destroy: cancellation can call back synchronously. A callback
+    // that arrives between checking pixels and closing is evidence, never pixels.
+    let result = {
+        let mut signals = shared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        signals.closed = true;
+        signals.map_result
+    };
+    marker.destroy();
+    let map = match result {
+        Some(true) => "ok",
+        Some(false) => "error",
+        None => "missing",
+    };
+    let pixels = match pixels {
+        Some(true) => "valid",
+        Some(false) => "invalid",
+        None => "missing",
+    };
+    eprintln!(
+        "FS_READBACK_PROBE event=prescene_summary submitted=true map_callback={map} pixels={pixels} poll={poll} cleanup=true elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    scene.started = Some(Instant::now());
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+enum ScenePhase {
+    #[default]
+    Active,
+    Deadline,
+    LateProbe,
+    OwnerTeardown,
+}
+
+impl ScenePhase {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Deadline => "deadline",
+            Self::LateProbe => "late_probe",
+            Self::OwnerTeardown => "owner_teardown",
+        }
+    }
+}
+
+#[derive(Default)]
+struct SceneSignals {
+    phase: ScenePhase,
+    registered: [bool; 6],
+    completed: [bool; 6],
+}
+
+impl SceneSignals {
+    fn close(&mut self, phase: ScenePhase) {
+        if self.phase == ScenePhase::Active {
+            self.phase = phase;
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+struct SceneProbes {
+    started: Option<Instant>,
+    frames: u64,
+    // Only enabled runs allocate this fixed-size state. Closures retain Weak.
+    shared: Option<Arc<Mutex<SceneSignals>>>,
+    finished: bool,
+}
+
+impl Drop for SceneProbes {
+    fn drop(&mut self) {
+        if let Some(shared) = &self.shared {
+            shared
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .close(ScenePhase::OwnerTeardown);
+        }
+    }
+}
+
+fn scene_callback(shared: &Weak<Mutex<SceneSignals>>, started: Instant, index: usize) {
+    let frame = SCENE_FRAMES[index];
+    let Some(shared) = shared.upgrade() else {
+        eprintln!(
+            "FS_READBACK_PROBE event=scene_callback frame={frame} cancelled=true phase=owner_released elapsed_ms={}",
+            started.elapsed().as_millis()
+        );
+        return;
+    };
+    let mut signals = shared
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let elapsed = started.elapsed();
+    // Callback delivery may happen on another thread while rendering is stalled.
+    // Freeze its evidence at the wall-clock cutoff without a timer or new task.
+    if elapsed >= SCENE_OBSERVATION_DEADLINE {
+        signals.close(ScenePhase::Deadline);
+    }
+    eprintln!(
+        "FS_READBACK_PROBE event=scene_callback frame={frame} cancelled={} phase={} elapsed_ms={}",
+        signals.phase != ScenePhase::Active,
+        signals.phase.name(),
+        elapsed.as_millis()
+    );
+    if signals.phase == ScenePhase::Active {
+        signals.completed[index] = true;
+    }
+}
+
+fn observe_scene_submissions(queue: Res<RenderQueue>, mut scene: ResMut<SceneProbes>) {
+    if scene.finished {
+        return;
+    }
+    let Some(started) = scene.started else {
+        return;
+    };
+    let elapsed = started.elapsed();
+    if elapsed >= SCENE_OBSERVATION_DEADLINE {
+        finish_scene(&mut scene, "deadline");
+        return;
+    }
+    scene.frames = scene.frames.saturating_add(1);
+    let Some(index) = SCENE_FRAMES.iter().position(|&frame| frame == scene.frames) else {
+        return;
+    };
+    let shared = scene
+        .shared
+        .get_or_insert_with(|| Arc::new(Mutex::new(SceneSignals::default())));
+    {
+        let mut signals = shared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let elapsed = started.elapsed();
+        if elapsed >= SCENE_OBSERVATION_DEADLINE {
+            signals.close(ScenePhase::Deadline);
+        }
+        if signals.phase != ScenePhase::Active {
+            return;
+        }
+        signals.registered[index] = true;
+        eprintln!(
+            "FS_READBACK_PROBE event=scene_register frame={} elapsed_ms={}",
+            SCENE_FRAMES[index],
+            elapsed.as_millis()
+        );
+    }
+    let weak = Arc::downgrade(shared);
+    // Called after public render_system; no submit, render pass, copy or poll.
+    // Registration can invoke the closure synchronously, so never hold its lock.
+    queue.on_submitted_work_done(move || scene_callback(&weak, started, index));
+}
+
+fn finish_scene_after_probe(probe: Res<ProbeState>, mut scene: ResMut<SceneProbes>) {
+    if probe.finished {
+        finish_scene(&mut scene, "late_probe");
+    }
+}
+
+fn finish_scene(scene: &mut SceneProbes, reason: &'static str) {
+    if scene.finished {
+        return;
+    }
+    let Some(started) = scene.started else {
+        return;
+    };
+    let (registered, completed, elapsed, reason) = if let Some(shared) = scene.shared.take() {
+        let mut signals = shared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let elapsed = started.elapsed();
+        let phase = if elapsed >= SCENE_OBSERVATION_DEADLINE {
+            ScenePhase::Deadline
+        } else {
+            ScenePhase::LateProbe
+        };
+        signals.close(phase);
+        (
+            signals.registered.iter().filter(|&&v| v).count(),
+            signals.completed.iter().filter(|&&v| v).count(),
+            elapsed,
+            phase.name(),
+        )
+    } else {
+        let elapsed = started.elapsed();
+        (
+            0,
+            0,
+            elapsed,
+            if elapsed >= SCENE_OBSERVATION_DEADLINE {
+                "deadline"
+            } else {
+                reason
+            },
+        )
+    };
+    // Timestamp the freeze itself. Logging can be scheduled later and must not
+    // relabel a late-probe freeze just because delivery crossed the 60 s edge.
+    scene.finished = true;
+    eprintln!(
+        "FS_READBACK_PROBE event=scene_summary registered={registered} completed={completed} cleanup=true reason={reason} elapsed_ms={}",
+        elapsed.as_millis()
+    );
+}
+
 fn observe_probe(
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
@@ -183,7 +552,7 @@ fn observe_probe(
     }
     check_pixels(probe);
     if elapsed >= NORMAL_OBSERVATION
-        && let Some(wait) = probe.wait.take()
+        && let Some(wait) = probe.marker.wait.take()
     {
         {
             let mut signals = lock_signals(&probe.shared);
@@ -197,28 +566,7 @@ fn observe_probe(
         // Public Bevy 0.18.1 forwards exactly to wgpu 27 Device::poll. A missing
         // return may reflect batch exit/interruption or a stalled poll/callback;
         // interpret it with the process outcome, never as a claimed 250 ms bound.
-        let result = device.poll(wait);
-        probe.poll_status = match &result {
-            Ok(status) if status.wait_finished() => {
-                if status.is_queue_empty() {
-                    "queue_empty"
-                } else {
-                    "wait_succeeded"
-                }
-            }
-            Ok(_) => "unexpected_poll",
-            // PollError is not re-exported by Bevy. These are the only two
-            // variants in pinned wgpu 27.0.1; retain its Debug value in a normal
-            // tracing log, with a bounded machine-readable classification here.
-            Err(error) => {
-                warn!("readback diagnostic poll error: {error:?}");
-                if format!("{error:?}") == "Timeout" {
-                    "timeout"
-                } else {
-                    "wrong_submission"
-                }
-            }
-        };
+        probe.poll_status = wait_for_marker(&device, wait);
         {
             let mut signals = lock_signals(&probe.shared);
             eprintln!(
@@ -239,8 +587,7 @@ fn observe_probe(
     }
 }
 
-fn start_probe(device: &RenderDevice, queue: &RenderQueue) -> ActiveProbe {
-    let started = Instant::now();
+fn create_marker(device: &RenderDevice, queue: &RenderQueue, timeout: Duration) -> Marker {
     let size = Extent3d {
         width: 4,
         height: 4,
@@ -301,15 +648,32 @@ fn start_probe(device: &RenderDevice, queue: &RenderQueue) -> ActiveProbe {
         size,
     );
     let submission = queue.submit([encoder.finish()]);
+    Marker {
+        buffer,
+        texture,
+        wait: Some(PollType::Wait {
+            submission_index: Some(submission),
+            timeout: Some(timeout),
+        }),
+        mapping: MappingLifecycle::AwaitingCallback,
+    }
+}
+
+fn start_probe(device: &RenderDevice, queue: &RenderQueue) -> ActiveProbe {
+    let started = Instant::now();
+    let marker = create_marker(device, queue, GPU_WAIT_TIMEOUT);
     eprintln!("FS_READBACK_PROBE event=submitted");
     let shared = Arc::new(Mutex::new(Signals::default()));
     let map_shared = Arc::downgrade(&shared);
     eprintln!("FS_READBACK_PROBE event=map_register_enter");
     // Registered directly on the render thread, outside AsyncComputeTaskPool.
     // Callback holds only a Weak signal reference, never the owned GPU resources.
-    buffer.slice(..).map_async(MapMode::Read, move |result| {
-        record_map_callback(&map_shared, result.is_ok());
-    });
+    marker
+        .buffer
+        .slice(..)
+        .map_async(MapMode::Read, move |result| {
+            record_map_callback(&map_shared, result.is_ok());
+        });
     eprintln!("FS_READBACK_PROBE event=map_registered");
     let queue_shared = Arc::downgrade(&shared);
     queue.on_submitted_work_done(move || record_queue_callback(&queue_shared));
@@ -320,15 +684,9 @@ fn start_probe(device: &RenderDevice, queue: &RenderQueue) -> ActiveProbe {
     ActiveProbe {
         started,
         render_frames: 0,
-        buffer,
-        texture,
-        wait: Some(PollType::Wait {
-            submission_index: Some(submission),
-            timeout: Some(GPU_WAIT_TIMEOUT),
-        }),
+        marker,
         poll_status: "not_entered",
         pixels: None,
-        mapping: MappingLifecycle::AwaitingCallback,
         shared,
         task: Some(task),
     }
@@ -423,20 +781,11 @@ fn green_pixels(bytes: &[u8]) -> bool {
 }
 
 fn check_pixels(probe: &mut ActiveProbe) {
-    probe
-        .mapping
-        .observe_callback(lock_signals(&probe.shared).map_result);
-    if probe.mapping != MappingLifecycle::Mapped {
-        return;
+    let result = lock_signals(&probe.shared).map_result;
+    if let Some(valid) = probe.marker.check_pixels(result) {
+        probe.pixels = Some(valid);
+        eprintln!("FS_READBACK_PROBE event=pixels valid={valid} count=16");
     }
-    let valid = {
-        let bytes = probe.buffer.slice(..).get_mapped_range();
-        green_pixels(&bytes)
-    }; // Release the mapped view before unmapping.
-    probe.buffer.unmap();
-    probe.mapping = MappingLifecycle::Unmapped;
-    probe.pixels = Some(valid);
-    eprintln!("FS_READBACK_PROBE event=pixels valid={valid} count=16");
 }
 
 fn finish_probe(probe: &mut ActiveProbe) {
@@ -446,12 +795,10 @@ fn finish_probe(probe: &mut ActiveProbe) {
     signals.closed = true;
     signals.phase = Phase::Cleanup;
     signals.waker = None;
-    probe.mapping.observe_callback(signals.map_result);
+    probe.marker.mapping.observe_callback(signals.map_result);
     drop(signals);
     probe.task = None;
-    release_mapping(&mut probe.mapping, || probe.buffer.destroy());
-    probe.texture.destroy();
-    probe.wait = None;
+    probe.marker.destroy();
     let signals = lock_signals(&probe.shared);
     let map = match signals.map_result {
         None => "missing",
@@ -500,6 +847,89 @@ mod tests {
         Pending,
         Mapped,
         Idle,
+    }
+
+    #[test]
+    fn prescene_callbacks_freeze_before_destroy_and_hold_no_gpu_owner() {
+        let started = Instant::now();
+        for initial in [None, Some(true), Some(false)] {
+            let shared = Arc::new(Mutex::new(PresceneSignals::default()));
+            let weak = Arc::downgrade(&shared);
+            if let Some(okay) = initial {
+                prescene_map_callback(&weak, started, okay);
+            }
+            shared.lock().unwrap().closed = true;
+            let mut owner = MappingLifecycle::AwaitingCallback;
+            release_mapping(&mut owner, || {
+                assert!(shared.try_lock().is_ok());
+                prescene_map_callback(&weak, started, false);
+            });
+            assert_eq!(shared.lock().unwrap().map_result, initial);
+            assert_eq!(Arc::strong_count(&shared), 1);
+            drop(shared);
+            assert!(weak.upgrade().is_none());
+            prescene_map_callback(&weak, started, true);
+        }
+    }
+
+    #[test]
+    fn sparse_scene_cleanup_is_one_shot_and_late_callbacks_cannot_count() {
+        let started = Instant::now();
+        let shared = Arc::new(Mutex::new(SceneSignals::default()));
+        let weak = Arc::downgrade(&shared);
+        {
+            let mut signals = shared.lock().unwrap();
+            signals.registered = [true; 6];
+        }
+        scene_callback(&weak, started, 0);
+        scene_callback(&weak, started, 1);
+        let mut scene = SceneProbes {
+            started: Some(started),
+            frames: 30,
+            shared: Some(Arc::clone(&shared)),
+            finished: false,
+        };
+        finish_scene(&mut scene, "late_probe");
+        assert!(scene.finished && scene.shared.is_none());
+        assert_ne!(shared.lock().unwrap().phase, ScenePhase::Active);
+        for index in 2..6 {
+            scene_callback(&weak, started, index);
+        }
+        assert_eq!(
+            shared.lock().unwrap().completed,
+            [true, true, false, false, false, false]
+        );
+        finish_scene(&mut scene, "deadline");
+        assert_eq!(Arc::strong_count(&shared), 1);
+        drop(shared);
+        assert!(weak.upgrade().is_none());
+        scene_callback(&weak, started, 5);
+    }
+
+    #[test]
+    fn sparse_callback_freezes_itself_at_cutoff_without_a_render_frame() {
+        let shared = Arc::new(Mutex::new(SceneSignals::default()));
+        let weak = Arc::downgrade(&shared);
+        shared.lock().unwrap().registered[0] = true;
+        let started = Instant::now() - SCENE_OBSERVATION_DEADLINE;
+        scene_callback(&weak, started, 0);
+        let signals = shared.lock().unwrap();
+        assert_eq!(signals.phase, ScenePhase::Deadline);
+        assert_eq!(signals.completed, [false; 6]);
+    }
+
+    #[test]
+    fn sparse_scene_app_teardown_closes_partial_observations() {
+        let shared = Arc::new(Mutex::new(SceneSignals::default()));
+        let weak = Arc::downgrade(&shared);
+        let scene = SceneProbes {
+            shared: Some(Arc::clone(&shared)),
+            ..default()
+        };
+        drop(scene);
+        assert_ne!(shared.lock().unwrap().phase, ScenePhase::Active);
+        scene_callback(&weak, Instant::now(), 0);
+        assert_eq!(shared.lock().unwrap().completed, [false; 6]);
     }
 
     #[test]

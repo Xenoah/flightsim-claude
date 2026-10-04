@@ -1,0 +1,620 @@
+{
+  "base": "docs/examples/aircraft-profiles-v2/numerical-jet.json",
+  "cases": [
+    {
+      "name": "valid-numerical-fixture",
+      "runtime_valid": true,
+      "schema_valid": true
+    },
+    {
+      "name": "metadata-aliases",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/model/forward": " X ",
+        "/model/up": "-Z",
+        "/engine_sound": " TURBOFAN "
+      }
+    },
+    {
+      "name": "optional-pitch-absent",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "remove": [
+        "/controls/elevator_rate",
+        "/controls/elevator_centering_rate"
+      ]
+    },
+    {
+      "name": "optional-pitch-null",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/elevator_rate": null,
+        "/controls/elevator_centering_rate": null
+      }
+    },
+    {
+      "name": "unstable-coefficient-is-authorable",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/aero/knots/0/aero/pitch_alpha": 1.0,
+        "/dynamics/aero/knots/0/aero/roll_aileron": -1.0
+      }
+    },
+    {
+      "name": "invalid-version-1",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/version": 1
+      }
+    },
+    {
+      "name": "invalid-version-3",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/version": 3
+      }
+    },
+    {
+      "name": "invalid-dynamics-kind-turbofan",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/kind": "turbofan"
+      }
+    },
+    {
+      "name": "invalid-dynamics-revision-2",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/revision": 2
+      }
+    },
+    {
+      "name": "invalid-dynamics-thrust-schema-2",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/thrust/schema": 2
+      }
+    },
+    {
+      "name": "invalid-dynamics-aero-schema-2",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/schema": 2
+      }
+    },
+    {
+      "name": "invalid-id-Upper",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/id": "Upper"
+      }
+    },
+    {
+      "name": "invalid-model-path-../bad.glb",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "../bad.glb"
+      }
+    },
+    {
+      "name": "invalid-model-path-/bad.glb",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "/bad.glb"
+      }
+    },
+    {
+      "name": "invalid-model-path-bad:evil.glb",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "bad:evil.glb"
+      }
+    },
+    {
+      "name": "invalid-model-path-bad\\evil.glb",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/path": "bad\\evil.glb"
+      }
+    },
+    {
+      "name": "invalid-model-forward-up",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/forward": "up"
+      }
+    },
+    {
+      "name": "invalid-model-up-+x",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/up": "+x"
+      }
+    },
+    {
+      "name": "invalid-engine_sound-silent",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/engine_sound": "silent"
+      }
+    },
+    {
+      "name": "invalid-dynamics-airframe-mass_kg-99",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": 99
+      }
+    },
+    {
+      "name": "invalid-dynamics-airframe-wing_span_m-101",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/wing_span_m": 101
+      }
+    },
+    {
+      "name": "invalid-dynamics-aero-knots-0-aero-drag_min-0",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/knots/0/aero/drag_min": 0
+      }
+    },
+    {
+      "name": "invalid-dynamics-envelope-mach-[0, 1]",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/envelope/mach": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "invalid-controls-approach_speed_mps-151",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/approach_speed_mps": 151
+      }
+    },
+    {
+      "name": "unknown-top-field",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/rights": "declared approved"
+      }
+    },
+    {
+      "name": "unknown-airframe-field",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/max_shaft_power_w": 1
+      }
+    },
+    {
+      "name": "unknown-coefficient",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/aero/knots/0/aero/foo": 1
+      }
+    },
+    {
+      "name": "missing--dynamics-kind",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/dynamics/kind"
+      ]
+    },
+    {
+      "name": "missing--dynamics-airframe",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/dynamics/airframe"
+      ]
+    },
+    {
+      "name": "missing--dynamics-aero-knots-0-aero-yaw_rate_p",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/dynamics/aero/knots/0/aero/yaw_rate_p"
+      ]
+    },
+    {
+      "name": "missing--camera_eye_m",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "remove": [
+        "/camera_eye_m"
+      ]
+    },
+    {
+      "name": "unknown-tag-integer-notation",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"version\":2",
+        "\"version\":2.0"
+      ]
+    },
+    {
+      "name": "duplicate-top-version",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"version\":2",
+        "\"version\":2,\"version\":2"
+      ]
+    },
+    {
+      "name": "duplicate-nested-mass",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "raw_replace": [
+        "\"mass_kg\":1043.0",
+        "\"mass_kg\":1043.0,\"mass_kg\":1043.0"
+      ]
+    },
+    {
+      "name": "numeric-string",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/model/length_m": "8.3"
+      }
+    },
+    {
+      "name": "underflow-to-zero",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/controls/default_trim": 12345
+      },
+      "raw_replace": [
+        "\"default_trim\":12345",
+        "\"default_trim\":1e-999"
+      ]
+    },
+    {
+      "name": "overflow",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/controls/default_trim": 12345
+      },
+      "raw_replace": [
+        "\"default_trim\":12345",
+        "\"default_trim\":1e999"
+      ]
+    },
+    {
+      "name": "numeric-token-128bytes",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "set": {
+        "/controls/default_trim": 12345
+      },
+      "raw_replace": [
+        "\"default_trim\":12345",
+        "\"default_trim\":0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "name": "numeric-token-129bytes",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/controls/default_trim": 12345
+      },
+      "raw_replace": [
+        "\"default_trim\":12345",
+        "\"default_trim\":0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "name": "one-mebibyte",
+      "runtime_valid": true,
+      "schema_valid": true,
+      "pad_to_bytes": 1048576
+    },
+    {
+      "name": "over-one-mebibyte",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "pad_to_bytes": 1048577
+    },
+    {
+      "name": "four-gear",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/airframe/landing_gear",
+          "count": 4,
+          "value": {
+            "contact_m": [
+              1.6,
+              0,
+              1.0
+            ],
+            "spring_n_per_m": 120000.0,
+            "damping_ns_per_m": 13000.0,
+            "max_stroke_m": 0.25,
+            "bottom_stop_travel_m": 0.05,
+            "max_recoil_mps": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "name": "33-pressure-knots",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/thrust/pressure_ratios",
+          "count": 33,
+          "value": 0
+        }
+      ]
+    },
+    {
+      "name": "33-temperature-knots",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/thrust/temperature_ratios",
+          "count": 33,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "33-mach-knots",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/thrust/mach",
+          "count": 33,
+          "value": 0
+        }
+      ]
+    },
+    {
+      "name": "33-aero-knots",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/aero/knots",
+          "count": 33,
+          "value": {
+            "mach": 0.0,
+            "aero": {
+              "lift_zero": 0.31,
+              "lift_alpha": 5.143,
+              "lift_flaps": 0.65,
+              "stall_angle_rad": 0.2792526803190927,
+              "stall_blend_rate": 50.0,
+              "drag_min": 0.031,
+              "oswald_efficiency": 0.75,
+              "drag_flaps": 0.06,
+              "side_beta": -0.31,
+              "side_rudder": 0.07835299999999999,
+              "roll_beta": -0.089,
+              "roll_rate_p": -0.47,
+              "roll_rate_r": 0.096,
+              "roll_aileron": 0.06212199999999999,
+              "roll_rudder": 0.0061592999999999995,
+              "pitch_zero": 0.015,
+              "pitch_alpha": -0.89,
+              "pitch_rate_q": -30.400000000000002,
+              "pitch_elevator": 0.55808,
+              "pitch_flaps": -0.12,
+              "yaw_beta": 0.065,
+              "yaw_rate_p": -0.0,
+              "yaw_rate_r": -0.099,
+              "yaw_aileron": -0.0018497,
+              "yaw_rudder": 0.027528299999999995
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4097-cells",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "repeat": [
+        {
+          "pointer": "/dynamics/thrust/cells",
+          "count": 4097,
+          "value": {
+            "idle_n": 0,
+            "maximum_dry_n": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "cell-product-mismatch",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "repeat": [
+        {
+          "pointer": "/dynamics/thrust/cells",
+          "count": 9,
+          "value": {
+            "idle_n": 0,
+            "maximum_dry_n": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "pressure-order",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/thrust/pressure_ratios": [
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "mach-first-not-zero",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/thrust/mach": [
+          0.1,
+          0.9
+        ]
+      }
+    },
+    {
+      "name": "aero-first-not-zero",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/aero/knots/0/mach": 0.01
+      }
+    },
+    {
+      "name": "vacuum-thrust",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/thrust/cells/0/maximum_dry_n": 1.0
+      }
+    },
+    {
+      "name": "dry-less-than-idle",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/thrust/cells/4/idle_n": 3000.0
+      }
+    },
+    {
+      "name": "envelope-uncontained",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/envelope/pressure_ratio": [
+          0.0,
+          1.1
+        ]
+      }
+    },
+    {
+      "name": "envelope-reversed",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/envelope/mach": [
+          0.9,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "singular-inertia",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/dynamics/airframe/inertia_kg_m2": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "utf8-path-over256bytes",
+      "runtime_valid": false,
+      "schema_valid": true,
+      "set": {
+        "/model/path": "\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c\u754c.glb"
+      }
+    },
+    {
+      "name": "numeric-wrong-type-object",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": {
+          "n": 1
+        }
+      }
+    },
+    {
+      "name": "numeric-wrong-type-array",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "numeric-wrong-type-null",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": null
+      }
+    },
+    {
+      "name": "numeric-wrong-type-bool",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": true
+      }
+    },
+    {
+      "name": "deep-numeric-subtree",
+      "runtime_valid": false,
+      "schema_valid": false,
+      "set": {
+        "/dynamics/airframe/mass_kg": 12345
+      },
+      "raw_replace": [
+        "\"mass_kg\":12345",
+        "\"mass_kg\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      ]
+    }
+  ]
+}

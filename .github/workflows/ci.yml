@@ -59,6 +59,12 @@ jobs:
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts/tests -v
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" -m unittest discover -s scripts -p 'test_pack_global_terrain.py' -v
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" schemas/tests/test_aircraft_profile_schema.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" schemas/tests/test_aircraft_profile_v2_schema.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" docs/qa/replay_identity_reference.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" docs/qa/replay_v3_reference.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" docs/qa/subsonic_reference.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" docs/qa/jet_identity_reference.py
+          "$RUNNER_TEMP/flightsim-source-tools/bin/python" docs/qa/replay_v4_reference.py
           "$RUNNER_TEMP/flightsim-source-tools/bin/python" tools/blender/validate_meadow_trainer.py
           # These boundary tests fetch no geospatial source data and require no HDF5.
 

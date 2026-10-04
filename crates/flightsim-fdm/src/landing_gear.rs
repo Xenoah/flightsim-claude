@@ -3,7 +3,7 @@
 //! 地形データはここで取得しない。呼び出し側が [`crate::Environment`] に渡した
 //! ローカル接地平面だけを使い、`flightsim-world` への横断依存を避ける。
 
-use flightsim_core::{Ecef, LocalFrame, Ned, Seconds};
+use flightsim_core::{Ecef, LocalFrame, Meters, Ned, Seconds};
 use glam::DVec3;
 
 use crate::{
@@ -114,6 +114,30 @@ fn normal_force(leg: &crate::LandingGearLeg, penetration: f64, penetration_rate:
 
     let damping_force = leg.damping_coefficient().get() * penetration_rate;
     (elastic_force * recoil_fade + damping_force).max(0.0)
+}
+
+/// Signed normal clearances for diagnostics in the separate jet runtime.
+/// Positive means above the plane; negative means penetration. This copies the
+/// exact rotated contact/plane arithmetic used by loads without changing the
+/// legacy force or imminent-contact expressions. The caller validates inputs
+/// and returned values; this helper never substitutes a fallback clearance.
+pub(crate) fn signed_normal_clearances(
+    gear: &LandingGearConfig,
+    state: &RigidBodyState,
+    environment: &Environment,
+    frame: &LocalFrame,
+) -> [Meters; 3] {
+    let ground_frame = ground_frame(environment, frame);
+    let normal_distance_scale = vertical_to_normal_distance_scale(environment);
+    gear.legs().map(|leg| {
+        let contact_body = leg.contact_point().as_vec();
+        let contact_offset_ecef = state.orientation * contact_body;
+        let contact_ecef = Ecef::from_vec(state.position.as_vec() + contact_offset_ecef);
+        let contact_offset_ned = ground_frame.ecef_to_ned_position(contact_ecef);
+        let ground_elevation = ground_elevation_at(environment, contact_offset_ned);
+        let contact_altitude = contact_ecef.to_geodetic().altitude.get();
+        Meters((contact_altitude - ground_elevation) * normal_distance_scale)
+    })
 }
 
 /// 全脚の接地荷重を機体軸で合算する。
