@@ -18,9 +18,15 @@ use flightsim_core::{Degrees, Geodetic, Meters};
 
 #[path = "regions.rs"]
 mod regions;
+#[path = "wind_settings.rs"]
+mod wind_settings;
 pub use regions::{
     RegionAction, RegionSummary, RegionsActions, RegionsButton, RegionsState, RegionsText,
     WorldMapRegionsRoot,
+};
+pub use wind_settings::{
+    WindSettingsButton, WindSettingsText, WindSettingsView, WorldMapConditionsEdit,
+    WorldMapTurbulence, WorldMapWindRoot,
 };
 
 /// Bounded global raster: one sample per half degree, north at the top.
@@ -249,6 +255,9 @@ pub struct WorldMapState {
     pub navigation_note: String,
     /// Pending new-flight weather; supplied by the app, never a live mutation.
     pub weather_note: String,
+    /// App-owned, staged physical conditions independent of visual cloud controls.
+    pub wind_settings: WindSettingsView,
+    wind_editor: Option<wind_settings::WindEditor>,
     /// Full app-verified ASCII derivative/source credits, shown in a separate
     /// paginated modal rather than abbreviated in the navigation sidebar.
     pub source_credits: String,
@@ -279,6 +288,8 @@ impl Default for WorldMapState {
             navigation_enabled: true,
             navigation_note: "New flight: safe airborne start above terrain".to_owned(),
             weather_note: String::new(),
+            wind_settings: WindSettingsView::default(),
+            wind_editor: None,
             source_credits: "Data credits are supplied by the application.".to_owned(),
             credits_visible: false,
             credits_page: 0,
@@ -304,6 +315,7 @@ impl WorldMapState {
         self.visible
             && !self.regions.visible
             && !self.credits_visible
+            && self.wind_editor.is_none()
             && self.coordinate_field.is_none()
     }
 
@@ -348,6 +360,7 @@ impl WorldMapState {
         self.invalidate_start_pending = true;
         self.visible = true;
         self.regions.show();
+        self.wind_editor = None;
         self.credits_visible = false;
         self.coordinate_field = None;
         self.coordinate_error.clear();
@@ -360,6 +373,7 @@ impl WorldMapState {
         self.visible = true;
         self.regions.visible = false;
         self.credits_visible = true;
+        self.wind_editor = None;
         self.credits_page = 0;
         self.coordinate_field = None;
         self.coordinate_error.clear();
@@ -456,6 +470,8 @@ impl WorldMapState {
 pub struct WorldMapActions {
     pub regions: RegionsActions,
     pub start_at: Option<WorldMapStart>,
+    /// Explicitly applied draft fields; app consumes and validates before Start.
+    pub conditions: Option<WorldMapConditionsEdit>,
     /// App must reject prepared results from any older request generation.
     pub generation: u64,
     /// A preview notification only. Do not apply it to the current flight.
@@ -576,6 +592,7 @@ pub struct WorldMapCreditsRoot;
 pub struct WorldMapImage;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorldMapText {
+    Wind(WindSettingsText),
     Regions(RegionsText),
     Month,
     Selection,
@@ -599,6 +616,8 @@ pub enum WorldMapMarker {
 }
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorldMapButton {
+    OpenWindSettings,
+    Wind(WindSettingsButton),
     OpenRegions,
     Regions(RegionsButton),
     Close,
@@ -715,7 +734,15 @@ pub fn spawn_world_map(
                     spawn_button(aircraft, "PgDn >", WorldMapButton::NextAircraft, px(72.0));
                 });
                 spawn_map_text(map_column, WorldMapText::AircraftDetail, 12.0, TEXT);
-                spawn_map_text(map_column, WorldMapText::Weather, 12.0, TEXT);
+                map_column.spawn(Node {
+                    width: percent(100.0), column_gap: px(8.0), align_items: AlignItems::Center,
+                    ..default()
+                }).with_children(|weather| {
+                    weather.spawn(Node { flex_grow: 1.0, flex_basis: px(0.0), min_width: px(0.0), ..default() }).with_children(|note| {
+                        spawn_map_text(note, WorldMapText::Weather, 12.0, TEXT);
+                    });
+                    spawn_button(weather, "Wind / turbulence", WorldMapButton::OpenWindSettings, px(138.0));
+                });
             });
             body.spawn((Node {
                 // Resolve height against the bounded body. An auto-height column
@@ -754,6 +781,7 @@ pub fn spawn_world_map(
         });
         root.spawn((Text::new("Preview only until Start. A new flight resets the current flight recording.    M / Esc closes this map."), TextFont { font_size: 12.0, ..default() }, TextColor(MUTED), Node { height: px(MAP_FOOTER_HEIGHT), flex_shrink: 0.0, ..default() }));
         regions::spawn_regions(root);
+        wind_settings::spawn_wind_settings(root);
         root.spawn((
             Node {
                 position_type: PositionType::Absolute,
@@ -916,6 +944,12 @@ pub fn handle_world_map_input(
     buttons: Query<(&Interaction, &WorldMapButton), Changed<Interaction>>,
     canvases: Query<&RelativeCursorPosition, With<WorldMapCanvas>>,
 ) {
+    let began_with_wind_editor = state.wind_editor.is_some();
+    let mut wind_owned_frame = began_with_wind_editor;
+    if wind_owned_frame && (!state.visible || !state.wind_settings.enabled) {
+        state.wind_editor = None;
+        actions.invalidate_start();
+    }
     let began_on_plain_map = state.new_flight_controls_active();
     let began_with_aircraft_controls = state.aircraft_controls_active();
     state.invalidate_pending_start(&mut actions);
@@ -946,7 +980,28 @@ pub fn handle_world_map_input(
     // clicked field before consuming its keyboard messages, so a quick
     // click -> Ctrl+A -> typing batch neither loses the clear nor edits the
     // previously focused field. Modal close/open actions retain priority.
+    let cancel_wind = buttons.iter().any(|(interaction, button)| {
+        *interaction == Interaction::Pressed
+            && *button == WorldMapButton::Wind(WindSettingsButton::Cancel)
+    });
     if editing_allowed {
+        if buttons.iter().any(|(interaction, button)| {
+            *interaction == Interaction::Pressed && *button == WorldMapButton::OpenWindSettings
+        }) && state.show_wind_settings()
+        {
+            wind_owned_frame = true;
+        }
+        if !cancel_wind && let Some(editor) = &mut state.wind_editor {
+            for (interaction, button) in &buttons {
+                if *interaction == Interaction::Pressed
+                    && let WorldMapButton::Wind(button) = button
+                {
+                    editor.button(*button, &mut actions);
+                }
+            }
+        }
+    }
+    if editing_allowed && !wind_owned_frame {
         for (interaction, button) in &buttons {
             if *interaction == Interaction::Pressed {
                 match button {
@@ -958,6 +1013,7 @@ pub fn handle_world_map_input(
         }
     }
     let mut coordinate_enter = false;
+    let mut wind_apply = false;
     for event in keyboard.read() {
         if lost_focus {
             continue;
@@ -968,7 +1024,17 @@ pub fn handle_world_map_input(
             KeyCode::ControlRight => control_modifiers[1] = pressed,
             _ => {}
         }
-        if editing_allowed && state.coordinate_field.is_some() {
+        if editing_allowed && wind_owned_frame && !cancel_wind && !wind_apply {
+            if let Some(editor) = &mut state.wind_editor {
+                let enter = editor.key(
+                    event,
+                    control_modifiers.iter().any(|held| *held),
+                    &mut actions,
+                );
+                // Opening owns an already-pressed Start key but does not apply it.
+                wind_apply |= enter && began_with_wind_editor;
+            }
+        } else if editing_allowed && !wind_owned_frame && state.coordinate_field.is_some() {
             coordinate_enter |= edit_coordinate(
                 event,
                 control_modifiers.iter().any(|held| *held),
@@ -980,7 +1046,9 @@ pub fn handle_world_map_input(
     // also invalidates older snapshots, even if the value was changed back.
     state.invalidate_pending_start(&mut actions);
     if lost_focus {
-        if state.visible {
+        if wind_owned_frame {
+            consume_wind_keys(&mut keys, logical_keys.as_deref_mut());
+        } else if state.visible {
             consume_aircraft_keys(&mut keys, logical_keys.as_deref_mut());
         }
         return;
@@ -990,15 +1058,43 @@ pub fn handle_world_map_input(
         regions::consume_keyboard_shortcuts(&mut keys, logical_keys.as_deref_mut());
         state.regions.dismiss(&mut actions.regions);
         state.credits_visible = false;
+        state.wind_editor = None;
         state.coordinate_field = None;
         state.coordinate_error.clear();
         actions.invalidate_start();
         consume_start_keys(&mut keys);
         keys.clear_just_pressed(KeyCode::KeyM);
         keys.clear_just_pressed(KeyCode::Escape);
+        if wind_owned_frame {
+            consume_wind_keys(&mut keys, logical_keys.as_deref_mut());
+        }
         return;
     }
     if !state.visible {
+        return;
+    }
+    if wind_owned_frame {
+        let close_map = buttons.iter().any(|(interaction, button)| {
+            *interaction == Interaction::Pressed && *button == WorldMapButton::Close
+        });
+        if keys.just_pressed(KeyCode::Escape) || cancel_wind || close_map {
+            state.wind_editor = None;
+            if close_map {
+                state.visible = false;
+            }
+            actions.invalidate_start();
+        } else if wind_apply
+            || (began_with_wind_editor
+                && buttons.iter().any(|(interaction, button)| {
+                    *interaction == Interaction::Pressed
+                        && *button == WorldMapButton::Wind(WindSettingsButton::Apply)
+                }))
+        {
+            state.apply_wind_settings(&mut actions);
+        }
+        // Every shortcut and underlying pointer action belongs to this child,
+        // including Apply/Cancel and focus-loss frames. F12 cannot change clouds.
+        consume_wind_keys(&mut keys, logical_keys.as_deref_mut());
         return;
     }
     if state.regions.visible {
@@ -1187,7 +1283,9 @@ pub fn handle_world_map_input(
             continue;
         }
         match *button {
-            WorldMapButton::Close
+            WorldMapButton::OpenWindSettings
+            | WorldMapButton::Wind(_)
+            | WorldMapButton::Close
             | WorldMapButton::OpenRegions
             | WorldMapButton::Regions(_)
             | WorldMapButton::OpenCredits
@@ -1219,6 +1317,13 @@ pub fn handle_world_map_input(
             WorldMapButton::Latitude | WorldMapButton::Longitude => {}
         }
         state.invalidate_pending_start(&mut actions);
+    }
+}
+
+fn consume_wind_keys(keys: &mut ButtonInput<KeyCode>, logical: Option<&mut ButtonInput<Key>>) {
+    keys.clear();
+    if let Some(logical) = logical {
+        logical.clear();
     }
 }
 
@@ -1317,10 +1422,18 @@ type CreditsVisibilityFilter = (
     Without<WorldMapRoot>,
     Without<WorldMapMarker>,
     Without<WorldMapRegionsRoot>,
+    Without<WorldMapWindRoot>,
 );
 
 type RegionsVisibilityFilter = (
     With<WorldMapRegionsRoot>,
+    Without<WorldMapRoot>,
+    Without<WorldMapMarker>,
+    Without<WorldMapWindRoot>,
+);
+
+type WindVisibilityFilter = (
+    With<WorldMapWindRoot>,
     Without<WorldMapRoot>,
     Without<WorldMapMarker>,
 );
@@ -1338,6 +1451,7 @@ pub fn update_world_map(
     mut roots: Query<&mut Visibility, (With<WorldMapRoot>, Without<WorldMapMarker>)>,
     mut credits: Query<&mut Visibility, CreditsVisibilityFilter>,
     mut region_panels: Query<&mut Visibility, RegionsVisibilityFilter>,
+    mut wind_panels: Query<&mut Visibility, WindVisibilityFilter>,
     map_images: Query<&ImageNode, With<WorldMapImage>>,
     mut texts: Query<(&WorldMapText, &mut Text)>,
     mut markers: Query<(&WorldMapMarker, &mut Node, &mut Visibility), Without<WorldMapRoot>>,
@@ -1359,6 +1473,13 @@ pub fn update_world_map(
     }
     for mut visibility in &mut region_panels {
         *visibility = if state.regions.visible {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for mut visibility in &mut wind_panels {
+        *visibility = if state.wind_editor.is_some() {
             Visibility::Inherited
         } else {
             Visibility::Hidden
@@ -1394,14 +1515,17 @@ pub fn update_world_map(
     }
     let last_credit_page = credit_pages(&state.source_credits).len() - 1;
     for (button, interaction, mut color) in &mut buttons {
-        let selected = matches!(button, WorldMapButton::Layer(layer) if *layer == state.layer)
+        let selected = matches!(button, WorldMapButton::Wind(button) if wind_settings::selected(*button, &state))
+            || matches!(button, WorldMapButton::Layer(layer) if *layer == state.layer)
             || matches!(button, WorldMapButton::Regions(button) if state.regions.button_selected(*button))
             || matches!(
                 (button, state.coordinate_field),
                 (WorldMapButton::Latitude, Some(CoordinateField::Latitude))
                     | (WorldMapButton::Longitude, Some(CoordinateField::Longitude))
             );
-        let disabled = (*button == WorldMapButton::Start && !state.navigation_enabled)
+        let disabled = (*button == WorldMapButton::OpenWindSettings
+            && (!state.wind_settings.enabled || !state.new_flight_modal_ready()))
+            || (*button == WorldMapButton::Start && !state.navigation_enabled)
             || (matches!(
                 button,
                 WorldMapButton::PreviousAircraft | WorldMapButton::NextAircraft
@@ -1433,6 +1557,7 @@ pub fn format_world_map_text(
     raster: &WorldMapRaster,
 ) -> String {
     match kind {
+        WorldMapText::Wind(kind) => wind_settings::format_text(kind, state),
         WorldMapText::Regions(kind) => regions::format_regions_text(kind, &state.regions),
         WorldMapText::Month => format!(
             "{} (preview)",
@@ -1642,6 +1767,10 @@ fn bounded_ascii(text: &str, columns: usize, lines: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod wind_settings_tests {
+        include!("wind_settings_tests.rs");
+    }
 
     fn near(actual: f64, expected: f64) {
         assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
@@ -2881,7 +3010,10 @@ mod tests {
         for (entity, kind) in world.query::<(Entity, &WorldMapText)>().iter(world) {
             if matches!(
                 kind,
-                WorldMapText::Credits | WorldMapText::CreditsPage | WorldMapText::Regions(_)
+                WorldMapText::Credits
+                    | WorldMapText::CreditsPage
+                    | WorldMapText::Regions(_)
+                    | WorldMapText::Wind(_)
             ) {
                 continue;
             }
@@ -2896,6 +3028,7 @@ mod tests {
             if matches!(
                 button,
                 WorldMapButton::Close
+                    | WorldMapButton::Wind(_)
                     | WorldMapButton::OpenRegions
                     | WorldMapButton::Regions(_)
                     | WorldMapButton::OpenCredits
@@ -3030,7 +3163,9 @@ mod tests {
             for (entity, button) in world.query::<(Entity, &WorldMapButton)>().iter(world) {
                 if matches!(
                     button,
-                    WorldMapButton::PreviousAircraft | WorldMapButton::NextAircraft
+                    WorldMapButton::PreviousAircraft
+                        | WorldMapButton::NextAircraft
+                        | WorldMapButton::OpenWindSettings
                 ) {
                     let rect = computed_rect(world, entity);
                     assert!(rect.width() >= 70.0 && rect.height() >= MAP_BUTTON_HEIGHT - 1.0);

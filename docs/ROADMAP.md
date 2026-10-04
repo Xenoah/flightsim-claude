@@ -111,6 +111,9 @@ alpha.21 は未公開。staging の component merge とリリースを同じ完�
   ので、再配布条件の判断が要らない）
 - [x] 夜間の滑走路灯（縁灯・進入端灯・末端灯。太陽高度で滑らかに点消灯）
 - [x] 定常風（`--wind 270/10`。FDM の空力と HUD へ。横風着陸が成立する）
+- [x] New-flight map wind-from/speed and independent authored turbulence editor;
+  exact pending conditions join the aircraft transaction. Visual presets do not
+  change forces. [Controls and qualification limits](new-flight-wind.md)
 - [x] 時刻・太陽位置（天文計算。時間加速つき。朝焼け・薄暮・夜）
 - [x] 突風・乱流（決定論的な値ノイズ。時間・空間相関つき）
 - [x] 決定論的な簡易雲層と雲中視程（雲量・雲底・雲頂・視程を CLI で設定。

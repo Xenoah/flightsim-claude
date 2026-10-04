@@ -33,6 +33,10 @@ No atmosphere temperature, pressure, wind or turbulence field is duplicated or
 overridden here. A Snow preset is therefore a visual scenario, not a validated
 thermodynamic state. Existing user-selected wind remains authoritative.
 
+The map's separate [Wind / turbulence editor](new-flight-wind.md) selects these
+existing physical settings for the next Start. Visual presets remain independent;
+physical turbulence strength changes preserve the existing physical seed.
+
 `WeatherParameters` is a copyable, editable DTO with unit-bearing physical
 quantities; it is not itself trusted. `WeatherScenario::try_from(parameters)`
 checks every scalar, revision and cross-field invariant without clamping or

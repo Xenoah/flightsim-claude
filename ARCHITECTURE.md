@@ -427,6 +427,15 @@ Legacy/no-precipitation creates no precipitation assets. See
 [modeled weather](docs/modeled-weather.md) for exact parameters, budgets,
 approximations and the separate app/native validation gates.
 
+New-flight wind/turbulence have an independent bounded map editor. App-owned
+exact pending values and override flags are copied only for explicitly edited
+fields, before wind-aware airborne construction. The aircraft transaction checks
+their exact snapshot and invalidated Start generation through regional/scene
+preparation. Visual weather selection never changes forces. Existing physical
+laws, seeds, v3/v4 bytes and restart/replay conditions stay unchanged; see
+[ADR-0017](docs/adr/0017-explicit-new-flight-forces.md) and
+[controls and limits](docs/new-flight-wind.md).
+
 CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
 `.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに
 `clippy -D warnings`、`fmt --check`、依存規約検査、

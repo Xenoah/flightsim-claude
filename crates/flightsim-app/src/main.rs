@@ -71,6 +71,7 @@ mod distribution;
 mod flight_session;
 mod graphics_runtime;
 use flight_session::{FlightSession, PreparedJetSession};
+mod conditions_runtime;
 mod region_runtime;
 mod render_metrics;
 mod replay_policy;
@@ -883,6 +884,7 @@ fn main() -> bevy::app::AppExit {
     graphics_runtime::configure(&mut app);
     cloud_runtime::configure(&mut app);
     weather_runtime::configure(&mut app);
+    conditions_runtime::configure(&mut app);
     windows_readback_diagnostic::configure(&mut app);
     distance_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);

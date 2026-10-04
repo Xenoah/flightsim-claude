@@ -52,6 +52,7 @@ struct PendingFlight {
     startup: Startup,
     selected_region: Option<String>,
     weather: Option<WeatherPreset>,
+    conditions: conditions_runtime::PhysicalConditions,
     phase: Phase,
 }
 enum Phase {
@@ -92,6 +93,7 @@ impl PendingFlight {
             && map.preview_month() == self.request.month
             && map.regions.selected == self.selected_region
             && weather == self.weather
+            && conditions_runtime::snapshot(world, current) == self.conditions
     }
 }
 
@@ -273,6 +275,7 @@ pub(super) fn apply(world: &mut World) {
                 request,
                 selected_region: world.resource::<WorldMapState>().regions.selected.clone(),
                 weather: startup.weather.requested,
+                conditions: conditions_runtime::PhysicalConditions::from_startup(&startup),
                 startup,
                 phase: Phase::Region,
             });

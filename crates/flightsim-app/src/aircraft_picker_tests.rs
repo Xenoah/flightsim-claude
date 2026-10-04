@@ -451,6 +451,16 @@ fn raw_or_selected_regions_reject_target_jet_before_consuming_request_or_mutatin
 #[cfg(not(feature = "commercial-staging"))]
 fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
     let mut app = app(startup());
+    let old_conditions =
+        conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>());
+    let mut changed = old_conditions;
+    changed.wind.speed = flightsim_core::MetersPerSecond(13.25);
+    changed.turbulence = flightsim_fdm::Turbulence::moderate(u64::MAX - 2);
+    app.world_mut()
+        .init_resource::<conditions_runtime::PendingConditions>();
+    app.world_mut()
+        .resource_mut::<conditions_runtime::PendingConditions>()
+        .selection = Some(changed);
     let old_root = active_root(&mut app);
     let before = recorder_bytes(&app);
     let original = app.world().resource::<AircraftPicker>().entries[3]
@@ -485,6 +495,10 @@ fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
         assert_eq!(active_root(&mut app), old_root);
         assert_eq!(recorder_bytes(&app), before);
         assert_eq!(
+            conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+            old_conditions
+        );
+        assert_eq!(
             app.world().resource::<WorldMapActions>().start_at,
             Some(requested)
         );
@@ -495,6 +509,10 @@ fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
     app.update();
     assert_eq!(active_root(&mut app), old_root);
     assert_eq!(recorder_bytes(&app), before);
+    assert_eq!(
+        conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+        old_conditions
+    );
     assert_eq!(
         app.world().resource::<WorldMapActions>().start_at,
         Some(requested)
@@ -511,6 +529,10 @@ fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
     submit(&mut app, 3);
     finish(&mut app);
     assert_target(&mut app, 3, old_root);
+    assert_eq!(
+        conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+        changed
+    );
 }
 
 #[test]
@@ -552,6 +574,228 @@ fn pending_weather_commits_with_target_and_flat_jet_cannot_switch_to_legacy() {
             .resource::<WorldMapState>()
             .navigation_note
             .contains("global terrain is off")
+    );
+}
+
+#[test]
+#[cfg(not(feature = "commercial-staging"))]
+fn pending_forces_commit_with_each_family_and_visual_only_switch_keeps_exact_values() {
+    use crate::conditions_runtime::{PendingConditions, PhysicalConditions};
+    let mut app = app(startup());
+    let mut desired = app.world().resource::<Startup>().clone();
+    desired.wind = flightsim_sim::Wind {
+        from: Radians(4.712_388_980_384_123),
+        speed: flightsim_core::MetersPerSecond(10.288_065_843_621),
+    };
+    desired.turbulence = flightsim_fdm::Turbulence {
+        intensity: flightsim_core::MetersPerSecond(2.125_123_456_789),
+        seed: 0x1234_5678_9abc_def0,
+    };
+    desired.wind_was_given = true;
+    desired.turbulence_was_given = true;
+    let expected = PhysicalConditions::from_startup(&desired);
+    app.world_mut()
+        .insert_resource(PendingConditions::default());
+    app.world_mut()
+        .resource_mut::<PendingConditions>()
+        .selection = Some(expected);
+    for target in [3, 2, 1, 0] {
+        app.world_mut()
+            .resource_mut::<weather_runtime::PendingWeather>()
+            .requested = Some(if target % 2 == 0 {
+            WeatherPreset::Clear
+        } else {
+            WeatherPreset::Rain
+        });
+        let old_root = active_root(&mut app);
+        let old_conditions = PhysicalConditions::from_startup(app.world().resource::<Startup>());
+        submit(&mut app, target);
+        world_runtime::apply_world_map_start(app.world_mut());
+        // No active values or hierarchy are published during model preparation.
+        assert_eq!(active_root(&mut app), old_root);
+        assert_eq!(
+            PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+            old_conditions
+        );
+        finish(&mut app);
+        assert_eq!(
+            PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+            expected
+        );
+        let mut calm_startup = app.world().resource::<Startup>().clone();
+        calm_startup.wind = flightsim_sim::Wind::CALM;
+        let calm = world_runtime::prepare_world_map_flight(calm_startup, request(target, 0), None)
+            .unwrap();
+        let actual = app.world().resource::<FlightSimulation>().0.state();
+        let initial_wind = actual.velocity_ned().0 - calm.simulation.state().velocity_ned().0;
+        assert!(
+            (initial_wind - desired.wind.to_ned().0).length() < 1e-8,
+            "forces must resolve before wind-aware airborne velocity construction"
+        );
+        for _ in 0..150 {
+            advance_one(&mut app);
+        }
+        let final_state = *app.world().resource::<FlightSimulation>().0.state();
+        let final_elapsed = app.world().resource::<FlightSimulation>().0.elapsed();
+        let bytes = recorder_bytes(&app);
+        if target == 3 {
+            let ModelReplayFile::V4(recording) =
+                ModelReplayFile::read_from(&mut bytes.as_slice()).unwrap()
+            else {
+                panic!()
+            };
+            assert_eq!(
+                recording.conditions().environment.conditions.wind,
+                desired.wind
+            );
+            assert_eq!(
+                recording.conditions().environment.conditions.turbulence,
+                desired.turbulence
+            );
+            let mut rewritten = Vec::new();
+            recording.write_to(&mut rewritten).unwrap();
+            assert_eq!(rewritten, bytes);
+            let mut player = JetReplayPlayer::new(
+                app.world()
+                    .resource::<Startup>()
+                    .aircraft
+                    .jet()
+                    .unwrap()
+                    .configuration()
+                    .clone(),
+                recording,
+            )
+            .unwrap();
+            for _ in 0..300 {
+                player.advance(Seconds(1.0 / 144.0)).unwrap();
+            }
+            assert!(player.finished());
+            assert!(flightsim_sim::replay_v4::state_bits_equal(
+                player.simulation().state(),
+                &final_state
+            ));
+            assert_eq!(player.simulation().elapsed(), final_elapsed);
+            player.restart().unwrap();
+            assert_eq!(player.simulation().elapsed(), Seconds::ZERO);
+            for _ in 0..100 {
+                player.advance(Seconds(1.0 / 30.0)).unwrap();
+            }
+            assert!(flightsim_sim::replay_v4::state_bits_equal(
+                player.simulation().state(),
+                &final_state
+            ));
+        } else {
+            let recording = ReplayFile::read_from(&mut bytes.as_slice()).unwrap();
+            assert_eq!(recording.environment().wind, desired.wind);
+            assert_eq!(recording.environment().turbulence, desired.turbulence);
+            let mut rewritten = Vec::new();
+            recording.write_to(&mut rewritten).unwrap();
+            assert_eq!(rewritten, bytes);
+            let environment = recording.environment();
+            let startup = app.world().resource::<Startup>();
+            let mut replay_sim = Simulation::from_state(
+                startup.aircraft.configuration(),
+                recording.keyframe_exactly_at(0).unwrap().state,
+                Terrain::new(
+                    make_source(startup),
+                    64 * 1024 * 1024,
+                    world_runtime::terrain_levels(startup),
+                ),
+                GroundSampler::default(),
+            );
+            replay_sim.set_wind(environment.wind);
+            replay_sim.set_turbulence(environment.turbulence);
+            replay_sim.set_climate(environment.climate_date).unwrap();
+            let mut playback = ReplayPlayback::new(recording);
+            for _ in 0..300 {
+                assert!(!playback.tick(&mut replay_sim, Seconds(1.0 / 144.0)));
+            }
+            assert!(playback.player.is_finished());
+            assert!(flightsim_sim::replay_v4::state_bits_equal(
+                replay_sim.state(),
+                &final_state
+            ));
+            assert_eq!(replay_sim.elapsed(), final_elapsed);
+            playback.rewind(&mut replay_sim);
+            assert_eq!(replay_sim.elapsed(), Seconds::ZERO);
+            for _ in 0..100 {
+                assert!(!playback.tick(&mut replay_sim, Seconds(1.0 / 30.0)));
+            }
+            assert!(playback.player.is_finished());
+            assert!(flightsim_sim::replay_v4::state_bits_equal(
+                replay_sim.state(),
+                &final_state
+            ));
+        }
+        // Production restart uses the committed conditions, resetting gust time.
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyR);
+        app.world_mut().run_system_once(control_flight).unwrap();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        assert_eq!(
+            app.world().resource::<FlightSimulation>().0.elapsed(),
+            Seconds::ZERO
+        );
+        assert_eq!(
+            PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+            expected
+        );
+    }
+}
+
+#[test]
+fn changed_conditions_or_edit_restore_cannot_commit_an_admitted_scene() {
+    use crate::conditions_runtime::{PendingConditions, PhysicalConditions};
+    let mut app = app(startup());
+    let original = PhysicalConditions::from_startup(app.world().resource::<Startup>());
+    let mut changed = original;
+    changed.wind.speed = flightsim_core::MetersPerSecond(11.0);
+    app.world_mut()
+        .insert_resource(PendingConditions::default());
+    app.world_mut()
+        .resource_mut::<PendingConditions>()
+        .selection = Some(original);
+    let old_root = active_root(&mut app);
+    let old_bytes = recorder_bytes(&app);
+    for restore in [false, true] {
+        submit(&mut app, 0);
+        world_runtime::apply_world_map_start(app.world_mut());
+        assert!(app.world().resource::<AircraftPicker>().preparing());
+        app.world_mut()
+            .resource_mut::<PendingConditions>()
+            .selection = Some(changed);
+        if restore {
+            // Editor mutation invalidates the generation immediately, before
+            // Apply. Even restoring every value cannot resurrect this Start.
+            app.world_mut()
+                .resource_mut::<WorldMapActions>()
+                .invalidate_start();
+            app.world_mut()
+                .resource_mut::<PendingConditions>()
+                .selection = Some(original);
+        }
+        for _ in 0..5 {
+            app.update();
+        }
+        assert!(!app.world().resource::<AircraftPicker>().preparing());
+        assert_eq!(active_root(&mut app), old_root);
+        assert_eq!(recorder_bytes(&app), old_bytes);
+        assert_eq!(
+            PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+            original
+        );
+        app.world_mut()
+            .resource_mut::<PendingConditions>()
+            .selection = Some(original);
+    }
+    submit(&mut app, 0);
+    finish(&mut app);
+    assert_eq!(
+        PhysicalConditions::from_startup(app.world().resource::<Startup>()),
+        original
     );
 }
 

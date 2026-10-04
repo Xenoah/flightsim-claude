@@ -634,6 +634,9 @@ pub(super) fn apply_world_map_start(world: &mut World) {
 }
 
 pub(super) fn apply_pending_weather(world: &World, startup: &mut Startup) {
+    // Snapshot forces before airborne_state constructs a wind-aware initial
+    // velocity. Only the final prepared transaction can publish these values.
+    super::conditions_runtime::snapshot(world, startup).apply(startup);
     if !startup.clouds_were_given
         && startup.traffic.host.is_none()
         && startup.traffic.join.is_none()

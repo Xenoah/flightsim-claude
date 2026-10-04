@@ -66,7 +66,8 @@ pub use tutorial::{
     spawn_tutorial_prompt, update_tutorial_prompt,
 };
 pub use world_map::{
-    WorldMapActions, WorldMapLayer, WorldMapRaster, WorldMapStart, WorldMapState, WorldMapSystems,
+    WindSettingsView, WorldMapActions, WorldMapConditionsEdit, WorldMapLayer, WorldMapRaster,
+    WorldMapStart, WorldMapState, WorldMapSystems, WorldMapTurbulence,
 };
 
 /// App-selected live guidance for an aircraft with different operating cues.

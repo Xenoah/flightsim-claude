@@ -400,6 +400,90 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_wind_review_rejects_exact_value_default_seed_and_override_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'from_dirty: false,', b'from_dirty: true,'),
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'speed_dirty: false,', b'speed_dirty: true,'),
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'turbulence: None,', b'turbulence: Some(WorldMapTurbulence::Calm),'),
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'value.is_finite() && (0.0..=maximum).contains(value)', b'true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'if let Some(level) = edit.turbulence {',
+             b'if let Some(level) = edit.turbulence {\n            self.turbulence.seed = 0;'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'self.wind.from.get().to_bits() == other.wind.from.get().to_bits()',
+             b'self.wind.from == other.wind.from'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& self.turbulence.seed == other.turbulence.seed', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& self.wind_was_given == other.wind_was_given', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& self.turbulence_was_given == other.turbulence_was_given', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'self.wind_was_given = true;', b'self.wind_was_given = false;'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'self.turbulence_was_given = true;', b'self.turbulence_was_given = false;'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            # Each wind component independently sets this same override flag.
+            expected_count = 2 if old == b'self.wind_was_given = true;' else 1
+            self.assertEqual(original.count(old), expected_count, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_wind_review_rejects_replay_lan_snapshot_and_generation_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'    !replay\n', b'    true\n'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& startup.replay.is_none()', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& startup.traffic.host.is_none()', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'&& startup.traffic.join.is_none()', b'&& true'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'if enabled && map.new_flight_modal_ready() {', b'if enabled {'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'actions.invalidate_start();', b'let _ = &actions;'),
+            ("crates/flightsim-app/src/conditions_runtime.rs",
+             b'.before(world_runtime::apply_world_map_start)',
+             b'.after(world_runtime::apply_world_map_start)'),
+            ("crates/flightsim-ui/src/wind_settings.rs",
+             b'self.invalidate_start_pending = true;', b'self.invalidate_start_pending = false;'),
+            ("crates/flightsim-ui/src/world_map.rs",
+             b'if keys.just_pressed(KeyCode::Escape) || cancel_wind || close_map {',
+             b'if keys.just_pressed(KeyCode::Escape) || close_map {'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'&& conditions_runtime::snapshot(world, current) == self.conditions', b'&& true'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'conditions: conditions_runtime::PhysicalConditions::from_startup(&startup),',
+             b'conditions: conditions_runtime::PhysicalConditions::from_startup(world.resource::<Startup>()),'),
+            ("crates/flightsim-app/src/world_runtime.rs",
+             b'super::conditions_runtime::snapshot(world, startup).apply(startup);',
+             b'let _ = super::conditions_runtime::snapshot(world, startup);'),
+        )
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(ValueError, "canonical baseline changed"):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
     def test_all_expanded_helpers_and_independent_goldens_fail_on_committed_drift(self):
         repo, _ = self.source_fixture()
         for relative in (*candidate.REPLAY_CONTRACT_PATHS, *candidate.INDEPENDENT_REPLAY_HASHES):

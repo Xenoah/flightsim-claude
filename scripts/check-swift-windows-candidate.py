@@ -93,6 +93,15 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-app/src/aircraft_scene.rs",
     "crates/flightsim-audio/src/lib.rs",
     "crates/flightsim-audio/src/lifecycle_tests.rs",
+    # Explicit pending wind/turbulence now own the environment copied into a
+    # prepared Swift session and recorder. Bind their exact-value/seed/default
+    # boundary and the reviewed app, input and physical/replay witnesses.
+    "crates/flightsim-app/src/conditions_runtime.rs",
+    "crates/flightsim-app/src/conditions_runtime_tests.rs",
+    "crates/flightsim-ui/src/wind_settings.rs",
+    "crates/flightsim-ui/src/wind_settings_tests.rs",
+    "crates/flightsim-sim/tests/wind_force_contract.rs",
+    "crates/flightsim-sim/tests/wind_replay_rewind.rs",
 }
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
