@@ -39,6 +39,12 @@
      assetgen (offline only)
 ```
 
+Aircraft package integrity and static GLB resource validation live in pure
+`content`; app supplies the existing original-byte physical-profile decoder.
+Terrain manifest v1 remains DEM-only. Offline aircraft import publishes data but
+never activates a flight, changes replay identity or grants distribution rights.
+See [ADR-0027](docs/adr/0027-offline-aircraft-data-packages.md).
+
 `net` は Bevy / FDM / world に依存しない純 Rust の UDP・交通データ層。
 ECEF のスナップショットと通信状態を app が描画・UI に結線する。
 通信時刻は `Time<Real>`、合成交通の時刻は simulation の固定時間を使い、
@@ -49,7 +55,7 @@ ECEF のスナップショットと通信状態を app が描画・UI に結線�
 | `flightsim-core` | WGS84 測地系、ECEF/ENU/NED 変換、単位型、シミュレーション時刻 | ✗ | architect |
 | `flightsim-fdm` | 6DoF 剛体、ISA 大気、空力係数、失速、風、着陸装置、積分器 | ✗ | simulation |
 | `flightsim-world` | タイル分割、DEM、LOD 選択、ストリーミング、地形高度クエリ | ✗ | world |
-| `flightsim-content` | Data-only package validation, immutable installation, hash-checked regional sources and opt-in prepared GitHub acquisition | ✗ | architect/world |
+| `flightsim-content` | Data-only terrain and aircraft-package validation, immutable installation, hash-checked regional sources and opt-in prepared terrain GitHub acquisition | ✗ | architect/world |
 | `flightsim-render` | floating origin の適用、地形メッシュの GPU 投入、LOD 描画 | ✓ | rendering |
 | `flightsim-input` | 入力マッピング、視点切替、カメラ制御 | ✓ | input-camera |
 | `flightsim-ui` | HUD、計器、メニュー、チュートリアル導線 | ✓ | ux |

@@ -224,7 +224,7 @@ impl Manifest {
     }
 }
 
-fn bounded_text(value: &str, limit: usize) -> Result<()> {
+pub(crate) fn bounded_text(value: &str, limit: usize) -> Result<()> {
     if value.trim().is_empty()
         || value.len() > limit
         || value
@@ -238,7 +238,7 @@ fn bounded_text(value: &str, limit: usize) -> Result<()> {
     Ok(())
 }
 
-fn source_url(value: &str) -> Result<()> {
+pub(crate) fn source_url(value: &str) -> Result<()> {
     bounded_text(value, 2048)?;
     if !(value.starts_with("https://") || value.starts_with("http://"))
         || value.chars().any(char::is_whitespace)
@@ -307,13 +307,25 @@ pub(crate) fn file_byte_limit(path: &str) -> Result<u64> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct PortablePaths {
+    limit: usize,
     // lowercased prefix -> (original case, is_directory, explicitly present)
     seen: BTreeMap<String, (String, bool, bool)>,
 }
 
+impl Default for PortablePaths {
+    fn default() -> Self {
+        Self::with_limit(crate::MAX_ARCHIVE_ENTRIES)
+    }
+}
 impl PortablePaths {
+    pub fn with_limit(limit: usize) -> Self {
+        Self {
+            limit,
+            seen: BTreeMap::new(),
+        }
+    }
     pub fn add(&mut self, path: &str, directory: bool) -> Result<()> {
         validate_path(path)?;
         let components: Vec<_> = path.split('/').collect();
@@ -331,7 +343,7 @@ impl PortablePaths {
                 }
             } else {
                 self.seen.insert(key, (prefix, is_directory, leaf));
-                if self.seen.len() > crate::MAX_ARCHIVE_ENTRIES {
+                if self.seen.len() > self.limit {
                     return Err(Error::Limit("materialized file/directory count"));
                 }
             }

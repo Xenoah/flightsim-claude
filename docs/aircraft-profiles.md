@@ -76,9 +76,10 @@ Authoring scope is a **self-contained glTF 2.0 binary GLB** with its buffers and
 images embedded and visible geometry in **scene 0**; the app explicitly requests
 that scene. The `.glb` suffix alone does not prove that dependencies are embedded,
 that extensions are supported, or that the model is loadable. The schema inspects
-no GLB bytes, external-resource references, textures, licenses or geometry. There
-is no aircraft archive manifest, dependency installer, hash-checked aircraft
-package store or general secure aircraft-package importer in this format. The
+no GLB bytes, external-resource references, textures, licenses or geometry. The separate [aircraft data package v1](aircraft-packages.md) now supplies a
+bounded static/untextured GLB manifest and explicit offline validation/basic
+import. This standalone profile format does not install dependencies or
+package files and is not a general untrusted-asset sandbox. The
 commercial staging path check also checks canonical root escape; ordinary
 profile validation itself is lexical and is not a sandbox for untrusted assets.
 The separate [regional terrain package system](content-packages.md) does not

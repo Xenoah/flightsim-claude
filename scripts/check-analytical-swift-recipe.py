@@ -98,7 +98,7 @@ def validate_header(value, source_sha):
 
 
 def source_evidence(repo, expected):
-    # This preserves every one of the 130 reviewed source pins and 102 anchors.
+    # This preserves all 149 reviewed source pins and 102 independent anchors.
     source = candidate.source_inputs(repo, expected)
     contract = json.loads((repo / CONTRACT).read_text())
     require(contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY

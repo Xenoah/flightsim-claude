@@ -56,52 +56,70 @@ impl StagedPackage {
     /// A process crash before the same-filesystem rename leaves an ignored .import-*
     /// directory, never a version reservation. Locks are released by the OS on exit.
     pub fn commit(self) -> Result<InstalledPackage> {
-        check_directory_path(&self.store)?;
-        let lock_path = self.store.join(".install.lock");
-        if let Ok(meta) = std::fs::symlink_metadata(&lock_path) {
-            if !meta.is_file() {
-                return Err(Error::Invalid("store lock is not a regular file".into()));
-            }
-        }
-        let lock = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(lock_path)?;
-        lock.try_lock_exclusive().map_err(|e| {
-            // Windows reports ERROR_LOCK_VIOLATION, whose Rust ErrorKind is
-            // not WouldBlock. Use fs2's platform contract, not a guessed code.
-            if e.kind() == std::io::ErrorKind::WouldBlock
-                || e.raw_os_error()
-                    .is_some_and(|code| Some(code) == fs2::lock_contended_error().raw_os_error())
-            {
-                Error::StoreBusy
-            } else {
-                Error::Io(e)
-            }
-        })?;
-        let parent = self.store.join(&self.manifest.id);
-        check_directory_path(&parent)?;
-        let target = parent.join(&self.manifest.version);
-        match std::fs::symlink_metadata(&target) {
-            Ok(_) => return Err(Error::AlreadyInstalled(target)),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.into()),
-        }
-        if list_installed(&self.store)?.len() >= 256 {
-            return Err(Error::Limit("installed version count"));
-        }
-        std::fs::create_dir_all(&parent)?;
-        // This store is trusted local application state. The OS lock serializes all
-        // cooperating importers; archive contents cannot choose the destination.
-        std::fs::rename(self.temp.path(), &target)?;
+        let target = publish_directory(
+            &self.temp,
+            &self.store,
+            &self.manifest.id,
+            &self.manifest.version,
+            || Ok(list_installed(&self.store)?.len()),
+        )?;
         Ok(InstalledPackage {
             directory: target,
             manifest: self.manifest,
             identity: self.identity,
         })
     }
+}
+
+/// Atomic, cooperating-importer no-overwrite publication in a trusted local store.
+pub(crate) fn publish_directory(
+    temp: &tempfile::TempDir,
+    store: &Path,
+    id: &str,
+    version: &str,
+    count_versions: impl FnOnce() -> Result<usize>,
+) -> Result<PathBuf> {
+    check_directory_path(store)?;
+    let lock_path = store.join(".install.lock");
+    if let Ok(meta) = std::fs::symlink_metadata(&lock_path) {
+        if is_link_or_reparse(&meta) || !meta.is_file() {
+            return Err(Error::Invalid("store lock is not a regular file".into()));
+        }
+    }
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(lock_path)?;
+    lock.try_lock_exclusive().map_err(|e| {
+        // Windows reports ERROR_LOCK_VIOLATION, whose Rust ErrorKind is
+        // not WouldBlock. Use fs2's platform contract, not a guessed code.
+        if e.kind() == std::io::ErrorKind::WouldBlock
+            || e.raw_os_error()
+                .is_some_and(|code| Some(code) == fs2::lock_contended_error().raw_os_error())
+        {
+            Error::StoreBusy
+        } else {
+            Error::Io(e)
+        }
+    })?;
+    let parent = store.join(id);
+    check_directory_path(&parent)?;
+    let target = parent.join(version);
+    match std::fs::symlink_metadata(&target) {
+        Ok(_) => return Err(Error::AlreadyInstalled(target)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    if count_versions()? >= 256 {
+        return Err(Error::Limit("installed version count"));
+    }
+    std::fs::create_dir_all(&parent)?;
+    // This store is trusted local application state. The OS lock serializes all
+    // cooperating importers; archive contents cannot choose the destination.
+    std::fs::rename(temp.path(), &target)?;
+    Ok(target)
 }
 
 /// Validated metadata only. Call inspect_installed before activation.
@@ -463,7 +481,7 @@ fn read_dem(root: &Path, file: &FileRecord) -> Result<flightsim_world::dem::io::
 
 pub(crate) fn read_bounded_file(path: &Path, limit: u64) -> Result<Vec<u8>> {
     let metadata = std::fs::symlink_metadata(path)?;
-    if !metadata.is_file() || metadata.len() > limit {
+    if is_link_or_reparse(&metadata) || !metadata.is_file() || metadata.len() > limit {
         return Err(Error::Limit("regular file bytes"));
     }
     let mut bytes = Vec::new();
@@ -480,7 +498,7 @@ pub(crate) fn check_directory_path(path: &Path) -> Result<()> {
             continue;
         }
         match std::fs::symlink_metadata(ancestor) {
-            Ok(meta) if !meta.is_dir() => {
+            Ok(meta) if is_link_or_reparse(&meta) || !meta.is_dir() => {
                 return Err(Error::Invalid(
                     "package store/directory contains symlink or non-directory".into(),
                 ));
@@ -491,4 +509,22 @@ pub(crate) fn check_directory_path(path: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Symlinks, multiply linked regular Unix files and all Windows reparse points.
+pub(crate) fn is_link_or_reparse(metadata: &std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        metadata.file_type().is_symlink() || metadata.is_file() && metadata.nlink() > 1
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        metadata.file_type().is_symlink()
+    }
 }

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "kind": "aircraft",
+  "id": "swift-sport-original",
+  "version": "1.0.0",
+  "title": "Original Swift Sport data package",
+  "profile": {
+    "path": "profile.json",
+    "version": 1
+  },
+  "model": {
+    "path": "assets/aircraft/swift_sport.glb",
+    "format": "static-untextured-glb-v1",
+    "scene": 0
+  },
+  "sources": [
+    {
+      "id": "original-swift",
+      "url": "https://github.com/Xenoah/flightsim-claude",
+      "revision": "fff0f6d2c5433248090867391f4cca94075ffbff",
+      "provenance": "Original project-authored Swift Sport profile and procedural Blender mesh. Exact original bytes and source history are recorded in docs/PROVENANCE.md.",
+      "credits": "FlightSim project contributors; original procedural Swift Sport",
+      "license": {
+        "name": "MIT OR Apache-2.0",
+        "url": "https://github.com/Xenoah/flightsim-claude/blob/fff0f6d2c5433248090867391f4cca94075ffbff/LICENSE-MIT",
+        "text_path": "docs/LICENSE-MIT.txt"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "profile.json",
+      "kind": "profile",
+      "size_bytes": 2717,
+      "sha256": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+      "source": "original-swift"
+    },
+    {
+      "path": "assets/aircraft/swift_sport.glb",
+      "kind": "model",
+      "size_bytes": 229192,
+      "sha256": "9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1",
+      "source": "original-swift"
+    },
+    {
+      "path": "docs/LICENSE-MIT.txt",
+      "kind": "documentation",
+      "size_bytes": 1086,
+      "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+      "source": "original-swift"
+    },
+    {
+      "path": "docs/LICENSE-APACHE.txt",
+      "kind": "documentation",
+      "size_bytes": 11359,
+      "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+      "source": "original-swift"
+    },
+    {
+      "path": "docs/PROVENANCE.md",
+      "kind": "documentation",
+      "size_bytes": 1342,
+      "sha256": "c31647be980d30b54223a9c06c3059ee0ded534f7b7add7c563efa2ab894d261",
+      "source": "original-swift"
+    }
+  ]
+}

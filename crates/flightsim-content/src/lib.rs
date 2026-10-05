@@ -1,9 +1,12 @@
-//! Bounded, data-only regional terrain packages.
+//! Bounded, data-only offline terrain and aircraft packages.
 //!
 //! Importing installs immutable versioned data; it never changes a live flight.
-//! The app must activate at most one validated package in its new-flight transaction
+//! For terrain, the app activates at most one validated package in its new-flight transaction
 //! and retain the existing global fallback. No package code runs. Network acquisition
 //! is an explicit opt-in through the `downloads` feature and never activates terrain.
+//! The separate [`aircraft`] contract provides static resource validation/basic
+//! import; the app retains authoritative physical-profile validation.
+pub mod aircraft;
 mod archive;
 #[cfg(feature = "downloads")]
 pub mod download;

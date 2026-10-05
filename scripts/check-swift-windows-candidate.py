@@ -234,6 +234,32 @@ AUTHORED_WEATHER_PATHS = {
     "crates/flightsim-ui/src/world_map_layout_tests.rs",
 }
 REPLAY_CONTRACT_PATHS |= AUTHORED_WEATHER_PATHS
+# Explicit ordinary-build aircraft package commands exit before startup and are
+# rejected by commercial-staging before I/O. Bind their complete offline closure,
+# shared terrain mechanics, existing axes/fit owner and actual fixture witnesses.
+# This protects source isolation; it grants no package/runtime/release admission.
+AIRCRAFT_PACKAGE_PATHS = {
+    "assets/aircraft/swift_sport.glb",
+    "crates/flightsim-app/src/aircraft_package_cli.rs",
+    "crates/flightsim-content/Cargo.toml",
+    "crates/flightsim-content/src/aircraft/glb.rs",
+    "crates/flightsim-content/src/aircraft/manifest.rs",
+    "crates/flightsim-content/src/aircraft/mod.rs",
+    "crates/flightsim-content/src/archive.rs",
+    "crates/flightsim-content/src/install.rs",
+    "crates/flightsim-content/src/lib.rs",
+    "crates/flightsim-content/src/manifest.rs",
+    "crates/flightsim-content/tests/aircraft_packages.rs",
+    "crates/flightsim-content/tests/packages.rs",
+    "crates/flightsim-content/tests/support/aircraft_zip.rs",
+    "crates/flightsim-render/src/model.rs",
+    "docs/examples/aircraft-packages/swift-sport-1.0.0.zip",
+    "docs/examples/aircraft-packages/swift/LICENSE-APACHE.txt",
+    "docs/examples/aircraft-packages/swift/LICENSE-MIT.txt",
+    "docs/examples/aircraft-packages/swift/PROVENANCE.md",
+    "docs/examples/aircraft-packages/swift/manifest.json",
+}
+REPLAY_CONTRACT_PATHS |= AIRCRAFT_PACKAGE_PATHS
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {

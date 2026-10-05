@@ -66,6 +66,7 @@ compile_error!("analytic-tonemapping requires --no-default-features; select one 
 #[cfg(not(any(feature = "default", feature = "analytic-tonemapping")))]
 compile_error!("flightsim-app requires default or analytic-tonemapping; select one tone mode");
 
+mod aircraft_package_cli;
 mod aircraft_picker_runtime;
 mod aircraft_profile;
 #[cfg(test)]
@@ -546,6 +547,15 @@ fn main() -> bevy::app::AppExit {
         println!("{}", distribution::aircraft_listing());
         return bevy::app::AppExit::Success;
     }
+    if let Some(result) = aircraft_package_cli::run_cli(&arguments) {
+        return match result {
+            Ok(()) => bevy::app::AppExit::Success,
+            Err(error) => {
+                eprintln!("{error}");
+                bevy::app::AppExit::error()
+            }
+        };
+    }
     let (mut startup, mut diagnostics) = parse_arguments();
     if let Some(error) = startup.weather.error.as_ref() {
         eprintln!("invalid weather options: {error}");
@@ -1011,6 +1021,9 @@ fn application_help() -> &'static str {
 --difficulty beginner|normal|realistic          Environment/help preset\n\
 --approach [NM] | --drop METRES                  Approach or drop scenario\n\
 --tiles DIR --start LAT,LON --max-level N        Local DEM over global baseline\n\
+--validate-aircraft-package FILE.zip             Validate static package and original profile, then exit\n\
+--import-aircraft-package FILE.zip --aircraft-store DIR  Import immutably, without activation\n\
+--inspect-aircraft-package DIR                    Revalidate installed package/profile\n\
 --import-region FILE.zip                       Install prepared local package, then exit\n\
 --list-regions [--region-store DIR]              List installed local versions, then exit\n\
 --weather legacy|clear|cloud|fog|rain|snow|storm   New-flight authored visual weather\n\

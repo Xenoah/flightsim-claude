@@ -1292,6 +1292,92 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_aircraft_package_review_rejects_admission_and_shared_policy_drift(self):
+        repo, _ = self.source_fixture()
+        # These committed mutations probe the source gate, not an executed app.
+        # Ordinary package validation cannot silently admit commercial imports,
+        # substitute a builtin profile, weaken content bounds or change axes/fit.
+        mutations = (
+            ("crates/flightsim-app/src/main.rs",
+             b'if let Some(result) = aircraft_package_cli::run_cli(&arguments) {',
+             b'if let Some(result) = None::<Result<(), String>> {'),
+            ("crates/flightsim-app/src/aircraft_package_cli.rs",
+             b'if cfg!(feature = "commercial-staging") {', b'if false {'),
+            ("crates/flightsim-app/src/aircraft_package_cli.rs",
+             b'SelectedAircraftProfile::from_bytes(bytes).map_err(Error::Invalid)?',
+             b'SelectedAircraftProfile::builtin("swift-sport").map_err(Error::Invalid)?'),
+            ("crates/flightsim-app/src/aircraft_package_cli.rs",
+             b'manifest.model.path.strip_prefix("assets/") != Some(profile.model_path())',
+             b'false'),
+            ("crates/flightsim-content/src/aircraft/mod.rs",
+             b'validate(&self.profile_bytes, &self.manifest, &self.geometry)?;',
+             b'let _ = validate;'),
+            ("crates/flightsim-content/src/aircraft/mod.rs",
+             b'sha256(&bytes) != file.sha256', b'false'),
+            ("crates/flightsim-content/src/archive.rs",
+             b'PortablePaths::with_limit(limits.entries)', b'PortablePaths::default()'),
+            ("crates/flightsim-content/src/archive.rs",
+             b'entries: MAX_ARCHIVE_ENTRIES,', b'entries: usize::MAX,'),
+            ("crates/flightsim-content/src/install.rs",
+             b'Ok(_) => return Err(Error::AlreadyInstalled(target)),', b'Ok(_) => {},'),
+            ("crates/flightsim-content/src/aircraft/glb.rs",
+             b'|| doc.scenes[0].nodes.len() > MAX_NODES', b'|| false'),
+            ("crates/flightsim-render/src/model.rs",
+             b'target / along_forward', b'1.0'),
+            ("crates/flightsim-app/src/aircraft_package_cli.rs",
+             b'assert!(error.to_string().contains("commercial-staging"));',
+             b'assert!(error.to_string().contains("package"));'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_aircraft_package_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        self.assertEqual(len(candidate.AIRCRAFT_PACKAGE_PATHS), 19)
+        for relative in sorted(candidate.AIRCRAFT_PACKAGE_PATHS):
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed digests",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed digests":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                    changed["reviewed_replay_source_evidence"][relative]["checkout_sha256"] = "0" * 64
+                    for record in changed["files"]:
+                        if record["path"] == relative:
+                            record["checkout_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
         self.checkout_source_fixture(repo, "crlf")

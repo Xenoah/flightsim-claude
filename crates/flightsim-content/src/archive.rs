@@ -9,7 +9,7 @@ use std::{
 use rawzip::{CompressionMethod, ZipArchive, ZipArchiveEntryWayfinder};
 use sha2::{Digest, Sha256};
 
-use crate::install::{check_directory_path, validate_payload};
+use crate::install::{check_directory_path, is_link_or_reparse, validate_payload};
 use crate::{
     Error, ImportPhase, ImportProgress, InstalledPackage, MANIFEST_NAME, MAX_ARCHIVE_BYTES,
     MAX_ARCHIVE_ENTRIES, MAX_COMPRESSION_RATIO, MAX_FILES, MAX_TOTAL_BYTES, Result, StagedPackage,
@@ -34,6 +34,79 @@ pub fn stage_zip_with_progress(
     store_root: &Path,
     mut callback: impl FnMut(ImportProgress) -> bool,
 ) -> Result<StagedPackage> {
+    let staged = stage_archive(
+        zip_path,
+        store_root,
+        ArchiveLimits::TERRAIN,
+        file_byte_limit,
+        |bytes| {
+            Ok(parse_manifest(bytes)?
+                .files
+                .into_iter()
+                .map(|f| ArchiveRecord {
+                    path: f.path,
+                    size_bytes: f.size_bytes,
+                    sha256: f.sha256,
+                })
+                .collect())
+        },
+        &mut callback,
+    )?;
+    let manifest = parse_manifest(&staged.manifest_bytes)?;
+    let mut progress = staged.progress;
+    progress.phase = ImportPhase::Validating;
+    progress.files_done = 0;
+    for file in &manifest.files {
+        validate_payload(staged.temp.path(), file, &manifest)?;
+        progress.files_done += 1;
+        notify(&mut callback, progress)?;
+    }
+    progress.phase = ImportPhase::Ready;
+    progress.files_done = progress.files_total;
+    notify(&mut callback, progress)?;
+    Ok(StagedPackage::new(
+        staged.temp,
+        store_root.to_owned(),
+        manifest,
+        &staged.manifest_bytes,
+    ))
+}
+
+/// Internal ZIP mechanics shared by closed, independently versioned formats.
+/// Policy selection is explicit; terrain never probes for aircraft content.
+#[derive(Clone, Copy)]
+pub(crate) struct ArchiveLimits {
+    pub archive_bytes: u64,
+    pub total_bytes: u64,
+    pub files: usize,
+    pub entries: usize,
+}
+impl ArchiveLimits {
+    const TERRAIN: Self = Self {
+        archive_bytes: MAX_ARCHIVE_BYTES,
+        total_bytes: MAX_TOTAL_BYTES,
+        files: MAX_FILES,
+        entries: MAX_ARCHIVE_ENTRIES,
+    };
+}
+pub(crate) struct ArchiveRecord {
+    pub path: String,
+    pub size_bytes: u64,
+    pub sha256: String,
+}
+pub(crate) struct StagedArchive {
+    pub temp: tempfile::TempDir,
+    pub manifest_bytes: Vec<u8>,
+    pub progress: ImportProgress,
+}
+pub(crate) fn stage_archive(
+    zip_path: &Path,
+    store_root: &Path,
+    limits: ArchiveLimits,
+    file_byte_limit: impl Fn(&str) -> Result<u64>,
+    parse: impl Fn(&[u8]) -> Result<Vec<ArchiveRecord>>,
+    mut callback: impl FnMut(ImportProgress) -> bool,
+) -> Result<StagedArchive> {
     let mut progress = ImportProgress {
         phase: ImportPhase::Inspecting,
         files_done: 0,
@@ -43,12 +116,13 @@ pub fn stage_zip_with_progress(
     };
     notify(&mut callback, progress)?;
     let metadata = std::fs::symlink_metadata(zip_path)?;
-    if !metadata.is_file() || metadata.len() > MAX_ARCHIVE_BYTES {
+    if is_link_or_reparse(&metadata) || !metadata.is_file() || metadata.len() > limits.archive_bytes
+    {
         return Err(Error::Limit("archive file bytes / regular file required"));
     }
     let input = File::open(zip_path)?;
     let input_size = input.metadata()?.len();
-    if input_size > MAX_ARCHIVE_BYTES {
+    if input_size > limits.archive_bytes {
         return Err(Error::Limit("archive file bytes"));
     }
     check_directory_path(store_root)?;
@@ -63,14 +137,14 @@ pub fn stage_zip_with_progress(
         notify(&mut callback, progress)
     })?;
     let mut file = snapshot.reopen()?;
-    preflight_zip32(&mut file, &mut callback, progress)?;
+    preflight_zip32(&mut file, limits.entries, &mut callback, progress)?;
     let mut buffer = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
     let mut local_buffer = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
     let archive = ZipArchive::from_file(file, &mut buffer)?;
-    if archive.entries_hint() > MAX_ARCHIVE_ENTRIES as u64 {
+    if archive.entries_hint() > limits.entries as u64 {
         return Err(Error::Limit("archive entry count"));
     }
-    let mut paths = PortablePaths::default();
+    let mut paths = PortablePaths::with_limit(limits.entries);
     let mut files = Vec::new();
     let mut directories = Vec::new();
     let mut ranges = Vec::new();
@@ -78,7 +152,7 @@ pub fn stage_zip_with_progress(
     let mut entries = archive.entries(&mut buffer);
     while let Some(entry) = entries.next_entry()? {
         count += 1;
-        if count > MAX_ARCHIVE_ENTRIES as u64 {
+        if count > limits.entries as u64 {
             return Err(Error::Limit("archive entry count"));
         }
         let raw_path = entry.file_path();
@@ -91,6 +165,12 @@ pub fn stage_zip_with_progress(
             raw_path
         };
         paths.add(path, directory)?;
+        // Reject Windows reparse metadata as well as Unix link/special modes.
+        // Extraction never applies attributes, but a link-shaped archive is not
+        // an accepted portable package on any host.
+        if entry.external_attributes() & 0x400 != 0 {
+            return Err(Error::Invalid("ZIP reparse points are forbidden".into()));
+        }
         let mode = entry.mode().value() & 0o170000;
         if mode != 0 && mode != if directory { 0o040000 } else { 0o100000 } {
             return Err(Error::Invalid(
@@ -124,7 +204,7 @@ pub fn stage_zip_with_progress(
                 .bytes_total
                 .checked_add(size)
                 .ok_or(Error::Limit("total bytes"))?;
-            if progress.bytes_total > MAX_TOTAL_BYTES || files.len() > MAX_FILES {
+            if progress.bytes_total > limits.total_bytes || files.len() > limits.files {
                 return Err(Error::Limit("total bytes / file count"));
             }
         }
@@ -165,21 +245,14 @@ pub fn stage_zip_with_progress(
         .iter()
         .find(|f| f.path == MANIFEST_NAME)
         .ok_or_else(|| {
-            Error::Invalid(
-                "root manifest.json missing; raw terrain/repository ZIPs require packaging first"
-                    .into(),
-            )
+            Error::Invalid("root manifest.json missing; prepared package required".into())
         })?;
     let mut manifest_bytes = Vec::new();
     read_entry(&archive, manifest_entry, &mut manifest_bytes, &mut |_| {
         notify(&mut callback, progress)
     })?;
-    let manifest = parse_manifest(&manifest_bytes)?;
-    let expected: BTreeMap<_, _> = manifest
-        .files
-        .iter()
-        .map(|f| (f.path.as_str(), f))
-        .collect();
+    let records = parse(&manifest_bytes)?;
+    let expected: BTreeMap<_, _> = records.iter().map(|f| (f.path.as_str(), f)).collect();
     if files.len() != expected.len() + 1 {
         return Err(Error::Invalid("archive/manifest file list mismatch".into()));
     }
@@ -242,22 +315,11 @@ pub fn stage_zip_with_progress(
         progress.files_done += 1;
         notify(&mut callback, progress)?;
     }
-    progress.phase = ImportPhase::Validating;
-    progress.files_done = 0;
-    for file in &manifest.files {
-        validate_payload(temp.path(), file, &manifest)?;
-        progress.files_done += 1;
-        notify(&mut callback, progress)?;
-    }
-    progress.phase = ImportPhase::Ready;
-    progress.files_done = progress.files_total;
-    notify(&mut callback, progress)?;
-    Ok(StagedPackage::new(
+    Ok(StagedArchive {
         temp,
-        store_root.to_owned(),
-        manifest,
-        &manifest_bytes,
-    ))
+        manifest_bytes,
+        progress,
+    })
 }
 
 /// Convenience import with no progress callback. It does not activate a region.
@@ -375,6 +437,7 @@ impl<W: Write> Write for HashingWriter<'_, W> {
 // arithmetic or offset-repair path is needed or permitted for this package format.
 fn preflight_zip32(
     file: &mut File,
+    max_entries: usize,
     callback: &mut impl FnMut(ImportProgress) -> bool,
     progress: ImportProgress,
 ) -> Result<()> {
@@ -396,7 +459,7 @@ fn preflight_zip32(
         return Err(invalid());
     }
     let count = usize::from(word(&end, 10));
-    if count == 0 || count > MAX_ARCHIVE_ENTRIES {
+    if count == 0 || count > max_entries {
         return Err(Error::Limit("archive entry count"));
     }
     let directory = u64::from(dword(&end, 16));

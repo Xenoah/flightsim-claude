@@ -50,7 +50,7 @@ impl SelectedAircraftProfile {
         Self::from_bytes(&bytes)
     }
 
-    fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+    pub(super) fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() > flightsim_sim::aircraft_profile::MAX_PROFILE_BYTES {
             return Err("aircraft profile exceeds 1 MiB".into());
         }
