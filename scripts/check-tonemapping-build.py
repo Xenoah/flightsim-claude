@@ -15,6 +15,8 @@ from pathlib import Path
 import re
 import sys
 
+ANALYTICAL_SWIFT_RECIPE = 'swift-only-analytical-windows-build-evidence-v1'
+
 KEY_CRATES = ('bevy', 'bevy_internal', 'bevy_core_pipeline', 'bevy_image', 'ktx2', 'ruzstd')
 LUTS = {
     'AgX-default_contrast.ktx2': '90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf',
@@ -50,12 +52,15 @@ def parse_graph(text):
     return graph
 
 
-def validate_graph(graph, mode, kind):
+def validate_graph(graph, mode, kind, *, recipe=None):
     analytical = mode == 'analytic'
     root = 'flightsim-app' if kind == 'app' else 'flightsim-render'
     require(root in graph, f'missing root package {root}')
+    require(recipe is None or (recipe == ANALYTICAL_SWIFT_RECIPE and mode == 'analytic' and kind == 'app'),
+            'recipe requires the explicit analytical Swift app identity')
     expected = {'analytic-tonemapping'} if analytical else {'default'}
-    require(graph[root]['features'] == expected, 'unexpected root mode/features; use the exact documented build')
+    root_features = expected | {'commercial-staging'} if recipe else expected
+    require(graph[root]['features'] == root_features, 'unexpected root mode/features; use the exact documented build')
     for name in KEY_CRATES:
         require(name in graph, f'missing graph package {name}')
         if name.startswith('bevy'):
@@ -105,9 +110,9 @@ def select_artifacts(messages, graph, kind):
     return root, selected
 
 
-def audit(graph_path, messages_path, mode, kind):
+def audit(graph_path, messages_path, mode, kind, *, recipe=None):
     graph = parse_graph(graph_path.read_text())
-    validate_graph(graph, mode, kind)
+    validate_graph(graph, mode, kind, recipe=recipe)
     messages = [json.loads(line) for line in messages_path.read_text().splitlines()]
     root, selected = select_artifacts(messages, graph, kind)
     executable = Path(root['executable'])
@@ -149,6 +154,8 @@ def audit(graph_path, messages_path, mode, kind):
             require((offset >= 0) == (mode == 'ordinary'), f'{name} payload presence disagrees with mode')
             result['payloads'].append({'name': name, 'source_sha256': expected,
                                        'bytes': path.stat().st_size, 'full_bytes_offset': offset})
+    if recipe is not None:
+        result['recipe'] = recipe
     result['limits'] = 'Exact source LUT payload search supports graph/fingerprint/dep-info evidence; not universal content, visual, performance, Windows runtime or licensing qualification.'
     return result
 
