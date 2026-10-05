@@ -212,6 +212,13 @@ cargo run -p flightsim-app -- --headless-screenshot capture.png --screenshot-del
 cargo run -p flightsim-app -- --screenshot window.png --exit-after-screenshot
 ```
 
+`--screenshot-delay` は最小待ち時間です。撮影は 30 フレーム以上経過し、機体の fit と
+地形・近傍の滑走路の CPU 側の準備が整った後に行います。通常の全球地形では要求した
+表示タイルの一致と橋・地表面の commit を待ちます。粗い地域データ・全球データの詳細度
+上限・空データは、要求範囲の初回探索と利用可能なメッシュ準備を終えた地形を撮影します。
+欠落・失敗済みタイルの通常の再試行は撮影を妨げません。GPU・shader の完了を保証する
+ものではありません。
+
 F9 は空いている連番名を原子的に確保して記録を保存します。再生は同じ機体を選んで
 `--aircraft swift-sport --replay flight-001.fsreplay` のように指定します。
 新しい記録は `yaw_rate_p` を含む完全な機体 ID を持つ v3 です。旧 v1/v2 は既定で拒否し、

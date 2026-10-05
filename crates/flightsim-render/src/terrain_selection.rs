@@ -27,6 +27,15 @@ struct LoadAttempt {
     outcome: LoadOutcome,
 }
 
+/// Allocated only while readiness is observed. Earlier unavailable fallback
+/// outcomes are unknown until an ordinary retry runs; enabling observation
+/// never advances that retry. Entries follow the existing active-tree bound.
+#[derive(Debug, Default)]
+struct ReadinessObservation {
+    ready: bool,
+    fallback_outcomes: HashMap<TileId, LoadOutcome>,
+}
+
 /// Persistent render-only streaming state.
 ///
 /// `ids()` reports visible tiles; `resident_len()` also counts prepared hidden
@@ -52,6 +61,9 @@ pub struct TerrainSelectionState {
     lod_truncated: bool,
     desired_len: usize,
     matches_desired: bool,
+    // Optional read-only work observation, used by one-shot scene capture.
+    // Ordinary streaming does not perform the extra dependency traversal.
+    readiness_observation: Option<Box<ReadinessObservation>>,
 }
 
 impl Default for TerrainSelectionState {
@@ -69,6 +81,7 @@ impl Default for TerrainSelectionState {
             lod_truncated: false,
             desired_len: 0,
             matches_desired: true,
+            readiness_observation: None,
         }
     }
 }
@@ -119,6 +132,81 @@ impl TerrainSelectionState {
     #[must_use]
     pub const fn matches_desired(&self) -> bool {
         self.matches_desired
+    }
+
+    /// Enable an additional read-only dependency observation after selection.
+    /// No source reads, scheduling priorities or budgets change. Disabling
+    /// removes the observation and its extra bounded traversal entirely.
+    /// Outcomes of earlier unavailable fallback reads are unknown until a
+    /// normal retry is observed; cached/resident data can be verified directly.
+    pub fn observe_readiness(&mut self, enabled: bool) {
+        if !enabled {
+            self.readiness_observation = None;
+        } else if self.readiness_observation.is_none() {
+            self.readiness_observation = Some(Box::default());
+        }
+    }
+
+    /// Whether the last observed selection examined all current dependency
+    /// paths and has no cached mesh preparation left. Known missing/failed
+    /// reads can still retry later. This permits valid coarse/empty availability
+    /// cuts without treating an arbitrary quiet frame as convergence. Renderer
+    /// bridge/overlay commits and displayed IDs must be checked separately.
+    #[must_use]
+    pub fn observed_readiness(&self) -> Option<bool> {
+        self.readiness_observation
+            .as_ref()
+            .map(|observation| observation.ready)
+    }
+
+    fn dependencies_examined(
+        &self,
+        wanted: &BTreeSet<TileId>,
+        cache: &TileCache,
+        primary_reads_possible: bool,
+        has_fallback: bool,
+    ) -> bool {
+        for &leaf in wanted {
+            let mut ancestor = Some(leaf);
+            let mut primary_available = false;
+            while let Some(id) = ancestor {
+                if self.available(id, cache) {
+                    primary_available = true;
+                    break;
+                }
+                if primary_reads_possible
+                    && !self.attempts.get(&id).is_some_and(|attempt| {
+                        matches!(attempt.outcome, LoadOutcome::Missing | LoadOutcome::Failed)
+                    })
+                {
+                    return false;
+                }
+                ancestor = id.parent();
+            }
+            // Primary ancestors deliberately outrank fine global fallback.
+            // Otherwise every path down to an available fallback ancestor must
+            // have been tried, regardless of distance-based retry arbitration.
+            if has_fallback && !primary_available {
+                let mut ancestor = Some(leaf);
+                while let Some(id) = ancestor {
+                    if self.resident.contains(&id) || cache.contains(id) {
+                        break;
+                    }
+                    if !self
+                        .readiness_observation
+                        .as_ref()
+                        .and_then(|observation| observation.fallback_outcomes.get(&id))
+                        .is_some_and(|outcome| {
+                            matches!(outcome, LoadOutcome::Missing | LoadOutcome::Failed)
+                        })
+                    {
+                        return false;
+                    }
+                    ancestor = id.parent();
+                }
+            }
+        }
+        true
     }
 
     fn available(&self, id: TileId, cache: &TileCache) -> bool {
@@ -526,11 +614,19 @@ fn update_selected_tiles_with_provenance<S: TileSource>(
     );
     state.attempts.retain(|id, _| active.contains(id));
     state.fallback_attempts.retain(|id, _| active.contains(id));
+    if let Some(observation) = state.readiness_observation.as_mut() {
+        observation
+            .fallback_outcomes
+            .retain(|id, _| active.contains(id));
+    }
     state.fallback_cache.retain(|id| cache.contains(*id));
     state.frame = state.frame.wrapping_add(1);
     if state.frame == 0 {
         state.attempts.clear();
         state.fallback_attempts.clear();
+        if let Some(observation) = state.readiness_observation.as_mut() {
+            observation.fallback_outcomes.clear();
+        }
     }
     let previous_live = state.live.clone();
     // At most two coarse seeds close the whole globe quickly while finer
@@ -649,6 +745,9 @@ fn update_selected_tiles_with_provenance<S: TileSource>(
         };
         if use_fallback {
             state.fallback_attempts.insert(id, state.frame);
+            if let Some(observation) = state.readiness_observation.as_mut() {
+                observation.fallback_outcomes.insert(id, outcome);
+            }
         } else {
             state.attempts.insert(
                 id,
@@ -702,6 +801,20 @@ fn update_selected_tiles_with_provenance<S: TileSource>(
     state.desired_len = wanted.len();
     state.matches_desired = keep == wanted;
     state.live = keep;
+    let observed_ready = state.readiness_observation.as_ref().map(|_| {
+        frame_budget > 0
+            && !update.capacity_limited
+            && state.dependencies_examined(
+                &wanted,
+                cache,
+                primary_reads_possible,
+                source.has_fallback(),
+            )
+            && state.next_preparation(&wanted, cache, camera).is_none()
+    });
+    if let Some((observation, ready)) = state.readiness_observation.as_mut().zip(observed_ready) {
+        observation.ready = ready;
+    }
     update.despawned.sort_unstable();
     update.despawned.dedup();
     update
@@ -1743,6 +1856,7 @@ mod tests {
         };
         source.add(parent);
         let mut state = TerrainSelectionState::default();
+        state.observe_readiness(true);
         let mut cache = TileCache::new(1_000_000);
         for _ in 0..32 {
             step(&children, &source, &mut cache, &mut state, 1);
@@ -1750,6 +1864,8 @@ mod tests {
         assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
         assert_eq!(state.fallback_len(), 0);
         assert!(source.fallback_calls.borrow().is_empty());
+        assert!(!state.matches_desired());
+        assert_eq!(state.observed_readiness(), Some(true));
     }
 
     #[test]
@@ -1924,6 +2040,7 @@ mod tests {
             ..Default::default()
         };
         let mut state = TerrainSelectionState::default();
+        state.observe_readiness(true);
         let mut cache = TileCache::new(1_000_000);
         for _ in 0..80 {
             step(&children, &source, &mut cache, &mut state, 1);
@@ -1931,6 +2048,235 @@ mod tests {
         assert_eq!(state.ids().collect::<Vec<_>>(), vec![parent]);
         assert_eq!(state.fallback_len(), 1);
         check_covered(&state, parent);
+        assert!(!state.matches_desired());
+        assert_eq!(state.observed_readiness(), Some(true));
+    }
+
+    #[test]
+    fn readiness_observation_is_opt_in_and_rejects_zero_budget_or_cached_work() {
+        let children = parent().children().unwrap();
+        let source = Source {
+            no_primary: true,
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for id in children {
+            cache.insert(id, dem(id));
+        }
+        step(&children, &source, &mut cache, &mut state, 1);
+        assert_eq!(state.observed_readiness(), None);
+        state.observe_readiness(true);
+        step(&children, &source, &mut cache, &mut state, 0);
+        assert_eq!(state.observed_readiness(), Some(false));
+        step(&children, &source, &mut cache, &mut state, 1);
+        assert_eq!(state.observed_readiness(), Some(false));
+        for _ in 0..2 {
+            step(&children, &source, &mut cache, &mut state, 1);
+        }
+        assert_eq!(state.observed_readiness(), Some(true));
+        state.observe_readiness(false);
+        step(&children, &source, &mut cache, &mut state, 1);
+        assert_eq!(state.observed_readiness(), None);
+    }
+
+    #[test]
+    fn readiness_does_not_mistake_evicted_success_for_a_missing_dependency() {
+        let id = parent();
+        let wanted = BTreeSet::from([id]);
+        let cache = TileCache::new(1_000_000);
+        for fallback in [false, true] {
+            let mut state = TerrainSelectionState::default();
+            state.observe_readiness(true);
+            let mut ancestor = Some(id);
+            while let Some(tile) = ancestor {
+                state.attempts.insert(
+                    tile,
+                    LoadAttempt {
+                        frame: 1,
+                        outcome: LoadOutcome::Missing,
+                    },
+                );
+                state
+                    .readiness_observation
+                    .as_mut()
+                    .unwrap()
+                    .fallback_outcomes
+                    .insert(tile, LoadOutcome::Missing);
+                ancestor = tile.parent();
+            }
+            state.attempts.insert(
+                id,
+                LoadAttempt {
+                    frame: 1,
+                    outcome: LoadOutcome::Loaded,
+                },
+            );
+            state
+                .readiness_observation
+                .as_mut()
+                .unwrap()
+                .fallback_outcomes
+                .insert(id, LoadOutcome::Loaded);
+            assert!(!state.dependencies_examined(&wanted, &cache, !fallback, fallback));
+        }
+    }
+
+    #[test]
+    fn readiness_observation_preserves_source_calls_budgets_and_selection_updates() {
+        let wanted = parent().children().unwrap();
+        let mut ordinary_source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut observed_source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        let mut ordinary = TerrainSelectionState::default();
+        let mut observed = TerrainSelectionState::default();
+        observed.observe_readiness(true);
+        let mut ordinary_cache = TileCache::new(1_000_000);
+        let mut observed_cache = TileCache::new(1_000_000);
+        for frame in 0..180 {
+            if frame == 40 {
+                ordinary_source.add(parent());
+                observed_source.add(parent());
+            }
+            let a = step(
+                &wanted,
+                &ordinary_source,
+                &mut ordinary_cache,
+                &mut ordinary,
+                1,
+            );
+            let b = step(
+                &wanted,
+                &observed_source,
+                &mut observed_cache,
+                &mut observed,
+                1,
+            );
+            assert_eq!(a, b);
+            assert_eq!(ordinary.live, observed.live);
+            assert_eq!(
+                *ordinary_source.calls.borrow(),
+                *observed_source.calls.borrow()
+            );
+            assert_eq!(
+                *ordinary_source.fallback_calls.borrow(),
+                *observed_source.fallback_calls.borrow()
+            );
+            assert_eq!(ordinary.observed_readiness(), None);
+        }
+    }
+
+    #[test]
+    fn late_readiness_observation_waits_for_normal_retries_and_prunes_history() {
+        let id = parent();
+        let source = Source {
+            no_primary: true,
+            fallback: true,
+            fallback_max_level: Some(0),
+            ..Default::default()
+        };
+        let mut state = TerrainSelectionState::default();
+        let mut cache = TileCache::new(1_000_000);
+        for _ in 0..16 {
+            step(&[id], &source, &mut cache, &mut state, 1);
+        }
+        assert!(state.readiness_observation.is_none());
+        let calls = source.fallback_calls.borrow().len();
+        state.observe_readiness(true);
+        step(&[id], &source, &mut cache, &mut state, 1);
+        assert_eq!(
+            source.fallback_calls.borrow().len(),
+            calls,
+            "observer must not accelerate retries"
+        );
+        assert_eq!(
+            state.observed_readiness(),
+            Some(false),
+            "unobserved missing history is unknown"
+        );
+        for _ in 0..RETRY_FRAMES + 16 {
+            step(&[id], &source, &mut cache, &mut state, 1);
+            if state.observed_readiness() == Some(true) {
+                break;
+            }
+        }
+        assert_eq!(state.observed_readiness(), Some(true));
+        let next = TileId::roots()[0];
+        step(&[next], &source, &mut cache, &mut state, 1);
+        assert!(
+            state
+                .readiness_observation
+                .as_ref()
+                .unwrap()
+                .fallback_outcomes
+                .keys()
+                .all(|&tile| tile == next)
+        );
+        state.frame = u64::MAX;
+        step(&[next], &source, &mut cache, &mut state, 0);
+        assert!(
+            state
+                .readiness_observation
+                .as_ref()
+                .unwrap()
+                .fallback_outcomes
+                .is_empty()
+        );
+        assert_eq!(state.observed_readiness(), Some(false));
+        state.observe_readiness(false);
+        assert!(state.readiness_observation.is_none());
+        assert_eq!(
+            std::mem::size_of::<Option<Box<ReadinessObservation>>>(),
+            std::mem::size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn polar_coarse_primary_readiness_finishes_despite_continuous_missing_retries() {
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        );
+        let camera = Geodetic::from_degrees(90.0, 0.0, 1215.0).to_ecef();
+        let wanted = selector.select_with_surface(camera, Meters(14.90934)).tiles;
+        assert_eq!(wanted.len(), 4_094);
+        let mut source = Source {
+            fallback: true,
+            ..Default::default()
+        };
+        for root in TileId::roots() {
+            source.add(root);
+        }
+        let mut state = TerrainSelectionState::default();
+        state.observe_readiness(true);
+        let mut cache = TileCache::new(512 * 1024 * 1024);
+        let mut ready_at = None;
+        for frame in 0..1_200 {
+            let update = step_at(&wanted, &source, &mut cache, &mut state, 8, camera);
+            assert!(
+                update.load_attempts > 0,
+                "fixture must expose the old idle-update deadlock"
+            );
+            if state.observed_readiness() == Some(true) {
+                ready_at = Some(frame);
+                break;
+            }
+        }
+        assert!(ready_at.is_some_and(|frame| frame >= RETRY_FRAMES));
+        assert!(!state.matches_desired());
+        assert_eq!(state.ids().collect::<Vec<_>>(), TileId::roots());
+        assert_eq!(state.fallback_len(), 0);
+        // No full cut, hidden model or renderer readiness is claimed here.
+        // This proves only that continued known-missing retries are not fresh
+        // discovery and cannot starve an otherwise valid availability capture.
     }
 
     #[test]

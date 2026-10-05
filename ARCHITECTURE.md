@@ -345,6 +345,34 @@ observable separately from DEM cache usage. Details and verification limits are
 in [mixed-LOD stitching QA](docs/qa/terrain-mixed-lod-stitching-2026-10-02.md) and
 [incremental planning QA](docs/qa/terrain-seam-planning-2026-10-02.md).
 
+One-shot screenshots retain their minimum delay and 30-frame floor, then require
+CPU world readiness after Update commands and PostUpdate visibility/transform
+propagation. The last sampled live/displayed cut must match exact tile IDs with
+no pending bridge or overlay transaction. Raw desired-ID convergence admits it;
+otherwise an opt-in, positive-budget selector observation must find every current
+dependency path examined and no cached mesh preparation or capacity deferral.
+Known missing/failed reads may continue their ordinary retries without starving
+capture, including 4,094-leaf polar cuts. This preserves valid coarse
+primary ancestors, capped global fallback and sparse/empty availability cuts.
+Capture-only metadata adds bounded traversal of existing dependency/attempt state
+without repeating LOD selection or reading sources, and is disabled once capture
+is requested.
+The ordinary selector retains only a nullable observer pointer (one machine
+word); the original fallback retry map keeps its u64 values. Fallback outcomes
+are allocated only in the enabled observer, pruned to the same active tree and
+cleared on frame wrap or selection-state replacement. Late observation treats
+unavailable earlier outcomes as unknown until their ordinary retry is observed.
+An active runway within the existing 15 km airport vicinity must have a visible
+propagated surface, including precision gating. Worldwide free-flight starts
+may retain a distant synthetic runway; its intentional hiding does not block capture.
+Optional omitted/precision-hidden scenery does not block capture. The same
+committed surface entities, overlay revision, runway mesh, model entities and
+stable render origin must be observed on consecutive frames, allowing a prior
+extraction/render-preparation opportunity. This is CPU readiness, not a GPU or
+shader completion guarantee. Signature work runs only while a screenshot is
+requested and unfinished; simulation, render budgets and capture acceptance
+timeouts remain unchanged.
+
 
 ソースは全てオープンデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）。
 

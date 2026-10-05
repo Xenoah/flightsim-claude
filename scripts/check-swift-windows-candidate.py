@@ -121,6 +121,11 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-ui/src/regions.rs",
     "crates/flightsim-ui/src/world_map_layout.rs",
     "crates/flightsim-ui/src/world_map_layout_tests.rs",
+    # Ordinary candidate captures now wait for a committed CPU world. Bind both
+    # the request gate and its opt-in selector observation, including witnesses.
+    # These pins do not attest GPU completion or a successful Windows capture.
+    "crates/flightsim-app/src/screen_capture.rs",
+    "crates/flightsim-render/src/terrain_selection.rs",
 }
 # Separate pure law/profile/replay review; these pins grant no new app or
 # commercial aircraft admission. Retained forward and original-token inputs are

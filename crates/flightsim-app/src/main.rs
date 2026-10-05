@@ -926,7 +926,6 @@ fn main() -> bevy::app::AppExit {
         .add_systems(
             Update,
             (
-                screen_capture::capture_screenshot,
                 report_terrain,
                 fit_loaded_model,
                 update_model_visibility,
@@ -962,6 +961,7 @@ fn main() -> bevy::app::AppExit {
     weather_runtime::configure(&mut app);
     conditions_runtime::configure(&mut app);
     windows_readback_diagnostic::configure(&mut app);
+    screen_capture::configure(&mut app);
     distance_runtime::configure(&mut app);
     configure_camera_tracking(&mut app);
     world_runtime::configure(&mut app);
@@ -3764,7 +3764,7 @@ fn setup(
         runway.width,
         |point| airport_sampler.sample(&mut airport_probe, point).elevation,
     );
-    airport_drape_runtime::spawn(
+    if let Some(entity) = airport_drape_runtime::spawn(
         &mut commands,
         &mut meshes,
         &mut terrain_tiles,
@@ -3775,7 +3775,11 @@ fn setup(
         rendered_terrain,
         airport_drape_runtime::Support::Surface,
         |p| airport_sampler.sample(&mut airport_probe, p).elevation,
-    );
+    ) {
+        commands
+            .entity(entity)
+            .insert(screen_capture::RunwaySurface);
+    }
     // 滑走路灯。**夜に降りるには滑走路の側が光る必要がある。**
     // 太陽高度に応じて `update_airport_lights` が明るさを動かす。
     let (light_groups, light_origin) =
@@ -4560,7 +4564,12 @@ fn stream_terrain(
     tower: Res<TowerViewAnchor>,
     scenery: Res<scenery_runtime::SceneryRuntime>,
     mut metrics: ResMut<render_metrics::RenderMetrics>,
+    mut capture_readiness: Option<ResMut<screen_capture::CaptureTerrainReadiness>>,
 ) {
+    if let Some(ready) = capture_readiness.as_mut() {
+        // A stitching-only frame has not sampled the current desired cut.
+        ready.settled = false;
+    }
     let camera = camera_position.0.to_ecef();
     let camera_ground = if *mode == ViewMode::Tower {
         Meters(tower.0.altitude.get() - world_runtime::TOWER_CLEARANCE.get())
@@ -4568,6 +4577,9 @@ fn stream_terrain(
         simulation.0.ground().elevation
     };
     let streaming = &mut *streaming;
+    streaming
+        .live
+        .observe_readiness(capture_readiness.is_some());
 
     let palette =
         |position, slope| world.surface_color(position, slope, startup.world.climate_date());
@@ -4616,6 +4628,9 @@ fn stream_terrain(
             ));
         },
     );
+    if let Some(ready) = capture_readiness.as_mut() {
+        ready.observe(&update, streaming.live.observed_readiness());
+    }
     for tile in prepared {
         tiles.insert_prepared(tile);
     }
