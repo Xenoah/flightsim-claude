@@ -171,6 +171,42 @@ jobs:
       - name: Lint optional region catalog application
         run: cargo clippy -j 2 -p flightsim-app -p flightsim-content -p flightsim-assetgen --features flightsim-app/region-downloads --all-targets -- -D warnings
 
+  # Source/build regression only: no analytical runtime or release qualification.
+  analytic-tonemapping:
+    name: analytical tonemapping (Linux source/build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      # Keep two independent Bevy build directories within the runner's disk budget.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libudev-dev libasound2-dev
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: clippy
+      - name: Check analytical tests, guards, and exact app artifacts
+        run: |
+          python3 scripts/ci-tonemapping.py \
+            "$RUNNER_TEMP/tonemapping-evidence" "$RUNNER_TEMP/tonemapping-build"
+      - name: Retain source/build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tonemapping-source-build-${{ github.run_id }}-${{ github.run_attempt }}
+          # Only logs, graphs, audit reports and provenance; never binaries.
+          path: ${{ runner.temp }}/tonemapping-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
   architecture:
     name: architecture rules
     runs-on: ubuntu-latest

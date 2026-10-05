@@ -30,7 +30,8 @@ flightsim-world = { path = "crates/flightsim-world" }
 flightsim-content = { path = "crates/flightsim-content" }
 flightsim-tilegen = { path = "crates/flightsim-tilegen" }
 flightsim-sim = { path = "crates/flightsim-sim" }
-flightsim-render = { path = "crates/flightsim-render" }
+# Runnable packages choose the tone curve; see docs/analytic-tonemapping.md.
+flightsim-render = { path = "crates/flightsim-render", default-features = false }
 flightsim-app = { path = "crates/flightsim-app" }
 flightsim-audio = { path = "crates/flightsim-audio" }
 flightsim-ui = { path = "crates/flightsim-ui" }
@@ -84,7 +85,7 @@ bevy = { version = "0.18.1", default-features = false, features = [
     # 合成した波形を WAV として渡すため。音声ファイルは同梱しない（ADR-0009）。
     "wav",
     "multi_threaded",
-    "tonemapping_luts",
+    # LUTs (ordinary) or explicit KTX2 (analytical) are selected by app/render.
     "zstd_rust",
     "x11",
     "std",

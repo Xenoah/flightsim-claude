@@ -23,8 +23,13 @@
 )]
 
 use bevy::camera::Exposure;
+#[cfg(feature = "analytic-tonemapping")]
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::{Atmosphere, ScatteringMedium};
 use bevy::prelude::*;
+
+#[cfg(not(any(feature = "default", feature = "analytic-tonemapping")))]
+compile_error!("sun_clock requires default or analytic-tonemapping; select one tone mode");
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 use flightsim_core::Geodetic;
 use flightsim_render::daylight::{SunIlluminancePolicy, SunLighting, TimeOfDay, TimeRate};
@@ -162,6 +167,8 @@ fn setup(
     // カメラ。**露出は光量と組で決めること**（HANDOFF の地雷）。
     let mut camera = commands.spawn((
         Camera3d::default(),
+        #[cfg(feature = "analytic-tonemapping")]
+        Tonemapping::Reinhard,
         Projection::Perspective(PerspectiveProjection {
             fov: std::f32::consts::FRAC_PI_3,
             near: 0.1,

@@ -8,6 +8,11 @@ edition.workspace = true
 rust-version = "1.89"
 license.workspace = true
 
+[features]
+# Standalone render examples retain the ordinary LUT-backed appearance.
+default = ["bevy/tonemapping_luts"]
+analytic-tonemapping = ["bevy/ktx2"]
+
 [dependencies]
 flightsim-core.workspace = true
 flightsim-fdm.workspace = true

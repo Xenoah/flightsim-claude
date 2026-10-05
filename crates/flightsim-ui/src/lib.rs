@@ -373,7 +373,7 @@ impl Plugin for FlightsimUiPlugin {
             .add_systems(Startup, input_diagnostics::spawn_input_diagnostics)
             .add_systems(Update, input_diagnostics::update_input_diagnostics_panel)
             .add_systems(Startup, spawn_hud)
-            .add_systems(Update, update_help_for_replay)
+            .add_systems(Update, update_help_for_replay.in_set(FlightDisplaySystems))
             .add_systems(
                 Update,
                 (
@@ -608,11 +608,21 @@ LANDINGS {:>6}",
 pub fn update_help_for_replay(
     status: Res<ReplayStatus>,
     guidance: Option<Res<FlightGuidance>>,
+    state: Option<Res<HudState>>,
+    ui_scale: Option<Res<bevy::ui::UiScale>>,
     cameras: Query<&Camera>,
-    mut help: Query<&mut Text, With<HudHelp>>,
+    mut help: Query<(&mut Text, &mut Node), With<HudHelp>>,
 ) {
     let compact = compact_hud(&cameras);
-    let desired = if status.active && compact {
+    let cockpit_replay = status.active
+        && state
+            .as_ref()
+            .is_some_and(|state| state.view_mode == "COCKPIT");
+    let desired = if cockpit_replay && compact {
+        // Five short rows retain every replay action beside the six-pack even
+        // at 640px, without pushing a long compatibility notice into credit.
+        "F5 pause/resume; C view\nF6/F7 speed; F8 -10s\nM preview; F12 exit LAN\nF10/F11 diagnostics\nFlight controls ignored".to_owned()
+    } else if status.active && compact {
         "F5 pause/resume; F6/F7 speed; F8 -10s\nC view; M preview; F12 leave LAN\nF10/F11 input diagnostics\nReplay: flight controls ignored".to_owned()
     } else if status.active {
         replay_help_text().to_owned()
@@ -631,7 +641,27 @@ pub fn update_help_for_replay(
     } else {
         help_text()
     };
-    for mut text in &mut help {
+    // The cockpit dials are intentionally fixed over their 3D dashboard seats.
+    // Preserve all replay controls at their existing font size, wrapping only
+    // within the space to the right of the six-pack (12px inset, 8px gap).
+    // Compute before layout so view changes and resizing settle in one update.
+    let max_width = if cockpit_replay {
+        cameras
+            .iter()
+            .filter(|camera| camera.is_active)
+            .filter_map(Camera::logical_viewport_size)
+            .map(|size| size.x / ui_scale.as_ref().map_or(1.0, |scale| scale.0))
+            .reduce(f32::min)
+            .map_or(Val::Percent(100.0), |width| {
+                Val::Px(((width - instruments::PANEL_WIDTH) / 2.0 - 12.0 - 8.0).max(1.0))
+            })
+    } else {
+        Val::Percent(100.0)
+    };
+    for (mut text, mut node) in &mut help {
+        if node.max_width != max_width {
+            node.max_width = max_width;
+        }
         if text.as_str() != desired {
             **text = desired.clone();
         }

@@ -29,6 +29,8 @@
 
 use bevy::camera::Exposure;
 use bevy::camera::primitives::Aabb;
+#[cfg(feature = "analytic-tonemapping")]
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::{Atmosphere, ScatteringMedium};
 use bevy::prelude::*;
 use flightsim_core::{Attitude, Degrees, Geodetic, LocalFrame, Meters, Ned, Radians, Seconds};
@@ -57,6 +59,12 @@ use flightsim_world::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+#[cfg(all(feature = "default", feature = "analytic-tonemapping"))]
+compile_error!("analytic-tonemapping requires --no-default-features; select one tone mode");
+
+#[cfg(not(any(feature = "default", feature = "analytic-tonemapping")))]
+compile_error!("flightsim-app requires default or analytic-tonemapping; select one tone mode");
 
 mod aircraft_picker_runtime;
 mod aircraft_profile;
@@ -4247,6 +4255,8 @@ fn setup(
 
     commands.spawn((
         Camera3d::default(),
+        #[cfg(feature = "analytic-tonemapping")]
+        Tonemapping::Reinhard,
         world_runtime::FlightCamera,
         flightsim_render::graphics_quality::GraphicsQualityCamera,
         flightsim_render::cloud_volume::CloudVolumeCamera,

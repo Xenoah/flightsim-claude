@@ -46,6 +46,11 @@ pub(crate) const DIAL_SIZE: f32 = 64.0;
 /// 計器のあいだの隙間。`DIAL_SIZE` と足して中心間隔 71 px になる値。
 const DIAL_GAP: f32 = 7.0;
 
+/// Shared with replay help so it can wrap beside the fixed cockpit six-pack.
+#[allow(clippy::cast_precision_loss, reason = "計器は 6 個")]
+pub(crate) const PANEL_WIDTH: f32 =
+    DIAL_SIZE * Instrument::COLUMNS as f32 + DIAL_GAP * (Instrument::COLUMNS as f32 - 1.0);
+
 /// 針の長さ（直径に対する比）。
 const NEEDLE_LENGTH: f32 = 0.38;
 
@@ -391,9 +396,6 @@ pub fn spawn_instrument_panel(
     mut commands: Commands,
     mut materials: ResMut<Assets<AttitudeMaterial>>,
 ) {
-    #[allow(clippy::cast_precision_loss, reason = "計器は 6 個")]
-    let panel_width =
-        DIAL_SIZE * Instrument::COLUMNS as f32 + DIAL_GAP * (Instrument::COLUMNS as f32 - 1.0);
     commands
         .spawn((
             Node {
@@ -409,11 +411,11 @@ pub fn spawn_instrument_panel(
                 // 出てしまう。**人の視野（約 120 度）より狭いレンズで
                 // 見ているぶん、幾何どおりには置けない。**
                 //
-                // 左下の操作説明とはわずかに重なる領域があるが、
-                // その高さの行は短いので実害が無い（画面で確認した）。
+                // Replay help reserves this panel's width at narrow viewports;
+                // the dials retain their alignment with the modeled dashboard.
                 bottom: Val::Px(93.0),
                 left: Val::Percent(50.0),
-                margin: UiRect::left(Val::Px(-panel_width / 2.0)),
+                margin: UiRect::left(Val::Px(-PANEL_WIDTH / 2.0)),
                 // **3 列 2 段。** 実機のシックスパックの形。
                 display: Display::Grid,
                 grid_template_columns: vec![RepeatedGridTrack::px(

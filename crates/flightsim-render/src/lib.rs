@@ -53,6 +53,12 @@ use bevy::{light::CascadeShadowConfigBuilder, pbr::Material, prelude::*};
 use flightsim_core::{Ecef, Geodetic, Meters, RenderFrame};
 use flightsim_world::{MeshOptions, TerrainMesh};
 
+#[cfg(all(feature = "default", feature = "analytic-tonemapping"))]
+compile_error!("analytic-tonemapping requires --no-default-features; select one tone mode");
+
+#[cfg(feature = "analytic-tonemapping")]
+mod tonemapping;
+
 pub mod aircraft;
 pub mod apron;
 pub mod biome;
@@ -195,6 +201,9 @@ pub struct FlightsimRenderPlugin;
 
 impl Plugin for FlightsimRenderPlugin {
     fn build(&self, app: &mut App) {
+        #[cfg(feature = "analytic-tonemapping")]
+        app.add_systems(Last, tonemapping::select_analytic_tonemapping);
+
         app.add_plugins((
             graphics_quality::GraphicsQualityPlugin,
             cloud_volume::CloudVolumePlugin,

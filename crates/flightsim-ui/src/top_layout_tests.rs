@@ -2,6 +2,7 @@
 //! No renderer, GPU, or operating-system window is needed.
 use super::*;
 use bevy::camera::{ComputedCameraValues, RenderTargetInfo, Viewport};
+use bevy::ecs::system::RunSystemOnce;
 use bevy::text::TextLayoutInfo;
 
 const JET_NOTICE: &str = "Kestrel Jet Trainer (fictional) | DRY THRUST 100% | PARK OFF [B] | brake 0% | Mach 0.00..0.35 | F9 OFF: manual clouds | RECORDING STOPPED: visual time rate changed; F9 saves the valid prefix; R starts a new recording";
@@ -115,6 +116,261 @@ fn rect(world: &World, entity: Entity) -> Rect {
     let node = world.get::<ComputedNode>(entity).unwrap();
     let transform = world.get::<bevy::ui::UiGlobalTransform>(entity).unwrap();
     Rect::from_center_size(transform.translation, node.size())
+}
+
+fn cockpit_layout_app(size: UVec2, state: HudState, status: ReplayStatus) -> App {
+    let mut app = layout_app(size, state, status);
+    app.init_asset::<attitude::AttitudeMaterial>().add_systems(
+        Update,
+        (
+            instruments::update_instrument_visibility,
+            instruments::update_instruments,
+        ),
+    );
+    app.world_mut()
+        .run_system_once(instruments::spawn_instrument_panel)
+        .unwrap();
+    app.update();
+    app
+}
+
+#[test]
+fn narrow_cockpit_replay_help_leaves_all_six_dials_readable() {
+    // The native 830x582 replay capture put compact help over the V/S dial.
+    // Previous complete-HUD tests did not spawn the separate cockpit panel.
+    let size = UVec2::new(830, 582);
+    let mut state = flight_hud(false);
+    state.stall_warning = false;
+    state.view_mode = "COCKPIT";
+    state.draw_distance = "STANDARD 4.5km";
+    let mut app = cockpit_layout_app(
+        size,
+        state,
+        ReplayStatus {
+            active: true,
+            finished: true,
+            ..default()
+        },
+    );
+    app.world_mut()
+        .resource_mut::<DataAttribution>()
+        .set(FULL_CREDIT);
+    app.update();
+    assert_complete_hud_clear(&mut app, size);
+    let world = app.world_mut();
+    let cockpit = entity::<instruments::InstrumentPanel>(world);
+    assert_eq!(
+        world.get::<Visibility>(cockpit),
+        Some(&Visibility::Inherited)
+    );
+    let dial_bounds = rect(world, cockpit);
+    for (name, panel) in [
+        ("help", entity::<HudHelp>(world)),
+        ("HUD", entity::<HudText>(world)),
+        ("log", entity::<HudLog>(world)),
+        ("notice", entity::<replay::ReplayBannerPanel>(world)),
+        ("credit", entity::<DataAttributionDisplay>(world)),
+    ] {
+        assert!(
+            dial_bounds.intersect(rect(world, panel)).is_empty(),
+            "cockpit overlaps {name}: {dial_bounds:?}, {:?}",
+            rect(world, panel)
+        );
+    }
+}
+
+fn assert_cockpit_replay_help_and_notices_clear(app: &mut App, size: UVec2) {
+    let unavailable = app.world().resource::<HudState>().stall_warning_unavailable;
+    assert_notice_readable(app, size, unavailable);
+    assert_complete_hud_clear(app, size);
+    let world = app.world_mut();
+    let cockpit = entity::<instruments::InstrumentPanel>(world);
+    let dial_bounds = rect(world, cockpit);
+    assert_eq!(
+        world.get::<Visibility>(cockpit),
+        Some(&Visibility::Inherited)
+    );
+    for (name, panel) in [
+        ("help", entity::<HudHelp>(world)),
+        ("log", entity::<HudLog>(world)),
+        ("credit", entity::<DataAttributionDisplay>(world)),
+    ] {
+        assert!(
+            dial_bounds.intersect(rect(world, panel)).is_empty(),
+            "cockpit overlaps {name} at {size:?}: {dial_bounds:?}, {:?}",
+            rect(world, panel)
+        );
+    }
+    // 640px retains a separate pre-existing HUD/long-notice versus dial
+    // collision. This scoped help fix does not claim full cockpit clearance
+    // there; the text panels themselves must still remain readable and apart.
+    if size.x >= 830 {
+        let notice = entity::<replay::ReplayBannerPanel>(world);
+        assert!(dial_bounds.intersect(rect(world, notice)).is_empty());
+    }
+    let help = entity::<HudHelp>(world);
+    let banner = entity::<ReplayBanner>(world);
+    for key in [
+        "F5", "F6", "F7", "F8", "C", "M", "F10", "F11", "F12", "ignored",
+    ] {
+        assert!(
+            world.get::<Text>(help).unwrap().contains(key),
+            "replay help lost {key}"
+        );
+    }
+    assert_eq!(
+        world.get::<Text>(banner).unwrap().as_str(),
+        format_replay_banner(world.resource::<ReplayStatus>())
+    );
+    // Every control and notice byte must produce a real glyph after wrapping;
+    // retaining only the source string, or clipping/hiding it, is not a pass.
+    for text_entity in [help, banner] {
+        let mut ancestor = Some(text_entity);
+        while let Some(entity) = ancestor {
+            assert_ne!(world.get::<Visibility>(entity), Some(&Visibility::Hidden));
+            assert_ne!(world.get::<Node>(entity).unwrap().display, Display::None);
+            ancestor = world.get::<ChildOf>(entity).map(ChildOf::parent);
+        }
+        let measured = world.get::<TextLayoutInfo>(text_entity).unwrap();
+        let bounds = rect(world, text_entity);
+        assert!(!measured.glyphs.is_empty());
+        assert!(measured.size.x <= bounds.width() + 1.0);
+        assert!(measured.size.y <= bounds.height() + 1.0);
+        for (line_index, line) in world.get::<Text>(text_entity).unwrap().lines().enumerate() {
+            for (index, _) in line
+                .bytes()
+                .enumerate()
+                .filter(|(_, b)| !b.is_ascii_whitespace())
+            {
+                assert!(
+                    measured.glyphs.iter().any(|g| g.line_index == line_index
+                        && (g.byte_index..g.byte_index + g.byte_length).contains(&index)),
+                    "byte {index} on line {line_index} was not laid out"
+                );
+            }
+        }
+    }
+    let readouts: Vec<_> = world
+        .query_filtered::<Entity, With<instruments::InstrumentReadout>>()
+        .iter(world)
+        .collect();
+    assert_eq!(readouts.len(), 6);
+    for readout in readouts {
+        let measured = world.get::<TextLayoutInfo>(readout).unwrap();
+        assert!(!measured.glyphs.is_empty());
+        assert!(measured.size.x <= rect(world, readout).width() + 1.0);
+        assert!((world.get::<TextFont>(readout).unwrap().font_size - 11.0).abs() < f32::EPSILON);
+    }
+}
+
+#[test]
+fn cockpit_replay_help_wraps_with_complete_status_and_compatibility_notices() {
+    for size in [
+        UVec2::new(640, 480),
+        UVec2::new(830, 582),
+        // Both sides of the compact/full reference boundary must clear dials.
+        UVec2::new(899, 600),
+        UVec2::new(900, 600),
+        UVec2::new(1180, 812),
+        UVec2::new(1280, 720),
+    ] {
+        for phase in 0..6 {
+            let status = ReplayStatus {
+                active: true,
+                paused: phase == 1,
+                seeking: phase == 2,
+                finished: phase == 0 || phase == 4,
+                fault: (phase == 5)
+                    .then(|| "REPLAY STOPPED: state outside aircraft operating envelope".into()),
+                notice: match phase {
+                    0 => None,
+                    1 => Some(RECORDING_NOTICE.into()),
+                    2 => Some(JET_NOTICE.into()),
+                    _ => Some(TURBOPROP_NOTICE.into()),
+                },
+                speed: 1.0,
+                elapsed: Seconds(65.0),
+                total: Seconds(195.0),
+            };
+            let mut state = flight_hud(phase >= 3);
+            state.view_mode = "COCKPIT";
+            let mut app = cockpit_layout_app(size, state, status);
+            app.world_mut()
+                .resource_mut::<DataAttribution>()
+                .set(FULL_CREDIT);
+            app.update();
+            assert_cockpit_replay_help_and_notices_clear(&mut app, size);
+        }
+    }
+}
+
+#[test]
+fn cockpit_replay_help_resizes_in_one_update_and_restores_other_views_and_live_help() {
+    let mut state = flight_hud(false);
+    state.view_mode = "COCKPIT";
+    let mut app = cockpit_layout_app(
+        UVec2::new(1280, 720),
+        state,
+        ReplayStatus {
+            active: true,
+            notice: Some(RECORDING_NOTICE.into()),
+            ..default()
+        },
+    );
+    app.world_mut()
+        .resource_mut::<DataAttribution>()
+        .set(FULL_CREDIT);
+    for size in [
+        UVec2::new(830, 582),
+        UVec2::new(640, 480),
+        UVec2::new(900, 600),
+        UVec2::new(899, 600),
+        UVec2::new(1180, 812),
+        UVec2::new(1280, 720),
+        UVec2::new(830, 582),
+    ] {
+        let world = app.world_mut();
+        for mut camera in world.query::<&mut Camera>().iter_mut(world) {
+            camera.computed.target_info.as_mut().unwrap().physical_size = size;
+            camera.viewport.as_mut().unwrap().physical_size = size;
+        }
+        app.update();
+        assert_cockpit_replay_help_and_notices_clear(&mut app, size);
+    }
+    let size = UVec2::new(830, 582);
+    for active in [true, false] {
+        for view_mode in ["CHASE", "FREE", "TOWER", "COCKPIT"] {
+            if active && view_mode == "COCKPIT" {
+                continue;
+            }
+            let world = app.world_mut();
+            world.resource_mut::<HudState>().view_mode = view_mode;
+            world.resource_mut::<ReplayStatus>().active = active;
+            let state = *world.resource::<HudState>();
+            let status = world.resource::<ReplayStatus>().clone();
+            app.update();
+            let mut unchanged = layout_app(size, state, status);
+            unchanged
+                .world_mut()
+                .resource_mut::<DataAttribution>()
+                .set(FULL_CREDIT);
+            unchanged.update();
+            let actual_help = entity::<HudHelp>(app.world_mut());
+            let expected_help = entity::<HudHelp>(unchanged.world_mut());
+            assert_eq!(
+                rect(app.world(), actual_help),
+                rect(unchanged.world(), expected_help)
+            );
+            assert_eq!(
+                app.world().get::<Text>(actual_help),
+                unchanged.world().get::<Text>(expected_help)
+            );
+            assert_eq!(
+                app.world().get::<Node>(actual_help).unwrap().max_width,
+                Val::Percent(100.0)
+            );
+        }
+    }
 }
 
 fn assert_warning_clear(app: &mut App, size: UVec2, unavailable: bool) -> (Rect, Rect) {

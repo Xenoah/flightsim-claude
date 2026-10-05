@@ -36,6 +36,8 @@ cargo test -p flightsim-core -p flightsim-fdm -p flightsim-world \
 cargo test -j 2 -p flightsim-render -p flightsim-input -p flightsim-ui -p flightsim-audio -p flightsim-app
 ```
 
+An explicit alternate Reinhard build is documented in [analytical tonemapping](docs/analytic-tonemapping.md). Ordinary LUT/Tony defaults remain unchanged; the alternate appearance has Linux-only validation.
+
 **`cargo test --workspace` は避けてください。** Bevy を含む全クレートのテストバイナリを
 同時にビルドするとメモリを使い切り、`failed to mmap ... The paging file is too small`
 （os error 1455）で落ちます。**コードの問題に見えますが環境の問題です。**

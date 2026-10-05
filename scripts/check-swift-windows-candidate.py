@@ -85,6 +85,9 @@ REPLAY_CONTRACT_PATHS = {
     "crates/flightsim-ui/src/lib.rs",
     "crates/flightsim-ui/src/tutorial.rs",
     "crates/flightsim-ui/src/top_layout_tests.rs",
+    # Cockpit replay help shares the actual six-pack width. Bind the complete
+    # geometry owner, not a projected constant or a synthetic layout witness.
+    "crates/flightsim-ui/src/instruments.rs",
     # The staged picker now owns Swift scene/session replacement. Its scene
     # builder is shared by initial startup, and audio replacement owns the
     # actual synthesized source rather than only its display/settings value.

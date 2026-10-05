@@ -9,9 +9,12 @@ rust-version = "1.89"
 license.workspace = true
 
 [features]
+# Ordinary builds retain Bevy's LUT bundle and implicit Tony camera default.
+default = ["bevy/tonemapping_luts"]
+# Alternate appearance; select with --no-default-features. Not a release recipe.
+analytic-tonemapping = ["bevy/ktx2", "flightsim-render/analytic-tonemapping"]
 # Local commercial candidate: original Swift Sport, isolated adjacent assets.
 # This feature is not a legal clearance or a Steam release switch.
-default = []
 commercial-staging = []
 # Explicit map acquisition; default and commercial candidate stay offline.
 region-downloads = ["flightsim-content/downloads"]

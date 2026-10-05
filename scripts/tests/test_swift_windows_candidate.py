@@ -588,6 +588,70 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_cockpit_instruments_reject_shared_width_and_actual_panel_drift(self):
+        repo, _ = self.source_fixture()
+        relative = "crates/flightsim-ui/src/instruments.rs"
+        self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+        path = repo / relative
+        original = path.read_bytes()
+        # These committed semantic mutations check source admission only. The
+        # real-font UI regressions and native pixels have their own evidence.
+        mutations = (
+            (b"const DIAL_GAP: f32 = 7.0;", b"const DIAL_GAP: f32 = 0.0;"),
+            (b"DIAL_GAP * (Instrument::COLUMNS as f32 - 1.0)",
+             b"DIAL_GAP * Instrument::COLUMNS as f32"),
+            (b"margin: UiRect::left(Val::Px(-PANEL_WIDTH / 2.0)),",
+             b"margin: UiRect::left(Val::Px(0.0)),"),
+        )
+        for old, new in mutations:
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(mutation=old), self.assertRaisesRegex(
+                    ValueError, "reviewed replay canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("canonical_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_cockpit_instruments_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        relative = "crates/flightsim-ui/src/instruments.rs"
+        self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+        for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                         "changed checkout digests", "removed contract row"):
+            changed = json.loads(json.dumps(source))
+            if mutation == "missing file":
+                changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+            elif mutation == "missing reviewed record":
+                del changed["reviewed_replay_source_evidence"][relative]
+            elif mutation == "changed canonical digest":
+                changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+            elif mutation == "changed checkout digests":
+                changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                changed["reviewed_replay_source_evidence"][relative]["checkout_sha256"] = "0" * 64
+                for record in changed["files"]:
+                    if record["path"] == relative:
+                        record["checkout_sha256"] = "0" * 64
+            else:
+                del changed["replay_contract"]["source_sha256"][relative]
+                changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                    changed["replay_contract_text"].encode()).hexdigest()
+                for record in changed["files"]:
+                    if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                        record["checkout_sha256"] = changed["replay_contract_sha256"]
+                        record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+            candidate.write_json(evidence / "source-inputs.json", changed)
+            changed_report = {**report,
+                              "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                              "replay_contract_sha256": changed["replay_contract_sha256"]}
+            self.seal_report(evidence, changed_report)
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                candidate.validate_evidence(evidence)
+
     def test_capture_readiness_rejects_order_discovery_and_stability_drift(self):
         repo, _ = self.source_fixture()
         capture = "crates/flightsim-app/src/screen_capture.rs"
