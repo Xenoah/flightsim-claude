@@ -24,6 +24,7 @@ pub(super) enum ScrollSurface {
     Credits,
     Regions,
     Wind,
+    Weather,
 }
 
 /// Presentation state used by [`super::update_world_map`].
@@ -144,7 +145,9 @@ impl MapLayout<'_, '_> {
         // Even individually finite events can overflow during accumulation.
         // Ignore such a batch instead of passing non-finite offsets to layout.
         let delta = if delta.is_finite() { delta } else { 0.0 };
-        let active = state.visible.then_some(if state.wind_editor.is_some() {
+        let active = state.visible.then_some(if state.weather_editor.is_some() {
+            ScrollSurface::Weather
+        } else if state.wind_editor.is_some() {
             ScrollSurface::Wind
         } else if state.regions.visible {
             ScrollSurface::Regions

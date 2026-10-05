@@ -469,6 +469,9 @@ fn raw_or_selected_regions_reject_bounded_targets_before_consuming_request_or_mu
 #[cfg(not(feature = "commercial-staging"))]
 fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
     let mut app = app(startup());
+    let old_weather = app.world().resource::<Startup>().weather.selection;
+    let custom = custom_draft(2000.123456789, 200.123456789);
+    select_custom(&mut app, custom);
     let old_conditions =
         conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>());
     let mut changed = old_conditions;
@@ -513,6 +516,10 @@ fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
         assert_eq!(active_root(&mut app), old_root);
         assert_eq!(recorder_bytes(&app), before);
         assert_eq!(
+            app.world().resource::<Startup>().weather.selection,
+            old_weather
+        );
+        assert_eq!(
             conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>()),
             old_conditions
         );
@@ -547,6 +554,14 @@ fn failed_glb_and_environment_keep_old_scene_recorder_and_request_retryable() {
     submit(&mut app, 3);
     finish(&mut app);
     assert_target(&mut app, 3, old_root);
+    assert_eq!(
+        app.world().resource::<Startup>().weather.draft,
+        Some(custom)
+    );
+    assert_eq!(
+        app.world().resource::<Startup>().weather.requested,
+        Some(WeatherPreset::Custom)
+    );
     assert_eq!(
         conditions_runtime::PhysicalConditions::from_startup(app.world().resource::<Startup>()),
         changed
@@ -1551,5 +1566,163 @@ fn opt_in_numerical_profile_loads_original_cedar_static_model_without_a_preset()
             .value()
             .to_bits(),
         0.0_f64.to_bits()
+    );
+}
+
+fn custom_draft(visibility: f64, base: f64) -> weather_runtime::AuthoredDraft {
+    weather_runtime::AuthoredDraft::from_preset(WeatherPreset::Rain, u64::MAX - 37)
+        .unwrap()
+        .edited(flightsim_ui::world_map::WorldMapWeatherEdit {
+            background_visibility: Some(Meters(visibility)),
+            cloud_base: Some(Meters(base)),
+        })
+        .unwrap()
+}
+
+fn select_custom(app: &mut App, draft: weather_runtime::AuthoredDraft) {
+    let mut pending = app
+        .world_mut()
+        .resource_mut::<weather_runtime::PendingWeather>();
+    pending.requested = Some(WeatherPreset::Custom);
+    pending.draft = Some(draft);
+    pending.revision = pending.revision.wrapping_add(1);
+}
+
+#[test]
+fn complete_custom_draft_revision_and_generation_guard_delayed_departure_commit() {
+    let mut app = app(startup());
+    let original = custom_draft(2000.123456789, 200.123456789);
+    let old_root = active_root(&mut app);
+    let old_bytes = recorder_bytes(&app);
+    let old_state = *app.world().resource::<FlightSimulation>().0.state();
+    for change in 0..6 {
+        select_custom(&mut app, original);
+        submit(&mut app, 0);
+        world_runtime::apply_world_map_start(app.world_mut());
+        assert!(app.world().resource::<AircraftPicker>().preparing());
+        match change {
+            0 => {
+                // Same Custom tag, different complete exact value; no generation hint.
+                app.world_mut()
+                    .resource_mut::<weather_runtime::PendingWeather>()
+                    .draft = Some(custom_draft(2500.123456789, 200.123456789));
+            }
+            1 => {
+                // Applied edit then restore is still a different pending revision.
+                select_custom(&mut app, custom_draft(2500.123456789, 200.123456789));
+                select_custom(&mut app, original);
+            }
+            2 => {
+                // Unapplied UI edit then restore is owned by the Start generation.
+                app.world_mut()
+                    .resource_mut::<WorldMapActions>()
+                    .invalidate_start();
+            }
+            3 => {
+                app.world_mut()
+                    .resource_mut::<WorldMapState>()
+                    .aircraft_choice = 1
+            }
+            4 => {
+                app.world_mut()
+                    .resource_mut::<WorldMapState>()
+                    .regions
+                    .selected = Some("changed-region".into())
+            }
+            _ => app.world_mut().resource_mut::<WorldMapState>().visible = false,
+        }
+        for _ in 0..3 {
+            app.update();
+        }
+        assert!(app.world().resource::<AircraftPicker>().pending.is_none());
+        assert_eq!(active_root(&mut app), old_root);
+        assert_eq!(recorder_bytes(&app), old_bytes);
+        assert_eq!(
+            *app.world().resource::<FlightSimulation>().0.state(),
+            old_state
+        );
+        app.world_mut()
+            .resource_mut::<WorldMapState>()
+            .regions
+            .selected = None;
+    }
+    select_custom(&mut app, original);
+    submit(&mut app, 0);
+    finish(&mut app);
+    let startup = app.world().resource::<Startup>();
+    assert_eq!(startup.weather.requested, Some(WeatherPreset::Custom));
+    assert_eq!(startup.weather.draft, Some(original));
+    let flightsim_sim::weather::WeatherSelection::Modeled(weather) = startup.weather.selection
+    else {
+        panic!()
+    };
+    let params = weather.parameters();
+    let base = params.departure_reference.altitude + Meters(200.123456789);
+    assert_eq!(
+        params.cloud.unwrap().base.get().to_bits(),
+        base.get().to_bits()
+    );
+    assert_eq!(
+        params.cloud.unwrap().top.get().to_bits(),
+        (base + Meters(2000.0)).get().to_bits()
+    );
+    assert_eq!(
+        params.ambient_visibility.get().to_bits(),
+        2000.123456789_f64.to_bits()
+    );
+    assert_eq!(params.seed, u64::MAX - 37);
+    assert_eq!(
+        app.world()
+            .resource::<FlightRecorder>()
+            .0
+            .recording()
+            .conditions()
+            .weather,
+        startup.weather.selection
+    );
+}
+
+#[test]
+fn invalid_resolved_custom_height_preserves_active_flight_and_requires_fresh_start() {
+    let mut app = app(startup());
+    let old_root = active_root(&mut app);
+    let old_bytes = recorder_bytes(&app);
+    let old_weather = app.world().resource::<Startup>().weather.selection;
+    // This offset is possible at -1000 m, but not at the chosen ocean ground.
+    select_custom(&mut app, custom_draft(2000.0, 29000.0));
+    submit(&mut app, 0);
+    world_runtime::apply_world_map_start(app.world_mut());
+    assert!(
+        app.world()
+            .resource::<AircraftPicker>()
+            .pending
+            .as_ref()
+            .is_some_and(|p| matches!(p.phase, Phase::Failed))
+    );
+    assert_eq!(active_root(&mut app), old_root);
+    assert_eq!(recorder_bytes(&app), old_bytes);
+    assert_eq!(
+        app.world().resource::<Startup>().weather.selection,
+        old_weather
+    );
+    assert!(
+        app.world()
+            .resource::<WorldMapState>()
+            .navigation_note
+            .contains("weather")
+    );
+    select_custom(&mut app, custom_draft(2000.0, 200.0));
+    for _ in 0..3 {
+        app.update();
+    }
+    assert_eq!(active_root(&mut app), old_root);
+    assert_eq!(recorder_bytes(&app), old_bytes);
+    assert!(app.world().resource::<AircraftPicker>().pending.is_none());
+    submit(&mut app, 0);
+    finish(&mut app);
+    assert_ne!(active_root(&mut app), old_root);
+    assert_eq!(
+        app.world().resource::<Startup>().weather.requested,
+        Some(WeatherPreset::Custom)
     );
 }

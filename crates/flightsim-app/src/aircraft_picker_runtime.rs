@@ -1,6 +1,7 @@
 //! Bounded, app-owned new-flight aircraft transactions. Catalog IDs identify
 //! choices; the validated profile, never its display name, determines physics.
 use super::*;
+#[cfg(test)]
 use flightsim_sim::weather::WeatherPreset;
 use flightsim_ui::world_map::{
     WorldMapActions, WorldMapAircraftChoice, WorldMapStart, WorldMapState,
@@ -51,7 +52,7 @@ struct PendingFlight {
     /// cloned once. No later re-read can silently change the target aircraft.
     startup: Startup,
     selected_region: Option<String>,
-    weather: Option<WeatherPreset>,
+    weather: weather_runtime::WeatherSnapshot,
     conditions: conditions_runtime::PhysicalConditions,
     phase: Phase,
 }
@@ -76,23 +77,13 @@ impl PendingFlight {
         let map = world.resource::<WorldMapState>();
         let actions = world.resource::<WorldMapActions>();
         let current = world.resource::<Startup>();
-        let weather = if !current.clouds_were_given
-            && current.traffic.host.is_none()
-            && current.traffic.join.is_none()
-        {
-            world
-                .get_resource::<weather_runtime::PendingWeather>()
-                .map_or(current.weather.requested, |pending| pending.requested)
-        } else {
-            current.weather.requested
-        };
         map.new_flight_modal_ready()
             && actions.generation == self.request.generation
             && map.aircraft_choice == self.request.aircraft_choice
             && map.selected == self.request.position
             && map.preview_month() == self.request.month
             && map.regions.selected == self.selected_region
-            && weather == self.weather
+            && weather_runtime::snapshot(world, current) == self.weather
             && conditions_runtime::snapshot(world, current) == self.conditions
     }
 }
@@ -287,7 +278,7 @@ pub(super) fn apply(world: &mut World) {
             picker.pending = Some(PendingFlight {
                 request,
                 selected_region: world.resource::<WorldMapState>().regions.selected.clone(),
-                weather: startup.weather.requested,
+                weather: weather_runtime::snapshot(world, &startup),
                 conditions: conditions_runtime::PhysicalConditions::from_startup(&startup),
                 startup,
                 phase: Phase::Region,

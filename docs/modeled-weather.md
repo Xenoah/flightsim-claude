@@ -9,6 +9,42 @@ See [app verification](qa/weather-app-controls-2026-10-04.md) and the
 [native integration record](qa/modeled-weather-integration-2026-10-04.md) for the
 tested scope, measured resource counts and remaining visual/qualification limits.
 
+## New-flight visibility and cloud-base controls
+
+On the offline new-flight map, use F12 to choose Clear, Cloud, Fog, Rain, Snow or
+Storm, then open **Visibility / cloud base**. Enter background visibility in
+metres (10 through 200000). For a cloud-bearing preset, optionally enter its base
+in metres above the **departure ground reference**. The retained layer thickness
+and precipitation are displayed; wind/turbulence use their separate editor.
+Clear and Fog have no cloud-base field to edit. Legacy/monthly, manual clouds,
+replay and LAN keep their existing paths.
+
+Click a field or use Tab, type, and use Ctrl+A to clear. Enter applies the child
+draft; Escape cancels it. At small window sizes, scroll the child using the mouse
+wheel or Page Up/Down. The map display now caps its raster width at 720 px
+(previously 740 px), preserving the 2:1 aspect ratio and 720x360 source image.
+Apply changes only pending choices; **Start** applies them
+in the existing new-flight transaction. Closing the map discards pending choices.
+An explicitly edited value labels the result **Modeled Custom**; untouched fields
+retain exact original values even though displayed text is rounded.
+
+The background setting is one extinction contribution, not total local visibility
+inside fog/cloud. For example, Rain at 2000 m background visibility with a 200 m
+base retains its 2000 m layer thickness and authored rain rate. Stronger fog/cloud
+extinction can reduce combined visibility below the background setting. Cloud base
+is authored scenario geometry, not an observed aviation ceiling.
+
+The possible base range depends on retained thickness. Actual departure height can
+still make Start invalid under the unchanged absolute layer bounds. Start resolves
+against the successfully selected departure terrain source once; a rejected Start
+keeps the current flight intact. The layer then stays fixed above WGS84 ellipsoidal
+height even over hills. Provenance is **Authored, not live. Applies on Start.**
+[Fresh native interaction, matched day/night images and replay verification](qa/authored-weather-native-2026-10-05.md) cover the editor.
+
+See [ADR-0025](adr/0025-authored-visibility-cloud-base.md) for exact preservation and
+transaction semantics. Native visual acceptance and release are separate from the
+source implementation and automated tests.
+
 ## Meaning and scope
 
 `WeatherSelection::Legacy` is the default. An absent weather block means the

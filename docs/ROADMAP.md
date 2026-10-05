@@ -111,6 +111,10 @@ alpha.21 は未公開。staging の component merge とリリースを同じ完�
   ので、再配布条件の判断が要らない）
 - [x] 夜間の滑走路灯（縁灯・進入端灯・末端灯。太陽高度で滑らかに点消灯）
 - [x] 定常風（`--wind 270/10`。FDM の空力と HUD へ。横風着陸が成立する）
+- [x] Authored background visibility and departure-relative cloud-base map editor;
+  exact pending Custom draft and atomic aircraft transaction, with unchanged
+  forces/codecs/render budgets. Native acceptance remains separate.
+  [Meaning and limits](modeled-weather.md#new-flight-visibility-and-cloud-base-controls)
 - [x] New-flight map wind-from/speed and independent authored turbulence editor;
   exact pending conditions join the aircraft transaction. Visual presets do not
   change forces. [Controls and qualification limits](new-flight-wind.md)

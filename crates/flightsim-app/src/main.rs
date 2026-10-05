@@ -74,6 +74,8 @@ mod near_static_turboprop_session;
 mod turboprop_session;
 use flight_session::{FlightSession, PreparedJetSession};
 mod conditions_runtime;
+#[cfg(test)]
+mod custom_weather_replay_tests;
 mod region_runtime;
 mod render_metrics;
 mod replay_policy;

@@ -1,0 +1,795 @@
+{
+  "version": 2,
+  "id": "peregrine-sport-jet-experimental",
+  "dynamics": {
+    "kind": "dry_jet_table",
+    "revision": 1,
+    "airframe": {
+      "name": "Peregrine Sport Jet (fictional experimental)",
+      "mass_kg": 1750,
+      "inertia_kg_m2": [
+        2081.230666666667,
+        5154.62219047619,
+        6974.15819047619,
+        0.0
+      ],
+      "wing_area_m2": 13.2,
+      "wing_span_m": 8.4,
+      "mean_chord_m": 1.6467923673631164,
+      "landing_gear": [
+        {
+          "contact_m": [
+            2.0,
+            0.0,
+            1.15
+          ],
+          "spring_n_per_m": 80000.0,
+          "damping_ns_per_m": 7000.0,
+          "max_stroke_m": 0.22,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.45
+        },
+        {
+          "contact_m": [
+            -0.85,
+            -1.5,
+            1.15
+          ],
+          "spring_n_per_m": 150000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.22,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.45
+        },
+        {
+          "contact_m": [
+            -0.85,
+            1.5,
+            1.15
+          ],
+          "spring_n_per_m": 150000.0,
+          "damping_ns_per_m": 13000.0,
+          "max_stroke_m": 0.22,
+          "bottom_stop_travel_m": 0.05,
+          "max_recoil_mps": 0.45
+        }
+      ],
+      "rolling_friction": 0.018,
+      "braking_friction": 0.7,
+      "lateral_friction": 0.8,
+      "friction_transition_mps": 0.25
+    },
+    "thrust": {
+      "schema": 1,
+      "pressure_ratios": [
+        0.0,
+        0.45,
+        0.7,
+        1.0,
+        1.08
+      ],
+      "temperature_ratios": [
+        0.75,
+        0.9,
+        1.0,
+        1.1
+      ],
+      "mach": [
+        0.0,
+        0.2,
+        0.35,
+        0.5,
+        0.6,
+        0.65
+      ],
+      "cells": [
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": -0.0,
+          "maximum_dry_n": 0.0
+        },
+        {
+          "idle_n": 259.8076211353316,
+          "maximum_dry_n": 6495.19052838329
+        },
+        {
+          "idle_n": 166.27687752661222,
+          "maximum_dry_n": 6204.205992711719
+        },
+        {
+          "idle_n": 96.12881982007269,
+          "maximum_dry_n": 5945.047890629226
+        },
+        {
+          "idle_n": 25.98076211353316,
+          "maximum_dry_n": 5650.8157596934625
+        },
+        {
+          "idle_n": -20.784609690826528,
+          "maximum_dry_n": 5435.175434151137
+        },
+        {
+          "idle_n": -44.16729559300637,
+          "maximum_dry_n": 5321.50959990443
+        },
+        {
+          "idle_n": 237.17082451262846,
+          "maximum_dry_n": 5929.2706128157115
+        },
+        {
+          "idle_n": 151.7893276880822,
+          "maximum_dry_n": 5663.6392893615675
+        },
+        {
+          "idle_n": 87.75320506967253,
+          "maximum_dry_n": 5427.061391910221
+        },
+        {
+          "idle_n": 23.717082451262847,
+          "maximum_dry_n": 5158.465433149669
+        },
+        {
+          "idle_n": -18.973665961010276,
+          "maximum_dry_n": 4961.6136488041875
+        },
+        {
+          "idle_n": -40.31904016714684,
+          "maximum_dry_n": 4857.851413079912
+        },
+        {
+          "idle_n": 225.0,
+          "maximum_dry_n": 5625.0
+        },
+        {
+          "idle_n": 144.0,
+          "maximum_dry_n": 5373.0
+        },
+        {
+          "idle_n": 83.25,
+          "maximum_dry_n": 5148.5625
+        },
+        {
+          "idle_n": 22.5,
+          "maximum_dry_n": 4893.75
+        },
+        {
+          "idle_n": -18.0,
+          "maximum_dry_n": 4707.0
+        },
+        {
+          "idle_n": -38.25,
+          "maximum_dry_n": 4608.5625
+        },
+        {
+          "idle_n": 214.52908258025826,
+          "maximum_dry_n": 5363.227064506456
+        },
+        {
+          "idle_n": 137.29861285136528,
+          "maximum_dry_n": 5122.954492016567
+        },
+        {
+          "idle_n": 79.37576055469556,
+          "maximum_dry_n": 4908.9617321427595
+        },
+        {
+          "idle_n": 21.452908258025825,
+          "maximum_dry_n": 4666.007546120617
+        },
+        {
+          "idle_n": -17.16232660642066,
+          "maximum_dry_n": 4487.948407579002
+        },
+        {
+          "idle_n": -36.4699440386439,
+          "maximum_dry_n": 4394.09193395014
+        },
+        {
+          "idle_n": 404.14518843273805,
+          "maximum_dry_n": 10103.629710818452
+        },
+        {
+          "idle_n": 258.65292059695236,
+          "maximum_dry_n": 9650.987099773785
+        },
+        {
+          "idle_n": 149.53371972011308,
+          "maximum_dry_n": 9247.852274312128
+        },
+        {
+          "idle_n": 40.414518843273804,
+          "maximum_dry_n": 8790.157848412053
+        },
+        {
+          "idle_n": -32.331615074619044,
+          "maximum_dry_n": 8454.71734201288
+        },
+        {
+          "idle_n": -68.70468203356546,
+          "maximum_dry_n": 8277.903822073557
+        },
+        {
+          "idle_n": 368.93239368631095,
+          "maximum_dry_n": 9223.309842157774
+        },
+        {
+          "idle_n": 236.116731959239,
+          "maximum_dry_n": 8810.105561229106
+        },
+        {
+          "idle_n": 136.50498566393506,
+          "maximum_dry_n": 8442.09549852701
+        },
+        {
+          "idle_n": 36.89323936863109,
+          "maximum_dry_n": 8024.279562677263
+        },
+        {
+          "idle_n": -29.514591494904874,
+          "maximum_dry_n": 7718.0656759176245
+        },
+        {
+          "idle_n": -62.71850692667285,
+          "maximum_dry_n": 7556.657753679864
+        },
+        {
+          "idle_n": 350.0,
+          "maximum_dry_n": 8750.0
+        },
+        {
+          "idle_n": 224.0,
+          "maximum_dry_n": 8358.0
+        },
+        {
+          "idle_n": 129.5,
+          "maximum_dry_n": 8008.875
+        },
+        {
+          "idle_n": 35.0,
+          "maximum_dry_n": 7612.5
+        },
+        {
+          "idle_n": -28.0,
+          "maximum_dry_n": 7322.0
+        },
+        {
+          "idle_n": -59.49999999999999,
+          "maximum_dry_n": 7168.875
+        },
+        {
+          "idle_n": 333.71190623595726,
+          "maximum_dry_n": 8342.797655898932
+        },
+        {
+          "idle_n": 213.57561999101267,
+          "maximum_dry_n": 7969.04032091466
+        },
+        {
+          "idle_n": 123.47340530730419,
+          "maximum_dry_n": 7636.162694444292
+        },
+        {
+          "idle_n": 33.37119062359573,
+          "maximum_dry_n": 7258.233960632071
+        },
+        {
+          "idle_n": -26.696952498876584,
+          "maximum_dry_n": 6981.253078456226
+        },
+        {
+          "idle_n": -56.73102406011273,
+          "maximum_dry_n": 6835.254119477995
+        },
+        {
+          "idle_n": 577.3502691896258,
+          "maximum_dry_n": 14433.756729740646
+        },
+        {
+          "idle_n": 369.5041722813605,
+          "maximum_dry_n": 13787.124428248264
+        },
+        {
+          "idle_n": 213.61959960016154,
+          "maximum_dry_n": 13211.217534731612
+        },
+        {
+          "idle_n": 57.73502691896258,
+          "maximum_dry_n": 12557.368354874361
+        },
+        {
+          "idle_n": -46.188021535170066,
+          "maximum_dry_n": 12078.167631446971
+        },
+        {
+          "idle_n": -98.14954576223639,
+          "maximum_dry_n": 11825.57688867651
+        },
+        {
+          "idle_n": 527.04627669473,
+          "maximum_dry_n": 13176.156917368247
+        },
+        {
+          "idle_n": 337.3096170846271,
+          "maximum_dry_n": 12585.86508747015
+        },
+        {
+          "idle_n": 195.00712237705005,
+          "maximum_dry_n": 12060.136426467157
+        },
+        {
+          "idle_n": 52.70462766947299,
+          "maximum_dry_n": 11463.256518110375
+        },
+        {
+          "idle_n": -42.16370213557839,
+          "maximum_dry_n": 11025.80810845375
+        },
+        {
+          "idle_n": -89.59786703810408,
+          "maximum_dry_n": 10795.225362399806
+        },
+        {
+          "idle_n": 500.0,
+          "maximum_dry_n": 12500.0
+        },
+        {
+          "idle_n": 320.0,
+          "maximum_dry_n": 11940.0
+        },
+        {
+          "idle_n": 185.0,
+          "maximum_dry_n": 11441.25
+        },
+        {
+          "idle_n": 50.0,
+          "maximum_dry_n": 10875.0
+        },
+        {
+          "idle_n": -40.0,
+          "maximum_dry_n": 10460.0
+        },
+        {
+          "idle_n": -85.0,
+          "maximum_dry_n": 10241.25
+        },
+        {
+          "idle_n": 476.7312946227961,
+          "maximum_dry_n": 11918.282365569903
+        },
+        {
+          "idle_n": 305.1080285585895,
+          "maximum_dry_n": 11384.343315592372
+        },
+        {
+          "idle_n": 176.39057901043458,
+          "maximum_dry_n": 10908.803849206131
+        },
+        {
+          "idle_n": 47.67312946227961,
+          "maximum_dry_n": 10368.905658045816
+        },
+        {
+          "idle_n": -38.13850356982369,
+          "maximum_dry_n": 9973.218683508894
+        },
+        {
+          "idle_n": -81.04432008587534,
+          "maximum_dry_n": 9764.648742111422
+        },
+        {
+          "idle_n": 623.5382907247958,
+          "maximum_dry_n": 15588.457268119897
+        },
+        {
+          "idle_n": 399.0645060638694,
+          "maximum_dry_n": 14890.094382508123
+        },
+        {
+          "idle_n": 230.70916756817448,
+          "maximum_dry_n": 14268.114937510141
+        },
+        {
+          "idle_n": 62.353829072479584,
+          "maximum_dry_n": 13561.95782326431
+        },
+        {
+          "idle_n": -49.88306325798367,
+          "maximum_dry_n": 13044.421041962729
+        },
+        {
+          "idle_n": -106.00150942321531,
+          "maximum_dry_n": 12771.623039770633
+        },
+        {
+          "idle_n": 569.2099788303083,
+          "maximum_dry_n": 14230.249470757708
+        },
+        {
+          "idle_n": 364.2943864513973,
+          "maximum_dry_n": 13592.73429446776
+        },
+        {
+          "idle_n": 210.60769216721408,
+          "maximum_dry_n": 13024.94734058453
+        },
+        {
+          "idle_n": 56.92099788303083,
+          "maximum_dry_n": 12380.317039559206
+        },
+        {
+          "idle_n": -45.536798306424664,
+          "maximum_dry_n": 11907.87275713005
+        },
+        {
+          "idle_n": -96.76569640115243,
+          "maximum_dry_n": 11658.84339139179
+        },
+        {
+          "idle_n": 540.0,
+          "maximum_dry_n": 13500.0
+        },
+        {
+          "idle_n": 345.6,
+          "maximum_dry_n": 12895.199999999999
+        },
+        {
+          "idle_n": 199.8,
+          "maximum_dry_n": 12356.55
+        },
+        {
+          "idle_n": 54.0,
+          "maximum_dry_n": 11745.0
+        },
+        {
+          "idle_n": -43.2,
+          "maximum_dry_n": 11296.8
+        },
+        {
+          "idle_n": -91.80000000000001,
+          "maximum_dry_n": 11060.550000000001
+        },
+        {
+          "idle_n": 514.8697981926198,
+          "maximum_dry_n": 12871.744954815495
+        },
+        {
+          "idle_n": 329.5166708432767,
+          "maximum_dry_n": 12295.09078083976
+        },
+        {
+          "idle_n": 190.50182533126934,
+          "maximum_dry_n": 11781.508157142622
+        },
+        {
+          "idle_n": 51.48697981926198,
+          "maximum_dry_n": 11198.418110689481
+        },
+        {
+          "idle_n": -41.18958385540959,
+          "maximum_dry_n": 10771.076178189605
+        },
+        {
+          "idle_n": -87.52786569274538,
+          "maximum_dry_n": 10545.820641480337
+        }
+      ]
+    },
+    "aero": {
+      "schema": 1,
+      "knots": [
+        {
+          "mach": 0.0,
+          "aero": {
+            "lift_zero": 0.16,
+            "lift_alpha": 4.6,
+            "lift_flaps": 0.85,
+            "stall_angle_rad": 0.29670597283903605,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.025,
+            "oswald_efficiency": 0.82,
+            "drag_flaps": 0.085,
+            "side_beta": -0.55,
+            "side_rudder": -0.085,
+            "roll_beta": -0.07,
+            "roll_rate_p": -0.46,
+            "roll_rate_r": 0.08,
+            "roll_aileron": 0.08,
+            "roll_rudder": -0.009,
+            "pitch_zero": 0.018,
+            "pitch_alpha": -0.55,
+            "pitch_rate_q": -12.0,
+            "pitch_elevator": 0.55,
+            "pitch_flaps": -0.1,
+            "yaw_beta": 0.12,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.26,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.029
+          }
+        },
+        {
+          "mach": 0.2,
+          "aero": {
+            "lift_zero": 0.1553846153846154,
+            "lift_alpha": 4.65,
+            "lift_flaps": 0.8253846153846154,
+            "stall_angle_rad": 0.2913357289867458,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.025,
+            "oswald_efficiency": 0.82,
+            "drag_flaps": 0.08961538461538462,
+            "side_beta": -0.5653846153846154,
+            "side_rudder": -0.08346153846153846,
+            "roll_beta": -0.07461538461538463,
+            "roll_rate_p": -0.4661538461538462,
+            "roll_rate_r": 0.07692307692307693,
+            "roll_aileron": 0.07753846153846154,
+            "roll_rudder": -0.008692307692307692,
+            "pitch_zero": 0.017076923076923076,
+            "pitch_alpha": -0.5807692307692308,
+            "pitch_rate_q": -12.615384615384615,
+            "pitch_elevator": 0.5392307692307693,
+            "pitch_flaps": -0.10307692307692308,
+            "yaw_beta": 0.12461538461538461,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.2661538461538462,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.028384615384615387
+          }
+        },
+        {
+          "mach": 0.35,
+          "aero": {
+            "lift_zero": 0.15192307692307694,
+            "lift_alpha": 4.75,
+            "lift_flaps": 0.8069230769230769,
+            "stall_angle_rad": 0.2873080460975281,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.0255,
+            "oswald_efficiency": 0.81,
+            "drag_flaps": 0.09307692307692308,
+            "side_beta": -0.576923076923077,
+            "side_rudder": -0.08230769230769232,
+            "roll_beta": -0.07807692307692309,
+            "roll_rate_p": -0.4707692307692308,
+            "roll_rate_r": 0.07461538461538461,
+            "roll_aileron": 0.0756923076923077,
+            "roll_rudder": -0.008461538461538461,
+            "pitch_zero": 0.016384615384615383,
+            "pitch_alpha": -0.6038461538461539,
+            "pitch_rate_q": -13.076923076923077,
+            "pitch_elevator": 0.5311538461538462,
+            "pitch_flaps": -0.1053846153846154,
+            "yaw_beta": 0.12807692307692306,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.27076923076923076,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.027923076923076925
+          }
+        },
+        {
+          "mach": 0.5,
+          "aero": {
+            "lift_zero": 0.14846153846153848,
+            "lift_alpha": 4.95,
+            "lift_flaps": 0.7884615384615384,
+            "stall_angle_rad": 0.2832803632083104,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.0265,
+            "oswald_efficiency": 0.8,
+            "drag_flaps": 0.09653846153846155,
+            "side_beta": -0.5884615384615385,
+            "side_rudder": -0.08115384615384616,
+            "roll_beta": -0.08153846153846155,
+            "roll_rate_p": -0.4753846153846154,
+            "roll_rate_r": 0.07230769230769231,
+            "roll_aileron": 0.07384615384615385,
+            "roll_rudder": -0.00823076923076923,
+            "pitch_zero": 0.015692307692307693,
+            "pitch_alpha": -0.6269230769230769,
+            "pitch_rate_q": -13.538461538461538,
+            "pitch_elevator": 0.5230769230769231,
+            "pitch_flaps": -0.1076923076923077,
+            "yaw_beta": 0.13153846153846152,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.2753846153846154,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.027461538461538464
+          }
+        },
+        {
+          "mach": 0.6,
+          "aero": {
+            "lift_zero": 0.14615384615384616,
+            "lift_alpha": 5.1,
+            "lift_flaps": 0.7761538461538462,
+            "stall_angle_rad": 0.2805952412821653,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.029,
+            "oswald_efficiency": 0.78,
+            "drag_flaps": 0.09884615384615385,
+            "side_beta": -0.5961538461538463,
+            "side_rudder": -0.08038461538461539,
+            "roll_beta": -0.08384615384615385,
+            "roll_rate_p": -0.4784615384615385,
+            "roll_rate_r": 0.07076923076923078,
+            "roll_aileron": 0.07261538461538462,
+            "roll_rudder": -0.008076923076923077,
+            "pitch_zero": 0.01523076923076923,
+            "pitch_alpha": -0.6423076923076924,
+            "pitch_rate_q": -13.846153846153847,
+            "pitch_elevator": 0.5176923076923078,
+            "pitch_flaps": -0.10923076923076924,
+            "yaw_beta": 0.13384615384615384,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.2784615384615385,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.027153846153846157
+          }
+        },
+        {
+          "mach": 0.65,
+          "aero": {
+            "lift_zero": 0.14500000000000002,
+            "lift_alpha": 5.2,
+            "lift_flaps": 0.77,
+            "stall_angle_rad": 0.2792526803190927,
+            "stall_blend_rate": 45.0,
+            "drag_min": 0.033,
+            "oswald_efficiency": 0.76,
+            "drag_flaps": 0.1,
+            "side_beta": -0.6000000000000001,
+            "side_rudder": -0.08,
+            "roll_beta": -0.085,
+            "roll_rate_p": -0.48000000000000004,
+            "roll_rate_r": 0.07,
+            "roll_aileron": 0.07200000000000001,
+            "roll_rudder": -0.008,
+            "pitch_zero": 0.015,
+            "pitch_alpha": -0.65,
+            "pitch_rate_q": -14.0,
+            "pitch_elevator": 0.515,
+            "pitch_flaps": -0.11,
+            "yaw_beta": 0.135,
+            "yaw_rate_p": -0.025,
+            "yaw_rate_r": -0.28,
+            "yaw_aileron": -0.004,
+            "yaw_rudder": 0.027000000000000003
+          }
+        }
+      ]
+    },
+    "envelope": {
+      "pressure_ratio": [
+        0.45,
+        1.08
+      ],
+      "temperature_ratio": [
+        0.75,
+        1.1
+      ],
+      "mach": [
+        0.0,
+        0.65
+      ]
+    }
+  },
+  "model": {
+    "path": "aircraft/peregrine-not-provided.glb",
+    "forward": "+z",
+    "up": "+y",
+    "length_m": 9.1
+  },
+  "controls": {
+    "surface_rate": 1.2,
+    "elevator_rate": 0.15,
+    "elevator_centering_rate": 5.0,
+    "centering_rate": 1.8,
+    "throttle_rate": 0.2,
+    "flap_rate": 0.2,
+    "default_trim": 0.05,
+    "trim_rate": 0.08,
+    "approach_speed_mps": 60.0,
+    "approach_throttle": 0.3,
+    "approach_flaps": 0.5,
+    "approach_pitch_rad": 0.0,
+    "approach_trim": 0.08
+  },
+  "camera_eye_m": [
+    0.75,
+    0.0,
+    -0.85
+  ],
+  "engine_sound": "turbine"
+}

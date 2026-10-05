@@ -786,8 +786,8 @@ class CandidateAcceptanceTests(unittest.TestCase):
             ("crates/flightsim-ui/src/world_map_layout.rs",
              b'let delta = if delta.is_finite() { delta } else { 0.0 };', b'let delta = delta;'),
             ("crates/flightsim-ui/src/world_map_layout.rs",
-             b'state.visible.then_some(if state.wind_editor.is_some() {',
-             b'true.then_some(if state.wind_editor.is_some() {'),
+             b'state.visible.then_some(if state.weather_editor.is_some() {',
+             b'true.then_some(if state.weather_editor.is_some() {'),
             ("crates/flightsim-ui/src/world_map_layout.rs",
              b'active != Some(*surface) && *surface != ScrollSurface::Map',
              b'active != Some(*surface)'),
@@ -844,6 +844,127 @@ class CandidateAcceptanceTests(unittest.TestCase):
                     del changed["reviewed_replay_source_evidence"][relative]
                 elif mutation == "changed canonical digest":
                     changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
+    def test_authored_weather_rejects_exact_draft_atomicity_and_departure_drift(self):
+        repo, _ = self.source_fixture()
+        mutations = (
+            ("crates/flightsim-ui/src/weather_settings.rs",
+             b'visibility_dirty: false,', b'visibility_dirty: true,'),
+            ("crates/flightsim-ui/src/weather_settings.rs",
+             b'base_dirty: false,', b'base_dirty: true,'),
+            ("crates/flightsim-ui/src/weather_settings.rs",
+             b'value.is_finite() && (minimum..=maximum).contains(value)', b'true'),
+            ("crates/flightsim-ui/src/weather_settings.rs",
+             b'if !self.weather_settings.enabled || !self.new_flight_modal_ready() {',
+             b'if !self.new_flight_modal_ready() {'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'self.background_visibility.is_some() || self.cloud_base.is_some()',
+             b'self.background_visibility.is_some() && self.cloud_base.is_some()'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'!(10.0..=200_000.0).contains(&value.get())', b'false'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'!(0.0..=31_000.0 - thickness).contains(&value.get())', b'false'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'layer.base = reference.altitude + value;', b'layer.base = value;'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'layer.top = layer.base + (original.top - original.base);',
+             b'layer.top = layer.base + Meters(1000.0);'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'&& left.seed == right.seed', b'&& true'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'&& cloud(left) == cloud(right)', b'&& true'),
+            ("crates/flightsim-app/src/weather_draft.rs",
+             b'&& optional_bits(self.cloud_base) == optional_bits(other.cloud_base)',
+             b'&& self.cloud_base == other.cloud_base'),
+            ("crates/flightsim-app/src/weather_runtime.rs",
+             b'draft.preset() == preset && draft.template().seed == seed',
+             b'draft.preset() == preset'),
+            ("crates/flightsim-app/src/weather_runtime.rs",
+             b'revision: pending.map_or(0, |p| p.revision),', b'revision: 0,'),
+            ("crates/flightsim-app/src/weather_runtime.rs",
+             b'let selectable = !replay && !lan && !startup.clouds_were_given;',
+             b'let selectable = true;'),
+            ("crates/flightsim-app/src/weather_runtime.rs",
+             b'if selectable\n            && map.new_flight_modal_ready()',
+             b'if selectable\n            && true'),
+            ("crates/flightsim-app/src/weather_runtime.rs",
+             b'if let Some(edit) = actions.weather.take() {\n        actions.invalidate_start();\n        pending.revision = pending.revision.wrapping_add(1);',
+             b'if let Some(edit) = actions.weather.take() {\n        actions.invalidate_start();'),
+            ("crates/flightsim-app/src/aircraft_picker_runtime.rs",
+             b'&& weather_runtime::snapshot(world, current) == self.weather', b'&& true'),
+            ("crates/flightsim-app/src/world_runtime.rs",
+             b'super::weather_runtime::snapshot(world, startup).apply(&mut startup.weather);',
+             b'let _ = super::weather_runtime::snapshot(world, startup);'),
+            ("crates/flightsim-app/src/world_runtime.rs",
+             b'super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain)?;',
+             b'let _ = super::weather_runtime::resolve_with_terrain(&mut startup, &mut terrain);'),
+            ("crates/flightsim-ui/src/world_map.rs",
+             b'if keys.just_pressed(KeyCode::Escape) || cancel_weather || close_map {',
+             b'if keys.just_pressed(KeyCode::Escape) || close_map {'),
+            ("crates/flightsim-ui/src/world_map.rs",
+             b'let mut weather_owned_frame = began_with_weather_editor;',
+             b'let mut weather_owned_frame = false;'),
+            ("crates/flightsim-ui/src/weather_settings.rs",
+             b'super::ScrollSurface::Weather, ScrollPosition::default()',
+             b'super::ScrollSurface::Map, ScrollPosition::default()'),
+            ("crates/flightsim-app/src/weather_editor_tests.rs",
+             b'assert_eq!(actual.draft, chosen.draft);', b'assert_eq!(actual.draft, actual.draft);'),
+            ("crates/flightsim-ui/src/weather_settings_tests.rs",
+             b'assert!(actions.generation > previous);', b'assert!(actions.generation >= previous);'),
+            ("crates/flightsim-app/src/custom_weather_replay_tests.rs",
+             b'assert_eq!(scalars(actual), scalars(expected));', b'assert_eq!(actual, expected);'),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            self.assertIn("checkout_sha256=" + candidate.digest(path), str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_authored_weather_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        for relative in sorted(candidate.AUTHORED_WEATHER_PATHS):
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "changed checkout digests", "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                elif mutation == "changed checkout digests":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                    changed["reviewed_replay_source_evidence"][relative]["checkout_sha256"] = "0" * 64
+                    for record in changed["files"]:
+                        if record["path"] == relative:
+                            record["checkout_sha256"] = "0" * 64
                 else:
                     del changed["replay_contract"]["source_sha256"][relative]
                     changed["replay_contract_text"] = json.dumps(changed["replay_contract"])

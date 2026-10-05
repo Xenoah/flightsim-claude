@@ -499,6 +499,15 @@ laws, seeds, v3/v4 bytes and restart/replay conditions stay unchanged; see
 [ADR-0017](docs/adr/0017-explicit-new-flight-forces.md) and
 [controls and limits](docs/new-flight-wind.md).
 
+Authored visibility and cloud base have a separate optional map child editor.
+An app-owned exact canonical template plus explicitly edited SI values is resolved
+once against the prepared departure source, then committed only by the existing
+complete-aircraft transaction. Full bitwise draft/revision and Start-generation
+checks reject stale Custom choices. Replay v3/v4/v5/v6 retain their existing
+resolved weather blocks; codecs, forces and render budgets are unchanged. See
+[ADR-0025](docs/adr/0025-authored-visibility-cloud-base.md). Native acceptance and
+release remain separate gates.
+
 CI の Windows / Linux で純 Rust 群と描画群の指定テストを実行する。対象は
 `.github/workflows/ci.yml` の `HEADLESS` / `RENDER` を確認する。さらに
 `clippy -D warnings`、`fmt --check`、依存規約検査、

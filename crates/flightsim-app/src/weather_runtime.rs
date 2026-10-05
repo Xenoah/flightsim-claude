@@ -3,6 +3,10 @@
 
 use bevy::prelude::*;
 use flightsim_core::Geodetic;
+
+#[path = "weather_draft.rs"]
+mod draft;
+pub(super) use draft::AuthoredDraft;
 use flightsim_render::RenderWeather;
 use flightsim_sim::{
     GroundSampler,
@@ -15,6 +19,7 @@ use crate::{FlightSimulation, ReplayPlayback, Startup, world_runtime};
 #[derive(Debug, Clone, Default)]
 pub(super) struct Options {
     pub requested: Option<WeatherPreset>,
+    pub draft: Option<AuthoredDraft>,
     pub seed: u64,
     pub was_given: bool,
     pub seed_was_given: bool,
@@ -79,9 +84,18 @@ pub(super) fn resolve_at(
     options
         .requested
         .map_or(Ok(WeatherSelection::Legacy), |preset| {
-            WeatherScenario::from_preset(preset, reference, options.seed)
-                .map(WeatherSelection::Modeled)
-                .map_err(|error| format!("cannot resolve authored weather: {error}"))
+            if preset == WeatherPreset::Custom {
+                options
+                    .draft
+                    .ok_or_else(|| "Custom weather requires an authored draft".to_owned())?
+                    .resolve(reference)
+                    .map(WeatherSelection::Modeled)
+            } else {
+                WeatherScenario::from_preset(preset, reference, options.seed)
+                    .map(WeatherSelection::Modeled)
+                    .map_err(|error| error.to_string())
+            }
+            .map_err(|error| format!("cannot resolve authored weather: {error}"))
         })
 }
 
@@ -131,8 +145,73 @@ pub(super) const fn preset_label(preset: WeatherPreset) -> &'static str {
 #[derive(Resource, Debug, Default)]
 pub(super) struct PendingWeather {
     pub requested: Option<WeatherPreset>,
+    pub draft: Option<AuthoredDraft>,
+    pub revision: u64,
+    error: String,
     was_visible: bool,
     was_plain: bool,
+}
+
+/// Complete exact template and app revision, additionally guarded by the map's
+/// existing Start generation for uncommitted edits and child-modal ownership.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct WeatherSnapshot {
+    requested: Option<WeatherPreset>,
+    seed: u64,
+    draft: Option<AuthoredDraft>,
+    revision: u64,
+}
+
+impl WeatherSnapshot {
+    pub fn apply(self, options: &mut Options) {
+        options.requested = self.requested;
+        options.seed = self.seed;
+        options.draft = self.draft;
+    }
+}
+
+fn authored_draft(
+    requested: Option<WeatherPreset>,
+    seed: u64,
+    retained: Option<AuthoredDraft>,
+) -> Option<AuthoredDraft> {
+    requested.and_then(|preset| {
+        if preset == WeatherPreset::Custom {
+            retained
+        } else if let Some(draft) =
+            retained.filter(|draft| draft.preset() == preset && draft.template().seed == seed)
+        {
+            // Reuse exact validated values until an actual preset/seed change.
+            Some(draft)
+        } else {
+            AuthoredDraft::from_preset(preset, seed).ok()
+        }
+    })
+}
+
+pub(super) fn snapshot(world: &World, startup: &Startup) -> WeatherSnapshot {
+    let pending = (!startup.clouds_were_given
+        && startup.traffic.host.is_none()
+        && startup.traffic.join.is_none()
+        && startup.replay.is_none()
+        && !world.contains_resource::<ReplayPlayback>()
+        && !world
+            .get_resource::<FlightSimulation>()
+            .is_some_and(|s| s.0.is_replay()))
+    .then(|| world.get_resource::<PendingWeather>())
+    .flatten();
+    let requested = pending.map_or(startup.weather.requested, |p| p.requested);
+    let draft = authored_draft(
+        requested,
+        startup.weather.seed,
+        pending.map_or(startup.weather.draft, |p| p.draft),
+    );
+    WeatherSnapshot {
+        requested,
+        seed: draft.map_or(startup.weather.seed, |draft| draft.template().seed),
+        draft,
+        revision: pending.map_or(0, |p| p.revision),
+    }
 }
 
 fn next_preset(current: Option<WeatherPreset>) -> Option<WeatherPreset> {
@@ -185,6 +264,14 @@ fn select_pending_weather(
 ) {
     if !map.visible || !pending.was_visible {
         pending.requested = startup.weather.requested;
+        let retained = if startup.weather.requested == Some(WeatherPreset::Custom) {
+            startup.weather.draft
+        } else {
+            startup.weather.draft.or(pending.draft)
+        };
+        pending.draft = authored_draft(startup.weather.requested, startup.weather.seed, retained);
+        pending.error.clear();
+        pending.revision = pending.revision.wrapping_add(1);
     }
     pending.was_visible = map.visible;
     let was_plain = pending.was_plain;
@@ -203,11 +290,53 @@ fn select_pending_weather(
     {
         if keys.just_pressed(KeyCode::F12) && actions.new_flight_shortcuts_available {
             pending.requested = next_preset(pending.requested);
+            pending.draft = authored_draft(pending.requested, startup.weather.seed, None);
+            pending.error.clear();
+            pending.revision = pending.revision.wrapping_add(1);
             actions.invalidate_start();
         }
         // A map-owned F12 must never also leave a LAN session or leak on Close.
         keys.clear_just_pressed(KeyCode::F12);
     }
+    if let Some(edit) = actions.weather.take() {
+        actions.invalidate_start();
+        pending.revision = pending.revision.wrapping_add(1);
+        if selectable
+            && map.new_flight_modal_ready()
+            && let Some(draft) =
+                authored_draft(pending.requested, startup.weather.seed, pending.draft)
+        {
+            match draft.edited(edit) {
+                Ok(draft) => {
+                    pending.requested = Some(draft.preset());
+                    pending.draft = Some(draft);
+                    pending.error.clear();
+                }
+                Err(error) => pending.error = error,
+            }
+        }
+    }
+    let draft = authored_draft(pending.requested, startup.weather.seed, pending.draft);
+    let (background_visibility, cloud_base, retained) = draft.map_or_else(
+        || (String::new(), None, "Select an authored preset with F12 first.".into()),
+        |draft| {
+            let parameters = draft.template();
+            let thickness = parameters.cloud.map_or_else(|| "No cloud layer".into(), |cloud| format!("Cloud thickness retained: {} m", (cloud.top - cloud.base).get()));
+            (format!("{:.3}", draft.background_visibility().get()),
+             draft.cloud_base().map(|base| format!("{:.3}", base.get())),
+             format!("{thickness}\nPrecipitation retained: {:?}\nWind / turbulence: use their separate editor", parameters.precipitation_kind))
+        },
+    );
+    map.weather_settings = flightsim_ui::world_map::WeatherSettingsView {
+        background_visibility,
+        cloud_base,
+        retained,
+        cloud_base_max: draft
+            .and_then(|draft| draft.template().cloud)
+            .map(|cloud| flightsim_core::Meters(31_000.0 - (cloud.top - cloud.base).get())),
+        enabled: selectable && draft.is_some(),
+        error: pending.error.clone(),
+    };
     map.weather_note = if replay {
         let label = simulation
             .as_ref()
@@ -951,3 +1080,7 @@ mod tests {
         assert_eq!(app.world().resource::<Observed>().0.elapsed, before.elapsed);
     }
 }
+
+#[cfg(test)]
+#[path = "weather_editor_tests.rs"]
+mod editor_tests;

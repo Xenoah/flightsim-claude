@@ -206,6 +206,26 @@ NEAR_STATIC_APP_PATHS = {
     "crates/flightsim-sim/src/near_static_turboprop_simulation/presentation.rs",
 }
 REPLAY_CONTRACT_PATHS |= NEAR_STATIC_APP_PATHS
+# Reviewed authored visibility/cloud-base drafts join the same transactional
+# Swift launch boundary. Bind complete UI/app implementations and the actual
+# all-family recording witnesses; this does not widen aircraft/release gates.
+AUTHORED_WEATHER_PATHS = {
+    "crates/flightsim-app/src/aircraft_picker_runtime.rs",
+    "crates/flightsim-app/src/aircraft_picker_tests.rs",
+    "crates/flightsim-app/src/main.rs",
+    "crates/flightsim-app/src/weather_draft.rs",
+    "crates/flightsim-app/src/weather_runtime.rs",
+    "crates/flightsim-app/src/weather_editor_tests.rs",
+    "crates/flightsim-app/src/custom_weather_replay_tests.rs",
+    "crates/flightsim-app/src/world_runtime.rs",
+    "crates/flightsim-ui/src/lib.rs",
+    "crates/flightsim-ui/src/weather_settings.rs",
+    "crates/flightsim-ui/src/weather_settings_tests.rs",
+    "crates/flightsim-ui/src/world_map.rs",
+    "crates/flightsim-ui/src/world_map_layout.rs",
+    "crates/flightsim-ui/src/world_map_layout_tests.rs",
+}
+REPLAY_CONTRACT_PATHS |= AUTHORED_WEATHER_PATHS
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {

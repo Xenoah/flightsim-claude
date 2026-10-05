@@ -639,13 +639,7 @@ pub(super) fn apply_pending_weather(world: &World, startup: &mut Startup) {
     // Snapshot forces before airborne_state constructs a wind-aware initial
     // velocity. Only the final prepared transaction can publish these values.
     super::conditions_runtime::snapshot(world, startup).apply(startup);
-    if !startup.clouds_were_given
-        && startup.traffic.host.is_none()
-        && startup.traffic.join.is_none()
-        && let Some(pending) = world.get_resource::<super::weather_runtime::PendingWeather>()
-    {
-        startup.weather.requested = pending.requested;
-    }
+    super::weather_runtime::snapshot(world, startup).apply(&mut startup.weather);
 }
 
 /// Fully validated physical state; no active ECS resource has been changed.

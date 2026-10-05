@@ -27,6 +27,14 @@ fn full_state() -> WorldMapState {
         error: "Wind speed: enter 0 to 300 knots".into(),
         enabled: true,
     };
+    state.weather_settings = WeatherSettingsView {
+        background_visibility: "200000.000".into(),
+        cloud_base: Some("29500.000".into()),
+        cloud_base_max: Some(Meters(29_500.0)),
+        retained: "Retained layer thickness: 1500.000 m\nRetained precipitation: Rain 5.000 mm/h\nWind / turbulence unchanged".into(),
+        enabled: true,
+        error: "Cloud base: enter 0 to 30000 m above departure ground reference".into(),
+    };
     state.regions.set_installed((0..8).map(|n| RegionSummary {
         key: format!("region-{n}@1.0.0"),
         name: "W".repeat(80),
@@ -253,6 +261,7 @@ fn measured_map_and_child_panels_keep_every_control_and_notice_reachable() {
             ScrollSurface::Credits,
             ScrollSurface::Regions,
             ScrollSurface::Wind,
+            ScrollSurface::Weather,
         ] {
             let mut state = full_state();
             match target {
@@ -266,6 +275,7 @@ fn measured_map_and_child_panels_keep_every_control_and_notice_reachable() {
                     state.show_regions();
                 }
                 ScrollSurface::Wind => assert!(state.show_wind_settings()),
+                ScrollSurface::Weather => assert!(state.show_weather_settings()),
             }
             let mut app = real_layout_app_at_size(state, size);
             if target == ScrollSurface::Regions {
@@ -717,5 +727,42 @@ fn nonfinite_and_overflowing_wheel_batches_leave_finite_scroll_unchanged() {
         let position = app.world().get::<ScrollPosition>(map).unwrap().y;
         assert!(position.is_finite());
         assert_eq!(position, before);
+    }
+}
+
+#[test]
+fn weather_child_real_pointer_scroll_cancel_and_reopen_keep_map_ownership() {
+    for size in [UVec2::new(640, 480), UVec2::new(1024, 720), UVec2::new(1280, 720)] {
+        let (mut app, window) = interactive_app(size);
+        let point = reveal_button(&mut app, WorldMapButton::OpenWeatherSettings, ScrollSurface::Map);
+        app.world_mut().write_message(MouseWheel {
+            unit: MouseScrollUnit::Line, x: 0.0, y: -10000.0, window,
+        });
+        pointer_press(&mut app, window, point);
+        let weather = surface_entity(app.world_mut(), ScrollSurface::Weather);
+        assert_eq!(app.world().get::<ScrollPosition>(weather).unwrap().y, 0.0);
+        assert!(app.world().resource::<WorldMapState>().weather_editor.is_some());
+        let map = surface_entity(app.world_mut(), ScrollSurface::Map);
+        let map_position = app.world().get::<ScrollPosition>(map).unwrap().y;
+        let generation = app.world().resource::<WorldMapActions>().generation;
+        wheel(&mut app, -10000.0, MouseScrollUnit::Line);
+        assert!(app.world().resource::<WorldMapActions>().generation > generation);
+        assert_eq!(app.world().get::<ScrollPosition>(map).unwrap().y, map_position);
+        assert_reachable_content(&mut app, size, ScrollSurface::Weather);
+        let point = reveal_button(&mut app, WorldMapButton::Weather(WeatherSettingsButton::Cancel), ScrollSurface::Weather);
+        app.world_mut().write_message(MouseWheel {
+            unit: MouseScrollUnit::Line, x: 0.0, y: -10000.0, window,
+        });
+        pointer_press(&mut app, window, point);
+        assert_eq!(app.world().get::<ScrollPosition>(map).unwrap().y, map_position);
+        assert!(app.world().resource::<WorldMapState>().weather_editor.is_none());
+        assert!(app.world().resource::<WorldMapActions>().weather.is_none());
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
+        click_reachable(&mut app, window, WorldMapButton::OpenWeatherSettings, ScrollSurface::Map);
+        assert_eq!(app.world().get::<ScrollPosition>(weather).unwrap().y, 0.0);
+        click_reachable(&mut app, window, WorldMapButton::Weather(WeatherSettingsButton::Apply), ScrollSurface::Weather);
+        assert_eq!(app.world().resource::<WorldMapActions>().weather, Some(WorldMapWeatherEdit::default()));
+        assert!(app.world().resource::<WorldMapState>().weather_editor.is_none());
+        assert!(app.world().resource::<WorldMapActions>().start_at.is_none());
     }
 }
