@@ -103,8 +103,13 @@ The source contract now binds 127 complete source/witness files plus 102 frozen
 independent anchors. Nine reviewed hashes changed and five weather files were
 added; the other 113 pins remain exact. All existing validator bodies and
 acceptance commands remain intact. The one obsolete hidden-modal mutation
-target was updated to the new weather-first dispatch. All 237 Python tests
-passed, including new semantic-drift and omitted/rehashed-evidence rejection.
+target was updated to the new weather-first dispatch. The initial 237 Python tests
+passed locally, including new semantic-drift and omitted/rehashed-evidence
+rejection. CI then exposed detached Git maintenance racing cleanup of a disposable
+test repository. Automatic maintenance and gc are now disabled only in that
+fixture before its first commit; cleanup errors are not suppressed. All 238 tests
+passed after the fix. Forty stressed repetitions observed 1,000 commits without
+a maintenance child or cleanup error. Existing acceptance assertions are unchanged.
 
 Final remote CI is tracked against the published commit. The preceding
 `23a0a23` Windows candidate compiled, then failed its ordinary 180-second Swift

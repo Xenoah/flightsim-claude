@@ -172,6 +172,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
         repo = self.root / "source"
         repo.mkdir()
         subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        # Detached maintenance can outlive a fixture commit and race temp cleanup.
+        # These short-lived repos need no maintenance; leave caller settings alone.
+        for key, value in (("gc.auto", "0"), ("maintenance.auto", "false")):
+            subprocess.run(["git", "config", "--local", key, value], cwd=repo, check=True)
         # Use the actual attributes: Rust is text=auto, profiles explicitly LF,
         # and verbatim license text explicitly bypasses all EOL conversion.
         for relative in (*candidate.REPLAY_CONTRACT_PATHS, *candidate.INDEPENDENT_REPLAY_HASHES,
@@ -203,6 +207,20 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 (repo / path).write_bytes(b"force fixture recheckout")
         subprocess.run(["git", "-c", "core.autocrlf=false", "-c", "core.eol=" + eol,
                         "checkout-index", "--force", "--all", "--index"], cwd=repo, check=True)
+
+    def test_source_fixture_commits_do_not_launch_auto_maintenance(self):
+        # Prevent the cleanup race seen in CI job 111575494921 at .git/objects.
+        trace = self.root / "git-trace.jsonl"
+        with patch.dict("os.environ", {"GIT_TRACE2_EVENT": str(trace)}):
+            repo, notice = self.source_fixture()
+            notice.write_bytes(notice.read_bytes() + b"Another fixture commit.\r\n")
+            self.commit_source_fixture(repo)
+        events = [json.loads(line) for line in trace.read_text().splitlines()]
+        auto_maintenance = [event["argv"] for event in events
+                            if event.get("event") == "child_start"
+                            and "--auto" in event.get("argv", [])
+                            and any(command in event["argv"] for command in ("maintenance", "gc"))]
+        self.assertEqual(auto_maintenance, [])
 
     def test_windows_native_checkout_failure_then_explicit_lf_preserves_raw_notices(self):
         repo, notice = self.source_fixture()
