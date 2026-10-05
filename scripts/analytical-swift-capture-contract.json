@@ -9,7 +9,7 @@
   "source_sha256": {
     ".github/workflows/analytical-swift-msvc-build.yml": "22f1936fa585d9c27d6144f5eb64ba583f21a79192cd50fefb1abf2b81b5d7eb",
     "docs/release/analytical-swift-msvc-capture.md": "c03bead0bcadf3ec6ebaef1b299980868d4d25cc48f8c3378dc8f1d5654a357f",
-    "scripts/capture-analytical-swift-msvc.py": "2a623605bbba9d164da7353d5d7b95348b22d9c660d517b8bc8e7f9a77995d18",
-    "scripts/tests/test_analytical_swift_capture.py": "0e9c378ff80fed629c3c87e3bb11c13daf198cfde3de3c18ee4abc4e8a9adffd"
+    "scripts/capture-analytical-swift-msvc.py": "cb9ba28f7196bf96bc64c5b2fc71271a0f24b271aaebc51389809227052b0f93",
+    "scripts/tests/test_analytical_swift_capture.py": "e912b8023ad85a73d385ce23bcc6f81dc3af886ab6465f494c7c9d2709616113"
   }
 }

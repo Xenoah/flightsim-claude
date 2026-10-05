@@ -52,7 +52,9 @@ MIN_COMMAND_FREE = 2 * 1024 ** 3
 
 
 def write_json(path, value):
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    # Canonical JSON is ASCII with LF on every host. Text-mode writes translate
+    # LF to CRLF on Windows, including the report the upload validator rejects.
+    path.write_bytes((json.dumps(value, indent=2, sort_keys=True) + '\n').encode('ascii'))
 
 
 def no_links(path):

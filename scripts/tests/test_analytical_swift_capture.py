@@ -199,6 +199,35 @@ class BoundaryTests(unittest.TestCase):
 
 
 class ExportTests(unittest.TestCase):
+    def test_json_writer_emits_ascii_lf_even_with_windows_text_translation(self):
+        # Reproduce run 37299384923 on every host using real text I/O newline
+        # conversion, without pretending that a native Windows build succeeded.
+        class CRLFTextPath(type(Path())):
+            def write_text(self, data, encoding=None, errors=None, newline=None):
+                return super().write_text(data, encoding=encoding, errors=errors,
+                                          newline='\r\n' if newline is None else newline)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            control = CRLFTextPath(root / 'text-control')
+            control.write_text('control\n', encoding='ascii')
+            self.assertEqual(control.read_bytes(), b'control\r\n')
+            path = CRLFTextPath(root / 'record.json')
+            capture.write_json(path, {'z': 1, 'a': '\u00e9\n'})
+            self.assertEqual(path.read_bytes(), b'{\n  "a": "\\u00e9\\n",\n  "z": 1\n}\n')
+
+    def test_crlf_export_is_rejected_without_normalizing_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); path = root / capture.EXPORT_NAME
+            capture.write_json(path, summary_fixture())
+            canonical = path.read_bytes()
+            self.assertNotIn(b'\r', canonical)
+            capture.validate_export(root)
+            crlf = canonical.replace(b'\n', b'\r\n')
+            path.write_bytes(crlf)
+            with self.assertRaisesRegex(ValueError, 'noncanonical export bytes'):
+                capture.validate_export(root)
+            self.assertEqual(path.read_bytes(), crlf)
+
     def test_schema_only_fixtures_keep_every_gate_and_false_qualification(self):
         for passed in (False, True):
             capture.validate_summary(summary_fixture(passed))
