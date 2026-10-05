@@ -1,0 +1,6 @@
+# These package inputs are byte-pinned by the manifest and source contract.
+# Keep the published LF bytes when core.autocrlf is enabled at checkout.
+LICENSE-MIT.txt text eol=lf
+LICENSE-APACHE.txt text eol=lf
+PROVENANCE.md text eol=lf
+manifest.json text eol=lf
