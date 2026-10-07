@@ -1,0 +1,7 @@
+# These sidecars have exact byte identities in SHA256SUMS and the package ZIP.
+# Preserve the published LF bytes even when core.autocrlf is enabled.
+manifest.json text eol=lf
+reconstruction-provenance.md text eol=lf
+verification.json text eol=lf
+SHA256SUMS text eol=lf
+Balzers_Terrain_Package_v1.zip binary

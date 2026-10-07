@@ -1,0 +1,1253 @@
+{
+  "schema_version": 1,
+  "id": "balzers-glo90-rebuilt",
+  "version": "1.0.0",
+  "title": "Balzers vicinity GLO-90 terrain (rebuilt)",
+  "content_kinds": [
+    "terrain_dem"
+  ],
+  "terrain": {
+    "bounds_degrees": {
+      "west": 9.31640625,
+      "south": 46.93359375,
+      "east": 9.66796875,
+      "north": 47.109375
+    },
+    "nominal_resolution_m": 90.0,
+    "datum": "EPSG:4979"
+  },
+  "sources": [
+    {
+      "id": "regional-dem",
+      "url": "https://copernicus-dem-90m.s3.amazonaws.com/readme.html",
+      "revision": "Regional fixture revision2; converter151905b4b82e1beb131fc2ac069eaace0b840817",
+      "provenance": "Copernicus N46E009/N47E009 EGM2008 orthometric DSM normalized h=H+N using matching NOAA ETOPO2022 EGM2008 geoid sampled at10arcminutes, then resampled into complete L10-L13 tile families. Exact raw URLs/SHA256, conversion and limitations are preserved in docs/source-provenance.md. No survey-level vertical accuracy or increased source resolution is claimed.",
+      "credits": "Produced using Copernicus WorldDEM-90 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the EU and ESA; all rights reserved. NOAA ETOPO2022 EGM2008 geoid correction. See docs/notice.txt and full licence text; no endorsement implied.",
+      "license": {
+        "name": "Copernicus GLO-90 free general-public licence; NOAA public-domain geoid",
+        "url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "text_path": "docs/copernicus-license-bundle.txt"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/balzers-reconstruction.md",
+      "kind": "documentation",
+      "size_bytes": 2891,
+      "sha256": "f9b5c6bd3f81ef8bf486aa92ea92860ba721b383b8e4a156ce826523aad74365",
+      "source": "regional-dem"
+    },
+    {
+      "path": "docs/copernicus-license-bundle.txt",
+      "kind": "documentation",
+      "size_bytes": 85124,
+      "sha256": "2fb23c33ab080faa0dc21c575c327005626b6a07af1d597994fb566129d6ab26",
+      "source": "regional-dem"
+    },
+    {
+      "path": "docs/notice.txt",
+      "kind": "documentation",
+      "size_bytes": 1490,
+      "sha256": "3c6ea356f260ba6243f275a2064d1f12132951eb64e1b0a8f080b412cfeb82a1",
+      "source": "regional-dem"
+    },
+    {
+      "path": "docs/source-provenance.md",
+      "kind": "documentation",
+      "size_bytes": 11167,
+      "sha256": "67ee3f27c2c5caa18a3b09f8f5d41c20089a60344104addba95ec7bd739cd19c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/10/1077/244.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "753b9c60ac2ec7be6675d440d2eb95bc37acca6396173f07786309ce7e147605",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/10/1078/244.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b07b5be85cf1e810d424869e7e13de258c6f69bd53ba92888e1c489babd909d6",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2154/488.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "2cb8f29ca5d8ae31dea56b31a61ec2f9491f1bc9a668eff72407a201ab26b347",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2154/489.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c9d89a4adb8e0a3bfcccdf1129c66c4b701381a58c1df9c6555c806b62193ac3",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2155/488.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "84886a4b51c373a2fc288c62a2b03269f828b7a4e011181dc9e2bfb5016c3fd3",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2155/489.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5fc6e27bf2987cd78cb9c71bcd30a1c193c7b4f1059717b3b6fa679d97233931",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2156/488.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a62971705d8c2a4a3f494b4b53e5f2ce4a2963eae42271da8496cf9be4bd933e",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2156/489.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ac64acc8d2c5eac2e7d7a87338cb926a96a29fa7e2384b6f4a491679f4acc235",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2157/488.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "426ba9db6360107ff8406e8697061c5b8e9313022e1b7a3bec19dbc4f80fdd0b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/11/2157/489.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5dbfcac9f03ab34a86eb31451ba76cb1d6e70c7b1624cb30d52b963bc777144a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4308/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "13b4394f15c96480737e362d004e23082de74855ed1994fafd690c3caf8fb5bc",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4308/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "acbdedd13aa11b04bdcf2ace3aa23b0d6ffc442f0663cf0fa736f6b1ce145fa0",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4308/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8f6efaf779e175f13d606e8f5c28c9c91a205768c10fd82d502e666e2a2f57d7",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4308/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "18253ecc100d9014587dd7e6faf62b3c727703512700144f5cb7ce6088c69f1a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4309/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6fa79339081675daab441a4e3ce8ad019c938f89524b88b9ee0ad43ccd1d8c97",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4309/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3a116529b87a015223b2ffc0bd09fac185273eea4770fbc2cc843d4196106845",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4309/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "30993d857b5ca116c7092146ae67df3bf2f89cf4f700e14105b8d5d994fd5d67",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4309/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "508d2abe05548585443f9c44de4413febf78d8543c7030a694b80d5d00305619",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4310/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "bac335b8673c4c3498dc144700a881d03f781ae761416b94cbe3ed6c58f5d496",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4310/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "92d708061b91600d0d717d5309d64a04460d33e2811ab9bf71b7de2f4a4cc3e9",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4310/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5b222bad1785ae067556e85e601b37660c864c1c297070e14a65ce0302ef976b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4310/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b20d5a16c43aecfbb4dd4237a96c315488a40a5472d0e1ddb30bec823a07891c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4311/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "fafbb540b7ecab3528d000ba367f0ca17c632ac26e117b393a58aeed4646bdd1",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4311/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b081061d056ff5c590bea11616280d4f1ffbd5528243f3f4c48fb855e8f29a6c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4311/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "47429bd6cbe54c6fc6f64d378dd72607ca01ab0e88065b4ecaefee7ae6b5c7ed",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4311/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "05a29e2f376573760a4da5a05042cf18840d8f3655e7da07adf947c623c79090",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4312/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ae46b3073cbdf8832bf4ec9ca67b7a82e1a5b14c0680551631ae4119ef3077fc",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4312/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ebf3f034f09d342d2ef308e48af53fd5bb358195f08f1d223fb9bdc0bd4fd99b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4312/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "995cf9183e423375c2e5de8f5117cad31b6e5ed290299304b35eaa1cd7162130",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4312/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "9676d413dd07ef14360aae63cc36e4b250b643019a34b3512ad183c5b9b820f0",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4313/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "58b098caecfe13e336ddd81c80d5b6c6be5b1abf2ca3b0decd735d272119ed0d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4313/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "443fe3b7ad5b2567571f7151131b9e73b9c7f79919adc602261e0d0962d7d68d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4313/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f06fabd2bede4a3084cf5d9c2fb5444c18d328d46bdd25271085cdae334b4e04",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4313/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "103c2887b956a3712ece34041573d08d11dbf2558b3648af3b3bcaf430fa6c8f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4314/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "de9c69014037a7288b8a4a282823f2c837ec20e2ecf387bac3c0681674fc494f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4314/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "fa00e1231c35344db96f14f70d27f721ff772a3ed9bcf83b6a4ac9b780517aa8",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4314/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b34bafe9bcebc79dcb224cef35f3604241a0b7342aebdfeb276c2cb40702581c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4314/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "510a868e58be0da4c8dd6001ac1dd667bcbcd058ef9fbac8bb8fe23c85280443",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4315/976.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f739d0dc9a5948aea280a28911ea3e0cb6e7a6601a3d093394215d995e2f07e9",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4315/977.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "9e33e27f4f8f7714625d88234033dcc6360334f5725fd23798859db9c604e5be",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4315/978.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6feb7a82ef516aa09e1f37a8685ead6e13c1244a13b852adefcaabddabff5208",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/12/4315/979.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3163a813c5e748acd6f3fa27f6d9cf458a10412cf09e592c01d4597eb0591bb1",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a721896ced874e82e8cf4056d31998f2bea95d2b0d169a6bc30be1069a8f07af",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c6bc79462326f7947f5c5aabd2fe9e0d84aae29ef845314bc70e09533ceeaae7",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b5493f92d51bda87aad880d2dfa5e9a014ff53e237119b263f33f8a8d57e4ee4",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "0811851a35d41a6a5476cb0b012d70ea3ec31d5833aa574fc3cb1f12117234f7",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8dcfc70ea6c6e496c478c6600a47da615208c20d9c41b6d0876ba46142f71df2",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6394b7f0d73bedfcbf8be871d84ea17ee9e9c96127baff1cd0373f0eae1c761f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "905c2bf58956106f90dad1f54cfae2b7ef30bd3f048d94dc4c37c68c499ea421",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8616/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "456ef2b50e9a716999ce5ca7705ac377b4161fd460abf6a1bf4621411bc0656b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a876c2eea12ccb8b0175eb9f693202bd654b4224a8c647bd196d2be37672cc67",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "af78b4c6d183b1e62c2959c93273e01e1b36d1ff410ab5bb4da648cd4523732e",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8f3bbc2dec4fb0a42c99c186ab6fa57a2d2cb7621fda7320e004560d31fc6a3b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "17d98748a8429db8b6bcdc236f0b7cf3c3b5985cc41c52b6b80b693f8ecad909",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "42e270f70985e67cdad23f8a0a5073c7fb633c23cb5455bb6b0875abeee9f13d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "270bf62727bc44b1ff0466e5bc4e5c19d96fe2fb8e6a6f61af048afcafe80179",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c1f97d039c451c52d0899a059e5f8b6d745a9c347ec79f4f41acf1866aed5a88",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8617/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "14bc50ae03081e0028a14bf07a2a7f7a8dfc7e19a41c73aae072fb1b1d507330",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1c1d8e3b3c78646f260af6ef5798b2f4f967f1e4268ddfc672ac8aacbcb1fe7b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "037387a109bee6070cb0e7799354fa664731c3b1cf4f8308be22015090cf336c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "06252ba25a81a932b39a35e4993140200d0e710a893e265d4939385e2a3ce379",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "455c11c9b7235412386ac297b30dfa51d2c8a13689df29aab8d524008d90ab8c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "2f7870f8a6fd983a728d5a1218202fd37699377b9610056d844df82d822fad61",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "7b04e644c3c9abb2fe594865c8e40fb6a0eb24228077b7ca282fd0e0e2952347",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5f431bb8f488abe7da6767bd8971ab2cbd7b1a0664ac53c3505e29ac3fcabf9f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8618/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a4c1dda986ed89d164773105731f22d555831261352cd10772f04a96507899ff",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a73c80021ccaebf32a7fcea36152f171baee43e8eca46c5e8c4a74a60f1a7960",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3284421e433bcfbc9c8d0ed742e35ae07fe7bdc749b71d915935fd5b81af730b",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f27e27733d49d1c243603faafcb448a74a8f9ea1aa27343dbf41204e1a7762ff",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "fa76e548c8ce78bd65aaf61b5927a1b2eb7da77f8edabebefc8ff825756d6dab",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "49b43a114df1ddba343a6e73dadc2ce094a6ba51866fd866c8ffdd334201b745",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5c7bc192a1308b75eb461475242316df872a9b00682ea53468cd2b724cc8e44c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "bd91548b1de048ffbe00de70326fb98f93084b4c93c17632ec719ac6013ffaa4",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8619/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8c533b3f032f6a160cf7903e31964456c87d930b2b732cee885d775178b4404c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "47b4f07dc3bdb1fd4b9eb900ebbacc9e38812581e559b2749cf64ff0ec631353",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "2206f6a944c88e0162e5a4bb88f5971716ecb4c0905d524c68f20f607f18fa1a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1b397b87bd298fad6838dc87680cf74b5fb5aeb0c2091694868fb2653a015dfe",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "488e7a2cc6b50bd3578bc955ba5c6cac616f522ae0d95da081fe0f858313d706",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "632e6b7d03516f8b3fb50673f699f2133ef38bdd061a31124bf0196349c640d4",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b040f9ea1dd7c67541d527dcc9a16504fa847eb2306c21e30dadbbc2cf191c8c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "72f74dd5a9fddb97b9239e085c380651fefb766a953c3b548e73ae334f467915",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8620/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "289ec4fa2906b7be6bc17879292a9de2f1690470bbb86ecd43537ff1482bdf75",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "18f759d8d7ee11a9c750e7650af219ea3dc8b64392de3061d010be3b5c511420",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5ef4dc21df683960ed60b59991f7cbe9c9fc2b2ce92353864f61858625d4177e",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b6302713578e12feedd3c9815ae09e37838a7bceccce4ca3017e89ff00af2370",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "4744c2ca9c651f073bb5d48699fbad24a02cab594646b067a5aaeb67a90cbc45",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "25357a07572e913fac703b8d15790f8106b050d7e2315072a6ecc90715bc115e",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "025f4dd3434a31dcedfe1330242d7ed2b8a8ff67ee1a7fc8b98ebecfc68376bc",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5152944b01872f6d6cfe653911315f07a0e7710e9b73c9c962fd07c6a534f9cc",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8621/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "2b98cf608c7bc52ccac08769b1f9a4813177d71261cd471a269cf8cda5ee512c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f2a3513e1c3f41a4929f6671a931e01e9080c9df27368493a8e063ab8a774b85",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6a11828e9c486e788135063a7723f82a2e1e6852014ec98d1876d0623960a2d7",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "83133af015c5d46de10e7ff1d1943393226d0174cb62f113eb8140eef3c0c010",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ca4756c83d3d3526987351d284a432fc44cb2b116a90889091ff114134e4e6f0",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "fbcdd4e3588788c0c33ab84987084a093232a58f8ee0eba2bf7d9786a57000b2",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8a6aa0374908641f335e127d29d99c534774c95e91f5355216dd7397eceaaab8",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c23f4365da75e2b943df3c7d6f1e19960becef0a83bed4bd9415c7970e02e157",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8622/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "7914e77560f289816bb40f7262b84481b98f30d40a18eb96876267a483455963",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "26b0618fa447d6f53695572d9ebc8cae6651da46a3d8fbe1ede2cace116b4b4a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "865facc1b31764b9b031cdbc2ce8b82d75589f28c44625c7adc86919b974eb8f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "2e1f78650e002752d36c5d64421f60d0d5a0f97198793b36e37abce6acd16348",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e90c519773d0d405027bce09551fa3640c1d061af2fc4ad28f63ef56e51979af",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c37bccb0b13597e990d6f716b550e3fb396c50a60e1e45d50f1c407a064f24b3",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "4bf92ba22d67e0550d25f0fd3043df7d3626174ff5a1b47c3ba0968e9c6d3a1c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e185fd961ffac7edb39136aaa7285d3e8dd39b493091ce941ec3677542d002ff",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8623/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "53051c66b0d8f47393035210bb5223d6878024cfee88775842c721b34fc3999d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "17322f24fa50146f0c596a537cbfd1cf6a485d2c53a173a0fb33f51e05778c07",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "448671161f4cae62ee46c13fd3c63453fa99950d4545c35db62e3baa4ec48716",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3544a7dec02289f93b8804c5575b30f9786a78d4f4be9c043dad9c84ec85a379",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "17be2904210e2e072470af550f6aa8b0984b27a437fb5ff9de22dccdb46ac6cd",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3056095b070cfb01ebc9875d58355ad79bab49644055b2da56501ebf12ccddbf",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "54d6c118942fe88f06d7b845861384ce582d058cbfe04af23960b129ab586f22",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a09fd888a995a31e2c90cab19c0e2f58ae6b2bc0d13ec33b22f138a6ac6aa87d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8624/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5bd1e1e789a5998e42f3906c1736c271a647acb3a7a3c9922d53268c87d65d05",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "95693f12d3e445efd7b7859d327e95671b124ba7c705036059d17ddee2448337",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "469f0cc494763d010e7977ede1f2caaa7b63f487c4e31e2052e8166cd6194c4c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a642c807af21dfa23d9f16ea67517f8138f2d04ebaac1b4339f2ed6c9d3d0fca",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "498afd278989041abaadbb503c9f9794bc2fef01a71adf34efa0966c10b89c79",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "04246fbdf8f6dfeace5e5ff8df6873724668a4e87839b63273989589a9857d47",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "37aa7ca66f620035e6cd444971b117e3b8e65425056db077f313e4c8819fbfc8",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1eebaebd410afab3fc0b9a14c7230eba984f97f346fa1554608d2ccb86fb0fba",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8625/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3834030f3b03427ebce8c14930b446c2d6523a45a7a086bb86e4a9cf63947a03",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "70d32974a1d401725762a44ac747794d2363bb0a060ea8381b6065fe671cb1b2",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "812302f7d59d4128306a7e4b3ce4cef31a78953bc4a5c9b581660228a3e43b42",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f7884c07d207dd20c323bba6ffae44cf447164b2f9b96d900c3d94dedc8c5d82",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1a971e913d4e020193cb88f9f777d832d12f505a6671f156707202aacd4ea249",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e1f877fc66ca4912808a4214d65304a5b1a2f0609322ed1e8daf54ca8cef5087",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8e889217be9cc70b59cdabbd7e87eadc83903eccd064f33da1802963a82cfa7d",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "a362bebb86fbd38218c33ee8e1b1f626135cc00dad41120068f6195206baa8ca",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8626/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "05c99cd1105c3cfefe563aa7a59cea5d224bbd92520821d28eaa28c5a98c457a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e92da35f7ea5dbad488eabc9c80876c153724f1e6532be285178b8928bc82bff",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "d7c7eaebf932d51c043005f179a3f0d69e7872afd44f3d2e48f739f6118bb830",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "67d7c6bc9ebe28a1d9281054698ef90f924f4f27bed988a6d126e4a053f5e97c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e5def2d00ddd4e2e26dccfd81dccaf42c2b48ad7852bf0b37acac9000a98f64c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b0a0931bb50eab73b3d05c87a532160de8d6c2312763e7d036aa69e15994ca76",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5ae258ddeea57ff58c921eab315f44e1dabe0d08cddef5361112cedd97ca811f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "c7030a0249e828905be422257df4df4bcaa3b7b584fe67b2b501c8d2a00a7a23",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8627/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "195e621be2f8c863e317e15b6fca11a4bb03c83dc589aad2f30a8b58060adc22",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "7e924cef72b26fd642c796232ff7d36e3173a4f00cf4c5e0901979e61dc1b912",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "fec51b301bfab9d3d05b94b2d074c46df3b0b4de03fff1b9a84ff040988b3028",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6824ac70d9f4f717bd8c9cb2cf515c39b2c81b22ecbe54649542ae8f6ddca9b9",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "316eec8f8af3c85a3637f3fd3d7bf188384ae36733b2da4ee556a8f019ad5b88",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b8b607a570556b7f3bb78dbc8bae2010e76618a76efab0c3e83978667e4236c9",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5bced6d941daa15e378f8d1b0f6122ef03e5d5666242196d980c70df489f9ef1",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "b34ee4085a931be94f3fae9c05abcef5bdeb6c2bae97b75b55b1bac8774b96cd",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8628/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "55610c0ca7c7efd87e7729fe35ddc732c62c775364775a215a471a49ad87e03f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "4888670ff30b46d4cd6baea09722f52806862f00f3187f0215f69948b2108fcb",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "39709784dfebfc9472ac7b27ab054bf56577af06f6a8a769c3a01731194b04c9",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "802d24a4e7fe98c631317f3641b3337cfadda9394fe708020091f7c3067de4eb",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1883e0277fecfd44351fcdb18664ff2498217ef4b6c6109060f8a29c8814ea17",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "377160496634448d135abdbad20007ef1910bf4365fec9003642096eec53163f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "832ba67b880bc83a154a6b998771e32efa0ff251d03dd63d720334b1bd410c25",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "9e6c7e6c749d8599bd6b26a11762f0f427e609c1bf6aa731e5545ebf46b6e65f",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8629/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f59c5ba747680a7d0e48374ea8258d51ff5bd23a0bdef250e2341981317c626a",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "3f48f782e4017a157f0178ad523f44fe366be4ff7b5078337e04c382771f7768",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "f5129eb732374b1f3624befbec47f95ff4b2aab47ed336df1c70e3c2b5f259e7",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8696de79fdeb802b215b0b1cd3929cb72bb99812983d2c0a5e2f2fb4626c0483",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ab4b3e46b067f8a99c29b7f6b02dbd8ea6489be927c64dd79a3d9960ec97740c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "8386eb90fd0845f2178384b09e64b66c78224b25f87563da81761d674594ec68",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "ae9b601a60acebc1dff4a9753c5e7b321eec3c4876f8211bd2527782c636c91c",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "0e6f59df8cf85027197f241b6c6cc97ebb3c416603c2abc93fa90d3af0736172",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8630/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e5c2a0ce812f74d20a53838d9e98e1d047caa467d73510a75b6ffdaf412e28ec",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1952.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "6af2ff8e4c18d686418ef6fa78c370d2e5a1c1b19cb8257f3ec75f41428b2743",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1953.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1e09ea93b63609d29b7b1adfbf3a766e01e3e5f3727c0acddc9a6cb2ec809f62",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1954.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "7e88ea1a3573d6b771c30ac9b6944c40665884274deb93e5c4acc6f9cbd33f83",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1955.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "e80b987fd6a5db77ef00a25857c3b5d59e41530baad2269ad4f845145f38c8b1",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1956.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "5dd67586d1ee5e888cf8cd782581d349865db0554716b6f6a5ad7f77ef4cb919",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1957.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "9ad81784391a28746427bdeb83c7640feb9fb8c77dfcf0abb5581215cdc726d4",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1958.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "249d3ca4c74941b7a39bce82f45006981028b9a7abab09027cf087514523c253",
+      "source": "regional-dem"
+    },
+    {
+      "path": "terrain/13/8631/1959.fsdem",
+      "kind": "terrain_dem",
+      "size_bytes": 8506,
+      "sha256": "1df66a744c374862f02576da6b43214ececfd326f48d88d61bd1879bf0d95555",
+      "source": "regional-dem"
+    }
+  ]
+}

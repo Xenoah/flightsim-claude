@@ -469,6 +469,12 @@ OpenStreetMap (.osm.pbf) ──[flightsim-airportgen / オフライン]──> r
 
 ## 7. 現状のスコープ
 
+The local [Balzers terrain sample](docs/examples/terrain-packages/balzers/README.md)
+adds a reproducible 170-tile L10–13 prepared ZIP and a GUI-independent content
+validation/import example. It reuses the existing package reader and immutable
+store; it does not alter runtime activation, download sources, replay formats,
+terrain sampling, source attribution or release gates.
+
 **2026-10-01 の統合ソースの状態。** 実装と検証範囲、配布状況は分ける。
 公開・CI の時点付き記録は [統合 QA](docs/qa/overnight-status-2026-10-01.md) を参照。
 実装済みでないものを「ある」と書かないこと。

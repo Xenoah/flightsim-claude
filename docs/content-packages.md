@@ -1,5 +1,39 @@
 # Local terrain packages, schema v1
 
+## Reproducible local Balzers sample
+
+The [Balzers sample](examples/terrain-packages/balzers/README.md) contains 170
+prepared GLO-90-derived DEM tiles: two complete L10 families through L13,
+approximately 26.7 × 19.5 km. It is a rebuilt, explicitly versioned local sample;
+it does not recover the identity of a later lost draft. The original license,
+attribution and source/conversion records remain byte-exact, with a separate
+reconstruction record. The nominal 90 m source resolution is not a surveyed
+accuracy or runtime mesh-spacing guarantee. Original datum-conversion limitations
+remain applicable.
+
+The content-only example validates or imports the ZIP without building Bevy:
+
+```text
+cargo run --locked -p flightsim-content --example validate_region_package -- \
+  validate docs/examples/terrain-packages/balzers/Balzers_Terrain_Package_v1.zip
+cargo run --locked -p flightsim-content --example validate_region_package -- \
+  install docs/examples/terrain-packages/balzers/Balzers_Terrain_Package_v1.zip LOCAL_REGION_STORE
+```
+
+`validate` discards temporary staging. `install` uses the unchanged immutable
+store operation and requires an explicit local destination. Pass that same
+directory as the app's `--region-store`; select the package from Installed and
+explicitly Start a new flight. Import does not activate terrain, add runways or
+buildings, enable regional replay, or qualify native Windows execution.
+The example also accepts `inspect INSTALLED_DIRECTORY` and `cancel ZIP`.
+
+No published download URL or real-area catalog is asserted by this sample.
+The offline generator can produce catalog metadata only when an explicit valid
+GitHub source URL is supplied; it does not publish or verify remote availability.
+Rights/release gates are unchanged.
+
+## Format and ownership
+
 `flightsim-content` is the pure Rust boundary for **prepared, data-only regional
 terrain packages**. It validates local ZIP files, stages them, and installs
 immutable versions. An optional [download foundation](content-downloads.md) can acquire

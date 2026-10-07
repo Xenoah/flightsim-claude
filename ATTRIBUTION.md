@@ -38,6 +38,21 @@ Copernicus 由来の変更データを含むため、全球ベースは全体と
 - EGM2008 geoid metadata: https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022/60s/60s_geoid_netcdf/ETOPO_2022_v1_60s_N90W180_geoid.nc.das
 - Natural Earth public-domain terms: https://www.naturalearthdata.com/about/terms-of-use/
 
+### Balzers 開発用地域サンプル — Copernicus GLO-90 / NOAA geoid
+
+[Balzers Terrain Package](docs/examples/terrain-packages/balzers/README.md) は
+復旧した Liechtenstein サンプルから元の DEM 170 タイルを変更せず選択した地域データです。
+GLO-90 の 90 m 級 DSM と NOAA ETOPO2022 EGM2008 geoid 由来で、全球ベースとは
+別の成果物です。精度・範囲・再構成の限界は同ページに記録しています。
+
+この ZIP の地形にはリポジトリの MIT/Apache ソフトウェアライセンスではなく、
+[Copernicus GLO-90 一般公開ライセンス](https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf)
+（PDF 19–21 ページ）が適用されます。元のライセンス全文、変更データのクレジット、
+免責と再配布時の義務は ZIP 内の `docs/copernicus-license-bundle.txt` と
+`docs/notice.txt` に保持しています。出典・処理は `docs/source-provenance.md`、
+今回の抽出は `docs/balzers-reconstruction.md` を参照してください。
+公開時もこれらの記録を保持してください。商用・Windows 配布の審査は別途必要です。
+
 ### 標高 — Copernicus DEM GLO-30
 
 `flightsim-tilegen` が読み込む対象です。**焼いたタイルを配布する場合、

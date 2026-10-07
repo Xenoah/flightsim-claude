@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "recipe": "balzers-terrain-reconstruction-1",
+  "archive_size_bytes": 1610134,
+  "archive_sha256": "d7e1265ee8015ad0fb1df23f7110b23124b90d889440f1b14a9cd85119f28528",
+  "manifest_sha256": "683db832fe789e72aa76e0afd7869112252aedbcd7d2c98c5937d785cb66cc74",
+  "id": "balzers-glo90-rebuilt",
+  "version": "1.0.0",
+  "bounds_degrees": {
+    "west": 9.31640625,
+    "south": 46.93359375,
+    "east": 9.66796875,
+    "north": 47.109375
+  },
+  "root_tile_ids": [
+    [
+      10,
+      1077,
+      244
+    ],
+    [
+      10,
+      1078,
+      244
+    ]
+  ],
+  "counts_by_level": {
+    "10": 2,
+    "11": 8,
+    "12": 32,
+    "13": 128
+  },
+  "verified_source_files": 768,
+  "selected_dem_files": 170,
+  "original_documentation_files_retained": 3,
+  "added_documentation_files": 1,
+  "source_archive_sha256": "fc4de5f479d769b0aa6f028ab965a8798f9c11bdbae157bffc57ecd45df66b2a",
+  "source_manifest_sha256": "34e8759340c315c745a9d83746944d082bb94b8139e2806756749572b7d53384",
+  "dem_bytes_unchanged": true,
+  "source_records_unchanged": true,
+  "historical_archive_equality_claimed": false,
+  "published": false,
+  "verification_scope": "Python input pins, payload hashes/CRC/FSDM checks and complete subtree selection; runtime import/native rendering are separate checks"
+}
