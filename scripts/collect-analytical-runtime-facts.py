@@ -82,6 +82,9 @@ LINK_REASONS = {'not_requested', 'missing_inputs', 'missing_fingerprint', 'ambig
                 'missing_linker', 'output_identity_unavailable', 'output_hash_mismatch', 'observed'}
 LIBRARY_ORIGINS = {'rust_target_libraries', 'cargo_release_deps', 'vc_runtime_x64',
                    'sdk_ucrt_x64', 'sdk_um_x64', 'unclassified'}
+TRACE_COUNTERS = ('total_lines', 'link_module_lines', 'recognized_info_lines', 'quoted_command_lines',
+                  'parsed_command_lines', 'rejected_command_lines', 'output_switch_commands',
+                  'matching_output_commands')
 
 
 def require(condition, message):
@@ -237,9 +240,19 @@ def file_versions(path):
 class Collector:
     def __init__(self, private, env):
         self.private = Path(private)
+        # os.environ uppercases keys on Windows; copying it into a plain dict
+        # loses case-insensitive lookup. Keep the same canonical key spelling
+        # for discovery, subprocesses and replay, including synthetic inputs.
+        # https://docs.python.org/3/library/os.html#os.environ
+        self.env = {}
+        for key, value in env.items():
+            require(isinstance(key, str) and isinstance(value, str), 'invalid environment entry')
+            key = key.upper()
+            require(key not in self.env or self.env[key] == value, 'conflicting environment key aliases')
+            self.env[key] = value
         # https://rust-lang.github.io/rustup/environment-variables.html
         # A missing toolchain is an unknown fact, never an implicit download.
-        self.env = {**env, 'RUSTUP_AUTO_INSTALL': '0'}
+        self.env['RUSTUP_AUTO_INSTALL'] = '0'
         self.files, self.queries = [], []
         self.total = 0
 
@@ -388,7 +401,7 @@ def microsoft_facts(collector):
               'static_contributions': UNKNOWN, 'licensed_product_entitlement': UNKNOWN,
               'applicable_terms_acceptance': UNKNOWN, 'dynamic_module_coverage': UNKNOWN}
     # This is the official installed location, not a PATH lookup/download.
-    program = collector.env.get('ProgramFiles(x86)')
+    program = collector.env.get('PROGRAMFILES(X86)')
     if not program:
         return result
     root = Path(program)
@@ -441,6 +454,9 @@ def debug_command_tokens(text):
 
     This is NOT shell parsing and never executes the trace. Unknown escaping or
     the different Unix environment-prefix format is rejected, not guessed.
+    Rust 1.93.0's Windows std::process::Command Debug prints each regular
+    OsString with Debug quoting, separated by spaces; the MSVC linker appends
+    the output path to one /OUT: argument. This is not CreateProcess quoting.
     """
     require(len(text) <= MAX_LINK_LINE, 'link command line budget exceeded')
     result, offset = [], 0
@@ -514,6 +530,7 @@ def final_link_facts(collector, trace=None, executable=None):
     """
     result = {'status': UNKNOWN, 'reason': 'not_requested', 'trace': None, 'executable': None,
               'fingerprint': None, 'link_output': None, 'linker': None,
+              'trace_observation': None,
               'installed_candidate_evidence_id': None,
               'constructed_final_command_observed': False, 'linker_process_execution_observed': False,
               'requested_libraries': [], 'rlib_input_names': [], 'explicit_library_paths': [],
@@ -547,23 +564,39 @@ def final_link_facts(collector, trace=None, executable=None):
     suffix = fingerprint.parent.name.removeprefix('flightsim-app-')
     deps_output = executable.parent / 'deps' / ('flightsim_app-' + suffix + '.exe')
     matches, malformed = [], False
+    observation = dict.fromkeys(TRACE_COUNTERS, 0)
     with trace.open('r', encoding='utf-8-sig') as stream:
         while line := stream.readline(MAX_LINK_LINE + 2):
             require(len(line) <= MAX_LINK_LINE + 1, 'trace line budget exceeded')
-            match = re.fullmatch(r' *INFO rustc_codegen_ssa::back::link:? (".*)\r?\n?', line)
+            observation['total_lines'] += 1
+            if 'rustc_codegen_ssa::back::link' in line:
+                observation['link_module_lines'] += 1
+            match = re.fullmatch(r' *INFO rustc_codegen_ssa::back::link:? (.*)', line.rstrip('\r\n'))
             if match is None:
                 continue
+            observation['recognized_info_lines'] += 1
+            if not match[1].startswith('"'):
+                continue
+            observation['quoted_command_lines'] += 1
             try:
-                args = debug_command_tokens(match[1].rstrip('\r\n'))
+                args = debug_command_tokens(match[1])
             except ValueError:
+                observation['rejected_command_lines'] += 1
                 malformed = True; continue
+            observation['parsed_command_lines'] += 1
             outputs = [arg[5:] for arg in args[1:] if arg.upper().startswith('/OUT:')]
+            if outputs:
+                observation['output_switch_commands'] += 1
             if any(Path(path).is_absolute() and (same_path(path, executable) or same_path(path, deps_output)) for path in outputs):
+                observation['matching_output_commands'] += 1
                 if len(outputs) != 1:
                     malformed = True
                 else:
                     matches.append((args, Path(outputs[0])))
             require(len(matches) <= 16, 'matching command budget exceeded')
+    # Counts diagnose unsupported prefixes/quoting without publishing any
+    # command text, path, environment, or inferred explanation of a mismatch.
+    result['trace_observation'] = observation
     if malformed:
         result['reason'] = 'unparseable_command'; return result
     if len(matches) != 1:
@@ -607,7 +640,7 @@ class ReplayCollector(Collector):
     """Read-only re-enumeration using byte-bound queries, without subprocesses."""
     def __init__(self, private, manifest):
         root = manifest['discovery_roots']['program_files_x86']
-        super().__init__(private, {'ProgramFiles(x86)': root} if root is not None else {})
+        super().__init__(private, {'PROGRAMFILES(X86)': root} if root is not None else {})
         self.expected_files = manifest['files']
         self.expected_queries = {row['id']: row for row in manifest['queries']}
 
@@ -843,7 +876,7 @@ def validate_projection(value):
             require(library['family'] in SDK_LIBS and library['name'] in SDK_LIBS[library['family']], 'unexpected SDK library')
             public_observation({k: v for k, v in library.items() if k not in ('family', 'name')})
     link = value['final_link']
-    require(set(link) == {'status', 'reason', 'trace', 'executable', 'fingerprint', 'link_output', 'linker',
+    require(set(link) - {'trace_observation'} == {'status', 'reason', 'trace', 'executable', 'fingerprint', 'link_output', 'linker',
                          'installed_candidate_evidence_id',
                          'constructed_final_command_observed', 'linker_process_execution_observed',
                          'requested_libraries', 'rlib_input_names', 'explicit_library_paths',
@@ -859,6 +892,26 @@ def validate_projection(value):
             public_observation(link[key])
         if link['status'] == 'observed':
             require(link[key] is not None and link[key]['status'] == 'observed', 'missing final link binding')
+    # Optional only for compatibility with already sealed schema-v1 captures.
+    # New captures always carry null (not scanned) or this closed count record.
+    if 'trace_observation' in link:
+        observation = link['trace_observation']
+        scanned = link['reason'] not in ('not_requested', 'missing_inputs', 'missing_fingerprint', 'ambiguous_fingerprint')
+        require((observation is not None) == scanned, 'inconsistent trace observation availability')
+        if observation is not None:
+            require(type(observation) is dict and set(observation) == set(TRACE_COUNTERS)
+                    and all(type(count) is int and 0 <= count <= MAX_TRACE for count in observation.values()),
+                    'invalid trace observation')
+            require(all(link[key] is not None and link[key]['status'] == 'observed'
+                        for key in ('trace', 'executable', 'fingerprint')), 'unbound trace observation')
+            require(link['trace']['record']['bytes'] >= observation['total_lines'] >= observation['link_module_lines']
+                    >= observation['recognized_info_lines'] >= observation['quoted_command_lines']
+                    == observation['parsed_command_lines'] + observation['rejected_command_lines']
+                    and observation['parsed_command_lines'] >= observation['output_switch_commands']
+                    >= observation['matching_output_commands'], 'inconsistent trace observation counts')
+            if link['status'] == 'observed':
+                require(observation['matching_output_commands'] == 1 and observation['rejected_command_lines'] == 0,
+                        'observed command lacks unique parsed output')
     for key, pattern in (('requested_libraries', r'[A-Za-z0-9_.+-]+\.lib'),
                          ('rlib_input_names', r'lib[A-Za-z0-9_]+-[0-9a-f]+\.rlib')):
         require(type(link[key]) is list and len(link[key]) <= 1024 and sorted(set(link[key])) == link[key], 'invalid link input list')
@@ -912,7 +965,7 @@ def collect_runtime_facts(private, *, source_sha, env=None, recipe_cfg_args=None
     manifest = {'schema_version': 1, 'source_sha': source_sha, 'recipe_cfg_args': recipe_cfg_args,
                 'files': collector.files, 'queries': collector.queries, 'rust': rust, 'microsoft': microsoft,
                 'final_link': final_link,
-                'discovery_roots': {'program_files_x86': collector.env.get('ProgramFiles(x86)')},
+                'discovery_roots': {'program_files_x86': collector.env.get('PROGRAMFILES(X86)')},
                 'linker_inputs': {'trace': str(linker_trace) if linker_trace is not None else None,
                                   'executable': str(audited_executable) if audited_executable is not None else None}}
     data = canonical(manifest)
@@ -1027,8 +1080,10 @@ def validate_private(private, projection, *, recheck_installed=True):
         replay = ReplayCollector(private, manifest)
         require(rust_facts(replay, prefix, recipe_args) == manifest['rust'], 'Rust discoveries changed')
         require(microsoft_facts(replay) == manifest['microsoft'], 'Microsoft discoveries changed')
-        require(final_link_facts(replay, manifest['linker_inputs']['trace'], manifest['linker_inputs']['executable']) == manifest['final_link'],
-                'final link observations changed')
+        replay_link = final_link_facts(replay, manifest['linker_inputs']['trace'], manifest['linker_inputs']['executable'])
+        if 'trace_observation' not in manifest['final_link']:
+            del replay_link['trace_observation']
+        require(replay_link == manifest['final_link'], 'final link observations changed')
         require(replay.files == manifest['files'] and len(replay.queries) == len(manifest['queries']), 'private discovery membership changed')
     return projection
 
