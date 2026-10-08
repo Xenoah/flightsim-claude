@@ -260,6 +260,24 @@ AIRCRAFT_PACKAGE_PATHS = {
     "docs/examples/aircraft-packages/swift/manifest.json",
 }
 REPLAY_CONTRACT_PATHS |= AIRCRAFT_PACKAGE_PATHS
+# Reviewed render-only regional-root discovery. The five changed app/content/
+# renderer owners are already pinned above. Bind the complete new helper/input
+# closure, its exact topology/radius primitive, and regression/benchmark witnesses.
+# These source pins admit neither package replay nor a binary distribution.
+REGIONAL_COVERAGE_PATHS = {
+    "crates/flightsim-core/src/geodetic.rs",
+    "crates/flightsim-world/src/coverage.rs",
+    "crates/flightsim-world/src/draw_distance.rs",
+    "crates/flightsim-world/src/draw_distance_tests.rs",
+    "crates/flightsim-world/src/global.rs",
+    "crates/flightsim-world/src/lib.rs",
+    "crates/flightsim-world/src/lod.rs",
+    "crates/flightsim-world/src/terrain.rs",
+    "crates/flightsim-world/src/tile.rs",
+    "crates/flightsim-world/benches/terrain.rs",
+    "crates/flightsim-content/tests/balzers_package.rs",
+}
+REPLAY_CONTRACT_PATHS |= REGIONAL_COVERAGE_PATHS
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {

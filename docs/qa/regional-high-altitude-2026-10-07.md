@@ -1,5 +1,21 @@
 # Regional high-altitude coverage regression, 2026-10-07
 
+## Artifact recovery status, 2026-10-08
+
+The test and native observations below were made before an executor reset. That
+reset later erased local PNG copies, raw logs, executable and local evidence ZIP.
+Two owner-retained original fixed-pose before/after stills survive separately.
+The other capture images, logs and binary have not been recovered. Retained
+hashes and reported results remain historical observations, not fresh reruns.
+No screenshot or successful log has been fabricated to replace missing evidence.
+
+The complete reviewed source was reconstructed and its Git tree matched the
+pre-reset `905fcefdfc090e4c0cbe8a9e8e3d73bb9000be2c` exactly, including all 19
+changed files. A durable full-source recovery archive now preserves that tree.
+This exact-byte source recovery does not restore the other missing native evidence.
+Final source-binding migration, fresh checks and any repeated capture must be
+identified separately. All remaining issue and distribution gates still apply.
+
 ## Scope
 
 This addresses the specific high-altitude regional-discovery gap recorded in
@@ -36,8 +52,9 @@ parity is checked separately through the production package integration test;
 The captured Linux binary SHA-256 is
 `942015d68677eddc0fde1fac7ab3547895aa9e2af9bad75598e6cce6324bd3fe`.
 Matched before/after PNGs, raw logs, commands, binary/code hashes and external
-fixture helpers are retained with the local validation evidence; screenshots and
-test binaries are not automatically added to a public release.
+fixture helpers were retained locally at validation time. The two original
+comparison stills survive separately; other artifacts were later lost as described
+above. Screenshots and test binaries were not added to a public release.
 
 ## Moving renderer evidence
 

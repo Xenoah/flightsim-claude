@@ -1378,6 +1378,103 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
                     candidate.validate_evidence(evidence)
 
+    def test_regional_coverage_review_rejects_budget_radius_source_and_physics_drift(self):
+        repo, _ = self.source_fixture()
+        # These are committed bad-source fixtures. They are never compiled or
+        # presented as runtime/physical/native qualification.
+        mutations = (
+            ("crates/flightsim-world/src/coverage.rs",
+             b"pub const MAX_COVERAGE_TILES: usize = 16_384;",
+             b"pub const MAX_COVERAGE_TILES: usize = usize::MAX;"),
+            ("crates/flightsim-world/src/coverage.rs",
+             b"pub const MAX_COVERAGE_DIRECTORY_ENTRIES: usize = 32_768;",
+             b"pub const MAX_COVERAGE_DIRECTORY_ENTRIES: usize = usize::MAX;"),
+            ("crates/flightsim-world/src/coverage.rs",
+             b"if entries > entry_limit {", b"if false {"),
+            ("crates/flightsim-world/src/lod.rs",
+             b"if id.level >= self.max_level {", b"if false {"),
+            ("crates/flightsim-world/src/lod.rs",
+             b"<= self.primary_coverage_radius.get()", b"<= f64::INFINITY"),
+            ("crates/flightsim-world/src/lod.rs",
+             b"if leaves.len().saturating_add(3) > self.max_tiles {", b"if false {"),
+            ("crates/flightsim-world/src/global.rs",
+             b"self.primary.primary_coverage()", b"None"),
+            ("crates/flightsim-world/src/terrain.rs",
+             b"for level in self.levels.clone().rev() {", b"for level in self.levels.clone() {"),
+            ("crates/flightsim-world/src/tile.rs",
+             b"pub const MAX_LEVEL: u8 = 24;", b"pub const MAX_LEVEL: u8 = 31;"),
+            ("crates/flightsim-core/src/geodetic.rs",
+             b".distance(self.0.clamp(minimum - padding, maximum + padding))",
+             b".distance(self.0)"),
+            ("crates/flightsim-world/src/draw_distance.rs",
+             b".with_primary_coverage_radius(self.terrain_detail_radius)",
+             b".with_primary_coverage_radius(Meters(400_000.0))"),
+            ("crates/flightsim-world/src/draw_distance_tests.rs",
+             b"assert_eq!(standard.terrain_detail_radius(), Meters(5500.0));",
+             b"assert_eq!(standard.terrain_detail_radius(), Meters(400_000.0));"),
+            ("crates/flightsim-content/src/install.rs",
+             b"Some(&self.coverage)", b"None"),
+            ("crates/flightsim-content/src/install.rs",
+             b"Err(Error::ReplayUnsupported)", b"Ok(())"),
+            ("crates/flightsim-render/src/terrain_selection.rs",
+             b"while update.load_attempts < frame_budget {",
+             b"while update.load_attempts < usize::MAX {"),
+            ("crates/flightsim-render/src/terrain_selection.rs",
+             b"while update.prepared.len() < frame_budget {",
+             b"while update.prepared.len() < usize::MAX {"),
+            ("crates/flightsim-app/src/main.rs",
+             b"source: make_render_source(&startup),", b"source: make_source(&startup),"),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_regional_coverage_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        self.assertEqual(len(candidate.REGIONAL_COVERAGE_PATHS), 11)
+        for relative in sorted(candidate.REGIONAL_COVERAGE_PATHS):
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed digests",
+                             "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed digests":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                    changed["reviewed_replay_source_evidence"][relative]["checkout_sha256"] = "0" * 64
+                    for record in changed["files"]:
+                        if record["path"] == relative:
+                            record["checkout_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
         self.checkout_source_fixture(repo, "crlf")
