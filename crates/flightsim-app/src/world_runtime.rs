@@ -775,7 +775,7 @@ pub(super) fn commit_world_map_flight(world: &mut World, prepared: PreparedWorld
         state,
         source_changed,
     } = prepared;
-    let source = make_source(&startup);
+    let source = crate::make_render_source(&startup);
     world.resource_mut::<WorldMapActions>().start_at = None;
     if let Some(mut runtime) = world.get_resource_mut::<WorldRuntime>() {
         runtime.last_navigation_error = None;

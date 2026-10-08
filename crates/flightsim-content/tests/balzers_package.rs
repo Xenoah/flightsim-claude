@@ -160,3 +160,52 @@ fn dropped_and_cancelled_real_packages_never_install() {
     );
     assert!(fs::read_dir(temp.path()).unwrap().next().is_none());
 }
+
+#[test]
+fn real_package_and_raw_snapshot_preserve_high_altitude_regional_roots() {
+    use flightsim_core::{Degrees, Geodetic, Meters};
+    use flightsim_world::{
+        DiskTileSource, LodSelector,
+        global::{GlobalTerrain, GlobalTileSource},
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let installed = install_zip(&sample(), temp.path()).unwrap();
+    let package = GlobalTileSource::new(installed.tile_source(), GlobalTerrain::bundled().unwrap());
+    let raw = DiskTileSource::new(installed.terrain_directory())
+        .with_coverage_index()
+        .unwrap();
+    let selector = LodSelector::new(
+        16.0,
+        1080.0,
+        Degrees(60.0).to_radians(),
+        13,
+        Meters(20_000.0),
+    );
+    for agl in [100.0, 2100.0, 2200.0, 2300.0, 3000.0, 10_000.0] {
+        let camera = Geodetic::from_degrees(47.068, 9.501, 522.6750371563289 + agl).to_ecef();
+        let cut = selector.select_with_coverage(
+            camera,
+            Meters(522.6750371563289),
+            package.primary_coverage(),
+        );
+        assert_eq!(
+            cut,
+            selector.select_with_coverage(
+                camera,
+                Meters(522.6750371563289),
+                raw.primary_coverage()
+            )
+        );
+        assert!(!cut.truncated);
+        let real = cut
+            .tiles
+            .iter()
+            .filter(|&&id| package.load(id).unwrap().is_some())
+            .count();
+        assert!(real >= 2, "AGL {agl}: primary {real}");
+    }
+    assert!(matches!(
+        installed.require_replay_support(),
+        Err(Error::ReplayUnsupported)
+    ));
+}

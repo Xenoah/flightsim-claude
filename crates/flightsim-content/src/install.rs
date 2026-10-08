@@ -158,14 +158,23 @@ impl InstalledPackage {
     /// Only declared, hash-checked DEMs can be loaded. Wrap this in the existing world
     /// global fallback source; no fallback or physical sampling policy changes here.
     pub fn tile_source(&self) -> PackageTileSource {
-        let files = self
+        let files: BTreeMap<String, FileRecord> = self
             .manifest
             .files
             .iter()
             .filter(|f| f.kind == FileKind::TerrainDem)
             .map(|f| (f.path.clone(), f.clone()))
             .collect();
+        let coverage = flightsim_world::PrimaryCoverage::from_tiles(files.keys().map(|path| {
+            flightsim_world::coverage::tile_id_from_relative_path(
+                path.strip_prefix("terrain/")
+                    .expect("validated terrain path"),
+            )
+            .expect("installed DEM path/header already validated")
+        }))
+        .expect("validated package entry limit fits coverage index");
         PackageTileSource {
+            coverage: Arc::new(coverage),
             directory: self.directory.clone(),
             files: Arc::new(files),
         }
@@ -176,8 +185,12 @@ impl InstalledPackage {
 pub struct PackageTileSource {
     directory: PathBuf,
     files: Arc<BTreeMap<String, FileRecord>>,
+    coverage: Arc<flightsim_world::PrimaryCoverage>,
 }
 impl TileSource for PackageTileSource {
+    fn primary_coverage(&self) -> Option<&flightsim_world::PrimaryCoverage> {
+        Some(&self.coverage)
+    }
     fn load(&self, id: TileId) -> std::result::Result<Option<DemTile>, TerrainError> {
         let path = format!(
             "terrain/{}",

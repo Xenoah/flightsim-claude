@@ -3562,12 +3562,30 @@ fn report_arguments(diagnostics: Res<StartupDiagnostics>) {
 /// 同じ `Terrain` を共有すると、描画のタイル読み込みが物理のキャッシュを
 /// 押し出して、接地判定のたびにディスクへ行くことになる。
 fn make_source(startup: &Startup) -> BoxedSource {
+    make_source_with_coverage(startup, false)
+}
+
+/// Only render-source preparation snapshots raw paths; physical/airport/weather
+/// samplers keep their existing lazy reads and never consume coverage hints.
+fn make_render_source(startup: &Startup) -> BoxedSource {
+    make_source_with_coverage(startup, true)
+}
+
+fn make_source_with_coverage(startup: &Startup, index_primary: bool) -> BoxedSource {
     let primary = if let Some(package) = &startup.active_region {
         Box::new(package.tile_source()) as BoxedSource
     } else {
         startup.tiles.as_ref().map_or_else(
             || Box::new(EmptyTileSource) as BoxedSource,
-            |path| Box::new(DiskTileSource::new(path)) as BoxedSource,
+            |path| {
+                let source = DiskTileSource::new(path);
+                if !index_primary { return Box::new(source) as BoxedSource; }
+                let indexed = source.clone().with_coverage_index().unwrap_or_else(|error| {
+                    warn!("regional coverage index unavailable: {error}; retaining ordinary SSE discovery");
+                    source
+                });
+                Box::new(indexed) as BoxedSource
+            },
         )
     };
     if startup.world.global_terrain {
@@ -4257,7 +4275,7 @@ fn setup(
                 startup.max_level,
                 config.root_geometric_error,
             )),
-        source: make_source(&startup),
+        source: make_render_source(&startup),
         cache: TileCache::new(config.cache_bytes),
         live: flightsim_render::TerrainSelectionState::default(),
         material: terrain_materials
@@ -4760,9 +4778,11 @@ fn report_terrain(
         streaming.live.ids(),
     );
     info!(
-        "terrain: {} tile(s) displayed, {} live, {} last desired (live_match {}, displayed_match {}), {} surface assets ({} retired), {} bridges ({} visible, {} queued), planning {} ({} descriptors, {} indexed edges, {} pairs, {} corners), {} boundary KiB, {} geometry KiB, stitching {}, camera {:.4}, {:.4} at {:.0} m",
+        "terrain: {} tile(s) displayed, {} live ({} primary, {} fallback), {} last desired (live_match {}, displayed_match {}), {} surface assets ({} retired), {} bridges ({} visible, {} queued), planning {} ({} descriptors, {} indexed edges, {} pairs, {} corners), {} boundary KiB, {} geometry KiB, stitching {}, camera {:.4}, {:.4} at {:.0} m",
         tiles.displayed_ids().count(),
         streaming.live.len(),
+        streaming.live.len() - streaming.live.fallback_len(),
+        streaming.live.fallback_len(),
         streaming.live.desired_len(),
         live_matches_desired,
         displayed_matches_desired,

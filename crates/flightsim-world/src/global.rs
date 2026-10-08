@@ -410,6 +410,10 @@ impl<S: TileSource> TileSource for GlobalTileSource<S> {
         self.primary.primary_reads_possible()
     }
 
+    fn primary_coverage(&self) -> Option<&crate::PrimaryCoverage> {
+        self.primary.primary_coverage()
+    }
+
     fn has_fallback(&self) -> bool {
         true
     }

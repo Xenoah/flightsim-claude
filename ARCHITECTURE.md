@@ -394,7 +394,7 @@ LOD は幾何誤差ベースの screen-space error で選択する（距離ベ�
 
 Visual draw-distance settings additionally bound the geographic region that may
 refine beyond coarse terrain. `world::draw_distance` provides validated Short,
-Standard and Long policies; Standard preserves the existing SSE-only cut.
+Standard and Long policies; unindexed sources preserve the existing SSE-only cut.
 Short caps subdivision outside 10 km after level 6, retaining complete planetary
 coverage, while Long requests more local detail under the same leaf, cache,
 load, mesh and scenery limits. Scenery query radius, regional terrain-detail
@@ -412,8 +412,20 @@ sampling and replay identity never read this visual policy. See
 可視・非表示を合わせた resident mesh は最大 8,192 とし、遠い保持済み子は近い新規描画へ
 場所を譲る。現在の選択木全体がこの上限に収まる設定だけを許容し、置換待ちの deadlock を
 防ぐ。履歴は現在の選択木内で保持・再試行し、古い非表示準備は破棄する。
-これは描画だけの処理で地面 sampler や物理へは書き戻さず、未発見の細かい子データを
-探す機能ではない（[親 fallback QA](docs/qa/terrain-parent-fallback-2026-10-01.md)）。
+これは描画だけの処理で地面 sampler や物理へは書き戻さない。供給元の任意 coverage index
+がある場合のみ、局所範囲で最も粗い実タイルへの経路を要求する。未索引の子タイルを探索する
+機能ではない（[親 fallback QA](docs/qa/terrain-parent-fallback-2026-10-01.md)）。
+
+Regional DEMs can begin below the SSE cut (for example L10 data under an L9
+high-altitude request). `PrimaryCoverage` indexes only the strict ancestor paths
+to the coarsest declared primary tiles. Within the current local-detail radius,
+render selection follows these paths before resuming SSE, under the same maximum
+level, hard radius and leaf limits. Package hints come from validated metadata;
+raw-directory hints are optional bounded filename snapshots at render-source
+preparation, never per-frame I/O. Hints neither attest payloads nor rule out later
+primary reads. Failure discards the complete raw hint with a diagnostic, retaining
+ordinary SSE/ancestor fallback. The sampler, replay and DEM bytes do not change.
+See [regional coverage decision](docs/adr/0028-bounded-primary-terrain-coverage.md).
 
 実行時タイル形式 `.fsdem` は `u16` 量子化 + タイル毎スケールの自前バイナリ（[ADR-0005](docs/adr/0005-runtime-tile-format.md)）。焼き込みは `flightsim-tilegen` が行う。
 

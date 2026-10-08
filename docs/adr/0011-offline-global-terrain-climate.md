@@ -110,3 +110,12 @@ and byte checks, corruption tests, regional/seasonal contrasts, dateline/poles,
 primary-ancestor precedence, bounded streaming under cache pressure, repeated map
 start/close/preview flows, v1/v2 replay, actual native/offscreen screenshots,
 aggregate split tests, clippy, strict documentation and architecture checks.
+
+## 2026-10-07 extension: regional roots above the SSE cut
+
+[ADR-0028](0028-bounded-primary-terrain-coverage.md) adds optional bounded,
+read-free source coverage hints. Within the current local-detail footprint,
+selection can reach a region's coarsest declared tiles even when high-altitude
+SSE would stop above them. The usual availability checks, primary provenance,
+streaming/mesh budgets and atomic seam commit remain authoritative. This does
+not change physical sampling, the global atlas or package replay restrictions.

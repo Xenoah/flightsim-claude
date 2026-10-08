@@ -62,6 +62,7 @@
 
 pub mod airport;
 pub mod climate;
+pub mod coverage;
 pub mod dem;
 pub mod draw_distance;
 pub mod global;
@@ -84,6 +85,7 @@ pub use climate::{
     ClimateDataError, ClimateDate, ClimateSample, ClimateSource, ClimateZone,
     GLOBAL_CLIMATE_DATASET_ID, GLOBAL_CLIMATE_FINGERPRINT, GlobalClimate,
 };
+pub use coverage::PrimaryCoverage;
 pub use dem::io::{StoredTile, TileReadError, TileWriteError, read_tile, write_tile};
 pub use dem::{DemTile, HeightGrid};
 pub use lod::{LodSelection, LodSelector};

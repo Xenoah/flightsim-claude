@@ -7,10 +7,11 @@ DEM sampling levels, aircraft state, and replay identity never read this policy.
 | Preset | Planetary refinement cap | Scenery query | Regional detail request | SSE | Camera far |
 |---|---|---|---|---|---|
 | Short | 10 km, coarse level 6 outside | 2.25 km | 3.25 km | 24 px | 400 km |
-| Standard | Existing SSE-only selection | 4.5 km | 5.5 km | 16 px | 400 km |
-| Long | SSE-only selection | 9 km | 11 km | 12 px | 400 km |
+| Standard | No planetary radius cap | 4.5 km | 5.5 km | 16 px | 400 km |
+| Long | No planetary radius cap | 9 km | 11 km | 12 px | 400 km |
 
-Standard retains the previous selector result exactly. It introduces no
+Standard retains the previous selector result exactly for sources without a
+primary-coverage hint. It introduces no
 planetary radius cap. Short suppresses subdivision outside the horizontal
 footprint radius after coarse level 6, while SSE still selects detail inside.
 Hard rejection uses a conservative distance to a containing WGS84 ECEF box,
@@ -19,7 +20,12 @@ not based on the tile center or independently clamped latitude/longitude, which
 can overestimate the nearest distance near poles. False positives and children
 of intersecting tiles can extend detail beyond the requested radius. The legacy
 SSE and near-detail distance estimates remain unchanged for exact Standard
-compatibility; only the new hard-cap rejection uses this conservative bound.
+compatibility. Hard-cap rejection and primary-coverage discovery use this
+conservative bound. A source coverage hint requests paths down to the coarsest
+regional tiles within the same 3.25/5.5/11 km detail radius, independently of AGL.
+This prevents an SSE cut above the first regional level from hiding the dataset.
+It does not force finer descendants, attest missing/corrupt payloads, or add
+measured detail. See [ADR-0028](adr/0028-bounded-primary-terrain-coverage.md).
 Every selection still covers both hemispheres, including at the date line and
 poles, without overlapping leaves. The existing bridge/overlay transaction
 continues to display the old complete terrain cut until its replacement is ready.
@@ -57,7 +63,8 @@ silently clamping. Exported unit-bearing bounds are:
 
 No numeric control increases maximum level, cache, terrain leaf, preparation,
 scenery residency, tree or upload budgets. Disabling the planetary radius cap
-means SSE-only selection under the existing leaf bound, never unlimited work.
+retains SSE and optional local coverage requests under the existing leaf bound,
+never unlimited work.
 
 ## App integration contract
 
@@ -66,7 +73,8 @@ terrain selector with `policy.apply_to_selector(selector)` at startup and each
 change. This returns an updated selector while retaining its viewport, maximum
 level, root error estimate and leaf ceiling. It removes any previous radius cap
 and regional floor; `SceneryRuntime::terrain_selector` adds the current coverage
-request afterward. Keep the live terrain state/cache and pending atomic terrain
+request afterward. Source-aware selection separately uses the current source’s
+coarsest-coverage hint with the policy’s detail radius. Keep the live terrain state/cache and pending atomic terrain
 transaction intact. Do not change physical `Terrain` or its source configuration.
 
 Construct scenery with `SceneryRuntime::new_with_draw_distance(startup, policy)`.

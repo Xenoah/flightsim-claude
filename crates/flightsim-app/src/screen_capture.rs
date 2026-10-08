@@ -214,9 +214,11 @@ fn capture_screenshot(
     }
     let ready = state.previous_ready.as_ref().expect("stable ready scene");
     info!(
-        "screenshot CPU ready: {} displayed, {} live, {} desired, live_match {}, availability_settled {}, stitching false, overlay revision {}/{}, pending false, precision hidden {}, runway {:?}, origin {:.6},{:.6}, discovery missing {}, failed {}, capacity-limited updates {}; same scene on consecutive frames, not GPU completion",
+        "screenshot CPU ready: {} displayed, {} live ({} primary, {} fallback), {} desired, live_match {}, availability_settled {}, stitching false, overlay revision {}/{}, pending false, precision hidden {}, runway {:?}, origin {:.6},{:.6}, discovery missing {}, failed {}, capacity-limited updates {}; same scene on consecutive frames, not GPU completion",
         ready.surfaces.len(),
         streaming.live.len(),
+        streaming.live.len() - streaming.live.fallback_len(),
+        streaming.live.fallback_len(),
         streaming.live.desired_len(),
         streaming.live.matches_desired(),
         terrain_readiness

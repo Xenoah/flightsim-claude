@@ -12,6 +12,10 @@
 [2026-10-01 統合 QA](qa/overnight-status-2026-10-01.md) を優先する。**
 [2026-10-07 backlog reconciliation](qa/backlog-reconciliation-2026-10-07.md) に、同じ受け入れ条件を維持した追加検査と未解決の配布・実機・目視条件を記録する。
 下の歴史欄の「未実装」「次」は各記録当時の意味であり、現状を上書きしない。
+地域 DEM の先頭レベルより SSE が粗くなる高高度の欠落は、
+[ADR-0028](adr/0028-bounded-primary-terrain-coverage.md) の局所 coverage hint で修正する。
+物理・replay・描画予算・配布ゲートは変更しない。受け入れ範囲と残件は
+[高高度の追加 QA](qa/regional-high-altitude-2026-10-07.md) を参照。
 
 **2026-10-02 の世界地形・気候の追加分は [操作ガイド](global-map.md) と
 [最終統合 QA](qa/global-map-integration-2026-10-02.md) を先に参照する。**

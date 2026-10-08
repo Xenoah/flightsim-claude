@@ -142,6 +142,24 @@ fn benchmarks(criterion: &mut Criterion) {
             bencher.iter(|| black_box(selector.select(black_box(camera))).tiles.len());
         });
     }
+    let coverage = flightsim_world::PrimaryCoverage::from_tiles([
+        TileId::new(10, 1077, 244),
+        TileId::new(10, 1078, 244),
+    ])
+    .unwrap();
+    let camera = Geodetic::from_degrees(47.068, 9.501, 3522.675).to_ecef();
+    for (label, hint) in [
+        ("balzers_3km_sse", None),
+        ("balzers_3km_primary_coverage", Some(&coverage)),
+    ] {
+        group.bench_function(label, |bencher| {
+            bencher.iter(|| {
+                black_box(selector.select_with_coverage(black_box(camera), Meters(522.675), hint))
+                    .tiles
+                    .len()
+            });
+        });
+    }
     group.finish();
 }
 

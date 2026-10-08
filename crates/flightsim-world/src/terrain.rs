@@ -51,6 +51,12 @@ pub trait TileSource {
         true
     }
 
+    /// Optional immutable, in-memory render coverage hint. This never changes
+    /// physical sampling, validates a payload, or rules out future primary reads.
+    fn primary_coverage(&self) -> Option<&crate::PrimaryCoverage> {
+        None
+    }
+
     /// Whether a separate, complete-planet fallback pass is available.
     fn has_fallback(&self) -> bool {
         false
@@ -139,12 +145,32 @@ impl std::error::Error for TerrainError {
 #[derive(Debug, Clone)]
 pub struct DiskTileSource {
     root: PathBuf,
+    coverage: Option<crate::PrimaryCoverage>,
 }
 
 impl DiskTileSource {
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            coverage: None,
+        }
+    }
+
+    /// Add a bounded metadata snapshot for render-only regional discovery.
+    /// Call at source preparation, never during a streaming update. Recreate
+    /// the snapshot to discover later additions; ordinary reads remain dynamic.
+    ///
+    /// # Errors
+    /// Snapshot I/O/limits fail without returning a partial coverage index.
+    pub fn with_coverage_index(mut self) -> Result<Self, TerrainError> {
+        self.coverage = Some(crate::PrimaryCoverage::from_directory(&self.root).map_err(
+            |source| TerrainError::Io {
+                path: self.root.clone(),
+                source,
+            },
+        )?);
+        Ok(self)
     }
 
     #[must_use]
@@ -154,6 +180,9 @@ impl DiskTileSource {
 }
 
 impl TileSource for DiskTileSource {
+    fn primary_coverage(&self) -> Option<&crate::PrimaryCoverage> {
+        self.coverage.as_ref()
+    }
     fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
         let path = self.root.join(tile_relative_path(id));
 
@@ -226,6 +255,9 @@ impl<T: TileSource + ?Sized> TileSource for Box<T> {
     fn primary_reads_possible(&self) -> bool {
         (**self).primary_reads_possible()
     }
+    fn primary_coverage(&self) -> Option<&crate::PrimaryCoverage> {
+        (**self).primary_coverage()
+    }
     fn has_fallback(&self) -> bool {
         (**self).has_fallback()
     }
@@ -247,6 +279,9 @@ impl<T: TileSource + ?Sized> TileSource for &T {
     }
     fn primary_reads_possible(&self) -> bool {
         (**self).primary_reads_possible()
+    }
+    fn primary_coverage(&self) -> Option<&crate::PrimaryCoverage> {
+        (**self).primary_coverage()
     }
     fn has_fallback(&self) -> bool {
         (**self).has_fallback()

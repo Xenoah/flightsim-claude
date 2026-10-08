@@ -49,6 +49,7 @@ pub struct LodSelector {
     max_tiles: usize,
     near_detail: Option<(Meters, u8)>,
     refinement_radius: Option<(Meters, u8)>,
+    primary_coverage_radius: Meters,
 }
 
 impl LodSelector {
@@ -94,6 +95,7 @@ impl LodSelector {
             max_tiles: DEFAULT_MAX_TILES,
             near_detail: None,
             refinement_radius: None,
+            primary_coverage_radius: Meters(5_500.0),
         }
     }
 
@@ -134,8 +136,24 @@ impl LodSelector {
         self
     }
 
-    /// Restore the original SSE-only policy, for example after leaving an
-    /// explicitly enabled regional scenery area.
+    /// Limit primary-coverage discovery to a horizontal neighborhood. This is
+    /// independent of AGL and never raises a global minimum LOD. Existing
+    /// refinement-radius, maximum-level and leaf limits still take precedence.
+    ///
+    /// # Panics
+    /// Radius must be finite and positive.
+    #[must_use]
+    pub fn with_primary_coverage_radius(mut self, radius: Meters) -> Self {
+        assert!(
+            radius.is_finite() && radius.get() > 0.0,
+            "invalid primary coverage radius"
+        );
+        self.primary_coverage_radius = radius;
+        self
+    }
+
+    /// Remove the optional scenery near-detail floor. Ordinary SSE and the
+    /// current source's independent coarsest-coverage hint remain applicable.
     #[must_use]
     pub const fn without_near_detail(mut self) -> Self {
         self.near_detail = None;
@@ -230,6 +248,20 @@ impl LodSelector {
     /// per-tile terrain bound, and remote relief still uses the error estimate.
     #[must_use]
     pub fn select_with_surface(&self, camera: Ecef, ground_elevation: Meters) -> LodSelection {
+        self.select_with_coverage(camera, ground_elevation, None)
+    }
+
+    /// Request the coarsest indexed primary coverage near the observer before
+    /// resuming ordinary SSE. No source reads occur here; the renderer still
+    /// validates/loads every requested payload under its existing frame budget.
+    /// An absent hint is exactly the original selection policy.
+    #[must_use]
+    pub fn select_with_coverage(
+        &self,
+        camera: Ecef,
+        ground_elevation: Meters,
+        coverage: Option<&crate::PrimaryCoverage>,
+    ) -> LodSelection {
         let ground_elevation = if ground_elevation.is_finite() {
             ground_elevation
         } else {
@@ -251,6 +283,14 @@ impl LodSelector {
                 Meters::ZERO,
             );
             (surface.to_ecef(), surface, radius, level)
+        });
+        let coverage_surface = coverage.map(|_| {
+            Geodetic::new(
+                camera_position.latitude,
+                camera_position.longitude,
+                Meters::ZERO,
+            )
+            .to_ecef()
         });
         let mut leaves: BTreeSet<_> = TileId::roots().into_iter().collect();
         let mut pending = BinaryHeap::new();
@@ -275,10 +315,15 @@ impl LodSelector {
                 id.level < level
                     && distance_to_bounds(surface, position, id.bounds()).get() <= radius.get()
             });
-            if near || error > self.max_screen_space_error {
+            let primary = coverage.is_some_and(|coverage| coverage.requires_refinement(id))
+                && coverage_surface.is_some_and(|surface| {
+                    conservative_distance_to_bounds(surface, id.bounds()).get()
+                        <= self.primary_coverage_radius.get()
+                });
+            if near || primary || error > self.max_screen_space_error {
                 // SSE is nonnegative. IEEE bit ordering is numeric ordering;
                 // the tile ID provides stable ordering for equal priorities.
-                pending.push((near, error.to_bits(), Reverse(id)));
+                pending.push((near || primary, error.to_bits(), Reverse(id)));
             }
         };
         for id in TileId::roots() {
@@ -786,5 +831,120 @@ mod tests {
     #[should_panic(expected = "near detail radius must be positive and finite")]
     fn invalid_near_detail_radius_is_rejected() {
         let _ = selector().with_near_detail(Meters(f64::NAN), 13);
+    }
+}
+
+#[cfg(test)]
+mod primary_coverage_tests {
+    use super::*;
+    use crate::PrimaryCoverage;
+    use flightsim_core::Degrees;
+
+    fn selector(max: u8) -> LodSelector {
+        LodSelector::new(
+            16.0,
+            1080.0,
+            Degrees(60.0).to_radians(),
+            max,
+            Meters(20_000.0),
+        )
+    }
+    fn assert_complete(selection: &LodSelection) {
+        let area: f64 = selection
+            .tiles
+            .iter()
+            .map(|id| id.bounds().width().get() * id.bounds().height().get())
+            .sum();
+        assert!((area - core::f64::consts::TAU * core::f64::consts::PI).abs() < 1e-9);
+        let ids: BTreeSet<_> = selection.tiles.iter().copied().collect();
+        for id in &ids {
+            let mut ancestor = id.parent();
+            while let Some(parent) = ancestor {
+                assert!(!ids.contains(&parent));
+                ancestor = parent.parent();
+            }
+        }
+    }
+    #[test]
+    fn balzers_roots_survive_the_old_high_altitude_dropout_boundary() {
+        let roots = [TileId::new(10, 1077, 244), TileId::new(10, 1078, 244)];
+        let coverage = PrimaryCoverage::from_tiles(roots).unwrap();
+        for agl in [2100.0, 2200.0, 2300.0, 3000.0, 10_000.0] {
+            let camera = Geodetic::from_degrees(47.068, 9.501, 522.675 + agl).to_ecef();
+            let selection =
+                selector(13).select_with_coverage(camera, Meters(522.675), Some(&coverage));
+            assert!(!selection.truncated);
+            for root in roots {
+                assert!(selection.tiles.contains(&root), "{agl} {root:?}");
+            }
+            assert_complete(&selection);
+            if agl >= 2300.0 {
+                assert!(
+                    !selector(13)
+                        .select_with_surface(camera, Meters(522.675))
+                        .tiles
+                        .contains(&roots[0])
+                );
+            }
+        }
+    }
+    #[test]
+    fn no_hint_empty_hint_and_distant_region_preserve_exact_sse_selection() {
+        let camera = Geodetic::from_degrees(47.068, 9.501, 3522.675).to_ecef();
+        let distant = PrimaryCoverage::from_tiles([TileId::containing(
+            13,
+            Geodetic::from_degrees(-30.0, -100.0, 0.0),
+        )])
+        .unwrap();
+        let base = selector(13).select_with_surface(camera, Meters(522.675));
+        for hint in [None, Some(&PrimaryCoverage::default()), Some(&distant)] {
+            assert_eq!(
+                base,
+                selector(13).select_with_coverage(camera, Meters(522.675), hint)
+            );
+        }
+    }
+    #[test]
+    fn sparse_coverage_maximum_level_radius_and_budget_remain_bounded_at_seams() {
+        for (lat, lon) in [
+            (47.068, 9.501),
+            (0.0, 179.999),
+            (90.0, 80.0),
+            (-90.0, -170.0),
+        ] {
+            let position = Geodetic::from_degrees(lat, lon, 3000.0);
+            let root = TileId::containing(13, position);
+            let coverage = PrimaryCoverage::from_tiles([root]).unwrap();
+            for maximum in [9, 13] {
+                for budget in [2, 32, 4096] {
+                    let configured = selector(maximum)
+                        .with_max_tiles(budget)
+                        .with_primary_coverage_radius(Meters(1000.0));
+                    let selection = configured.select_with_coverage(
+                        position.to_ecef(),
+                        Meters::ZERO,
+                        Some(&coverage),
+                    );
+                    assert!(selection.tiles.len() <= budget);
+                    assert!(selection.tiles.iter().all(|id| id.level <= maximum));
+                    assert_complete(&selection);
+                    if budget == 2 {
+                        assert!(selection.truncated);
+                    }
+                    if maximum == 13 && budget == 4096 {
+                        assert!(selection.tiles.contains(&root));
+                    }
+                }
+            }
+        }
+        let camera = Geodetic::from_degrees(47.068, 9.501, 3000.0);
+        let remote = TileId::containing(13, camera.offset_by(Meters(25_000.0), Meters::ZERO));
+        let coverage = PrimaryCoverage::from_tiles([remote]).unwrap();
+        let configured = selector(13)
+            .with_primary_coverage_radius(Meters(100_000.0))
+            .with_refinement_radius(Meters(1000.0), 6);
+        let cut = configured.select_with_coverage(camera.to_ecef(), Meters::ZERO, Some(&coverage));
+        assert!(!cut.tiles.contains(&remote));
+        assert_complete(&cut);
     }
 }

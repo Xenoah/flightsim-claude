@@ -488,7 +488,8 @@ pub enum TerrainMeshProvenance {
 ///
 /// Missing/error reads are retried after 120 updates. Missing desired leaves can
 /// use ancestors; existing visible descendants survive unavailable coarsening.
-/// This does not discover unseen finer descendants of an unavailable coarse tile.
+/// Indexed primary coverage can request finer regional roots before streaming;
+/// sources without that optional hint retain the existing ancestor-only search.
 ///
 /// # Panics
 ///
@@ -503,7 +504,7 @@ pub fn update_terrain_selection<S: TileSource>(
     frame_budget: usize,
     mesh_sink: &mut dyn FnMut(TileId, &DemTile),
 ) -> TerrainUpdate {
-    let selection = selector.select(camera);
+    let selection = selector.select_with_coverage(camera, Meters::ZERO, source.primary_coverage());
     state.lod_truncated = selection.truncated;
     update_selected_tiles(
         selection.tiles.into_iter().collect(),
@@ -533,7 +534,8 @@ pub fn update_terrain_selection_with_surface<S: TileSource>(
     frame_budget: usize,
     mesh_sink: &mut dyn FnMut(TileId, &DemTile),
 ) -> TerrainUpdate {
-    let selection = selector.select_with_surface(camera, ground_elevation);
+    let selection =
+        selector.select_with_coverage(camera, ground_elevation, source.primary_coverage());
     state.lod_truncated = selection.truncated;
     update_selected_tiles(
         selection.tiles.into_iter().collect(),
@@ -562,7 +564,8 @@ pub fn update_terrain_selection_with_surface_and_provenance<S: TileSource>(
     frame_budget: usize,
     mesh_sink: &mut dyn FnMut(TileId, &DemTile, TerrainMeshProvenance),
 ) -> TerrainUpdate {
-    let selection = selector.select_with_surface(camera, ground_elevation);
+    let selection =
+        selector.select_with_coverage(camera, ground_elevation, source.primary_coverage());
     state.lod_truncated = selection.truncated;
     update_selected_tiles_with_provenance(
         selection.tiles.into_iter().collect(),
@@ -930,6 +933,7 @@ mod tests {
         no_primary: bool,
         fallback_max_level: Option<u8>,
         fallback_errors: BTreeSet<TileId>,
+        coverage: Option<flightsim_world::PrimaryCoverage>,
     }
 
     impl Source {
@@ -939,6 +943,9 @@ mod tests {
     }
 
     impl TileSource for Source {
+        fn primary_coverage(&self) -> Option<&flightsim_world::PrimaryCoverage> {
+            self.coverage.as_ref()
+        }
         fn load(&self, id: TileId) -> Result<Option<DemTile>, TerrainError> {
             assert!(
                 !self.no_primary,
@@ -2661,5 +2668,83 @@ mod tests {
             &mut |_, _| {},
         );
         assert!(!state.selection_truncated());
+    }
+    #[test]
+    fn indexed_sparse_region_survives_climb_move_and_missing_payloads_under_budget() {
+        let region = TileId::new(10, 1078, 244);
+        let selector = LodSelector::new(
+            16.0,
+            1080.0,
+            flightsim_core::Degrees(60.0).to_radians(),
+            13,
+            Meters(20_000.0),
+        );
+        for outcome in [
+            LoadOutcome::Loaded,
+            LoadOutcome::Missing,
+            LoadOutcome::Failed,
+        ] {
+            let missing = !matches!(outcome, LoadOutcome::Loaded);
+            let mut source = Source {
+                fallback: true,
+                coverage: Some(flightsim_world::PrimaryCoverage::from_tiles([region]).unwrap()),
+                ..Default::default()
+            };
+            if !missing {
+                source.add(region);
+            }
+            if matches!(outcome, LoadOutcome::Failed) {
+                source.malformed.insert(region);
+            }
+            let mut cache = TileCache::new(1_000_000);
+            let mut state = TerrainSelectionState::default();
+            let mut globe_seeded = false;
+            for (lat, lon, agl) in [
+                (47.068, 9.501, 3000.0),
+                (47.068, 9.501, 100.0),
+                (47.068, 9.501, 3000.0),
+                (47.068, 9.520, 3000.0),
+                (48.0, 10.0, 3000.0),
+                (47.068, 9.501, 3000.0),
+            ] {
+                let camera = Geodetic::from_degrees(lat, lon, agl).to_ecef();
+                state.observe_readiness(true);
+                let mut ready = false;
+                for _ in 0..500 {
+                    let update = update_terrain_selection_with_surface_and_provenance(
+                        &selector,
+                        &source,
+                        &mut cache,
+                        &mut state,
+                        camera,
+                        Meters::ZERO,
+                        1,
+                        &mut |_, _, _| {},
+                    );
+                    assert!(update.load_attempts <= 1 && update.prepared.len() <= 1);
+                    assert!(cache.used_bytes() <= cache.capacity_bytes());
+                    check_no_overlap(&state);
+                    let complete = TileId::roots()
+                        .into_iter()
+                        .all(|root| covers_region(root, &state.live));
+                    if globe_seeded {
+                        assert!(complete, "previous complete coverage was lost");
+                    }
+                    globe_seeded |= complete;
+                    if state.observed_readiness() == Some(true) {
+                        ready = true;
+                        break;
+                    }
+                }
+                assert!(ready, "streaming failed to settle at {lat},{lon},{agl}");
+                if lat < 47.1 && agl >= 3000.0 && !missing {
+                    assert!(state.contains(region));
+                    assert!(!state.fallback_resident.contains(&region));
+                }
+                if missing {
+                    assert_eq!(state.fallback_len(), state.len());
+                }
+            }
+        }
     }
 }

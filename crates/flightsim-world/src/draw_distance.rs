@@ -196,6 +196,7 @@ impl DrawDistancePolicy {
     pub fn apply_to_selector(self, selector: LodSelector) -> LodSelector {
         let selector = selector
             .with_screen_space_error(self.screen_space_error)
+            .with_primary_coverage_radius(self.terrain_detail_radius)
             .without_near_detail()
             .without_refinement_radius();
         self.refinement_radius.map_or(selector, |radius| {
