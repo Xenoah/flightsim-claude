@@ -377,7 +377,10 @@ stable render origin must be observed on consecutive frames, allowing a prior
 extraction/render-preparation opportunity. This is CPU readiness, not a GPU or
 shader completion guarantee. Signature work runs only while a screenshot is
 requested and unfinished; simulation, render budgets and capture acceptance
-timeouts remain unchanged.
+timeouts remain unchanged. Native screenshot sessions additionally bound uncompleted render-frame
+batches to two using queue-completion credits around the complete Render
+schedule; ordinary launches install no gate. See [ADR-0029](docs/adr/0029-capture-render-backpressure.md).
+This is backpressure, not a GPU readiness or deadline guarantee.
 
 
 ソースは全てオープンデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）。

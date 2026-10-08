@@ -31,6 +31,9 @@ flightsim-audio.workspace = true
 flightsim-ui.workspace = true
 flightsim-net.workspace = true
 bevy.workspace = true
+# Bevy does not re-export PollError. Use the already-locked type directly rather
+# than classifying production errors by their display/debug strings.
+wgpu-types = { version = "=27.0.1", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

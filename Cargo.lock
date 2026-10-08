@@ -2430,6 +2430,7 @@ dependencies = [
  "flightsim-world",
  "serde",
  "serde_json",
+ "wgpu-types",
 ]
 
 [[package]]

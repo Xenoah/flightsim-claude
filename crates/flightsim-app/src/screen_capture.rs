@@ -21,6 +21,8 @@ use crate::{ActiveRunway, ExteriorModel, PendingModelFit, Startup, TerrainStream
 pub(super) struct RunwaySurface;
 
 pub(super) fn configure(app: &mut App) {
+    #[cfg(not(target_family = "wasm"))]
+    crate::capture_backpressure::configure(app);
     if app.world().resource::<Startup>().screenshot.is_some() {
         app.init_resource::<CaptureTerrainReadiness>();
     }
@@ -254,7 +256,17 @@ fn capture_screenshot(
     }
 }
 
-fn save_capture(captured: On<ScreenshotCaptured>, startup: Res<Startup>) {
+fn save_capture(
+    captured: On<ScreenshotCaptured>,
+    startup: Res<Startup>,
+    #[cfg(not(target_family = "wasm"))] session: Option<
+        Res<crate::capture_backpressure::CaptureSession>,
+    >,
+) {
+    #[cfg(not(target_family = "wasm"))]
+    if let Some(session) = session {
+        session.finish();
+    }
     let Some(path) = startup.screenshot.as_ref() else {
         return;
     };
@@ -787,6 +799,56 @@ mod tests {
         assert!(save_capture_image(image(), &directory.join("missing/failed.png")).is_err());
         assert!(save_capture_image(image(), &directory.join("wrong.jpg")).is_err());
         std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn screenshot_events_end_backpressure_on_save_success_failure_and_cancellation() {
+        let directory = std::env::temp_dir().join(format!(
+            "flightsim-capture-session-test-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        for (name, remove_request, saved) in [
+            ("complete.png", false, true),
+            ("invalid.jpg", false, false),
+            ("cancelled.png", true, false),
+        ] {
+            let mut app = capture_app();
+            let session = crate::capture_backpressure::CaptureSession::default();
+            app.insert_resource(session.clone());
+            let path = directory.join(name);
+            app.world_mut().resource_mut::<Startup>().screenshot = Some(path.clone());
+            for _ in 0..30 {
+                app.update();
+            }
+            assert_eq!(requests(&mut app), 1);
+            let entity = app
+                .world_mut()
+                .query_filtered::<Entity, With<Screenshot>>()
+                .single(app.world())
+                .unwrap();
+            if remove_request {
+                app.world_mut().resource_mut::<Startup>().screenshot = None;
+            }
+            assert!(session.active());
+            app.world_mut().trigger(ScreenshotCaptured {
+                entity,
+                image: image(),
+            });
+            assert!(!session.active());
+            // A duplicate/late delivery cannot reopen the one-shot session.
+            app.world_mut().trigger(ScreenshotCaptured {
+                entity,
+                image: image(),
+            });
+            assert!(!session.active());
+            assert_eq!(path.exists(), saved);
+            if saved {
+                std::fs::remove_file(path).unwrap();
+            }
+        }
         std::fs::remove_dir(directory).unwrap();
     }
 
