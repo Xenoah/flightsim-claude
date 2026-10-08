@@ -43,6 +43,10 @@ SOURCE_PATHS = {
     'crates/flightsim-render/tests/tonemapping_modes.rs',
     'scripts/check-analytical-swift-recipe.py', 'scripts/check-tonemapping-build.py',
     'scripts/collect-dependency-notices.py', 'scripts/check-commercial-readiness.py',
+    # Native toolchain/linker observations rely on this bounded collector and
+    # its exact-output, ambiguity, origin and closed-schema witnesses.
+    'scripts/collect-analytical-runtime-facts.py',
+    'scripts/tests/test_analytical_runtime_facts.py',
     'scripts/check-swift-windows-candidate.py', 'scripts/stage-commercial-candidate.py',
     'scripts/check-release-authorization.py', 'scripts/replay-candidate-contract.json',
     'scripts/tests/test_analytical_swift_recipe.py', 'scripts/tests/test_tonemapping_build.py',
@@ -98,7 +102,7 @@ def validate_header(value, source_sha):
 
 
 def source_evidence(repo, expected):
-    # This preserves all 402 reviewed source pins and 102 independent anchors.
+    # This preserves all 404 reviewed source pins and 102 independent anchors.
     source = candidate.source_inputs(repo, expected)
     contract = json.loads((repo / CONTRACT).read_text())
     require(contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY

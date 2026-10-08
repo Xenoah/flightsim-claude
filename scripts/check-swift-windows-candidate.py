@@ -62,6 +62,10 @@ REPLAY_CONTRACT_PATHS = {
     'crates/flightsim-app/src/aircraft_profile.rs',
     'crates/flightsim-app/src/distribution.rs',
     'crates/flightsim-app/src/main.rs',
+    # Rebase following delegates state transport to the input camera rig.
+    # Keep the whole helper and the actual app reset/basis witnesses together.
+    'crates/flightsim-input/src/camera.rs',
+    'crates/flightsim-app/src/runtime_tests.rs',
     'crates/flightsim-app/src/replay_policy.rs',
     'crates/flightsim-app/src/replay_runtime.rs',
     'crates/flightsim-app/src/replay_migration_tests.rs',

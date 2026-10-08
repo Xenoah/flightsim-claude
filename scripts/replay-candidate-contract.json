@@ -1,6 +1,6 @@
 {
   "contract": "swift-candidate-replay-v3-v1",
-  "reviewed_source": "7d8c8770a5f3aaa69f36303ac11390ff0755a037",
+  "reviewed_source": "bda51fd222a339dbbf6bee52097b7a02e840798f",
   "schema_version": 1,
   "source_sha256": {
     ".gitattributes": "16236f1c2ad1e4ffb9d4bb173ca21d371dbbe4e07cd8ad8bbfbb8b2c5a913b73",
@@ -26,7 +26,7 @@
     "crates/flightsim-app/src/distribution.rs": "9ff2482986e408e99aafed01b4ca64a5d08694f13df4081324cc3fcdc852f701",
     "crates/flightsim-app/src/flight_session.rs": "6d7a6289ecd7947575f2af52e023a221e463bf29e8f02298e7ea804af5b19c68",
     "crates/flightsim-app/src/jet_runtime_tests.rs": "5b5c47e4d6d3cf838944f39bfa52eec14318a7713d3d66da637c3d2bb9cb2847",
-    "crates/flightsim-app/src/main.rs": "72575f0d61a087e649541a3da230be0deae6d142d96aa01a3b6d172777c9fd77",
+    "crates/flightsim-app/src/main.rs": "160cc900acbb0029452c4175fee9ba24bc26611ce41faaa57a97a8426b97811a",
     "crates/flightsim-app/src/near_static_turboprop_session.rs": "492a5de374b69b50ff5a7c2db91cf824f5e8ff8fd5cbae1225ab873a726853dd",
     "crates/flightsim-app/src/nearstatic_lifecycle_tests.rs": "4a5c5c9345a405d061e13847f00ea68b71a5fa01ea6d3f02076dd9bae5750809",
     "crates/flightsim-app/src/nearstatic_runtime_tests.rs": "a39355a93a5e669ad0a45d6ed88680a79babcc63e12bfe444f4a2f309fa333db",
@@ -34,6 +34,7 @@
     "crates/flightsim-app/src/replay_migration_tests.rs": "05b3b6ca71e696e6c88e5aae6da300fc7c7eec07f98e23d122a5805adb59cef6",
     "crates/flightsim-app/src/replay_policy.rs": "f6c40374194a2d51a0e7ee317c5227ef285edcc0e44ad4a479732d54aa26ce35",
     "crates/flightsim-app/src/replay_runtime.rs": "6f4fe36a36ce3fdf7ec2b0bd2e3e67d8dd861db81a918173bd2c60d37f53920b",
+    "crates/flightsim-app/src/runtime_tests.rs": "2b44a8f17cb9e73f4feb927394d79c00d9fbca1eda3e3fb0f15a2b14ea89553a",
     "crates/flightsim-app/src/screen_capture.rs": "40694e0029491bd0cf0cade97fe518695e7225d0a54b5ae4ccca072faddd5962",
     "crates/flightsim-app/src/traffic_runtime.rs": "ab0791764da79c8a9aed26fc7f6deeb35d692b11fe0af0d078ecb9aeb5d66ff2",
     "crates/flightsim-app/src/turboprop_lifecycle_tests.rs": "03c4ae8312976125cabda8e586a7420af397641f01df7034d565ee7e3031a1b6",
@@ -87,6 +88,7 @@
     "crates/flightsim-fdm/src/turboprop/tests.rs": "3ebc3b5ff74a0e46ff34adec210ae7e0a474e73198264dc7cd3858bd697b147e",
     "crates/flightsim-fdm/src/turbulence.rs": "7a82247e4c567c70770043837ca19f0a4793a6abdb5043bc3e683db86234bd52",
     "crates/flightsim-fdm/tests/support/cedar_boundary_witness.rs": "ef26887d91231c78c5d906c11900a6dd6605289503c4daac4de33537f1ac9476",
+    "crates/flightsim-input/src/camera.rs": "0ac2fcc23695380c22f25e98d89915534c3688c3a7503ad0dda961b15e331f66",
     "crates/flightsim-input/src/lateral_trim_regression.rs": "b5cde00d4bba1f35f3a4748b3a77b89b104336316c98a9b73c7c96a93465d2db",
     "crates/flightsim-input/src/lib.rs": "aaa2a4839b8632baa22ebeff5839fa8dc42adb27bbec77e4398df346753e47e7",
     "crates/flightsim-input/tests/fixtures/legacy-input-v1.json": "b3139b961b09d01a6931d3326d0af7703e28b2ad2d42c711d908eb44c6181e1b",

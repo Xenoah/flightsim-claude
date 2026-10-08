@@ -673,6 +673,30 @@ class CandidateAcceptanceTests(unittest.TestCase):
             path.write_bytes(original)
             self.commit_source_fixture(repo)
 
+    def test_camera_rebase_helper_and_runtime_witness_reject_committed_drift(self):
+        repo, _ = self.source_fixture()
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        mutations = (
+            ("crates/flightsim-input/src/camera.rs",
+             b"self.smoothed = map(self.smoothed);", b"self.smoothed = Vec3::ZERO;"),
+            ("crates/flightsim-app/src/runtime_tests.rs",
+             b"(actual.0 - expected).length() < 0.001,",
+             b"(actual.0 - expected).length() < 1.0,"),
+        )
+        for relative, old, new in mutations:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
     def test_all_expanded_helpers_and_independent_goldens_fail_on_committed_drift(self):
         repo, _ = self.source_fixture()
         for relative in (*candidate.REPLAY_CONTRACT_PATHS, *candidate.INDEPENDENT_REPLAY_HASHES):
@@ -1869,7 +1893,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(candidate.VENDORED_PACKAGE_PATHS), 207)
         self.assertEqual(len(candidate.REPLACEMENT_WITNESS_PATHS), 20)
         self.assertEqual(len(candidate.MODIFIED_SOURCE_POLICY_PATHS), 9)
-        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 402)
+        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 404)
         for prefix, paths in candidate.MODIFIED_SOURCE_BOUNDARIES:
             actual = {path.relative_to(ROOT).as_posix() for path in (ROOT / prefix).rglob('*') if path.is_file()}
             self.assertEqual(actual, {p for p in paths if p.startswith(prefix)}, prefix)

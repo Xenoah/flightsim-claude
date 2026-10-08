@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -325,6 +326,54 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'collection design'):
                 check.reconcile(metadata, graph, repo, 'analytic')
 
+    def test_runtime_facts_helper_and_witness_reject_committed_drift(self):
+        source = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+            for name, value in (('core.autocrlf', 'false'), ('gc.auto', '0'),
+                                ('maintenance.auto', 'false')):
+                subprocess.run(['git', 'config', name, value], cwd=repo, check=True)
+            paths = (check.candidate.REPLAY_CONTRACT_PATHS
+                     | set(check.candidate.INDEPENDENT_REPLAY_HASHES)
+                     | check.SOURCE_PATHS | {check.CONTRACT,
+                        '.gitattributes', 'assets/aircraft/.gitattributes',
+                        'docs/release/.gitattributes'})
+            for relative in paths:
+                target = repo / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((source / relative).read_bytes())
+
+            def commit():
+                subprocess.run(['git', 'add', '.'], cwd=repo, check=True)
+                subprocess.run(['git', '-c', 'user.name=Fixture', '-c',
+                                'user.email=fixture@example.invalid',
+                                'commit', '-qm', 'analytical source fixture'],
+                               cwd=repo, check=True)
+                return check.candidate.git(repo, 'rev-parse', 'HEAD')
+
+            check.source_evidence(repo, commit())
+            mutations = (
+                ('scripts/collect-analytical-runtime-facts.py',
+                 b"require(sys.platform == 'win32', 'native Windows is required')",
+                 b"require(True, 'native Windows is required')"),
+                ('scripts/tests/test_analytical_runtime_facts.py',
+                 b'def test_only_exact_output_argument_and_fingerprint_match(self):',
+                 b'def disabled_exact_output_argument_and_fingerprint_match(self):'),
+            )
+            for relative, old, new in mutations:
+                self.assertIn(relative, check.SOURCE_PATHS)
+                path = repo / relative
+                original = path.read_bytes()
+                self.assertEqual(original.count(old), 1, relative)
+                path.write_bytes(original.replace(old, new))
+                with self.subTest(relative=relative), self.assertRaisesRegex(
+                        ValueError, 'analytical source pin changed') as failure:
+                    check.source_evidence(repo, commit())
+                self.assertIn(relative, str(failure.exception))
+                path.write_bytes(original)
+                check.source_evidence(repo, commit())
+
     def test_old_minimal_audit_and_ordinary_constants_are_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo, capture, receipt, source, luts = fixture(Path(temporary))
@@ -334,7 +383,8 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
             for mode, kind, recipe in [('ordinary', 'app', check.IDENTITY), ('analytic', 'sun-clock', check.IDENTITY), ('analytic', 'app', 'unknown')]:
                 with self.assertRaises(ValueError): check.tone.validate_graph(graph, mode, kind, recipe=recipe)
         self.assertEqual(check.candidate.FEATURES, ['commercial-staging'])
-        self.assertEqual(len(check.candidate.load_replay_contract(Path(__file__).parents[2])['source_sha256']), 402)
+        self.assertEqual(len(check.candidate.load_replay_contract(Path(__file__).parents[2])['source_sha256']), 404)
+        self.assertEqual(len(check.SOURCE_PATHS), 24)
         self.assertEqual(len(check.candidate.INDEPENDENT_REPLAY_HASHES), 102)
 
 
