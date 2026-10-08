@@ -334,7 +334,7 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
             for mode, kind, recipe in [('ordinary', 'app', check.IDENTITY), ('analytic', 'sun-clock', check.IDENTITY), ('analytic', 'app', 'unknown')]:
                 with self.assertRaises(ValueError): check.tone.validate_graph(graph, mode, kind, recipe=recipe)
         self.assertEqual(check.candidate.FEATURES, ['commercial-staging'])
-        self.assertEqual(len(check.candidate.load_replay_contract(Path(__file__).parents[2])['source_sha256']), 160)
+        self.assertEqual(len(check.candidate.load_replay_contract(Path(__file__).parents[2])['source_sha256']), 164)
         self.assertEqual(len(check.candidate.INDEPENDENT_REPLAY_HASHES), 102)
 
 

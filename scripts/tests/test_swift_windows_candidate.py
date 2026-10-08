@@ -1475,6 +1475,179 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
                     candidate.validate_evidence(evidence)
 
+    def test_capture_backpressure_keeps_independent_lifecycle_and_engine_anchors(self):
+        # Literal review anchors supplement whole-file pins. This checks source
+        # semantics and dependency identity, never native/GPU execution.
+        import tomllib
+        relative = "crates/flightsim-app/src/capture_backpressure.rs"
+        production = (ROOT / relative).read_text().split("#[cfg(test)]", 1)[0]
+        for anchor in (
+            "const MAX_IN_FLIGHT_FRAMES: usize = 2;",
+            "const SERVICE_WAIT: Duration = Duration::from_millis(100);",
+            "self.0.store(false, Ordering::Release);",
+            ".is_some_and(|complete| complete.load(Ordering::Acquire))",
+            "if self.pending.len() < MAX_IN_FLIGHT_FRAMES {",
+            "service()?;",
+            "let complete = Arc::new(AtomicBool::new(false));",
+            "self.pending.push_back(complete.clone());",
+            "submission_index: None,",
+            "timeout: Some(SERVICE_WAIT),",
+            "Ok(_) | Err(PollError::Timeout) => Ok(()),",
+            "Err(error) => Err(error),",
+            '.unwrap_or_else(|error| panic!("screenshot GPU backpressure failed: {error}"));',
+            ".on_submitted_work_done(move || complete.store(true, Ordering::Release));",
+        ):
+            self.assertEqual(production.count(anchor), 1, anchor)
+        configure = production.split("pub(super) fn configure", 1)[1].split("fn cancel_removed_request", 1)[0]
+        self.assertLess(configure.index(".is_none()"), configure.index("let session = CaptureSession::default();"))
+        self.assertIn("return;", configure[:configure.index("let session = CaptureSession::default();")])
+        self.assertIn("render_app.update_schedule = Some(CaptureRender.intern());", configure)
+        self.assertIn(".add_systems(Last, cancel_removed_request);", configure)
+        wrapper = production.split("fn render_capture_frame", 1)[1]
+        order = [wrapper.index(value) for value in (
+            ".wait_for_credit(&session, || {", "world.run_schedule(Render);",
+            "if session.active() {", "let complete = credits.submitted();",
+            ".on_submitted_work_done(move || complete.store(true, Ordering::Release));",
+        )]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(production.count("world.run_schedule(Render);"), 1)
+        for forbidden in (".set_extract(", ".submit(", ".run_if("):
+            self.assertNotIn(forbidden, production)
+        main = (ROOT / "crates/flightsim-app/src/main.rs").read_text()
+        self.assertIn('#[cfg(not(target_family = "wasm"))]\nmod capture_backpressure;', main)
+        capture = (ROOT / "crates/flightsim-app/src/screen_capture.rs").read_text().split("#[cfg(test)]", 1)[0]
+        self.assertIn('    #[cfg(not(target_family = "wasm"))]\n    crate::capture_backpressure::configure(app);', capture)
+        self.assertIn("state.elapsed < startup.screenshot_delay || state.frames < 30 || !stable", capture)
+        self.assertIn("let stable = state.observe(ready);", capture)
+        saver = capture.split("fn save_capture(", 1)[1].split("fn save_capture_image", 1)[0]
+        self.assertLess(saver.index("session.finish();"), saver.index("let Some(path) = startup.screenshot.as_ref()"))
+        self.assertLess(saver.index("session.finish();"), saver.index("let result = save_capture_image"))
+        self.assertIn("finish_batch_capture(startup.exit_after_screenshot, &result);", saver)
+        manifest = tomllib.loads((ROOT / "crates/flightsim-app/Cargo.toml").read_text())
+        self.assertEqual(manifest["dependencies"]["wgpu-types"],
+                         {"version": "=27.0.1", "default-features": False})
+        workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())
+        self.assertEqual(workspace["workspace"]["dependencies"]["bevy"]["version"], "0.18.1")
+        locked = tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]
+        # These exact upstream packages supplied the independently reviewed
+        # extraction/Render/poll/callback lifecycle; no engine patch was used.
+        for name, version, checksum in (
+            ("bevy_render", "0.18.1", "243523e33fe5dfcebc4240b1eb2fc16e855c5d4c0ea6a8393910740956770f44"),
+            ("bevy_app", "0.18.1", "def9f41aa5bf9b9dec8beda307a332798609cffb9d44f71005e0cfb45164f2f6"),
+            ("wgpu", "27.0.1", "bfe68bac7cde125de7a731c3400723cadaaf1703795ad3f4805f187459cd7a77"),
+            ("wgpu-core", "27.0.3", "27a75de515543b1897b26119f93731b385a19aea165a1ec5f0e3acecc229cae7"),
+            ("wgpu-types", "27.0.1", "afdcf84c395990db737f2dd91628706cb31e86d72e53482320d368e52b5da5eb"),
+        ):
+            matches = [entry for entry in locked if entry["name"] == name and entry["version"] == version]
+            self.assertEqual(len(matches), 1, name)
+            self.assertEqual(matches[0]["checksum"], checksum, name)
+
+    def test_capture_backpressure_rejects_credit_lifecycle_error_and_scope_drift(self):
+        repo, _ = self.source_fixture()
+        helper = "crates/flightsim-app/src/capture_backpressure.rs"
+        capture = "crates/flightsim-app/src/screen_capture.rs"
+        # Each altered complete file is committed, then rejected before a build.
+        # These fixtures do not run altered Rust or claim renderer acceptance.
+        mutations = (
+            (helper, b"const MAX_IN_FLIGHT_FRAMES: usize = 2;",
+             b"const MAX_IN_FLIGHT_FRAMES: usize = usize::MAX;"),
+            (helper, b"Duration::from_millis(100)", b"Duration::from_millis(60_000)"),
+            (helper, b"self.0.store(false, Ordering::Release);", b"self.0.store(true, Ordering::Release);"),
+            (helper, b".is_some_and(|complete| complete.load(Ordering::Acquire))", b".is_some_and(|_| true)"),
+            (helper, b"if !session.active() {", b"if false {"),
+            (helper, b"self.pending.clear();", b"// retain cancelled credit debt"),
+            (helper, b"if self.pending.len() < MAX_IN_FLIGHT_FRAMES {", b"if true {"),
+            (helper, b"service()?;", b"let _ = service();"),
+            (helper, b"service()?;", b"service()?; self.pending.pop_front();"),
+            (helper, b"let complete = Arc::new(AtomicBool::new(false));", b"let complete = Arc::new(AtomicBool::new(true));"),
+            (helper, b"self.pending.push_back(complete.clone());",
+             b"self.pending.push_back(Arc::new(AtomicBool::new(true)));"),
+            (helper, b".screenshot\n        .is_none()", b".screenshot\n        .is_some()"),
+            (helper, b"render_app.update_schedule = Some(CaptureRender.intern());",
+             b"render_app.update_schedule = Some(Render.intern());"),
+            (helper, b".wait_for_credit(&session, || {\n                match device.poll(PollType::Wait {",
+             b".wait_for_credit(&CaptureSession::default(), || {\n                match device.poll(PollType::Wait {"),
+            (helper, b"timeout: Some(SERVICE_WAIT),", b"timeout: None,"),
+            (helper, b"Ok(_) | Err(PollError::Timeout) => Ok(()),", b"Ok(_) | Err(_) => Ok(()),"),
+            (helper, b"Err(error) => Err(error),", b"Err(_) => Ok(()),"),
+            (helper, b'.unwrap_or_else(|error| panic!("screenshot GPU backpressure failed: {error}"));',
+             b".unwrap_or_else(|_| ());"),
+            (helper, b"world.run_schedule(Render);", b"// omit the original Render lifecycle"),
+            (helper, b"if session.active() {", b"if true {"),
+            (helper, b".on_submitted_work_done(move || complete.store(true, Ordering::Release));",
+             b".on_submitted_work_done(move || drop(complete));"),
+            (helper, b"assert_eq!(render_app.update_schedule, Some(Render.intern()));",
+             b"assert_eq!(render_app.update_schedule, render_app.update_schedule);"),
+            ("crates/flightsim-app/src/main.rs",
+             b'#[cfg(not(target_family = "wasm"))]\nmod capture_backpressure;', b"mod capture_backpressure;"),
+            (capture, b"crate::capture_backpressure::configure(app);", b"let _ = app;"),
+            (capture, b"if let Some(session) = session {\n        session.finish();\n    }",
+             b"if let Some(session) = session {\n        let _ = session;\n    }"),
+            (capture, b"state.elapsed < startup.screenshot_delay || state.frames < 30 || !stable",
+             b"state.elapsed < startup.screenshot_delay || state.frames < 1 || !stable"),
+            (capture, b"let stable = state.observe(ready);", b"let stable = true;"),
+            ("crates/flightsim-app/Cargo.toml",
+             b'wgpu-types = { version = "=27.0.1", default-features = false }',
+             b'wgpu-types = { version = "=27.0.1", default-features = true }'),
+            ("Cargo.toml", b'bevy = { version = "0.18.1",', b'bevy = { version = "0.19.0",'),
+            ("Cargo.lock", b'afdcf84c395990db737f2dd91628706cb31e86d72e53482320d368e52b5da5eb', b'0' * 64),
+        )
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
+        for relative, old, new in mutations:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, "canonical baseline changed") as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_capture_backpressure_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        paths = candidate.CAPTURE_BACKPRESSURE_PATHS | {
+            "crates/flightsim-app/src/main.rs", "crates/flightsim-app/src/screen_capture.rs",
+        }
+        self.assertEqual(len(paths), 6)
+        for relative in sorted(paths):
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            for mutation in ("missing file", "missing reviewed record", "changed canonical digest",
+                             "changed checkout digests", "removed contract row"):
+                changed = json.loads(json.dumps(source))
+                if mutation == "missing file":
+                    changed["files"] = [r for r in changed["files"] if r["path"] != relative]
+                elif mutation == "missing reviewed record":
+                    del changed["reviewed_replay_source_evidence"][relative]
+                elif mutation == "changed canonical digest":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                elif mutation == "changed checkout digests":
+                    changed["reviewed_replay_source_evidence"][relative]["canonical_sha256"] = "0" * 64
+                    changed["reviewed_replay_source_evidence"][relative]["checkout_sha256"] = "0" * 64
+                    for record in changed["files"]:
+                        if record["path"] == relative:
+                            record["checkout_sha256"] = "0" * 64
+                else:
+                    del changed["replay_contract"]["source_sha256"][relative]
+                    changed["replay_contract_text"] = json.dumps(changed["replay_contract"])
+                    changed["replay_contract_sha256"] = candidate.hashlib.sha256(
+                        changed["replay_contract_text"].encode()).hexdigest()
+                    for record in changed["files"]:
+                        if record["path"] == candidate.REPLAY_CONTRACT_PATH:
+                            record["checkout_sha256"] = changed["replay_contract_sha256"]
+                            record["checkout_bytes"] = len(changed["replay_contract_text"].encode())
+                candidate.write_json(evidence / "source-inputs.json", changed)
+                changed_report = {**report,
+                                  "source_inputs_sha256": candidate.digest(evidence / "source-inputs.json"),
+                                  "replay_contract_sha256": changed["replay_contract_sha256"]}
+                self.seal_report(evidence, changed_report)
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
         self.checkout_source_fixture(repo, "crlf")

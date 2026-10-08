@@ -278,6 +278,16 @@ REGIONAL_COVERAGE_PATHS = {
     "crates/flightsim-content/tests/balzers_package.rs",
 }
 REPLAY_CONTRACT_PATHS |= REGIONAL_COVERAGE_PATHS
+# Capture-only render admission depends on the reviewed complete scheduling
+# helper and the exact Bevy/wgpu build inputs, not just the app call site.
+# These pins cannot establish GPU progress, a native capture or release rights.
+CAPTURE_BACKPRESSURE_PATHS = {
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/flightsim-app/Cargo.toml",
+    "crates/flightsim-app/src/capture_backpressure.rs",
+}
+REPLAY_CONTRACT_PATHS |= CAPTURE_BACKPRESSURE_PATHS
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {
