@@ -1,0 +1,161 @@
+name: Analytical Swift Windows qualification evidence
+
+# Separately reviewed engineering run. The exact push branch is for the
+# integration owner's explicitly reviewed invocation, never ordinary main/PR CI.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qualification/analytical-swift-reviewed']
+
+permissions:
+  contents: read
+
+env:
+  GIT_CONFIG_COUNT: '2'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.eol
+  GIT_CONFIG_VALUE_1: 'lf'
+  PYTHONUTF8: '1'
+
+concurrency:
+  group: analytical-swift-qualification-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  source-ci:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Require successful CI for this exact main push source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: python scripts/check-analytical-source-ci.py --repository "$EXPECTED_REPOSITORY" --source-sha "$EXPECTED_SOURCE_SHA" --output "$RUNNER_TEMP/source-ci.json"
+      - name: Preserve bounded exact source CI binding
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-swift-source-ci-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/source-ci.json
+          if-no-files-found: error
+          retention-days: 7
+
+  regressions:
+    needs: source-ci
+    runs-on: windows-2022
+    timeout-minutes: 185
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact official toolchain and Clippy
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --component clippy --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'exact toolchain installation failed' }
+      - name: Test new capture and projection boundaries
+        shell: pwsh
+        run: |
+          foreach ($test in @('test_analytical_swift_qualification.py', 'test_analytical_runtime_facts.py', 'test_analytical_ui_capabilities.py', 'test_analytical_source_ci.py')) {
+            python -m unittest discover -s scripts/tests -p $test -v
+            if ($LASTEXITCODE -ne 0) { throw 'qualification boundary tests failed' }
+          }
+      - name: Run actual combined regressions and exact tests
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python scripts/qualify-analytical-swift-windows.py --phase regressions --source-sha $env:EXPECTED_SOURCE_SHA --private (Join-Path $env:RUNNER_TEMP 'qualification-private') --evidence (Join-Path $env:RUNNER_TEMP 'qualification-export')
+          if ($LASTEXITCODE -ne 0) { throw 'analytical regression phase failed' }
+      - name: Revalidate bounded output
+        if: always()
+        id: evidence
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python scripts/qualify-analytical-swift-windows.py --validate-evidence (Join-Path $env:RUNNER_TEMP 'qualification-export') --source-sha $env:EXPECTED_SOURCE_SHA --private (Join-Path $env:RUNNER_TEMP 'qualification-private')
+          if ($LASTEXITCODE -ne 0) { throw 'no validated regression export' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Upload regression evidence only
+        if: always() && steps.evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-swift-regressions-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualification-export/qualification.json
+          if-no-files-found: error
+          retention-days: 7
+
+  runtime:
+    needs: source-ci
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install exact official toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'exact toolchain installation failed' }
+      # No cache or downloaded executable. Fresh builds and all bundle bytes stay private.
+      - name: Audit new private builds and capture extracted production runtime
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python scripts/qualify-analytical-swift-windows.py --phase runtime --source-sha $env:EXPECTED_SOURCE_SHA --private (Join-Path $env:RUNNER_TEMP 'qualification-private') --evidence (Join-Path $env:RUNNER_TEMP 'qualification-export')
+          if ($LASTEXITCODE -ne 0) { throw 'analytical runtime phase failed; no qualification or approval' }
+      - name: Revalidate exact export against private evidence
+        if: always()
+        id: evidence
+        shell: pwsh
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python scripts/qualify-analytical-swift-windows.py --validate-evidence (Join-Path $env:RUNNER_TEMP 'qualification-export') --source-sha $env:EXPECTED_SOURCE_SHA --private (Join-Path $env:RUNNER_TEMP 'qualification-private')
+          if ($LASTEXITCODE -ne 0) { throw 'no validated runtime export' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Upload only validated text and fixed Swift PNGs
+        if: always() && steps.evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-swift-runtime-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/qualification-export/qualification.json
+            ${{ runner.temp }}/qualification-export/native-review.json
+            ${{ runner.temp }}/qualification-export/runtime-facts.json
+            ${{ runner.temp }}/qualification-export/ui-capabilities.json
+            ${{ runner.temp }}/qualification-export/default-swift.png
+            ${{ runner.temp }}/qualification-export/day-cockpit.png
+            ${{ runner.temp }}/qualification-export/low-sun.png
+            ${{ runner.temp }}/qualification-export/night-cockpit.png
+            ${{ runner.temp }}/qualification-export/fog-cockpit.png
+            ${{ runner.temp }}/qualification-export/cloud-high.png
+            ${{ runner.temp }}/qualification-export/water-high.png
+            ${{ runner.temp }}/qualification-export/tower-day.png
+          if-no-files-found: error
+          retention-days: 7
