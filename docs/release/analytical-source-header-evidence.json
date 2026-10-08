@@ -1,0 +1,4085 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "package_id": "accesskit@0.21.1",
+      "source_relative_path": "src/geometry.rs",
+      "source_sha256": "2f2c37da6a856f1463c593bd2c01d07f237951556c3f72594cb05a2561afa7ed",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "2a3bf0b887c33a6e897f3acdd6c74f958376725ae2c87c89083ad22fac409192"
+    },
+    {
+      "package_id": "accesskit@0.21.1",
+      "source_relative_path": "src/geometry.rs",
+      "source_sha256": "2f2c37da6a856f1463c593bd2c01d07f237951556c3f72594cb05a2561afa7ed",
+      "start_byte": 222,
+      "byte_length": 218,
+      "excerpt_sha256": "e333beeaa12f1b291c877fe434e2a48ec4ed3d334aba6e9d83079f640d57b348"
+    },
+    {
+      "package_id": "accesskit@0.21.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6010c455faf058ab5e913124d2572017a6fc784c16aad253625ea2dd7ddb7cba",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit@0.21.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6010c455faf058ab5e913124d2572017a6fc784c16aad253625ea2dd7ddb7cba",
+      "start_byte": 222,
+      "byte_length": 227,
+      "excerpt_sha256": "9d184f959fbe0532d3f46aa657414825c539c6cc2625053ad670a252c6876ee9"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/filters.rs",
+      "source_sha256": "1e6a4ee49b01fef23a9e8cdd5e577251c3057ab1d41e98e3be1b2c4dc149ff34",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "2a3bf0b887c33a6e897f3acdd6c74f958376725ae2c87c89083ad22fac409192"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/iterators.rs",
+      "source_sha256": "4e75e59921c30a1e83427a6592bd3565e4cafb850c0565b9fb80ad6caefe3028",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/iterators.rs",
+      "source_sha256": "4e75e59921c30a1e83427a6592bd3565e4cafb850c0565b9fb80ad6caefe3028",
+      "start_byte": 222,
+      "byte_length": 227,
+      "excerpt_sha256": "9d184f959fbe0532d3f46aa657414825c539c6cc2625053ad670a252c6876ee9"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "0bbec3b9f2c07ce375386ef7cd1e03b24eeeec75de61c575206c6ba565f3e141",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/node.rs",
+      "source_sha256": "0e8b5787ab9a1510aa5e8e8191e4f6a875ed5c01564646f4d8760d9d62e9e7c7",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/node.rs",
+      "source_sha256": "0e8b5787ab9a1510aa5e8e8191e4f6a875ed5c01564646f4d8760d9d62e9e7c7",
+      "start_byte": 222,
+      "byte_length": 227,
+      "excerpt_sha256": "698bf5b0339b160e2c2d1a3cd29050a9232a2f3f76f1d5b38a32875eaadace1b"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/text.rs",
+      "source_sha256": "688de1a07a533e9557a2320b84947bfa39de0db4e6dafadc6735be0f01269ec4",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_consumer@0.31.0",
+      "source_relative_path": "src/tree.rs",
+      "source_sha256": "68121db9d4bd00a31c95c9a9a5d7b92359f96c978dc35446b01c24f6d389e7c8",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/adapter.rs",
+      "source_sha256": "175f5f87c3b9801eec0b61c67dba36a988414acf025ca8d4224b3bdd92337c87",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/context.rs",
+      "source_sha256": "8a45005a8c1449e4ed234bb6f041f026f2dbc6d2935e76407637adb1c127601c",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "2a3bf0b887c33a6e897f3acdd6c74f958376725ae2c87c89083ad22fac409192"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/filters.rs",
+      "source_sha256": "744374b547065b153123c80028f129f5c6bb53052660205e1a2f231c3e169f64",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "2a3bf0b887c33a6e897f3acdd6c74f958376725ae2c87c89083ad22fac409192"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "8a6f20ed5354c9834d88a59091c764f65aa31359f81c57386fe06e9d806e9396",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "78bd5a262a7b130ff777290d7a9a4adc27c1a8dd2ff687ab3ab552c112740a75"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/node.rs",
+      "source_sha256": "59a1ed2a8aa5da1529a6d6164fb6ed335e207c7ebafbfa73176d1964d617ec9a",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/node.rs",
+      "source_sha256": "59a1ed2a8aa5da1529a6d6164fb6ed335e207c7ebafbfa73176d1964d617ec9a",
+      "start_byte": 222,
+      "byte_length": 227,
+      "excerpt_sha256": "698bf5b0339b160e2c2d1a3cd29050a9232a2f3f76f1d5b38a32875eaadace1b"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/subclass.rs",
+      "source_sha256": "1504fe6a4058d304490e52eb30135170a39bf5caa442100d6581cee20bc66887",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/tests/mod.rs",
+      "source_sha256": "3007d7082af4c28574e4d70b8e5f89746dc01a17762d29e204e7ae21d9926a9b",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/tests/simple.rs",
+      "source_sha256": "9ad0c8b85921620d5ccb7e83b1d90a6c9d565925dda6d9d4fcae2afdfc17b252",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/tests/subclassed.rs",
+      "source_sha256": "74b551c9cffb2c14ecfc9509cc3dc4252388a3e80870ee8ecef6f2fb87619457",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/text.rs",
+      "source_sha256": "bcf5610a718025206d1a5e48fb0ff8bea2d9e29b62bcfa4b73bc2b27f68e48b5",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/util.rs",
+      "source_sha256": "199fc46c7e00fac1c4912602587c6425093f5ef739f9b6520a452366ec7c396b",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "06664769e7b0f69dd845b121b9042cf11e4800c01e5e3f0e0adfa730a1fa295c"
+    },
+    {
+      "package_id": "accesskit_windows@0.29.2",
+      "source_relative_path": "src/window_handle.rs",
+      "source_sha256": "dec1d78c81784a18c50f066e89d57d0fe02a7c9199a11e47a0833f8b9113d8c2",
+      "start_byte": 0,
+      "byte_length": 220,
+      "excerpt_sha256": "4a3b601a0328e8da1a5efaa1d1cd310a9940ee01c572a56e47e01927c2589596"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "cbe4ef8dde0a3aa3d9777e51f86eeff2eb4396e290ab5ea83494920b8005b631",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/android.rs",
+      "source_sha256": "3bd0c85c8da3ed2dfaafc107616e9a72216dfae65c0dff2eec63c0ed841afae3",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "b7c9b19df725feb7c1a1cab795155da0123eda20e2d538adf7ac39d33d2ad5d3"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/macos.rs",
+      "source_sha256": "9bb36fff123be11afadc7a7f8c09d2b8d04d3f091ad3f6bf23bec55ff933ebf1",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/mod.rs",
+      "source_sha256": "7bd9ce32dbdd50903add37e53af398d876d6d570f8b563aaeb57f2b728031aa7",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/null.rs",
+      "source_sha256": "0bad7fd53d810d9076ef1cc6feef3e1e68930c26a0677a4fdb38ce36c8658c96",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/unix.rs",
+      "source_sha256": "116c505a50fc7ba3c6eb9bc17d6c6dd6065082a8bc246e8889199d4153d1ece3",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "accesskit_winit@0.29.2",
+      "source_relative_path": "src/platform_impl/windows.rs",
+      "source_sha256": "7222ee5c2c519e5f1a195d9724f720ebf84fa6b6ac11547370f2fb66ec98417b",
+      "start_byte": 0,
+      "byte_length": 150,
+      "excerpt_sha256": "feedfbcbb30aaf4bf0d0cc39d2ab6edf35e157dd3e598e734407c22b685e9018"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "502f1999b588a0cc8d5575e9d2d847d5ae17f983cf87b72b9fa8be54c5507695",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "src/macros.rs",
+      "source_sha256": "b27db6e4e1d3ca9bfb04a1278bf5842e8c946c5f7c1dace621029f6a0d616e63",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "tests/abs_diff_eq.rs",
+      "source_sha256": "14b7c71ea16022ddd93641aedaa78d7b17d2af7b7cc142cb04fb54059f5ba5c7",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "tests/macros.rs",
+      "source_sha256": "a20d7e011c451775e0e5c3a0b726860413a6b7c1f250752a70e979353dcc800d",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "tests/relative_eq.rs",
+      "source_sha256": "d5fffe26f0296fd14fe3c9abe29497f0c00290091c2833e0d3bf0c41ce7976b1",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "approx@0.5.1",
+      "source_relative_path": "tests/ulps_eq.rs",
+      "source_sha256": "9fb76de1e244d4884402428c03fa29d09c2f6907b2b789c1d5e32a1cb2831bfb",
+      "start_byte": 0,
+      "byte_length": 607,
+      "excerpt_sha256": "b8cb86ca7d849d3e21d9c0287d1a42fd7207040eb38226675265fdbdbf1fb3a3"
+    },
+    {
+      "package_id": "arrayvec@0.7.8",
+      "source_relative_path": "src/char.rs",
+      "source_sha256": "1de50e1d6045af2b3496426492315ba774986f9bc8301ffa391de861a08cc9cb",
+      "start_byte": 0,
+      "byte_length": 515,
+      "excerpt_sha256": "1fa23849bf79a2e13d3f98e8045cd0349e05ddd564782cf0cf8cee458c08da13"
+    },
+    {
+      "package_id": "bevy_color@0.18.1",
+      "source_relative_path": "src/palettes/tailwind.rs",
+      "source_sha256": "50cd110dd35ef816539d13f4b1738d3dc179830e6ad28da5e06f28a7585a2e84",
+      "start_byte": 211,
+      "byte_length": 1129,
+      "excerpt_sha256": "03f8c97d76d4a3e7a2f31d8b2050dba7aeea3eb821670adb710f82850c8daae0"
+    },
+    {
+      "package_id": "bevy_input@0.18.1",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "db58e2da1060da06eef5da37c833a8f4ddf6b48bcd880552979242992361b21f",
+      "start_byte": 39,
+      "byte_length": 677,
+      "excerpt_sha256": "2d9d8a283e654881e59f7582445ec2948f67f960e786942cd863118a2711fb2e"
+    },
+    {
+      "package_id": "bevy_input@0.18.1",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "db58e2da1060da06eef5da37c833a8f4ddf6b48bcd880552979242992361b21f",
+      "start_byte": 718,
+      "byte_length": 2002,
+      "excerpt_sha256": "428d8ae505f2254ec4825242ed11dd71e74bcaa046f5809316bfdac4ec2556a5"
+    },
+    {
+      "package_id": "bevy_input@0.18.1",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "db58e2da1060da06eef5da37c833a8f4ddf6b48bcd880552979242992361b21f",
+      "start_byte": 2722,
+      "byte_length": 748,
+      "excerpt_sha256": "02c137054e2845cdb5362b72c31d329429b41a0bb3721d73f92aa4860e092013"
+    },
+    {
+      "package_id": "bevy_mikktspace@0.17.0-dev",
+      "source_relative_path": "src/math.rs",
+      "source_sha256": "53007834b39f3a02c44a06c8b9d3dbc6d75e32d30cfba4ecbe8e07e898eafe27",
+      "start_byte": 0,
+      "byte_length": 1149,
+      "excerpt_sha256": "73cc3770884e5ab258c7dedef5cd57d56f2f9d68a360c8254ef8624c3ccc7115"
+    },
+    {
+      "package_id": "bevy_pbr@0.18.1",
+      "source_relative_path": "src/atmosphere/bruneton_functions.wgsl",
+      "source_sha256": "d39ee45c14f366bceb06f935d2043366dc59c653f9fd0de9dfa4a1498fe349e0",
+      "start_byte": 0,
+      "byte_length": 3174,
+      "excerpt_sha256": "4081495a79a7ab5a3aeeba5e37843b81f9f7504638450171608b6f1aa4b11ca1"
+    },
+    {
+      "package_id": "bevy_pbr@0.18.1",
+      "source_relative_path": "src/ssr/raymarch.wgsl",
+      "source_sha256": "05ed85d974b5bca0153eeb5ce487487c8e6bca744a4f5fd810f59a25fa2f14fc",
+      "start_byte": 0,
+      "byte_length": 568,
+      "excerpt_sha256": "35441edfb6cdb0271e943462598271bb51116856a89e5bd0adfafd7a9940523c"
+    },
+    {
+      "package_id": "bevy_window@0.18.1",
+      "source_relative_path": "src/cursor/system_cursor.rs",
+      "source_sha256": "734a72cab7d11a4b8ca29721039dbca91f2a150e21905e26796db45938b7bf95",
+      "start_byte": 0,
+      "byte_length": 552,
+      "excerpt_sha256": "1944cf752e3a0685585fd1aa403cc38e676fe4c730ab4dbc92591e9492111b74"
+    },
+    {
+      "package_id": "bevy_window@0.18.1",
+      "source_relative_path": "src/cursor/system_cursor.rs",
+      "source_sha256": "734a72cab7d11a4b8ca29721039dbca91f2a150e21905e26796db45938b7bf95",
+      "start_byte": 554,
+      "byte_length": 2027,
+      "excerpt_sha256": "79e1efda38b5726c0d6d28d682d8fe7e9e7f883db3f249d633e891a35f66d498"
+    },
+    {
+      "package_id": "bevy_window@0.18.1",
+      "source_relative_path": "src/cursor/system_cursor.rs",
+      "source_sha256": "734a72cab7d11a4b8ca29721039dbca91f2a150e21905e26796db45938b7bf95",
+      "start_byte": 2583,
+      "byte_length": 762,
+      "excerpt_sha256": "56b822ed62ade22be81a03c9501abf59dc30418fb62b2be802ec8aff37f30174"
+    },
+    {
+      "package_id": "bit-set@0.8.0",
+      "source_relative_path": "benches/bench.rs",
+      "source_sha256": "b044b6aa529e73d921ade54b85dd1c07543a588999ba69192714774abf80edbf",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "b360d824e4da7117ca8096c9d54ab7e3b4b4edb418214deb2ab5c183fa8f330b"
+    },
+    {
+      "package_id": "bit-set@0.8.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "c090ea3ef7cd0367c8e157418c5d51072a474f660b1c74c94fa68be696a079e0",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "bit-vec@0.8.0",
+      "source_relative_path": "benches/bench.rs",
+      "source_sha256": "b0f3cd80ea37456a4ba7dee46f3aef0a143c7ab88418b8ca8e0661b9bb741d2a",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "bit-vec@0.8.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "2c570ee7e33315cb8f1cbb33bbb91aee9b4b9dc8521f488837414e890a149084",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "b12ce8beaebfe3d1d8d126d40584faa1326c4376b351f24a73b57d4e912e40c0"
+    },
+    {
+      "package_id": "bitflags@2.13.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "41e4e87cc47b9e54bdea72a8692f3923c8ec03caa942c6327e7e9fce8c660c7f",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "2bfdf1c90cb1bff08c29b76348919d79cc59f9bd469ddb965c45604c43293973"
+    },
+    {
+      "package_id": "blake3@1.8.6",
+      "source_relative_path": "c/CMakeLists.txt",
+      "source_sha256": "aaa3a050b38762acc82c145af73b87bf8dcf2a112b2b725cd7dc2a4d4645861d",
+      "start_byte": 11670,
+      "byte_length": 794,
+      "excerpt_sha256": "b6a628a5cc0aaacb54170e3d924fb6926d3667b3f62c2051c497405aff74cbf3"
+    },
+    {
+      "package_id": "blake3@1.8.6",
+      "source_relative_path": "src/rust_sse2.rs",
+      "source_sha256": "71388d8f291523bc324defa2a17a454741ae8178c909b0315055a82d5daecbc7",
+      "start_byte": 2906,
+      "byte_length": 201,
+      "excerpt_sha256": "036d699144635e6bb53c4936ba38d3565af3f38dd10e2d2eb84eafe261bb16ac"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/alloc.rs",
+      "source_sha256": "3a9645d9e8db1f2a8549ee928cafa5263a828f25c88ce4d2b07996ecc14bfa81",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "4fa4efc313594028ed59ca6e690ee936334dd83fc1def07cbc82a0ee1af97cd1"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/mod.rs",
+      "source_sha256": "d58dc46eb4f9fcdde574f09bc5b8646f53e42d49c169561d98e0c23e5b36848a",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "adf1a0e285887bc3f2eab024764c82550454b236d8b5bfcb0337357dc694eae0"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/raw_vec.rs",
+      "source_sha256": "c045b13f3ac191f1c597f87a7385f59078a3d091f7888d8449d65b9e6f67e315",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "4fa4efc313594028ed59ca6e690ee936334dd83fc1def07cbc82a0ee1af97cd1"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/str/lossy.rs",
+      "source_sha256": "c5d62b16e01071e2a574ae41ef6693ad12f1e6c786c5d38f7a13ebd6cb23c088",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "58da8b6b8b0d2bee720583279d384e27454bf2771ace4a9a52e097652eb25e46"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/str/mod.rs",
+      "source_sha256": "d82a8bd417fbf52a589d89a16ea2a0ac4f6ac920c3976ab1f5b6ac0c8493c4f2",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/string.rs",
+      "source_sha256": "9cbca6a0c6ae8b9c961d7a140d5146ba4c1f2e7a317c33e2e693911f2848044d",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "2bfdf1c90cb1bff08c29b76348919d79cc59f9bd469ddb965c45604c43293973"
+    },
+    {
+      "package_id": "bumpalo@3.20.3",
+      "source_relative_path": "src/collections/vec.rs",
+      "source_sha256": "ebb91c051e92c00c192c7b25eea9a5961ff9895a4fe195b29a2d71d0422b4a8c",
+      "start_byte": 0,
+      "byte_length": 2434,
+      "excerpt_sha256": "539f9bf80f9364af5276a2469b927bf4fc2f692f1057ecac8bb486dec9b033da"
+    },
+    {
+      "package_id": "clap@4.6.5",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "2113a01737494e6497cc71ec18766741b69b5a90ebcbc70a3c3a6503d5e11ce5",
+      "start_byte": 0,
+      "byte_length": 341,
+      "excerpt_sha256": "0de24858c0be852480c04e811cf79359ca078463e20bfc72339243aa3b50eb0d"
+    },
+    {
+      "package_id": "clap_builder@4.6.5",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "bd8987448be4ace2a3501375f6850261252f3485ea1c9879e137a2245359fbf5",
+      "start_byte": 0,
+      "byte_length": 341,
+      "excerpt_sha256": "0de24858c0be852480c04e811cf79359ca078463e20bfc72339243aa3b50eb0d"
+    },
+    {
+      "package_id": "clap_builder@4.6.5",
+      "source_relative_path": "src/parser/matches/arg_matches.rs",
+      "source_sha256": "bff90ec6afeaa8133369277036ab7c191274fe6751ed0c78b621d9ad6addedba",
+      "start_byte": 55306,
+      "byte_length": 223,
+      "excerpt_sha256": "23bf9d3edc79a28af36e1a22d3f708dadc08d8939ad076a37e826fc4f68679d7"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/args.rs",
+      "source_sha256": "b9c766b770d5dd02855e3897978e23b07ce78d4afbce8851240d228fdb64484a",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/into_app.rs",
+      "source_sha256": "fb1d0708ede65e15ae3ec80ced5a38fa4960c372ceae65c916b48bcc9bd5a9dc",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/mod.rs",
+      "source_sha256": "660c5d27942993d7331025ddfc29ee4c1d7f3a7f49ae2ee2293624e6b2abd952",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/parser.rs",
+      "source_sha256": "11af0826ebec312d44dfec3d94d8c516e4bf9fdb1bd0712e26fd9207b643fbc0",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/subcommand.rs",
+      "source_sha256": "2e4a569fe37a4a682b9b26a42ad117160c9fd1dd1caf497eece0a9bf9cf71ac5",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/derives/value_enum.rs",
+      "source_sha256": "251a794bfa7e8a267abca8db518175ddfaeb6b68e75591742bae06f986da722a",
+      "start_byte": 0,
+      "byte_length": 472,
+      "excerpt_sha256": "0dc88c962297c7b553a8c30194d9a35673e5edfdedc57c3496f45b62563a168e"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/item.rs",
+      "source_sha256": "382ef691d65bdc867eaa5465a408374ffda528e96824cebeff88de7f9d40e2eb",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "clap_derive@4.6.4",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "ecb7d751f03cb24ae5ba7c963d2298716d67cae9baa16c7b301b198e810ca893",
+      "start_byte": 0,
+      "byte_length": 660,
+      "excerpt_sha256": "9731c1cff03de0d4d400e94d0a29fdf7af04aa150e653ff4bad4a2d790071bd8"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f32/cos.rs",
+      "source_sha256": "759278573251d0336f0feef20b7cf4416a39a55eb505070e4b9536450e95d1fb",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f32/helpers/k_cosf.rs",
+      "source_sha256": "68103e3ec418131191b6229844a3df867db7d4b6bb8038d0d51b0f23caf677c9",
+      "start_byte": 181,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f32/helpers/rem_pio2f.rs",
+      "source_sha256": "23df431316bf70904c147f8077417a5eb05b28c5dcdf5f95aa1137c022216d0e",
+      "start_byte": 186,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f32/sin.rs",
+      "source_sha256": "43fcd1b09588fbdf1c993a7fe2b2400b01388e0da5b2fb8a8a6c7b26d4b0dc27",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/cos.rs",
+      "source_sha256": "9a4fd04ae87044255a013a86a68e8ec485e7368370c55618d7b49000b81261c5",
+      "start_byte": 0,
+      "byte_length": 527,
+      "excerpt_sha256": "c5f9f196719938c4724a75fadd2d7dd0310e70a0bfeadb34f77d3b5bb2acd5e2"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/helpers/k_cos.rs",
+      "source_sha256": "704b9c6ac2626ba20753759b1eb0505e341aedd8f78d2fc0b2eed3010dbcf8dc",
+      "start_byte": 0,
+      "byte_length": 527,
+      "excerpt_sha256": "523c817f5904d63beda1465dd574e232bdfb371467dcfd6eddeb8254108832d4"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/helpers/k_sin.rs",
+      "source_sha256": "7fde68b4384fd1a081c867bbc3d4562222b496a20f334031270926d7430a551b",
+      "start_byte": 0,
+      "byte_length": 527,
+      "excerpt_sha256": "ea2293c1c46e58204686594ac27fc74938563d063719ab205a64696409a5eae8"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/helpers/rem_pio2.rs",
+      "source_sha256": "434482facfbf9da484d594a2537537f01c1f4ae36434953f4541a285bd995d93",
+      "start_byte": 46,
+      "byte_length": 467,
+      "excerpt_sha256": "370d3d0ecd600731cb6b225e4a037d18d9ab48fac6a463563f088227c2fd0964"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/helpers/rem_pio2_large.rs",
+      "source_sha256": "e6caafc05e7def0a3bf1beaee4615a83d94a29794eb419ef8de97808380d68a9",
+      "start_byte": 82,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/sin.rs",
+      "source_sha256": "ad5f8c1156e8a61cee67691ec833d7f55e012d771c5f406b55a3f0b243b96813",
+      "start_byte": 0,
+      "byte_length": 524,
+      "excerpt_sha256": "f48da3ade5e4a93b4ef8c714d32e09bc00dc9d757b2d852aee93ae543a359454"
+    },
+    {
+      "package_id": "const_soft_float@0.1.4",
+      "source_relative_path": "src/soft_f64/sqrt.rs",
+      "source_sha256": "a94f30bee2a07cc746b012c65ff0e1db2e65d90b6c914e61a9eafc672fc22872",
+      "start_byte": 53,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/attrs.rs",
+      "source_sha256": "49d1de956488eb3f8cd82dbd118d3489566bc31678d9aba313a4026849268c91",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/bidi_para.rs",
+      "source_sha256": "a81f78e45237d2622e70d01869e4691f748d633f1f8a766d81009d2cedc195f3",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/buffer.rs",
+      "source_sha256": "30bc352be07bfc77093309fb3b8c31368d80a2f62168fabdae5bd3c58ca1624c",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/edit/editor.rs",
+      "source_sha256": "9e4a864a6d8dd90846a476d12eb95c4b2763d00ce36176193cc3fe9de105d4c8",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/fallback/macos.rs",
+      "source_sha256": "7a200cdd634814e86fc49719a71ba21591972a6a49e44fd70e2303417e67e39a",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/fallback/mod.rs",
+      "source_sha256": "2a7267084cc6254dfaa67a8344cf53721b578907053c42de5142b82a9bc88523",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/fallback/other.rs",
+      "source_sha256": "b5981c13c15a61a91643904533aea350ad3a3679aea321d7708d6914c0ede7b9",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/fallback/unix.rs",
+      "source_sha256": "0ca043dc44da2d3c30b0a9c69bae9bda88a354be782a3c8be2cc5fc6fd96dae4",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/fallback/windows.rs",
+      "source_sha256": "b96f09a775b9274da0ab424b4160b01ccfd9da1e693116debf51da5e5b4119aa",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/font/mod.rs",
+      "source_sha256": "35dcd14b7e26601e082bd9352bc47b055744d7945fe846d928dfd6ae368d16f0",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/glyph_cache.rs",
+      "source_sha256": "d32978b61cc491a68ae43368e3b7413e60fa376e10bde1c6b5df4265d4522a54",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/layout.rs",
+      "source_sha256": "6c0254a3832e8ab85a6295381e147a90f9a6e9ea6ae29354a2e8d8e211cf479c",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6fdadf979f1ea29cfa63d3e4916ab44db307233fdeb9780fd1011683454541b8",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/shape.rs",
+      "source_sha256": "ccb62eac1ad64864512ca14ae9aa77a2b40e08a9748830edb74e8ceff6732426",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "cosmic-text@0.16.0",
+      "source_relative_path": "src/swash.rs",
+      "source_sha256": "955a684430853c736c2e8f8e8c364a2a8217238232d222d0dd064e201ad4803d",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "492efadc6bb2be57e0d9347966d7f127626a1afb18e9cb37dc5a5c6c8a3293ad"
+    },
+    {
+      "package_id": "crossbeam-channel@0.5.16",
+      "source_relative_path": "tests/golang.rs",
+      "source_sha256": "7b2ef219ba8a21841c133512f3a540f8279a2458304e9bbed7da81d6091ecd82",
+      "start_byte": 0,
+      "byte_length": 285,
+      "excerpt_sha256": "d402b1b88cc3603a259113b3c088052cd250f74dc72f33c64bcfd2ca41f652be"
+    },
+    {
+      "package_id": "crossbeam-channel@0.5.16",
+      "source_relative_path": "tests/mpsc.rs",
+      "source_sha256": "a88f2c756536328aa2fd3d05d1d277df8dc8dbe5f560133ac12cd101fc50cda5",
+      "start_byte": 0,
+      "byte_length": 843,
+      "excerpt_sha256": "3fee428ac795bb43beb3ef9c40b16958a334c0627eb394137148eeac6e94b57e"
+    },
+    {
+      "package_id": "ctrlc@3.5.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "1446a5dcb466ac508093ec76739bca8cf6c4824d82bd78059e9aa22d0c48b9f1",
+      "start_byte": 0,
+      "byte_length": 381,
+      "excerpt_sha256": "cf61f8d54f7b2a1fd7f0eabf8fe3178289c40ba175083d38ee4c131d04a87f2f"
+    },
+    {
+      "package_id": "cursor-icon@1.2.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "2f649887b91d2ea059fcf64ef8512a16c0bde72e38ff0aeb14df0f119a9885cb",
+      "start_byte": 994,
+      "byte_length": 3347,
+      "excerpt_sha256": "0b3fdceb88b71c09f71e2cbd2196b98bd261b9d33794b20b00dd814b83c8e352"
+    },
+    {
+      "package_id": "derive_more@2.1.1",
+      "source_relative_path": "src/as_dyn_error.rs",
+      "source_sha256": "ba3767c6c95966583360f28cd59bfe20717d0f53c2041c2c534552fcb1b265d9",
+      "start_byte": 0,
+      "byte_length": 709,
+      "excerpt_sha256": "5d3573e424f92d67206d0a93812a3295045f93603d7d76303529dd08ea68f90f"
+    },
+    {
+      "package_id": "document-features@0.2.12",
+      "source_relative_path": "lib.rs",
+      "source_sha256": "4b137510dcedb04a4c630fbb3ecd98f8cf5695ae22b17b6d52c6cc2d8028538c",
+      "start_byte": 0,
+      "byte_length": 94,
+      "excerpt_sha256": "0b03475274ec1ff2c78803be75f95d451801a463a928892b8c0f2c2d83b2f88e"
+    },
+    {
+      "package_id": "dpi@0.1.2",
+      "source_relative_path": "src/libm.rs",
+      "source_sha256": "512cc1b7313fdbec0fe2330321e6c794efaf8dfe4f81feb03bc3c8a6221b149c",
+      "start_byte": 0,
+      "byte_length": 521,
+      "excerpt_sha256": "656bbddd88996814a51d660d3f263fed1b8f76ed7a315597c72192adf78733b0"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/angle.rs",
+      "source_sha256": "8b74df06ab0aeee9ea68a32f07475fbcbf6e98b97bbcf5a160407dc816399a47",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/approxeq.rs",
+      "source_sha256": "38acca150041488719a1263ce5453349293a01408a0b0abd2e7e3bdc27adab7f",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/approxord.rs",
+      "source_sha256": "f1b11ea7603b3dddb0002c7ded934816f5a8bb108e150028b49595b8e3382ac1",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/box2d.rs",
+      "source_sha256": "005028d7ece3bad49564c1e9b41f36ba955c5bc9f6f1619c811874181a9f8ca7",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/box3d.rs",
+      "source_sha256": "4009d8702968fd9a44826d064aed038abe7b189434193fbc78f887f62ed4c19f",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/homogen.rs",
+      "source_sha256": "9c62552190e180d488a92c7d29eaca5341824785400d18e4bd67c3d635bee318",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "cd2f7b2d5e189768b7b5ef8b2e5ee42af08e118ca5d8024cc90071e32a3408ec"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/length.rs",
+      "source_sha256": "9eea6da35d66b7518b3f88c3333b7a393e7ade0965bb8c0ed87fd6a4d6a6629c",
+      "start_byte": 0,
+      "byte_length": 478,
+      "excerpt_sha256": "b483a58bfc0f2a11b038b49382b9fe44ed5e4dd649636ec2eed675c804643cac"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "06f9e5624214fbd6cb4e84d2cf808bacbdeef850c3a599498b26a2703e25bd04",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/macros.rs",
+      "source_sha256": "1db3958b78fc1fe353c5c995646f154f0e2951a121cfe439c26710b55330a7b9",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/num.rs",
+      "source_sha256": "16d66ba814f1f92a0be33574a7ee7a9ccc50669e51e7da80162c52aecaf7e3dc",
+      "start_byte": 0,
+      "byte_length": 478,
+      "excerpt_sha256": "b483a58bfc0f2a11b038b49382b9fe44ed5e4dd649636ec2eed675c804643cac"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/point.rs",
+      "source_sha256": "beb74dea3da22a13a9a3524f186c61d37183d91c2a06abc1826c88c7fb0ada1c",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/rect.rs",
+      "source_sha256": "8506ec7fe5a6f80c5f52938e4eb360a24d21f0c950564b2ef95160b11af35f0c",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/rotation.rs",
+      "source_sha256": "9606aba525db17e8b97a827dc35147e2432c8f6729fcacd51a08b4be84277440",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/scale.rs",
+      "source_sha256": "2315b3d89ed02ff0d5756855936ad1e103c9a16edc707c02e4d1ff116450824d",
+      "start_byte": 0,
+      "byte_length": 474,
+      "excerpt_sha256": "b163a9d62efadc62dbd3a8095fb948450d74c106db402fbc04ab114766845458"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/side_offsets.rs",
+      "source_sha256": "af3f247b1bf9b088bc136da3a8b48015aa42b95884dc3b26e7f2b4a2f67ce855",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/size.rs",
+      "source_sha256": "ef16c60add9785a941c7866a0fb9edcfd0eccf4de5bf0c2d189da652d1b32b89",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/transform2d.rs",
+      "source_sha256": "fa6a5d9a30a42e35b8b8aab8a3f6d6e06f78927968671a2f22ddeea369396d3e",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/transform3d.rs",
+      "source_sha256": "a957eba32bc64d5d159348f93eb911c74096affe762d4e9d8d016be3da010395",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/translation.rs",
+      "source_sha256": "d07018b4535805ea3ce25306d17aa55d3f7b936985e8bf55864bf8fd61d75a10",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "cd2f7b2d5e189768b7b5ef8b2e5ee42af08e118ca5d8024cc90071e32a3408ec"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/trig.rs",
+      "source_sha256": "b7dac52a3e5fa0b2ee091b6fbc17e7b16dc1de7bf2a36024ed48ea09f5057221",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "euclid@0.22.14",
+      "source_relative_path": "src/vector.rs",
+      "source_sha256": "ef855e7da56035dbafb4b9dfb2eca81ed2f4a4417bc95df83680e2b6f9a04dc4",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "5659f1f435d5ff82483c76e16c8e5621856df99483219d9d70fdb487abbbb830"
+    },
+    {
+      "package_id": "find-msvc-tools@0.1.9",
+      "source_relative_path": "src/com.rs",
+      "source_sha256": "d71a248866e04a19c62221999f7f120890cb98bc74ea7fd0b714f766d3e0dd81",
+      "start_byte": 0,
+      "byte_length": 379,
+      "excerpt_sha256": "1f69791f113ff4ac5ecee35aa754afa92f46a84ae3ee3d20d702b75022fb5e7a"
+    },
+    {
+      "package_id": "find-msvc-tools@0.1.9",
+      "source_relative_path": "src/find_tools.rs",
+      "source_sha256": "4b97e6f518943d4754ac73c77bc5932025bd1b48d10ed310694ed7d7449ae256",
+      "start_byte": 0,
+      "byte_length": 467,
+      "excerpt_sha256": "01c192b4425dbc5491fbcfcfca371e5a8752af2490e42f69c000a9d51fabad30"
+    },
+    {
+      "package_id": "find-msvc-tools@0.1.9",
+      "source_relative_path": "src/registry.rs",
+      "source_sha256": "ccbb665b60517a62d249dbe708675ea915c423c14bea786e17efee27453afd41",
+      "start_byte": 0,
+      "byte_length": 467,
+      "excerpt_sha256": "01c192b4425dbc5491fbcfcfca371e5a8752af2490e42f69c000a9d51fabad30"
+    },
+    {
+      "package_id": "find-msvc-tools@0.1.9",
+      "source_relative_path": "src/setup_config.rs",
+      "source_sha256": "5fee84b80d089ae4a92f10080b072ea2bb32c2edbcdc759cb9072e380404fc46",
+      "start_byte": 0,
+      "byte_length": 379,
+      "excerpt_sha256": "1f69791f113ff4ac5ecee35aa754afa92f46a84ae3ee3d20d702b75022fb5e7a"
+    },
+    {
+      "package_id": "find-msvc-tools@0.1.9",
+      "source_relative_path": "src/winapi.rs",
+      "source_sha256": "d486d80ebe222f3bf61bba50038cf63b258585325b29b89d149de8b5a489c2b5",
+      "start_byte": 0,
+      "byte_length": 384,
+      "excerpt_sha256": "18d3e7d4e8e71ed6256ece99759e35db45eee6b2ef161872762d25bfcfdddf61"
+    },
+    {
+      "package_id": "flate2@1.1.9",
+      "source_relative_path": "src/bufreader.rs",
+      "source_sha256": "2d6a59330e8f838eb6474d19104f21cb98236125c189f36bdff75a069a4cea8f",
+      "start_byte": 0,
+      "byte_length": 492,
+      "excerpt_sha256": "a019504962c167ef915595e105fd617228ef2c5bcbe7de09ee7a85162e386f52"
+    },
+    {
+      "package_id": "fs2@0.4.3",
+      "source_relative_path": "README.md",
+      "source_sha256": "4dda80a0599cc235f8eaf56c33117fcc7cbeb48aece7f7b262f374ee12e3f1f4",
+      "start_byte": 1648,
+      "byte_length": 233,
+      "excerpt_sha256": "a16bac74535d4205846d05a5714b5d9f1292dc812637cc2db0685eeb29a84380"
+    },
+    {
+      "package_id": "gilrs-core@0.6.8",
+      "source_relative_path": "src/platform/linux/mod.rs",
+      "source_sha256": "e1bc0b31cb742d0afb4612ffdd884db778511a68d31f1657d9df7f444c62b9d4",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "848a888be2c6ad32ba819968e5a2a8648fda4068f426754b91fff09c829debd7"
+    },
+    {
+      "package_id": "gilrs@0.11.2",
+      "source_relative_path": "build.rs",
+      "source_sha256": "e4dfb30aa9fc293142e92228607a17d484fd2bcdf5fddbf16299783e5ad368eb",
+      "start_byte": 0,
+      "byte_length": 2481,
+      "excerpt_sha256": "e4dfb30aa9fc293142e92228607a17d484fd2bcdf5fddbf16299783e5ad368eb"
+    },
+    {
+      "package_id": "gilrs@0.11.2",
+      "source_relative_path": "src/mapping/mod.rs",
+      "source_sha256": "58880a158c0d721f5788994a91b07968af64265051fcda46c808f848a224a412",
+      "start_byte": 0,
+      "byte_length": 519,
+      "excerpt_sha256": "d4e1c5028f875787f9533cc52c0edb373ea39caae568d2bc89d424a7284f4ab4"
+    },
+    {
+      "package_id": "glam@0.30.10",
+      "source_relative_path": "ATTRIBUTION.md",
+      "source_sha256": "9f0738ead3dcc72bac87afc652c2466e1bc130d235db7798f98da4d4ef013639",
+      "start_byte": 0,
+      "byte_length": 3718,
+      "excerpt_sha256": "9f0738ead3dcc72bac87afc652c2466e1bc130d235db7798f98da4d4ef013639"
+    },
+    {
+      "package_id": "gltf@1.4.1",
+      "source_relative_path": "src/math.rs",
+      "source_sha256": "1c53af4f9a06ea49767f3826066282b0d41f51080d53872fa8c7871249820938",
+      "start_byte": 0,
+      "byte_length": 669,
+      "excerpt_sha256": "67717a4700821e9d71222677d486ce39202fc09090feb95318c6ef26021ab7bf"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "examples/append.rs",
+      "source_sha256": "dcd32b0b9d8b1612a0a1291232bba2ef6401bd03eec537dfa4647066bb89ea96",
+      "start_byte": 0,
+      "byte_length": 625,
+      "excerpt_sha256": "0e392301db449b02c87347492ab8a7198d66a516d8bef060511cb12e30e0d437"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "examples/cpal.rs",
+      "source_sha256": "737818febdb69026cd79a8de7ee7e4955a87d484da07c8908b7b91a41cb2422f",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "6a0f9eb5722e46530024f1837efc7f1217e65c11882d67a824139fb6f8f08d70"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "examples/mean.rs",
+      "source_sha256": "83ab3e25659f19e7acda5dacaa3f308aa7c8f6528c5798bb71e5fbcec888245b",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "6a0f9eb5722e46530024f1837efc7f1217e65c11882d67a824139fb6f8f08d70"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "examples/rms.rs",
+      "source_sha256": "4ecf24902988f861a7e96c62722a9da90b401ee109aaebf2b41fc92170ed9761",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "269458e8d33fdb943289b60a8c457d8e64623c59d6274a28d0f4ddd476a87223"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "3047d2c0eaf276c076b462640628a4d46d55b71d350ba1a1cd5b66916924ac73",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "6a0f9eb5722e46530024f1837efc7f1217e65c11882d67a824139fb6f8f08d70"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "src/read.rs",
+      "source_sha256": "4ee18005e5da74b36bc5832917e9ea21e2321c55d9525dab4534124579b84481",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "6a0f9eb5722e46530024f1837efc7f1217e65c11882d67a824139fb6f8f08d70"
+    },
+    {
+      "package_id": "hound@3.5.1",
+      "source_relative_path": "src/write.rs",
+      "source_sha256": "6ef6b7402645e68662d90c3369454e22c5d5af3e6a0a274f03611aacae3f2816",
+      "start_byte": 0,
+      "byte_length": 629,
+      "excerpt_sha256": "6a0f9eb5722e46530024f1837efc7f1217e65c11882d67a824139fb6f8f08d70"
+    },
+    {
+      "package_id": "image@0.25.9",
+      "source_relative_path": "src/codecs/jpeg/transform.rs",
+      "source_sha256": "65490ae7ce990dda33044b4c52afc1bdcfa836b474a1b6a06c611af6e53a70db",
+      "start_byte": 0,
+      "byte_length": 2563,
+      "excerpt_sha256": "bef8f808cf8583849854000167ff203e47e2e6373478881a48cd7f54fbc9fc7e"
+    },
+    {
+      "package_id": "image@0.25.9",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6e47fec523655d8881a7d638045062f3b30f28e13a0ab041cdaf80027b6156a3",
+      "start_byte": 9586,
+      "byte_length": 294,
+      "excerpt_sha256": "57327710094050786521e7dd113fe91db3bc28e608a0a3b651998eabf83813bc"
+    },
+    {
+      "package_id": "itertools@0.14.0",
+      "source_relative_path": "src/adaptors/mod.rs",
+      "source_sha256": "1e0cf7409c7291a923cf87f1c6d27cc57bd9f71ca52f7dd08a429aa994daa6ce",
+      "start_byte": 0,
+      "byte_length": 273,
+      "excerpt_sha256": "bff882d5968224ca3c857938d237acb376d936ef8bf1688665549bbde30b472f"
+    },
+    {
+      "package_id": "itertools@0.14.0",
+      "source_relative_path": "tests/test_core.rs",
+      "source_sha256": "9bbc6772e97a60d93d4021c184b9e4de1c0440a1c48b991a92edc189699fd20d",
+      "start_byte": 0,
+      "byte_length": 269,
+      "excerpt_sha256": "17981954fe19b8e6f50e3ecb6480ff1ca83ca43546d2080b3cf1d4b1cc08d960"
+    },
+    {
+      "package_id": "lazy_static@1.5.0",
+      "source_relative_path": "src/core_lazy.rs",
+      "source_sha256": "dfb195f44a62b19a32542297edfd281bc40837e48905603dfec20d62b12711d0",
+      "start_byte": 0,
+      "byte_length": 342,
+      "excerpt_sha256": "6a3c014a78d253b9056207a1812f9a36633486ae97ac454f92955d8c574888dc"
+    },
+    {
+      "package_id": "lazy_static@1.5.0",
+      "source_relative_path": "src/inline_lazy.rs",
+      "source_sha256": "cd8a9babcc3af7d0d39f9874dc575a1da000f0d6048a66296f3ca197c2c00b46",
+      "start_byte": 0,
+      "byte_length": 342,
+      "excerpt_sha256": "6a3c014a78d253b9056207a1812f9a36633486ae97ac454f92955d8c574888dc"
+    },
+    {
+      "package_id": "lazy_static@1.5.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "680e2ac624b3000ba17e9c3d49138332c15c5caf3a0143601b4fc6d9fbd5dd85",
+      "start_byte": 0,
+      "byte_length": 342,
+      "excerpt_sha256": "6a3c014a78d253b9056207a1812f9a36633486ae97ac454f92955d8c574888dc"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/acos.rs",
+      "source_sha256": "efd83a6138061209867f06421c6a756b8ca3aab5c6c0a85c4aba31bedb299da5",
+      "start_byte": 53,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/acosf.rs",
+      "source_sha256": "c5c9c74d267725bbe5f9319e6f4a396af6ce46c890b601d3f963a5d74d12e4c3",
+      "start_byte": 137,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/asin.rs",
+      "source_sha256": "9693a7cb61674ec6fe22be9db8fe20276729c48b1562fd86d5421e372a0a12e4",
+      "start_byte": 53,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/asinf.rs",
+      "source_sha256": "25f6b7bbf46fc5aac4ebdd9e00118239747dcd28a79b90b858ddc4633d773d65",
+      "start_byte": 137,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/atan.rs",
+      "source_sha256": "54181dbddf4f77b90b32b9f6819ac989da570dc02b791f3685d20a23d51324be",
+      "start_byte": 53,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/atan2.rs",
+      "source_sha256": "7d028d4d397f7484b8feed7b228eda65b84acac94d27729d236d5df95e38d8f0",
+      "start_byte": 54,
+      "byte_length": 383,
+      "excerpt_sha256": "11f476f899dacfef801a097465ad0755ad4546afe03b02c9a17aa38e228344e1"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/atan2f.rs",
+      "source_sha256": "b9497b5adb75e2788c404fd121aa64dcfa0e9357b67af3b3e7e6d4624dae1ca1",
+      "start_byte": 138,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/atanf.rs",
+      "source_sha256": "197762f16ed5951236e17d0869c529e857acc329cc287df019ff69e5401f3b4d",
+      "start_byte": 137,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/cbrt.rs",
+      "source_sha256": "1ed98a0943c46ca48e32af54b6baeb80b6e8da5dda550005711fcb26bfcf12c2",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/cbrt.rs",
+      "source_sha256": "1ed98a0943c46ca48e32af54b6baeb80b6e8da5dda550005711fcb26bfcf12c2",
+      "start_byte": 35,
+      "byte_length": 137,
+      "excerpt_sha256": "225167f203ade8fe5b0714aed4abf358d23fb9dd385a63580ba216ac88a7b799"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/cbrtf.rs",
+      "source_sha256": "7a2b4f190e8618c52cb23b47c040a4b4eacca739c68393cf14fb3f5d73988127",
+      "start_byte": 182,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/cos.rs",
+      "source_sha256": "6e81752899c471bd42d04bdf08e0b22bc10a29f92fa2a343281b995fd342f035",
+      "start_byte": 0,
+      "byte_length": 427,
+      "excerpt_sha256": "f53a3c97c9531345379adbe79db501062242feefd51de57162178585ea62788f"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/cosf.rs",
+      "source_sha256": "f48aa954f199fe4f54fd73b4e7886a75f2c08afba7fc31c6a36db5b5f90ced69",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/erf.rs",
+      "source_sha256": "5a69f440d5ca88a5c4a45119837c45b14238836a036675230e10fec41d293a3b",
+      "start_byte": 110,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/erff.rs",
+      "source_sha256": "62c30876390e532d7dc9ac1f1f1c1f654065fba2b2e534e531964d79e1766196",
+      "start_byte": 136,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/exp.rs",
+      "source_sha256": "1d486e847e1752fb9ce74a714096a11adcac935dacd4f17625ff63819103a80d",
+      "start_byte": 52,
+      "byte_length": 320,
+      "excerpt_sha256": "15e78071c8347a689c48ec92bbdd5eba7bd8dc74f86ee3e7ad31d34b24fefe83"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/exp2.rs",
+      "source_sha256": "e7270f15a682b69a49e042c80503c206d37c6c895f2c63da59a5e2431fa5fedc",
+      "start_byte": 0,
+      "byte_length": 1421,
+      "excerpt_sha256": "b24dea27b63aa91f44ce04d53d6e84d8b7a76faef78a2224ed2a751a6aa6c0bd"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/exp2f.rs",
+      "source_sha256": "3b4b5cb2e5674e1ce66a6051710738c1a6edc1d1638686fe9c78f0af4792a634",
+      "start_byte": 0,
+      "byte_length": 1419,
+      "excerpt_sha256": "9b9ce313edd1fd1cdd9e16ec7ffe26e9b4ea644d4da334618edef2ef79d180fd"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/expf.rs",
+      "source_sha256": "33b01180ebd01bb2911379476c5411fd05b066f2e17ef66e48c4dde83a7f01c0",
+      "start_byte": 136,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/expm1.rs",
+      "source_sha256": "6cc612ca7cf1384dc15f541b301a1f176efbc79536aff1293408b3121cc30ad3",
+      "start_byte": 54,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/expm1f.rs",
+      "source_sha256": "2b517f1bcb6279c906aad737f08c83ac30d7871e3beff266ea50a01fa18ccc81",
+      "start_byte": 138,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/fma.rs",
+      "source_sha256": "16e72470f5c4407c44183cf06f5868f216c92e0532f3fb387b57dbccf815e2a7",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/ceil.rs",
+      "source_sha256": "66b3def2b00ed9dd6a4f59c73765a050853dfe06c828fdf731987ac99e7c2a88",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/floor.rs",
+      "source_sha256": "7d4f15369abefa27645d6deda51d30febbe60ee9dca76e72a9364d574d0711c0",
+      "start_byte": 0,
+      "byte_length": 67,
+      "excerpt_sha256": "cc7ddd4aec15d176fc40570979991b6bbe00d3ec3d9bbf7c5dd8bfe0e04278b9"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fma.rs",
+      "source_sha256": "ba44930a56d7c1953ab0c96c7c767911c9dc6967083700c8ef02f43672c8482f",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fmax.rs",
+      "source_sha256": "68d923950c3f1eab68baeab24679ab50918b663904839bc349ef666d9467518f",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fmaximum.rs",
+      "source_sha256": "c4b8b7080821a2dc65d0a50baf717ccd9ee20b813ce6d6d3f9f01b5700b674fa",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fmaximum_num.rs",
+      "source_sha256": "2f2d41e1f0160eb73469fa63db27d881b5b8eabc6d62fae7ca1b4b03eb35c5d5",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fmin.rs",
+      "source_sha256": "9bbdece9606e5eac57f3a91a5db7aab814c8e2b28b6df1813723c6b5715efc55",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fminimum.rs",
+      "source_sha256": "a6a33085356610eced23957ca86456b7dbe95e0f9d916298d59ce8bd90076b02",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fminimum_num.rs",
+      "source_sha256": "f5db65654e690adea16da83839d62a707cc814c998fd4a77e63caaaea1472256",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/fmod.rs",
+      "source_sha256": "11aae62d08d656d815184eafd78a3b2d5764b6ce308b89e3819cd049bc491fe7",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/rint.rs",
+      "source_sha256": "deec183fd0da6c0a47ab272a256990cea4f9231db7faff314697886457d6841a",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/sqrt.rs",
+      "source_sha256": "c58e48ec07404d618109ad45332efe46c5246f42a2ddefdf5b25ba19e4ca9a0f",
+      "start_byte": 0,
+      "byte_length": 34,
+      "excerpt_sha256": "f73e293daa12abe52dd73882816fe4002b4f6e69065892abd57881180fb26bf2"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/generic/trunc.rs",
+      "source_sha256": "46dd2cc35f6da25099ea2202264d8da3330b5ff1a962a8afb671b54b6ef6002d",
+      "start_byte": 0,
+      "byte_length": 67,
+      "excerpt_sha256": "b1e0b197ab096657b36a818578674de4e4af0030827bf8a6e5b4405fafda000d"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/j0.rs",
+      "source_sha256": "1cb991f0151a626744ad1832d4aedfaca681bcfcecc797de5ac5e9baf2342006",
+      "start_byte": 51,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/j0f.rs",
+      "source_sha256": "de97374b6a0019fd8b3d1f553be1708018546491d3b4a5fc650ee2dcdfc9620e",
+      "start_byte": 135,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/j1.rs",
+      "source_sha256": "e0a10746fd11a458d55ee61e758d9f016ff0f2203a07eb9907b5aca709a40469",
+      "start_byte": 51,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/j1f.rs",
+      "source_sha256": "27b586c94d510aa653923b6b83cfec174e1f5da326d9120b0a0135b1190e32dc",
+      "start_byte": 135,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/jn.rs",
+      "source_sha256": "ba36d25d4bbada83aadb3b2986879b7d88b91adb7b502061d21bf96ff3942194",
+      "start_byte": 51,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/jnf.rs",
+      "source_sha256": "b3861e19644ae669fe17db81d91aeaee9c9f9051b59957ab674017684c98fe32",
+      "start_byte": 135,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_cos.rs",
+      "source_sha256": "d4867527877c846aa8e2a0b43cf06f03e2d94c321a548acaf8d5171c09ff4057",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "50dc54cee8b36780c535e15a6d30d75226fe2bdb81d450e375118e42bd3bc659"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_cosf.rs",
+      "source_sha256": "8f76089d014e217b96c9eca520271e64d467dc0d6542bf313dd70eb96c040f7f",
+      "start_byte": 181,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_sin.rs",
+      "source_sha256": "dfe6524cb2d530ec51eb1a2ab233aeb65b3f12177c1fb2f50f044ea41170f5d8",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "a04bfa8426560b34a6dc330fb3f55ebc8def1092f0cf2faf86093bcd5d7c82aa"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_sinf.rs",
+      "source_sha256": "cf0e8bbe8d73a6704b7f1f710f5b9d31f190f1c633e894d4f69c4e3bc359eba3",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_tan.rs",
+      "source_sha256": "dc3f8ece9187bbd65792a7d1068e676092e9c2a0886f28c80579f9bd94d744b7",
+      "start_byte": 0,
+      "byte_length": 362,
+      "excerpt_sha256": "68726120d836ef745923a5412ad99f724cec7a97e053c0b1c1dd6639336c167e"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/k_tanf.rs",
+      "source_sha256": "3381d2d4865bfc98e87aadb96bd8986f7691a389569a58fb1cb8db74fb5d9c20",
+      "start_byte": 52,
+      "byte_length": 314,
+      "excerpt_sha256": "5a534ed1f9266ed799e9f2e3f830f15411762021829da121b23df5edc498c6b6"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/lgamma_r.rs",
+      "source_sha256": "5d56169c077b5b9f88902e2d243a7a4b4d06b89295aa84283d6fa15d9c244032",
+      "start_byte": 57,
+      "byte_length": 383,
+      "excerpt_sha256": "11f476f899dacfef801a097465ad0755ad4546afe03b02c9a17aa38e228344e1"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/lgammaf_r.rs",
+      "source_sha256": "0bc2b5e0eec7666973adaca536f4d5fe978c8793bb340484fff9e5e7abb425f0",
+      "start_byte": 141,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log.rs",
+      "source_sha256": "df5f4d1325e89621bfcd9cf7788d0d7e20a6ef7f429110fe35b370b3c9362615",
+      "start_byte": 52,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log10.rs",
+      "source_sha256": "4a96dd2b6a2a505497f2bb7ea956a50491d068dab1b6055a573aec1724a52e40",
+      "start_byte": 54,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log10f.rs",
+      "source_sha256": "784a576dd4a4071f4f67c670eb9b221cb03014818c4b2d71afbcbd2211431caf",
+      "start_byte": 55,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log1p.rs",
+      "source_sha256": "bb8ce741e54d8f001d9c12450a14a663bd413014da2ade9ba1f5fbc9ff0c9a88",
+      "start_byte": 54,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log1pf.rs",
+      "source_sha256": "8736222a9b9004b061f1339bb819c63c6b54414d4a01ef79d5f5a5f0a70677b5",
+      "start_byte": 55,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log2.rs",
+      "source_sha256": "1ec0cdd94bf4435ff0402d209089b1bdbcb1ba9a4cd5f77807f9c84cf534f980",
+      "start_byte": 53,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/log2f.rs",
+      "source_sha256": "7b3b17ba08df6b5a57dacf6f945bfe1a3c088bee0eb11e201ac5affc7f65925a",
+      "start_byte": 54,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/logf.rs",
+      "source_sha256": "c7dfa5e89fcca0411624fdc594f64c62d5dfa3b91f061fcb7ac3aea18414f238",
+      "start_byte": 136,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/pow.rs",
+      "source_sha256": "c5566d0f48682d107e8803b0ed204ff3521503348f18a4f26cbe3f47fef15192",
+      "start_byte": 52,
+      "byte_length": 320,
+      "excerpt_sha256": "15e78071c8347a689c48ec92bbdd5eba7bd8dc74f86ee3e7ad31d34b24fefe83"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/powf.rs",
+      "source_sha256": "819971cb8e927d80113aded3cfe90dcd501c031e0eb1c562b58842fddd1751be",
+      "start_byte": 136,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/rem_pio2.rs",
+      "source_sha256": "5a040ab09dc356bca6d57712327151ed43003e2bac156553e3eb87d1cdefd2d1",
+      "start_byte": 0,
+      "byte_length": 467,
+      "excerpt_sha256": "370d3d0ecd600731cb6b225e4a037d18d9ab48fac6a463563f088227c2fd0964"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/rem_pio2_large.rs",
+      "source_sha256": "986b5b9ad2c8fba828aee47bf198eab97fab243359ab03eb09783d98ca5847b5",
+      "start_byte": 82,
+      "byte_length": 380,
+      "excerpt_sha256": "74344ebf347f27ca446e00f1c1921f705546f4b20e0fb31c183cd2c8464b1bc5"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/rem_pio2f.rs",
+      "source_sha256": "fb34bab63f8d143dfefa4ef2e31e8166bf21f3c67f1519bfc3ca4fb8eb28cafe",
+      "start_byte": 186,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/sin.rs",
+      "source_sha256": "b48cebd120fc2ac93a6563059cabda28a72c8680304eb8335b92b412235cc232",
+      "start_byte": 0,
+      "byte_length": 427,
+      "excerpt_sha256": "aa31720e0a22f01d45849f4f5badc7a75fbabc8073b08df329baa9305cf2c682"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/sincos.rs",
+      "source_sha256": "a9c414e828c2e78b6bce4d5e4237b1baa93e81d78421aed5cedeab43df64067f",
+      "start_byte": 52,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/sincosf.rs",
+      "source_sha256": "c39b6e3b52be83ccf4015ff105dab55e693577ebfc43745881750e73eebc6fa6",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/sinf.rs",
+      "source_sha256": "b17db34d5da39a0f336d831abcb700fab69402c915321823870f1845e66c03d2",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/support/int_traits/narrowing_div.rs",
+      "source_sha256": "5f5378e33f1da56090d0dce2514926ab465dce65b89ad4ee2f7da07a92f8d5de",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/support/modular.rs",
+      "source_sha256": "cf6a562d6bdf16336f31d41c59e828ad47f85388849d20d6d3b59fc1c3e388a2",
+      "start_byte": 0,
+      "byte_length": 48,
+      "excerpt_sha256": "a997449a08324894b63f1159f979a44ef52a95bd4a0d2374c76e2e1b87e50963"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/tan.rs",
+      "source_sha256": "2ea87ca18526753db6d149635ed6c895c8fbafd1e0fa7a9c04f7dc44b4eae986",
+      "start_byte": 0,
+      "byte_length": 427,
+      "excerpt_sha256": "3c85590cea896eaab7cb8a8f4474902c6b44fb0d67ee569737cac1942f9933a9"
+    },
+    {
+      "package_id": "libm@0.2.16",
+      "source_relative_path": "src/math/tanf.rs",
+      "source_sha256": "f7140c4193a57709acde5d290c8f83435562da42924c54cab0aa3a4f26095190",
+      "start_byte": 168,
+      "byte_length": 379,
+      "excerpt_sha256": "0c3d0381d2cd647be68590170490be5f624c962d9f95eb698489e578c1de8f05"
+    },
+    {
+      "package_id": "linebender_resource_handle@0.1.1",
+      "source_relative_path": "src/blob.rs",
+      "source_sha256": "e41c5b77222d2e57a79308fbef8d7e814743b2e57bba0cb9b570b72a3205900f",
+      "start_byte": 0,
+      "byte_length": 95,
+      "excerpt_sha256": "acab8008b87055fbbeb0961c264d6c6726aa2732890b893a3c8eb25999458a4f"
+    },
+    {
+      "package_id": "linebender_resource_handle@0.1.1",
+      "source_relative_path": "src/font.rs",
+      "source_sha256": "8cc131912d270aab2a4972857254904990a7facc8c3b747cbec37151da064098",
+      "start_byte": 0,
+      "byte_length": 95,
+      "excerpt_sha256": "acab8008b87055fbbeb0961c264d6c6726aa2732890b893a3c8eb25999458a4f"
+    },
+    {
+      "package_id": "linebender_resource_handle@0.1.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "ba557d6e29bd215d0f14f639f03937767eca1bb821abf3d114ed69f339414001",
+      "start_byte": 0,
+      "byte_length": 95,
+      "excerpt_sha256": "e6911086fe2be8d6479b5cb139a8adecfd1f2182b8f217baaa34b0ae3097ad1f"
+    },
+    {
+      "package_id": "lock_api@0.4.14",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "f6dfe0a321e47b5ea9f01a59711e5d3a0442949a829eb4957fa1491fbce63e5c",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "a89b64bf8560d44b77070ff7c8ab3a8b9eca8fbcc8360a3d8e8e9ab0dbc7a521"
+    },
+    {
+      "package_id": "lock_api@0.4.14",
+      "source_relative_path": "src/mutex.rs",
+      "source_sha256": "1487130ba159c9158623d58204b52531c0feaabcdea8e58c0740a29d4f33e5af",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "a89b64bf8560d44b77070ff7c8ab3a8b9eca8fbcc8360a3d8e8e9ab0dbc7a521"
+    },
+    {
+      "package_id": "lock_api@0.4.14",
+      "source_relative_path": "src/remutex.rs",
+      "source_sha256": "a0cc36a3ac9ba2a399f83667ca53670afbec0d0bae6e9c103323918594873eeb",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "a89b64bf8560d44b77070ff7c8ab3a8b9eca8fbcc8360a3d8e8e9ab0dbc7a521"
+    },
+    {
+      "package_id": "lock_api@0.4.14",
+      "source_relative_path": "src/rwlock.rs",
+      "source_sha256": "3094177475cf67c8dc34e68b3fdff2d4133ffb453860b72037477734cb87aefc",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "log@0.4.33",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "7b605f1702b0a97c5ba5371aba62d6297cad21c00f1097040d201eb7cc28fa7e",
+      "start_byte": 0,
+      "byte_length": 465,
+      "excerpt_sha256": "4fa4efc313594028ed59ca6e690ee936334dd83fc1def07cbc82a0ee1af97cd1"
+    },
+    {
+      "package_id": "log@0.4.33",
+      "source_relative_path": "src/macros.rs",
+      "source_sha256": "6917080cd9c4a2ca8128024f562a2bfdbbcd43616e41ef125289a30c6a9a4be2",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "deeb22ce438380f3379a62e2c8c7387829bfbaa6890b855eec2c0bb554cd7570"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/chad.rs",
+      "source_sha256": "39fad161ddf6f581561af2b4736832977ba781526778a6153a01435d70eac7e7",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "23b3aaa9d55564e719d93855d363f232fa4b98bb48945be6f33818abd85584dd"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/chromaticity.rs",
+      "source_sha256": "f97f4094a0e5cfe02319e122357b347853ca406c0146dd275eb3aa6525d25cfb",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "529c20af860d2d16a73c43ae087c759bc863770a4791f391d8bd3263908bf8e0"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/conversions/avx/interpolator.rs",
+      "source_sha256": "2aa75787e5ee4e355d83a459ff98122b59e6f6c48fd4163b7e34264d2f94cbc5",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "7e5726c24b8f2afa178af9655d9504cf0d6c6fc6ed1c5057ec36b2dc67137c1e"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/conversions/avx512/mod.rs",
+      "source_sha256": "0d1d91dbfa7b1f0398ac2ab966332969bfb805f855b3bb205ccb704a13651251",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "6f85ab062b8c12f712b333218fc85d99e76b027301f7420a02c67033794ca513"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/conversions/gray2rgb_extended.rs",
+      "source_sha256": "e5b7df1ceb833ed99bf7e58bb52dbb630030b645d00852428556f725c40e4f3c",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "2368364a0446e0574c1254a07b6ba90743d92d9fb2bc71797d47c9fd0afc0cf0"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/conversions/katana/md3x3.rs",
+      "source_sha256": "da78b608a2989b4ba60fce2d70643a6810398ff4d5e19f2a778e723bac377206",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "43b3814758bc7cd40adebea80e81728c33d486ba15be6b9c430382f2612c9265"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/conversions/prelude_lut_xyz_rgb.rs",
+      "source_sha256": "d5266e9affea4262db4c1b221109145f75fc7ec1cc2c7fefd23d8c2dbb160828",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "479a29987e73b1ca24ec3ec7044431f00f6d237f88eab43926a332403968d338"
+    },
+    {
+      "package_id": "moxcms@0.7.11",
+      "source_relative_path": "src/luv.rs",
+      "source_sha256": "377aef287589ef938d85306a0d90d0dfabcf18220c4c17effca192afa4280c27",
+      "start_byte": 0,
+      "byte_length": 1234,
+      "excerpt_sha256": "265f5a61abad5ee128cef5af114eff0ffee44556ed03bf203e3d4ec5ca79b3c9"
+    },
+    {
+      "package_id": "num-traits@0.2.19",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "00973c9c52fd607d6e4b1da4ce4d5caa7d1bc39c8cd6f5d64878075766c8ad33",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "3ae581b4ff7e305647f4be3a738c9b0f49da57334b64de2e76800bec5e5ecf4f"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/condvar.rs",
+      "source_sha256": "182e5a2f6c06cf665bb7723c2780580647a73d9de5ff319f26c0fbbf5e7280ea",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/elision.rs",
+      "source_sha256": "7070a29080f4c7d3b2c9b6e51a0d8230ebc8e56e4790aaeda1747b6c073a7438",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/fair_mutex.rs",
+      "source_sha256": "2d0c5c2b779492653cad99825180628af95ce5f4bdbcfed57e7a5f2138a55fc0",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "0ad0d7a416c12f99db0033f22c98baf201878ab40b3cd34fe74e7bd0e5b87cca",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/mutex.rs",
+      "source_sha256": "b7ee456958a3b0dc208dd39be195641ce3998f7906d101ccf284fa0f84c58d14",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/once.rs",
+      "source_sha256": "58c78dba952e217c17bd8d5cf3dce32bb78e3e1c38a86860c8edc8c308caeca7",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/raw_fair_mutex.rs",
+      "source_sha256": "316f954d9673ac5b8d6bf4c19f2444800f63daf801c224d986e2d6dac810643c",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/raw_mutex.rs",
+      "source_sha256": "4a79255673f47e167ce28d331c3b51f245017c7023e36c1c9b09baf00cc121c6",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/raw_rwlock.rs",
+      "source_sha256": "bdbb06e1433ea2bc1dbbfd69e66755bcad588f48c6552c0fe125d98419035791",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/remutex.rs",
+      "source_sha256": "f0c0711ed46be67f7736a8500689e37a301ccf0dacb7706e1087513d3e87a432",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/rwlock.rs",
+      "source_sha256": "7edd9dd320858a628388c1ebca1ed89cc2984abc30157c4b0c03194ebba7eade",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot@0.12.5",
+      "source_relative_path": "src/util.rs",
+      "source_sha256": "37a2c8b5c9254df83e8f3a5cd831558c1045061a76c2571bdc4d78eb86e467f2",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "c8c164deb6369857838b886423918383fb80ab4153e7eac5fffacbed12a533e7",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/parking_lot.rs",
+      "source_sha256": "ead11d575a1930c241aeec20f0e5e504bcdad637e284449ef4efcb9f9f175777",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/spinwait.rs",
+      "source_sha256": "0d73980c72e84fd75c73693f0b351e097353b46f4b8aaa67b3dde7c721817bf7",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/generic.rs",
+      "source_sha256": "414bd3114b40f7665efe59fa4c5033d2401eafc58b57a9ba5803949d26cc0454",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/linux.rs",
+      "source_sha256": "70bfe6c168fc431965374d921e33b3e04536cb68fde3e807a837aa38a65772b0",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/redox.rs",
+      "source_sha256": "38fbede41817b6606a5612ee9456940eaf627540a4aa39de8452e355ca1df306",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/sgx.rs",
+      "source_sha256": "969a706a15b96bfd27c1c4c14aa87c0cbfc7a104cdce667262768470035dc971",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/unix.rs",
+      "source_sha256": "4cd468fcee83f29e9c923c5a574d0f5cbff0207741dae2eba99b16509fdb6ffa",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/wasm.rs",
+      "source_sha256": "86e954d009d57d2dfdbca71e5c0f116a99a182af83b7e51ed5b14fc55b2f7b01",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/wasm_atomic.rs",
+      "source_sha256": "6fbc09accc9df9d42444cec6f55d3eed2c7078a474485fa269a9f503da2ee1c5",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/windows/keyed_event.rs",
+      "source_sha256": "12b72b70ad9d58d943b51246621ac73223debb0b37abff990fa0f895c575f7c7",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/windows/mod.rs",
+      "source_sha256": "ff86c7fc19eb139b16d3dd0452a512e3ff3e2f18d1034303682c0b45aebd2528",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/thread_parker/windows/waitaddress.rs",
+      "source_sha256": "9ab190cd9aaaf89bed4535f8a0ccb81102b7abb64d4f94b31aa98f8a2acaf8de",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/util.rs",
+      "source_sha256": "285e6133150645525f2ca1ece41f6d35bad4e7c5e08b42b20c99d2a97e04a974",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "parking_lot_core@0.9.12",
+      "source_relative_path": "src/word_lock.rs",
+      "source_sha256": "57133a9da052d8e86eb38ff1968129149838918d69f52761dc8757b541f9d044",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "903fb9aff6d1777a054067b53a00092a74507afc78aaeac3638e27b230c6e796"
+    },
+    {
+      "package_id": "percent-encoding@2.3.2",
+      "source_relative_path": "src/ascii_set.rs",
+      "source_sha256": "f75552e4f446ed240cef64c1367e848cf3ae65f77602085459566d835a1d8587",
+      "start_byte": 0,
+      "byte_length": 350,
+      "excerpt_sha256": "e11a2364483c94c71e7c44683f1b3425b705d04b3aa400d4a7161a96f3cba5c9"
+    },
+    {
+      "package_id": "percent-encoding@2.3.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "641903d385581e76f31ef8c991d83c2a5d7fbbc2879d93909c539037e4e1e3e2",
+      "start_byte": 0,
+      "byte_length": 350,
+      "excerpt_sha256": "e11a2364483c94c71e7c44683f1b3425b705d04b3aa400d4a7161a96f3cba5c9"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "09a84ff233021dabb75200ef71ebcb1c5a47c94484ce294ef5dcf43797873ba4",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/auxiliary/mod.rs",
+      "source_sha256": "52a78b77be05c67737c56865fbce4477eaacc6482d6377af2a5822f05a2ce061",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/compiletest.rs",
+      "source_sha256": "48cfd92c7271345d57a6c222a7a61e00449f38e6ba379130813c45b31a5589c9",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/drop_order.rs",
+      "source_sha256": "9b13b6461e44be1c1beca6ec47387de83efcb988326e4ff832183b8fad17a3f4",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/default/enum.rs",
+      "source_sha256": "ebe6b6403e35459420f6fe979243c382972d2d582376d69f6c630ab5ba2599b5",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/default/struct.rs",
+      "source_sha256": "05767cd68ec5cddc481cff5ad677b5146f7d6fd1effcf1ff131d24c334d85032",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/multifields/enum.rs",
+      "source_sha256": "d38eb301c86307edbf5cb07ed434b64a10a68aaef32dfb8b15029b5cc5586b0b",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/multifields/struct.rs",
+      "source_sha256": "1fe2b911e8782eaac5952d9e0914473d46d82db45b1da859bdc6b8dc3978e549",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/enum-all.rs",
+      "source_sha256": "ebe6b6403e35459420f6fe979243c382972d2d582376d69f6c630ab5ba2599b5",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/enum-mut.rs",
+      "source_sha256": "bf215d055b29a7f9fdb84cabf34576d9dec8e87c33cebe2b553d1fe5e5cb0882",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/enum-none.rs",
+      "source_sha256": "115968816e1a1a6b3634b8594dde4815d4641d817d69ebdd90879b96a8a2808e",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/enum-ref.rs",
+      "source_sha256": "e09ce2ca812b9fcf7dc59b486e5b50b84db08860a2ceda63ba094d7351bb391f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/struct-all.rs",
+      "source_sha256": "0d6b64bc687fbc19329a5558461329e3d2cfa367ff8adb7be76efe2d3160d33e",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/struct-mut.rs",
+      "source_sha256": "36edd8db816c122c80ccb139b4305cad8edfdf9b7ee4aebacafa1180613a5075",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/struct-none.rs",
+      "source_sha256": "05767cd68ec5cddc481cff5ad677b5146f7d6fd1effcf1ff131d24c334d85032",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/naming/struct-ref.rs",
+      "source_sha256": "dd249875f962d16dd9ec821acf0c2b5c1ed0ed05569f6e874ccd5caca2759acf",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/not_unpin/enum.rs",
+      "source_sha256": "c65aac4d2083e83d2dfc3bec8ce243e3e9169ef5f986f077f0a8b4226d39f7c3",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/not_unpin/struct.rs",
+      "source_sha256": "99d77727393e4a050d2ceb99710172dfdd13dfcb6e6416f63de39e5df3a9f03f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/pinned_drop/enum.rs",
+      "source_sha256": "8f590791cb4693bb077c562f0d93128f9452e6a5f60c631b5fd624a221883ebd",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/pinned_drop/struct.rs",
+      "source_sha256": "8da271d7d3182b33be297d985a1e3b57d6067406db21eca8ac2c448ef1a0869a",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/pub/enum.rs",
+      "source_sha256": "fdbd806e92cfad4e67737d1f782544aa4e3116bae702161c43b5c22bfbf3a208",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expand/pub/struct.rs",
+      "source_sha256": "05cb3f03ef9801fecf0a7c86bbd236c97218b34ac01ee507cb7de9a78efaeffa",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/expandtest.rs",
+      "source_sha256": "a4336ab879d79824ab3144ea385a7a00ba77604c3b6639ae53b6283850b421df",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/include/basic.rs",
+      "source_sha256": "8c06c765c92d696284dde5b4762488100ce0ee1661ead307023a85d5c82d8ddc",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/proper_unpin.rs",
+      "source_sha256": "83790eb38ae2fd5aed97fc67da79d91c1071f08d1e5aaef0c71e65d8b5767403",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/test.rs",
+      "source_sha256": "3bfff987a820770bd0126656a77871d5609f21c9c3b6825bd1606561aa37b572",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/not_unpin/conflict-unpin.rs",
+      "source_sha256": "23c7e081d86f2000838c32844dce1eee98d1b118eb1a29daf65c705aad5c68fb",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/not_unpin/negative_impls_stable.rs",
+      "source_sha256": "f014d5398d505ca5f482905cb9597a2d5fced563b9350229468c3751dd7f92ae",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/conflict-drop.rs",
+      "source_sha256": "a1964fa136080cc354479ff55b8428e5fa79305681fb2475cc37d6071cd64112",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/conflict-unpin.rs",
+      "source_sha256": "37e7b2f9ab1be70d0521c9dbbc954067f22a2321511e008f0f72e13d0edb4afe",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/invalid-bounds.rs",
+      "source_sha256": "4068e272a4f5d44851e0901dd6cfa806ead000c2e1a507a2b42be51d26d17056",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/invalid.rs",
+      "source_sha256": "1c84cc089623dd31f483011ed6543f169af341b028a212fcf00146bc96dd792f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/negative_impls_stable.rs",
+      "source_sha256": "1e70055fbec4bc0a53454fd93a0663f8785440d37dcf359ab29958d97fd51e9d",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/overlapping_lifetime_names.rs",
+      "source_sha256": "ac9c29b389e8e067e9e384cf04be69c0e5bb862cf373de0e3b4296fe2007809b",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/overlapping_unpin_struct.rs",
+      "source_sha256": "cb3d6d4087b8b4c917bc71e55764775f6bb018a77cda5c6b726afacd66789859",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/packed.rs",
+      "source_sha256": "6a24ac14e61e5d3e3b495f49d226318ec500e5aa46f34acf8e4f3e0827bd9604",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/unpin_sneaky.rs",
+      "source_sha256": "6e6385e067679c3bf5233163b3fa99ff2fc28bcb93fe594a5c987c0db7c0eaa6",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pin_project/unsupported.rs",
+      "source_sha256": "3ad5f584f9e56be3573133fba026a7bb378595d0a4b7b1bcbb6b78e37cef20a7",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pinned_drop/call-drop-inner.rs",
+      "source_sha256": "0618b60a450c99b5953b302e26c68df1abe7632af3d9baf3639eb60091e4ff4e",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pin-project-lite@0.2.17",
+      "source_relative_path": "tests/ui/pinned_drop/conditional-drop-impl.rs",
+      "source_sha256": "df03f38b2a331f339af2734fdd4ad2f637b2e2189d9928599adebe04ebee517f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "build.rs",
+      "source_sha256": "2e137a84bb55d08716203009eb9244c4c2620dcd36900d4c9ff89f9c57f93208",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/cfgs.rs",
+      "source_sha256": "2e7bdfd6ba48957a8760c0cec389c91917bd5965abaa04db32f916e6e75e8aae",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/gen/build.rs",
+      "source_sha256": "4ad2fa43f8f725631e9754338f39b80f64a2e61facdb3bd735efc215b95a6597",
+      "start_byte": 0,
+      "byte_length": 133,
+      "excerpt_sha256": "2c0b0a72cec0785b13b433677e2c0d0c991b0aff385a57c3a8fd57a1446b4c7e"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/gen/utils.rs",
+      "source_sha256": "c44ee71296aaa90c8104339e470688f631a2380d7f10349c7766205c415050aa",
+      "start_byte": 0,
+      "byte_length": 133,
+      "excerpt_sha256": "2c0b0a72cec0785b13b433677e2c0d0c991b0aff385a57c3a8fd57a1446b4c7e"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/aarch64.rs",
+      "source_sha256": "8fe3bebbf1a7991b35e6ffeb796ff872bc15edcdbbdcf7a5835cb2b1ce149542",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/intrinsics.rs",
+      "source_sha256": "882b817a77ba6b90ad96585bdd5545c8526a9590473a93ca8dda96d91d1fcbcb",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/macros.rs",
+      "source_sha256": "31f63dd5f6523fdc80d752afdd7b13e90394e7210b8f14bfa38a4feab0822cd5",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/mod.rs",
+      "source_sha256": "4d12d39ed3c0e5ab46724ac9536598ccc0028147d258b739ed27212c4e4d5e7e",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/powerpc64.rs",
+      "source_sha256": "f1831b186b89049aba31be4c4cd37b5572554f2655944d5cfc04ab5654691715",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/riscv64.rs",
+      "source_sha256": "bcf4fb886b97986bf2aaeb442f0728c4facae695e3274af6b507b61bdfa6feb3",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/s390x.rs",
+      "source_sha256": "f996062eddb29a5b15830ee32b89754435d4a9eab6b3ff402efdd3965817c9bc",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic128/x86_64.rs",
+      "source_sha256": "8d24f2e0478ae20a40bf079f8b133a821772db571d854219f4535d2dab2d98e2",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic64/arm_linux.rs",
+      "source_sha256": "86416137c53773e719a302f6f9d070d1b9fa9afac52b891c0b71a6344b60d429",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic64/macros.rs",
+      "source_sha256": "5b6f0bfe40064885926cfd57a336f15da92f6964864c50d339d1bb9903802a9d",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic64/mod.rs",
+      "source_sha256": "2977468d184134a068179eb8361d73500865b8d1476b87590099d6b503db30e5",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/atomic64/riscv32.rs",
+      "source_sha256": "357322c1c2be7a045c86947e1f76635e836c05bb78e60d0a89df69fe9c1b8d26",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/avr.rs",
+      "source_sha256": "085cdcc03d7ffb85c491f3939e0bcc3ae1e78738acadf09472f547a0b9d7c8fc",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/core_atomic.rs",
+      "source_sha256": "e17dc0c7498493dea2ee2800b221e23f1d81403dfc4b308c9eff83efe9e0436c",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/aarch64_aa64reg.rs",
+      "source_sha256": "0a441de5ee67342551bac9237e3b70d1b5f5ae33474ec24360bede3bfcaa348f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/aarch64_apple.rs",
+      "source_sha256": "5d3136a27f163f55627198bae60a3b3ec2465e9ba5f58fc74d9e977f45e9dd73",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/aarch64_fuchsia.rs",
+      "source_sha256": "edb86bdc2630329b96396d3da23d3ee2ca55d3d45737df2de76ac2bfbce4964f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/aarch64_illumos.rs",
+      "source_sha256": "50b95302831a5fe2837fc13b882d6d4e92f79e05b004c4c6cd2a6402d86eefc3",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/aarch64_windows.rs",
+      "source_sha256": "2cfc29df37c09aa8685b47e4973ab11fdb18f66ca9bbc2346e2713ef6898e1e1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/auxv.rs",
+      "source_sha256": "301bc5d8af1c0d3abfb2653e7feb8151548836b0a1e4412772e8ca037eb9c684",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/common.rs",
+      "source_sha256": "735925ba2717d649f49a7550d78fd523b002fb8c030cb7d52e542d982ada43a9",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/powerpc64_aix.rs",
+      "source_sha256": "b635538662e9add807cebd26c5742eae6dd764e11fd2c30fc6661baa03b69d01",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/riscv_linux.rs",
+      "source_sha256": "95ba93e88c230cd48da555cb0a7fbd3c48339d8c7923080c5390c62978e71a11",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/detect/x86_64.rs",
+      "source_sha256": "8b315b61a409d3350b19c02e98a741f4c1c1e3861e6792594137267f4595eeb1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/mod.rs",
+      "source_sha256": "970934078d4cf02e424f2bc80ad7724e188bc8fe4c883898311ef32b4601d826",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/outline_atomics.rs",
+      "source_sha256": "041d872affc4ad0b6b452f695a1373a1f76fe75d1b2377c24c3c0d199d89e383",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/seq_lock.rs",
+      "source_sha256": "9e51c4c2084eb14c702c09adde46bccaf5b969e604b3538e60724e70498c5f76",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/seq_lock_common.rs",
+      "source_sha256": "5d7089c0c7418c6c2dde660f126af499848b96442e950ddebd4846cf6a19f80a",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/seq_lock_wide.rs",
+      "source_sha256": "8459db142fde27de0176761043eb61e8e4d7be757dd349555891c275e0853561",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/fallback/utils.rs",
+      "source_sha256": "4b04423031fa66eaf7619e4ddbb30689eb834f74e9dd876b8f4d163cf9c75f73",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/float/aarch64.rs",
+      "source_sha256": "b3d69ef526252b8ee99662f2059898cfa6cb99e1c969828225a2be99de2d45df",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/float/int.rs",
+      "source_sha256": "8801b336650a039bc6e056857c0f65c2f148a0774c83baa9bd9bf415618107e5",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/float/mod.rs",
+      "source_sha256": "2c722182baee05df65f9f6e2b4de5d5474a3b2bf0c24803a65a771de78b76f95",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/armv4t.rs",
+      "source_sha256": "6fb9e7d01f7fb483bc6bec07916fdcba8563b605b53bd87c5310662da04e55a4",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/armv6m.rs",
+      "source_sha256": "364a38f18ffb2b3cd836700dff6a390d9542f0f2a3eda07bc63bc8868dafaad1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/avr.rs",
+      "source_sha256": "252569da4b194f91d7f52c6480a869e26679dc74c30a3a8fcd6568a39b90440d",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/mod.rs",
+      "source_sha256": "256ed2675f921dc2c2fb0ea06b610990e391ec2714dc460383e21d688a0f751f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/msp430.rs",
+      "source_sha256": "a7131a478fca956de4ca569f340641da2eb6a5cbd86a05a854f1231dd24e62d1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/riscv.rs",
+      "source_sha256": "339bf4236d0d93d5253ff3b8e5b24fbdf78f305d5daa494f6d5eef837fee9771",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/interrupt/xtensa.rs",
+      "source_sha256": "7c877f42c237d7ff6564776ee9c4afa5b8143d4fb6b39b4ac869e5e357189b4f",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/mod.rs",
+      "source_sha256": "0d0962d188d23534cecae596b92a3d6b2fc74353daa8d6ddd8d01c3beebe3fb1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/msp430.rs",
+      "source_sha256": "16635485eeca1c1c4b866253eefc1f39fa6121c84c16ec389b904c03fa9cdb55",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/riscv.rs",
+      "source_sha256": "9485cfe03591e7c5c0677eeac502574396e7ace0e3732b2ba588119182269561",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/imp/x86.rs",
+      "source_sha256": "a62dd51d358eaf1541198723e4d3f8bc3cd13d546f1316ec79d83254019b1a8c",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "41d7bedb84708f5c97f731f1da62415148ead8689e0b027ee6951a735d09e29d",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/tests/helper.rs",
+      "source_sha256": "79607ea85a8168f46d99821c1280415c2d2a7405ffdaf7f99074eee5fe08ae44",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/tests/mod.rs",
+      "source_sha256": "74aff58531edbba0c833d6a3ec7a45b987896945074763ab3a88f6d99feff05e",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "src/utils.rs",
+      "source_sha256": "86d76f5335ca54f7c34f79cf67cf351936b66f6bdd61f6ae94b3a79c14939282",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "portable-atomic@1.14.0",
+      "source_relative_path": "version.rs",
+      "source_sha256": "25c4e742d5a9e49ee16793b607157e181fd79eeafcbcbf0aa389f31b8d5514d1",
+      "start_byte": 0,
+      "byte_length": 45,
+      "excerpt_sha256": "8587cb2daa81acd282087cb74eb8f0fd49a6093d30b852b43c48842d28094b98"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/acos.rs",
+      "source_sha256": "5e2ca448b939f4e9bb1fa5f317e4ae4df64f3418b646d59c4449d1b2a6d798d3",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "43b3814758bc7cd40adebea80e81728c33d486ba15be6b9c430382f2612c9265"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/bessel/alpha0.rs",
+      "source_sha256": "7ebf163f01e259f37127a3c14e565260727d1fea1763c6e929dc2625a3037a4b",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "529c20af860d2d16a73c43ae087c759bc863770a4791f391d8bd3263908bf8e0"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/bessel/bessel_exp.rs",
+      "source_sha256": "540276371b2e5bd65e4acdf36690f015cfee3c360ab2b1c7f86d1e0ceea7b12e",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "4d87ff498cfb6659cd1792867238d3e5bc786f88f97a49eeb8289bd74f713cac"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/bessel/i0.rs",
+      "source_sha256": "80f826010d6d46296c9528371f322742a3f74d5eaac1b52134a05ea042a8d8fa",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "2368364a0446e0574c1254a07b6ba90743d92d9fb2bc71797d47c9fd0afc0cf0"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/common.rs",
+      "source_sha256": "0cae20e773bbbd23f774e1c682578242277760aa7732ae82e17aee77bb6c991b",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "479a29987e73b1ca24ec3ec7044431f00f6d237f88eab43926a332403968d338"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/logs/log2p1.rs",
+      "source_sha256": "e3b1974aebbd21e3426a04bb49dd82189f97dac48ad47ee25c857844cf82c1d9",
+      "start_byte": 0,
+      "byte_length": 1652,
+      "excerpt_sha256": "2368364a0446e0574c1254a07b6ba90743d92d9fb2bc71797d47c9fd0afc0cf0"
+    },
+    {
+      "package_id": "pxfm@0.1.30",
+      "source_relative_path": "src/logs/log2p1.rs",
+      "source_sha256": "e3b1974aebbd21e3426a04bb49dd82189f97dac48ad47ee25c857844cf82c1d9",
+      "start_byte": 9447,
+      "byte_length": 2146,
+      "excerpt_sha256": "1592f1da93d9466269b942c054438a2ad177a4e8f87581f84a8a42109f5f1c6c"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/bernoulli.rs",
+      "source_sha256": "8e11cf18fd021abeac46675def322bd004839c830241ae3ea6143fe809ce64d1",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/distribution.rs",
+      "source_sha256": "3f5904afd9d0f7492b1746b9cc45759a477a5dd2cc5802dbc4f09f1391eaeb96",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "745f1f91fa28b913230a5a05e92e25285799542ea3e0f6b50a29248c61b1175d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/float.rs",
+      "source_sha256": "486f2c8ead197d283593689e7b9026626ca83ab3fe7ebf9a89c8e701a4767c2e",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/integer.rs",
+      "source_sha256": "69ac205b6fed57ae09e2f8f1b15ae3d2049b85874bc4da3f246a18188b42d8ea",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/mod.rs",
+      "source_sha256": "de901e07e7ee11f4375a02fff29d77ac26d1df2721214b162dafcec1e47b2d67",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "745f1f91fa28b913230a5a05e92e25285799542ea3e0f6b50a29248c61b1175d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/other.rs",
+      "source_sha256": "b98748667af9415d65c8eaa6e51aee2d42a1d31c7970c22be7491adcb18a45a7",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/slice.rs",
+      "source_sha256": "e29eb71308f30aee13a4b1454da1ab70c2cc307738445172a27246df2dfa75ce",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/uniform.rs",
+      "source_sha256": "04efcc061e1904b824e3feb68541c4e8259a46ecd2c118af6fb383b3ad37f73c",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "67b70572f6deeaa32999a046334c5d8aea0b2c73789be9ab74b390bedfa80d2d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/uniform_float.rs",
+      "source_sha256": "62271f5fb4be087538d1fae743ad95027c66589740762521f97d20d358463d6b",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "67b70572f6deeaa32999a046334c5d8aea0b2c73789be9ab74b390bedfa80d2d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/uniform_int.rs",
+      "source_sha256": "30c620bc9d74263162de2e0755ae4b323abce1d6aa22c00d1b9de378480f22c0",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "67b70572f6deeaa32999a046334c5d8aea0b2c73789be9ab74b390bedfa80d2d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/uniform_other.rs",
+      "source_sha256": "41a7eee84bd0f2018207cea55fdf477cfcff25abb4536575a9add5df688be56c",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "67b70572f6deeaa32999a046334c5d8aea0b2c73789be9ab74b390bedfa80d2d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/utils.rs",
+      "source_sha256": "a631940e728257c9b0cb753bc64fa631958c92ce52d5b2265c7ed06a46567b8f",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/weighted/mod.rs",
+      "source_sha256": "52379f09ea06c8ac54bdb4ecaed93fd7fc08f85866b5e3fcb4e40d0f1576bdfe",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/distr/weighted/weighted_index.rs",
+      "source_sha256": "b4559037354bcb9e0b1eab569c867dd70053de382232c7ed4d9aef3d5b049003",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "d6bd9923f614d3beccc0d9bbe0a6e6c09d14b79cb4a5c4b6d2bd31fb21e2ab3b",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "745f1f91fa28b913230a5a05e92e25285799542ea3e0f6b50a29248c61b1175d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/prelude.rs",
+      "source_sha256": "ba69a78b5ebf3f7acb648ee57b8a8aa5403868852e6da082e8d87869d9dd18ce",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rng.rs",
+      "source_sha256": "19a29d58ea169c50ae7fea0a941c405e4a8f3a9b2ac0dc0edd9f7a55e9431703",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "745f1f91fa28b913230a5a05e92e25285799542ea3e0f6b50a29248c61b1175d"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/mock.rs",
+      "source_sha256": "330e6d7d7f30c6c9f6d64fe3f3a493b6c9574b075599b34b4871ebd4a9061015",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/mod.rs",
+      "source_sha256": "3868d87e88892a30ae0a8f2cbafdca299cea02d2aa6b3589300751cd8840a530",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/reseeding.rs",
+      "source_sha256": "a059793e940dbaf7635b89f15c8c42f40984f021b4bfc302f31b379c664f5f34",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/small.rs",
+      "source_sha256": "d043d5c8f11aa8c5e9f8cbdaf7812486a1ccd64133a0721b8bf7d0f2097b651a",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/std.rs",
+      "source_sha256": "7d804c97f1633fc0928de4ceb77292e8b3f630158a4922ee82d0dd6633bcfcc0",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/thread.rs",
+      "source_sha256": "4f8b9472d0140d4d729b8188f73849acca5d45967992ca6e3aec58b95c524fad",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/xoshiro128plusplus.rs",
+      "source_sha256": "4d5dcad38c9126ea133055d49953549e50063a1f8385e05b9434911358c2fcca",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/rngs/xoshiro256plusplus.rs",
+      "source_sha256": "3f386364f569f5b2dc7fb8f5b58152e075abeefb2ad5af86f715657f2bece0fd",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/coin_flipper.rs",
+      "source_sha256": "db57ebb4679144df94a6714d3fb1a9b5cb3dae7355d337d98ebc8dafbcf959c3",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "494b2ad6b34434706bdc9aab3bfac0449e0b39538206cc84a904137f9a6aa040"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/increasing_uniform.rs",
+      "source_sha256": "73b1bf2b30c4e5972f2e902dbb30b90518006bae7eb2628d1ab2547eaeca8ea3",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "494b2ad6b34434706bdc9aab3bfac0449e0b39538206cc84a904137f9a6aa040"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/index.rs",
+      "source_sha256": "d4f80b1dcb643cbec7caf8bf36d6dabd9c65d2db39bbf0b62d839aea79c553e1",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/iterator.rs",
+      "source_sha256": "e19443f5ca4cd02d9cad97706626cc3e5efe9bc21c0c578d08d1edb75f34406c",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "a49a61a942143e6eb6ad384e95ba5b55eff63c376555c5a9541dd8ad450c33f7"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/mod.rs",
+      "source_sha256": "04511fff0b199d84c6ff2ca7a394ad87197bcf6a9f2ba4fa2d139dae63f64913",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "494b2ad6b34434706bdc9aab3bfac0449e0b39538206cc84a904137f9a6aa040"
+    },
+    {
+      "package_id": "rand@0.9.5",
+      "source_relative_path": "src/seq/slice.rs",
+      "source_sha256": "3422ae1370761149ff72b89f07f90770c21e99e38007a0a5027080ddd3acaba0",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "494b2ad6b34434706bdc9aab3bfac0449e0b39538206cc84a904137f9a6aa040"
+    },
+    {
+      "package_id": "rand_chacha@0.9.0",
+      "source_relative_path": "src/chacha.rs",
+      "source_sha256": "8b7fb696f491afe9ca5830e5ed66f418f0cb6bee40dafb4e4d2404c50523a33a",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_chacha@0.9.0",
+      "source_relative_path": "src/guts.rs",
+      "source_sha256": "33d284279f5bacc5951a46de693a77758b662c341ef05bd8a4bcda84f34863a6",
+      "start_byte": 0,
+      "byte_length": 405,
+      "excerpt_sha256": "c2c62e6a7c0eed39320970e60dca5e3f198b9bd4492d0542e6e5955a46c0200b"
+    },
+    {
+      "package_id": "rand_chacha@0.9.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "a3eddc972be141f04118957200d23ec8b783ca53b382c0d886a9436229c8bec4",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_core@0.9.5",
+      "source_relative_path": "src/block.rs",
+      "source_sha256": "105cb275cd8f38f5d4f51ea574beb2263ae1d510a8b1737a41d8d622f730ddbb",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_core@0.9.5",
+      "source_relative_path": "src/impls.rs",
+      "source_sha256": "145ec30e733af5aa0fd8556a706aa932723de45cfa964aacf284bc59e951ca5a",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_core@0.9.5",
+      "source_relative_path": "src/le.rs",
+      "source_sha256": "e1d01e111ce8d2b6fdc8c85e1fcf400b490b302db5c5f32e040c5b9e6b528013",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_core@0.9.5",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "694b8736371fcda0a78e62346519034af9f7d493e417575f55cfbb9c3c3cfe6d",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "878edbaba3f3cf5a41ae7d5b9414102f328b66999743260ffce1dae0b950b11f"
+    },
+    {
+      "package_id": "rand_core@0.9.5",
+      "source_relative_path": "src/os.rs",
+      "source_sha256": "10ef59c924aa6286b4ded0dd03086fb1b6b0b7a2fd106aada70d3270ee135fea",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "131e072fdb2118de0c839d1f11e36afd2cfc7d33edd715402fcfb080ce2d3a0d"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/beta.rs",
+      "source_sha256": "eece1679d835c17526457e79522441e239f857a577424af371a063fb138c9d4e",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/binomial.rs",
+      "source_sha256": "faee1acdc51fc638633f517d5241db7852a4733c5aafcef3b3d7e6504ad9e9fa",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "a3fa29f5628f02c72722076a78ac207e465c5fb909cc8f857a004008931d5732"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/cauchy.rs",
+      "source_sha256": "e51df08200f0b94fb8d198c63d2d2980ce06e4765283c0d5d54256f991fc4fcd",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "a3fa29f5628f02c72722076a78ac207e465c5fb909cc8f857a004008931d5732"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/chi_squared.rs",
+      "source_sha256": "a90991d124586ac6c05979178a95a8e5fc5d5ff67147f659502bd41f24194561",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/dirichlet.rs",
+      "source_sha256": "f522bc6984947b5e57385a2ea3bae10536fb43c102cc27faed149ec991922fe3",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/exponential.rs",
+      "source_sha256": "6e65ed2c3668e40febc9866335f6777c911aaecbceea0705d3ad696c88a0a81b",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/fisher_f.rs",
+      "source_sha256": "c53d0d4346377909074a1cc3bab60a777d6f24940c43777062c493f133182d37",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/frechet.rs",
+      "source_sha256": "0314b87c0cfe16a5b9476b020f3955e50d368201cf7e42d1819be595f4c1fe1e",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/gamma.rs",
+      "source_sha256": "a44e937583a967a67e2c469b8db7ae0dc114fe166175da6117aa42839e33126c",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/gumbel.rs",
+      "source_sha256": "316801c00764eb447f061b6defbd9489901746f40a6a0b3e378afc7067ec50b1",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "cb35db2440af32a91e22aa26a12915233415d9955e2037332744fe9b84c1d822",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "131e072fdb2118de0c839d1f11e36afd2cfc7d33edd715402fcfb080ce2d3a0d"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/normal.rs",
+      "source_sha256": "2790fd5fd4eb2980e0e2b05c0fae8e52bc42e557ca83144ec09bcc45e6212c2d",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/pareto.rs",
+      "source_sha256": "bcb02df558b0d5b1690c24c36d7f1fe404d78da4f36a187bd0dd7722dd8f29e7",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/pert.rs",
+      "source_sha256": "f8e606ff24a5d9a1f408a940a0f2d44bf70ec452a5514ba263ef80a395c0c95b",
+      "start_byte": 0,
+      "byte_length": 381,
+      "excerpt_sha256": "11b59c0cc0e697f030df8d03258770538c9ec22b1c4967a12237f11b273de897"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/poisson.rs",
+      "source_sha256": "115afa4a9f2a4b367106b5c594fab6074bb0205aeefdef2eb81a6361d17278d4",
+      "start_byte": 0,
+      "byte_length": 406,
+      "excerpt_sha256": "a3fa29f5628f02c72722076a78ac207e465c5fb909cc8f857a004008931d5732"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/skew_normal.rs",
+      "source_sha256": "26d8dff99e05fd829b2e319b9e702c923c2e3ee542e4ed6b32b2b1bbc300716f",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/student_t.rs",
+      "source_sha256": "9e592634c1932fd6efdb23d49d256606db184765ba644abb4a01a2c60bbc999b",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/triangular.rs",
+      "source_sha256": "3338b9b0a95e3f44fafc73c57b48bba1d1fb319f1c7326b0e4b2e90eff445ada",
+      "start_byte": 0,
+      "byte_length": 387,
+      "excerpt_sha256": "e1f68070f316003bce4ba5282d833c236c5e68589b8d7039e63af5aa1c5d7ae9"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/unit_ball.rs",
+      "source_sha256": "f2ef9597f5290c12ca7b001477efc2ce19c6b18c44f80b84f21815064d880712",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "131e072fdb2118de0c839d1f11e36afd2cfc7d33edd715402fcfb080ce2d3a0d"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/unit_circle.rs",
+      "source_sha256": "881b22f159edc639cf372cb0be7b361f3f4edc53c2fcdda9e3ff96c1f87898f8",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/unit_disc.rs",
+      "source_sha256": "01b7c2acab82eeb4991a963be6bf5428d9c65fe533e2b0ec15c3efc7d91ae662",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "131e072fdb2118de0c839d1f11e36afd2cfc7d33edd715402fcfb080ce2d3a0d"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/unit_sphere.rs",
+      "source_sha256": "79dc677ddbd55ca6e1ce79261162121d8a3aa7fb54a84dda0244a930b4917ad9",
+      "start_byte": 0,
+      "byte_length": 359,
+      "excerpt_sha256": "95de254833d477023942b18d0f5b9b35bf37cc7ec698fffdf1ac9331e787f6ae"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/utils.rs",
+      "source_sha256": "b9368d4de9a72ed189353b5e4b81e293e9ddfb01a2895f0b98de32d934e9392d",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/weibull.rs",
+      "source_sha256": "24cc9216f83835139f0b3dca60d218c52a76d9e221fb3c20d4cba3cbe8595ca8",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/weighted/mod.rs",
+      "source_sha256": "52a397939c1613a4c725d7b904fcf52f4bcc5881d80b30a4be5a32dad77720ef",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "5cc16d6c1d8bcd2541d9d49d4976a1609ce5afbb4de2d0c2d913854fb370c1c1"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/weighted/weighted_alias.rs",
+      "source_sha256": "5d82145d731c9ded894aecc9805439d0d7dc817c666a2f76b026b722b8ee7955",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "131e072fdb2118de0c839d1f11e36afd2cfc7d33edd715402fcfb080ce2d3a0d"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/weighted/weighted_tree.rs",
+      "source_sha256": "120317f9d5f86e9c1a1d048f53101b6b3ca60dad2a00ae875ef7a2a1673b05b2",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "271a8f40f10011bb73bbb2658a4141725b77e5097a86aa28813b46efdb77cf71"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/zeta.rs",
+      "source_sha256": "44f30bb936c3c60b32d5ec8a36dcd19cdab6bddfc83553cbe8ac49aad2b55e0e",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/ziggurat_tables.rs",
+      "source_sha256": "2994bb821a60681e0d7a2bb45fcdcbea1040aa775c9aab2c80a7161d753d1ad0",
+      "start_byte": 0,
+      "byte_length": 401,
+      "excerpt_sha256": "ce26bf3ccffa46b55a2eea26515ad6c85a1293b4d4d60d35896e542e246f521a"
+    },
+    {
+      "package_id": "rand_distr@0.5.1",
+      "source_relative_path": "src/zipf.rs",
+      "source_sha256": "ae1e87fa3f55acdabc660353c8337dc0d22ef7bb4872388fa8a9c383a1a52c8a",
+      "start_byte": 0,
+      "byte_length": 354,
+      "excerpt_sha256": "3aaae4091f9b5a8f8712be8efee028aa2a1a639a3062e0bc65d7922cf5f19b74"
+    },
+    {
+      "package_id": "read-fonts@0.41.0",
+      "source_relative_path": "data/glyphlist.txt",
+      "source_sha256": "7bca3e2431753d85e6c6617707bec21396af7110199e746a3b75e01f0ace2346",
+      "start_byte": 0,
+      "byte_length": 1958,
+      "excerpt_sha256": "5313228dd7f6c2feec809d1c3f6e0bfc00c29a3230c501f2cfdb30ed83b950d4"
+    },
+    {
+      "package_id": "ron@0.12.2",
+      "source_relative_path": "src/value/raw.rs",
+      "source_sha256": "959a6d74a802474b9c87f40557c737280d8e1a50e5dacdf725d4dbba0e501839",
+      "start_byte": 0,
+      "byte_length": 184,
+      "excerpt_sha256": "d72df8c12083a5002fef5c24d210b89883c9dd56a1b612c87acd039afb2f641d"
+    },
+    {
+      "package_id": "rustc-hash@1.1.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "ddecafb5db609d0d8eebd19e4d98dc865e7e9282a4183421f9bd765c01a231c0",
+      "start_byte": 0,
+      "byte_length": 467,
+      "excerpt_sha256": "4b88f68c805a1bb0883f4c202c95083cf9bfc8122a9c57e16a0786bfe4a3b2e0"
+    },
+    {
+      "package_id": "rustc_version@0.4.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6d0dbf7bd12ba7121e6767841a0cee23b8282cc4d7c4b778a1e33129abdd7d72",
+      "start_byte": 0,
+      "byte_length": 348,
+      "excerpt_sha256": "42bad60312b985576cd40e859a7afe6dc6b2d5e048a2193e34d2f03577ba78fe"
+    },
+    {
+      "package_id": "serde_json@1.0.151",
+      "source_relative_path": "src/lexical/mod.rs",
+      "source_sha256": "ace2ccea2cd541f019a84b9eeb3b9ecd88daf6bccbe9edf0eac00b62704f47c4",
+      "start_byte": 0,
+      "byte_length": 536,
+      "excerpt_sha256": "13512eb214c7b6be66e33a5fa988cb7b8973accb46670526d297ed92eab0b3a2"
+    },
+    {
+      "package_id": "shlex@2.0.1",
+      "source_relative_path": "src/bytes.rs",
+      "source_sha256": "14ac6d79be6cd93543de6cbba8a4c07181aacf7d02d01a1e5f51b63a89bf11c0",
+      "start_byte": 0,
+      "byte_length": 306,
+      "excerpt_sha256": "b7090253cf5f1c2845eb4432f31d8dcda83dd3e3229aae0d534b94af331fc776"
+    },
+    {
+      "package_id": "shlex@2.0.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "d707a605a9dbe52b48c53f5d0209ab457d1db535f10acad060883b6c3d8d7a91",
+      "start_byte": 0,
+      "byte_length": 306,
+      "excerpt_sha256": "b7090253cf5f1c2845eb4432f31d8dcda83dd3e3229aae0d534b94af331fc776"
+    },
+    {
+      "package_id": "smallvec@1.15.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "a779bc485235ccb746b680be71d57b707865341209a585b53e63a91c4bda6cae",
+      "start_byte": 0,
+      "byte_length": 299,
+      "excerpt_sha256": "91325d4d826f290bcd8e5974b9c28e5715fd75a1265850a96e024703962590f6"
+    },
+    {
+      "package_id": "smallvec@1.15.2",
+      "source_relative_path": "src/specialization.rs",
+      "source_sha256": "46433586203399251cba496d67b88d34e1be3c2b591986b77463513da1c66471",
+      "start_byte": 0,
+      "byte_length": 299,
+      "excerpt_sha256": "91325d4d826f290bcd8e5974b9c28e5715fd75a1265850a96e024703962590f6"
+    },
+    {
+      "package_id": "spin@0.10.1",
+      "source_relative_path": "src/barrier.rs",
+      "source_sha256": "f8569a601d870a713344747eb355e6d840db510a599709173ebd0ccba5fc4028",
+      "start_byte": 0,
+      "byte_length": 740,
+      "excerpt_sha256": "b91b82fc227c9d7d2a714f3b5f860ee608c6b763e4b6c98ddc9796ee586448d5"
+    },
+    {
+      "package_id": "stackfuture@0.3.1",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "8b9d719a769be5197ab31953cac89b09052057009b43284e5d592c7c41344833",
+      "start_byte": 0,
+      "byte_length": 74,
+      "excerpt_sha256": "a6d85fdde75cead3c32b7efd46aa860b589f5c7c672d64a470c04c0e9a8be0e9"
+    },
+    {
+      "package_id": "stackfuture@0.3.1",
+      "source_relative_path": "src/tests.rs",
+      "source_sha256": "b55964e0c621120ff0cb95bc134fed9caeb063d7d9920bbf28cac1c78e6490c3",
+      "start_byte": 0,
+      "byte_length": 74,
+      "excerpt_sha256": "a6d85fdde75cead3c32b7efd46aa860b589f5c7c672d64a470c04c0e9a8be0e9"
+    },
+    {
+      "package_id": "tempfile@3.27.0",
+      "source_relative_path": "src/dir/mod.rs",
+      "source_sha256": "d144325a6528a9a6e7c78a42e0eec42ee401c3b834ef5851376323725756f219",
+      "start_byte": 0,
+      "byte_length": 349,
+      "excerpt_sha256": "34f74f6b1b41d7b43d5d4cff3e6f73f6ac35246f09be6f5f3b4920bd71746df5"
+    },
+    {
+      "package_id": "tempfile@3.27.0",
+      "source_relative_path": "tests/tempdir.rs",
+      "source_sha256": "b52cbe9937525075c83091da520734ef0c4eac35cd13c9c121000e2dcef87cc5",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "3ae581b4ff7e305647f4be3a738c9b0f49da57334b64de2e76800bec5e5ecf4f"
+    },
+    {
+      "package_id": "thread_local@1.1.10",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "6586dfaabf81be0f20002b4fa88aa7f2ef797bc1bd90081b80a71c32ea0e7aa8",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "38beccec93197a03921f86a958e41c307fc6b3e952e2bf5ba7b4bf75a028ef02"
+    },
+    {
+      "package_id": "thread_local@1.1.10",
+      "source_relative_path": "src/thread_id.rs",
+      "source_sha256": "706926d4484a0d9e71b8274cf3efb8bc84fe7e6c11ea9179985f2ad973c50d3e",
+      "start_byte": 0,
+      "byte_length": 331,
+      "excerpt_sha256": "38beccec93197a03921f86a958e41c307fc6b3e952e2bf5ba7b4bf75a028ef02"
+    },
+    {
+      "package_id": "tracing-subscriber@0.3.23",
+      "source_relative_path": "src/fmt/time/datetime.rs",
+      "source_sha256": "a6eeeb475e1f0b8cf90d1ef0dcb862b244cea58261485d440d51095694637213",
+      "start_byte": 0,
+      "byte_length": 6759,
+      "excerpt_sha256": "635dba323a4c23bd66a10ee7d64e9583c04428e436126a082a1158b29077cd90"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/char_data/mod.rs",
+      "source_sha256": "8cbdcaacddb3dd9b70d615693fa73d0e7dca6332102a95f0d3ce447df7645284",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/data_source.rs",
+      "source_sha256": "36fa0785e51c549c1f72f09040cfe515b848d1b23fb30d469770a6b4b17b49df",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/deprecated.rs",
+      "source_sha256": "f94c0e75dec7e70cb9802e26b7f82fe618dcdd50e9973927bacd4eccc6899c62",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/explicit.rs",
+      "source_sha256": "86c3c55bf2cc90aab1411aac6cf05de505ca74e44a76fe829572dd7dc4dd2aa3",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/format_chars.rs",
+      "source_sha256": "678399fec3f4bfaf4093f38cfdb8956288313386dc3511dab9fb58164e8dc01b",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "76cf8f77b6197a24bef2cf0d00d5033e135cbb947196572608f16db4e4b3f658"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/implicit.rs",
+      "source_sha256": "8d5b003464aee3f333785c6170a884945251f39601e4ea658e669a2ad575d588",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/level.rs",
+      "source_sha256": "ce1eaa9940f1b90bc59aba296488b8cd128aefeb4b6b2e3ecc34da26c569150b",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "76cf8f77b6197a24bef2cf0d00d5033e135cbb947196572608f16db4e4b3f658"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "8a611ccb9d56c176f8428edc14b1e6fc1fbe8ed22bc72118fb987e6a29638197",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/prepare.rs",
+      "source_sha256": "aeb8b88cfb2d2e6b74473f5903205dd3683d57abcc8801de7b9fdea6a432a0fe",
+      "start_byte": 0,
+      "byte_length": 425,
+      "excerpt_sha256": "45cd6ad333905ec3729e27f1bba7fb9ab2f1d1624b70933562f7e72fffcb57d3"
+    },
+    {
+      "package_id": "unicode-bidi@0.3.18",
+      "source_relative_path": "src/utf16.rs",
+      "source_sha256": "12ee177127a0b5b0350a1fcc1edf7387c26b51ec5654f724629aab723881c313",
+      "start_byte": 0,
+      "byte_length": 419,
+      "excerpt_sha256": "bb0c0db563b6a687187d0405f5e7d3b5f4fcaddd6018c0388a3cd3156af71f5c"
+    },
+    {
+      "package_id": "unicode-script@0.5.8",
+      "source_relative_path": "src/tables.rs",
+      "source_sha256": "036be4f0b3284a737fc58071a8017ab64c08d040e00846978aa5d9add793cf3b",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "f4786338763ea4479dcfbaf0ae7fa2d595a026d9a292be64575db27b92da4dca"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "src/grapheme.rs",
+      "source_sha256": "730d50fb3d2858840e61ed3805a67336fd0b02c0e6bb9192306511ae6adfdbb3",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "3f5ddecddefa2caea4182b51bb5075a856ae542277a50c10a1a2216c54d86aac",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "ff983b8120a220d7550eb016c24ec4b681d4e05d00a997d98dcc82e0dff300bd"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "src/sentence.rs",
+      "source_sha256": "7fe9496fbd694f335359be8ccd12980680e880cbf40b61141bbfb9f95e8b589d",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "src/tables.rs",
+      "source_sha256": "089c221918a60e8672ed8eda73d27f195dcc404f91b9e71b57c0b5e348e7aeef",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "f4786338763ea4479dcfbaf0ae7fa2d595a026d9a292be64575db27b92da4dca"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "src/word.rs",
+      "source_sha256": "27d8f79071f57e314053d0c9dda0d39eb10c66343d2069e9ba22a8629e1ddef4",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "7d180a4ee4908ca52430012af77295a7923ac1a9fa0dc56514a10ea530f64287"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "tests/test.rs",
+      "source_sha256": "5d21ec5b729a0f0554f247c28cf8636e0929468bbcb8c0540ee0cf96b7bdb3ef",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "ff983b8120a220d7550eb016c24ec4b681d4e05d00a997d98dcc82e0dff300bd"
+    },
+    {
+      "package_id": "unicode-segmentation@1.13.3",
+      "source_relative_path": "tests/testdata/mod.rs",
+      "source_sha256": "52b9609d96660413c21f51e8f9d15667213f628c05b7c228e54585865bd4c373",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "f4786338763ea4479dcfbaf0ae7fa2d595a026d9a292be64575db27b92da4dca"
+    },
+    {
+      "package_id": "unicode-width@0.2.2",
+      "source_relative_path": "benches/benches.rs",
+      "source_sha256": "066d361583f911883791fd313c02556a2faf2854470dbbae328a6513ae035bb6",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "2a772cf96d34e6d1fc4e1525e5e6867009dc3a1b4d5768105c91b1ae870b8f9d"
+    },
+    {
+      "package_id": "unicode-width@0.2.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "be8917e1a821806c0ce7a392564c72731a5f7d02155429a37b08571ad246a0bf",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "2a772cf96d34e6d1fc4e1525e5e6867009dc3a1b4d5768105c91b1ae870b8f9d"
+    },
+    {
+      "package_id": "unicode-width@0.2.2",
+      "source_relative_path": "src/tables.rs",
+      "source_sha256": "4c3e673da24634c269562ca4d3652b494542c78cafe56da69d23df9178adffd4",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "2a772cf96d34e6d1fc4e1525e5e6867009dc3a1b4d5768105c91b1ae870b8f9d"
+    },
+    {
+      "package_id": "unicode-width@0.2.2",
+      "source_relative_path": "tests/tests.rs",
+      "source_sha256": "10c40454f79c2b66ea99d2924df62c8afc3e13fb8cea835883d3c458b8076204",
+      "start_byte": 0,
+      "byte_length": 470,
+      "excerpt_sha256": "2a772cf96d34e6d1fc4e1525e5e6867009dc3a1b4d5768105c91b1ae870b8f9d"
+    },
+    {
+      "package_id": "unicode-xid@0.2.6",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "5ec8dbe7a10106d8798e8469986408ecfb60710e7f6a936e265283753c8d1a94",
+      "start_byte": 0,
+      "byte_length": 485,
+      "excerpt_sha256": "ffca9929e007a2c3df030ad9d354933aa7906289049822299cc874cc95f8dded"
+    },
+    {
+      "package_id": "unicode-xid@0.2.6",
+      "source_relative_path": "src/tables.rs",
+      "source_sha256": "6a886d9107d42e8dbec81fa7f4acbb6a82adcec4976b56f757551c7a61cf788d",
+      "start_byte": 0,
+      "byte_length": 485,
+      "excerpt_sha256": "ffca9929e007a2c3df030ad9d354933aa7906289049822299cc874cc95f8dded"
+    },
+    {
+      "package_id": "unicode-xid@0.2.6",
+      "source_relative_path": "src/tests.rs",
+      "source_sha256": "56da0662966bb3c69201ae3eb1f69a62b808d604584b7fbdc4f930905301e4c6",
+      "start_byte": 0,
+      "byte_length": 485,
+      "excerpt_sha256": "ffca9929e007a2c3df030ad9d354933aa7906289049822299cc874cc95f8dded"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/builder.rs",
+      "source_sha256": "d332dbf9380bd6275f8c416758a8971db875ce2a661440c8e476cc6f827736c9",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/external/serde_support.rs",
+      "source_sha256": "3c461e4d71b03423e817d53c3292095c6b2965bda28c46604dc5bccf1dd24f3d",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/external/slog_support.rs",
+      "source_sha256": "8ba03d4b6c8b37dd8e3d08f47b254ca68ffa6f4a29a2c98dd277dbafdcb810dc",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/fmt.rs",
+      "source_sha256": "59160088a7ef7df7fd6d622d888db2a73d5a93940121ef14daf957f0d2cef68f",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "4faed808181ee052d97b9f0574f47fd23428282d9c692129bbab3fb59ddf0b72",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/parser.rs",
+      "source_sha256": "6dbeb10a725bf00a711257579f3a0752910315b03648b42fbe937c1776cbaa4a",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "239617059bad030aafc0ae08c0da7d14fc1dbd545f0684deb3b2784e377c0a8e"
+    },
+    {
+      "package_id": "uuid@1.24.0",
+      "source_relative_path": "src/rng.rs",
+      "source_sha256": "0025abde1ac4171b96fff8d137bb4cdc56b41387d426ab23797c30c97eb10444",
+      "start_byte": 5742,
+      "byte_length": 1672,
+      "excerpt_sha256": "b9de24e6a2580894ca2596539473625f505c01ca029f9a8d3eb76b6bf1bb5c6d"
+    },
+    {
+      "package_id": "vec_map@0.8.2",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "660ae0d68bb09c0281c75c526c0bfb2059821dee065e14f5cb31e695b4c81c2d",
+      "start_byte": 0,
+      "byte_length": 472,
+      "excerpt_sha256": "ea209f4a7ece94ebc3b200abf6352505142233ff3764045cd94de3ade9102b89"
+    },
+    {
+      "package_id": "winapi@0.3.9",
+      "source_relative_path": "src/um/evntcons.rs",
+      "source_sha256": "297bbdf96b7f9bdbcd6b7a8696e4b65fff7731b5fba52257387d03cdaeed25f9",
+      "start_byte": 6823,
+      "byte_length": 314,
+      "excerpt_sha256": "732deb7da04ff2a2f1d43e346c8007c724ccea445c291d024e4bef3e3fd86b98"
+    },
+    {
+      "package_id": "winit@0.30.13",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "fb1400750fb0c6d376415e642c837e0e8ded95f55ba03a8889d336d180620394",
+      "start_byte": 36,
+      "byte_length": 864,
+      "excerpt_sha256": "ec3deaf5729770f052dba1f803421fb42462b0169a9cad4d0fe26a8bf54c13a1"
+    },
+    {
+      "package_id": "winit@0.30.13",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "fb1400750fb0c6d376415e642c837e0e8ded95f55ba03a8889d336d180620394",
+      "start_byte": 902,
+      "byte_length": 2002,
+      "excerpt_sha256": "428d8ae505f2254ec4825242ed11dd71e74bcaa046f5809316bfdac4ec2556a5"
+    },
+    {
+      "package_id": "winit@0.30.13",
+      "source_relative_path": "src/keyboard.rs",
+      "source_sha256": "fb1400750fb0c6d376415e642c837e0e8ded95f55ba03a8889d336d180620394",
+      "start_byte": 2906,
+      "byte_length": 748,
+      "excerpt_sha256": "02c137054e2845cdb5362b72c31d329429b41a0bb3721d73f92aa4860e092013"
+    },
+    {
+      "package_id": "winit@0.30.13",
+      "source_relative_path": "src/platform_impl/linux/x11/activation.rs",
+      "source_sha256": "e30310151a7277aa8467adb0890b16482913efa6aea1e518a0b1d5ac83e3ec95",
+      "start_byte": 0,
+      "byte_length": 38,
+      "excerpt_sha256": "01461ae137dca0f445362c3eb3b15ced89d55a5b09eabdc9d453910d49b5aedc"
+    },
+    {
+      "package_id": "zerocopy-derive@0.8.55",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "00d855fea1b0225e2e0f253523c3b4c97442490e54e4b3bb1e7ca2445b8951f8",
+      "start_byte": 0,
+      "byte_length": 440,
+      "excerpt_sha256": "77ee9bce4ac66db1a7c4d5981acb771b85bda28ec5a34205eacfba5790c18367"
+    },
+    {
+      "package_id": "zerocopy-derive@0.8.55",
+      "source_relative_path": "src/output_tests/mod.rs",
+      "source_sha256": "b9c70718beec548a84cacc86cb824e02098ead23a48114db4d7736645e12c9aa",
+      "start_byte": 0,
+      "byte_length": 397,
+      "excerpt_sha256": "f1a841778b53a507f5cc78f88891d554422914e52bec77d9328e80515006b6c8"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/byte_slice.rs",
+      "source_sha256": "c61c875a6e10aa06c44300337e7e270099a4a5ece7ddd4863de2cef4439087b4",
+      "start_byte": 0,
+      "byte_length": 440,
+      "excerpt_sha256": "388ab80c8f3a357eaf6c89d831047392791cb8439a538dedf1a2af6f05a7c344"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/byteorder.rs",
+      "source_sha256": "3631826007e5546e9d2ade6fe1269eac22245ebb020bbb9f6f3cf64c82afe0c1",
+      "start_byte": 0,
+      "byte_length": 440,
+      "excerpt_sha256": "77ee9bce4ac66db1a7c4d5981acb771b85bda28ec5a34205eacfba5790c18367"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/doctests.rs",
+      "source_sha256": "dcbadd8d83a676ba003d00e9ce038cb7752224fd700be4547ae7f56b17ab718d",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "90a0af8d5c8e5a90b0c074cb812714f5bf6979d20cefc2f395f3eb6ed6316310"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/lib.rs",
+      "source_sha256": "80b14f7017ba0bfd4d9ac6c12af03eb73ec3c04e4ded6a60de4fe11688337a7b",
+      "start_byte": 0,
+      "byte_length": 479,
+      "excerpt_sha256": "3ec62ca51f6375dc09d8d311a21611080ff2d1040f9b3c379e5dea7ecc9c9409"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/pointer/mod.rs",
+      "source_sha256": "fed883833d01acb38b152b2f251acf4bda6b1b4c58be6c50edab5341f97b107c",
+      "start_byte": 0,
+      "byte_length": 440,
+      "excerpt_sha256": "a0391b94bba1e28d1067237466a4d6e590f369ffb21755535a4aaf3b2f437825"
+    },
+    {
+      "package_id": "zerocopy@0.8.55",
+      "source_relative_path": "src/util/macro_util.rs",
+      "source_sha256": "489866940d8483d1f4ea4ce24ca64321f24d78d8f57f1e20d252961203d79535",
+      "start_byte": 0,
+      "byte_length": 440,
+      "excerpt_sha256": "e382906616915453c368b64c2eb946f37747f1848360203299d8d15587ed9fb0"
+    },
+    {
+      "package_id": "zune-core@0.5.1",
+      "source_relative_path": "src/bit_depth.rs",
+      "source_sha256": "879b5b4b3ac99fc567f8d281662dc4125109f835b3944d023d038a084b2c0dd9",
+      "start_byte": 0,
+      "byte_length": 167,
+      "excerpt_sha256": "6c12dfa435e4adf6a2560044fed48e108cda4cff49ef6fd9e37d30b5250ea1a6"
+    },
+    {
+      "package_id": "zune-jpeg@0.5.15",
+      "source_relative_path": "src/bitstream.rs",
+      "source_sha256": "0f053b8d4443b8818fe187be90304a4f3c645ee43bc9984b8baad4c8b39ce387",
+      "start_byte": 351,
+      "byte_length": 1181,
+      "excerpt_sha256": "f5b507e805e8f3a9f2141fbfa6088687a14e7b5da6fed0f844352b467342cf33"
+    },
+    {
+      "package_id": "zune-jpeg@0.5.15",
+      "source_relative_path": "src/idct.rs",
+      "source_sha256": "be856aec47d17f28dfaa98072f2317eb78be0f6b9dc9535f5d309e97da5cf8e8",
+      "start_byte": 1492,
+      "byte_length": 2181,
+      "excerpt_sha256": "fed2ad3780728bcdb4397e0d2a61cb4c093fb5e5963b63752e7cf3342f0651f3"
+    },
+    {
+      "package_id": "zune-jpeg@0.5.15",
+      "source_relative_path": "src/unsafe_utils_avx2.rs",
+      "source_sha256": "3d2ce5ab5b67711ba7262b3d3051cd936040615d150bb1593746a596d32c32da",
+      "start_byte": 0,
+      "byte_length": 449,
+      "excerpt_sha256": "6dfb5e02b501eee557098f579848e0856b90255610624c1dd6def1db34c493a1"
+    },
+    {
+      "package_id": "zune-jpeg@0.5.15",
+      "source_relative_path": "src/worker.rs",
+      "source_sha256": "6f939fa614844d11b826c196ea56ea13846ba7725025da0e2418b2d453fecc6d",
+      "start_byte": 463,
+      "byte_length": 295,
+      "excerpt_sha256": "bc1426fb83928cdf1f9418b010f1e75ab6f55db348ae8bfa91d912b813c9bbd3"
+    },
+    {
+      "package_id": "zune-jpeg@0.5.15",
+      "source_relative_path": "src/unsafe_utils_avx2.rs",
+      "source_sha256": "3d2ce5ab5b67711ba7262b3d3051cd936040615d150bb1593746a596d32c32da",
+      "start_byte": 3373,
+      "byte_length": 46,
+      "excerpt_sha256": "039bca050160e3114162ece74406acd7a33fd8b6ee8afe1a6e1c1f41d4e29162"
+    },
+    {
+      "package_id": "bevy_pbr@0.18.1",
+      "source_relative_path": "src/render/parallax_mapping.wgsl",
+      "source_sha256": "65226a61e28f9f7b593e7a59d983a8b52e8c5ced952156e2977774dd5687baf1",
+      "start_byte": 1664,
+      "byte_length": 46,
+      "excerpt_sha256": "039bca050160e3114162ece74406acd7a33fd8b6ee8afe1a6e1c1f41d4e29162"
+    }
+  ]
+}

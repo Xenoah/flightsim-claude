@@ -1,7 +1,8 @@
 //! Actual-scene screenshots, including a windowless software-rendering path.
 //!
-//! This changes only the camera's output surface. Physics, assets, atmosphere,
-//! terrain and UI use the same plugins and systems as the interactive app.
+//! The windowless path changes the camera output surface. Native batch capture
+//! defers unfinished view draws while preserving normal preparation and budgets.
+//! Physics, assets, atmosphere, terrain and UI use the interactive app systems.
 
 use bevy::camera::RenderTarget;
 use bevy::prelude::*;
@@ -23,6 +24,8 @@ pub(super) struct RunwaySurface;
 pub(super) fn configure(app: &mut App) {
     #[cfg(not(target_family = "wasm"))]
     crate::capture_backpressure::configure(app);
+    #[cfg(not(target_family = "wasm"))]
+    crate::capture_admission::configure(app);
     if app.world().resource::<Startup>().screenshot.is_some() {
         app.init_resource::<CaptureTerrainReadiness>();
     }
@@ -75,11 +78,14 @@ struct CaptureState {
     frames: u32,
     done: bool,
     previous_ready: Option<ReadyScene>,
+    scene_changed: bool,
 }
 
 impl CaptureState {
     fn observe(&mut self, ready: Option<ReadyScene>) -> bool {
         let stable = ready.is_some() && self.previous_ready == ready;
+        // Reuse the existing comparison; do not traverse a ready scene twice.
+        self.scene_changed = !stable && (ready.is_some() || self.previous_ready.is_some());
         self.previous_ready = ready;
         stable
     }
@@ -154,6 +160,9 @@ fn capture_screenshot(
     models: Query<Entity, With<ExteriorModel>>,
     mut commands: Commands,
     mut state: Local<CaptureState>,
+    #[cfg(not(target_family = "wasm"))] mut admission: Option<
+        ResMut<crate::capture_admission::CaptureAdmission>,
+    >,
 ) {
     let Some(path) = startup.screenshot.as_ref() else {
         return;
@@ -211,6 +220,13 @@ fn capture_screenshot(
     // It gets an extraction/render-preparation opportunity before we request
     // capture. This is not a GPU/pipeline completion acknowledgement.
     let stable = state.observe(ready);
+    #[cfg(not(target_family = "wasm"))]
+    if let Some(admission) = admission.as_deref_mut() {
+        let eligible = state.elapsed >= startup.screenshot_delay && state.frames >= 30 && stable;
+        if !admission.observe(state.scene_changed, eligible) {
+            return;
+        }
+    }
     if state.elapsed < startup.screenshot_delay || state.frames < 30 || !stable {
         return;
     }
@@ -243,6 +259,10 @@ fn capture_screenshot(
             .map_or(0, |ready| ready.capacity_limited_updates),
     );
     state.done = true;
+    #[cfg(not(target_family = "wasm"))]
+    if let Some(admission) = admission.as_deref_mut() {
+        admission.requested();
+    }
     state.previous_ready = None;
     commands.remove_resource::<CaptureTerrainReadiness>();
     let screenshot = target.map_or_else(Screenshot::primary_window, |target| {
@@ -262,7 +282,14 @@ fn save_capture(
     #[cfg(not(target_family = "wasm"))] session: Option<
         Res<crate::capture_backpressure::CaptureSession>,
     >,
+    #[cfg(not(target_family = "wasm"))] admission: Option<
+        ResMut<crate::capture_admission::CaptureAdmission>,
+    >,
 ) {
+    #[cfg(not(target_family = "wasm"))]
+    if let Some(mut admission) = admission {
+        admission.finish();
+    }
     #[cfg(not(target_family = "wasm"))]
     if let Some(session) = session {
         session.finish();
@@ -804,6 +831,98 @@ mod tests {
 
     #[cfg(not(target_family = "wasm"))]
     #[test]
+    fn batch_admission_preserves_delay_and_30_updates_then_requires_a_prior_opportunity() {
+        use crate::capture_admission::CaptureAdmission;
+        use std::sync::atomic::Ordering;
+        for (delay, eligible_at) in [(0.0, 30), (40.0, 40)] {
+            let mut app = capture_app();
+            app.insert_resource(CaptureAdmission::default());
+            app.world_mut().resource_mut::<Startup>().screenshot_delay = delay;
+            for frame in 1..=eligible_at {
+                app.world_mut()
+                    .resource_mut::<Time>()
+                    .advance_by(std::time::Duration::from_secs(1));
+                app.update();
+                assert_eq!(
+                    requests(&mut app),
+                    0,
+                    "frame {frame} must not capture immediately"
+                );
+                assert_eq!(
+                    app.world()
+                        .resource::<CaptureAdmission>()
+                        .test_opportunity()
+                        .is_some(),
+                    frame == eligible_at
+                );
+            }
+            let (epoch, ack) = app
+                .world()
+                .resource::<CaptureAdmission>()
+                .test_opportunity()
+                .unwrap();
+            app.update();
+            assert_eq!(
+                requests(&mut app),
+                0,
+                "a pending render cannot acknowledge itself"
+            );
+            ack.store(epoch, Ordering::Release);
+            app.update();
+            assert_eq!(requests(&mut app), 1);
+            assert!(
+                app.world()
+                    .resource::<CaptureAdmission>()
+                    .test_opportunity()
+                    .is_none()
+            );
+            app.update();
+            assert_eq!(requests(&mut app), 1);
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn a_changed_ready_scene_rejects_late_render_acknowledgements() {
+        use crate::capture_admission::CaptureAdmission;
+        use std::sync::atomic::Ordering;
+        let mut app = capture_app();
+        app.insert_resource(CaptureAdmission::default());
+        for _ in 0..30 {
+            app.update();
+        }
+        let (old_epoch, old_ack) = app
+            .world()
+            .resource::<CaptureAdmission>()
+            .test_opportunity()
+            .unwrap();
+        app.insert_resource(RenderOrigin::new(Geodetic::from_degrees(36.0, 139.78, 0.0)));
+        old_ack.store(old_epoch, Ordering::Release);
+        app.update();
+        assert_eq!(requests(&mut app), 0);
+        assert!(
+            app.world()
+                .resource::<CaptureAdmission>()
+                .test_opportunity()
+                .is_none()
+        );
+        app.update();
+        let (new_epoch, new_ack) = app
+            .world()
+            .resource::<CaptureAdmission>()
+            .test_opportunity()
+            .unwrap();
+        assert_ne!(old_epoch, new_epoch);
+        old_ack.store(old_epoch, Ordering::Release);
+        app.update();
+        assert_eq!(requests(&mut app), 0);
+        new_ack.store(new_epoch, Ordering::Release);
+        app.update();
+        assert_eq!(requests(&mut app), 1);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
     fn screenshot_events_end_backpressure_on_save_success_failure_and_cancellation() {
         let directory = std::env::temp_dir().join(format!(
             "flightsim-capture-session-test-{}",
@@ -818,11 +937,20 @@ mod tests {
             let mut app = capture_app();
             let session = crate::capture_backpressure::CaptureSession::default();
             app.insert_resource(session.clone());
+            app.insert_resource(crate::capture_admission::CaptureAdmission::default());
             let path = directory.join(name);
             app.world_mut().resource_mut::<Startup>().screenshot = Some(path.clone());
             for _ in 0..30 {
                 app.update();
             }
+            assert_eq!(requests(&mut app), 0);
+            let (epoch, ack) = app
+                .world()
+                .resource::<crate::capture_admission::CaptureAdmission>()
+                .test_opportunity()
+                .unwrap();
+            ack.store(epoch, std::sync::atomic::Ordering::Release);
+            app.update();
             assert_eq!(requests(&mut app), 1);
             let entity = app
                 .world_mut()
@@ -844,6 +972,12 @@ mod tests {
                 image: image(),
             });
             assert!(!session.active());
+            assert_eq!(
+                app.world()
+                    .resource::<crate::capture_admission::CaptureAdmission>()
+                    .test_acknowledged_epoch(),
+                0
+            );
             assert_eq!(path.exists(), saved);
             if saved {
                 std::fs::remove_file(path).unwrap();

@@ -83,6 +83,8 @@ mod near_static_turboprop_session;
 mod turboprop_session;
 use flight_session::{FlightSession, PreparedJetSession};
 #[cfg(not(target_family = "wasm"))]
+mod capture_admission;
+#[cfg(not(target_family = "wasm"))]
 mod capture_backpressure;
 mod conditions_runtime;
 #[cfg(test)]

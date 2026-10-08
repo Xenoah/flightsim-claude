@@ -381,6 +381,13 @@ timeouts remain unchanged. Native screenshot sessions additionally bound uncompl
 batches to two using queue-completion credits around the complete Render
 schedule; ordinary launches install no gate. See [ADR-0029](docs/adr/0029-capture-render-backpressure.md).
 This is backpressure, not a GPU readiness or deadline guarantee.
+Native batch capture additionally defers unfinished view draws while every normal
+Main/extraction/Render preparation, upload and cleanup still runs. It preserves
+the 30-Main-update floor and original work budgets, then requires a prior admitted
+same-scene Render opportunity before Screenshot. SortedCameras is restored before
+cleanup and on render unwinding; ordinary/non-batch launches keep their path.
+This is not a claim of 30 full-scene draws, GPU completion or native acceptance.
+See [ADR-0030](docs/adr/0030-batch-capture-preparation-admission.md).
 
 
 ソースは全てオープンデータ（[ADR-0003](docs/adr/0003-terrain-data.md)）。

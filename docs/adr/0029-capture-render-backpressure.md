@@ -81,3 +81,12 @@ bounds, repeated and reordered completion, credit reclamation, cancellation,
 late callbacks, error debt, and unchanged ordinary registration/extraction.
 Existing readiness and PNG/exit tests remain applicable. Actual Windows capture,
 visual review and all frozen source/capture/release contracts are still required.
+
+
+## Follow-up: preparation pacing
+
+The ordinary 3b098bc1 Windows attempt timed out before CPU readiness: retaining
+the whole render sub-app during credit waits also paced bounded Main preparation
+by GPU throughput. The cap still prevented unbounded submitted frame debt. See
+[ADR-0030](0030-batch-capture-preparation-admission.md) for the separate loading
+admission correction and its remaining native-acceptance requirements.

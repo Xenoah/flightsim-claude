@@ -1,0 +1,32 @@
+[
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/material.rs",
+    "sha256": "fa9d8f1353d3f2a8e7e617ebf8bb55eabfefda631c4abd56d43256d78b124098",
+    "purpose": "Read-only evidence for fixture definitions and caller arguments; not composed by this harness"
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/pbr_material.rs",
+    "sha256": "fea423cde672552f2d9bd367b8de3eb741177cb4eeff900f60c5d5a860aafa8b",
+    "purpose": "Read-only evidence for fixture definitions and caller arguments; not composed by this harness"
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/pbr_fragment.wgsl",
+    "sha256": "cb84cf58ac92d1a5ac78fb05f4afceea818d5069b9c67542643e5a444f5d5d9b",
+    "purpose": "Read-only evidence for fixture definitions and caller arguments; not composed by this harness"
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/mesh.rs",
+    "sha256": "afd8e5399c4207a7a56a08ebe039ffe212e07b6acda42164670e8dbd92143142",
+    "purpose": "Read-only evidence for fixture definitions and caller arguments; not composed by this harness"
+  },
+  {
+    "root": "registry",
+    "path": "bevy_shader-0.18.1/src/shader_cache.rs",
+    "sha256": "129f4e134b6e44faddfbcb32572f406622da50d1622b7b591aab34388e224a0d",
+    "purpose": "Read-only evidence for fixture definitions and caller arguments; not composed by this harness"
+  }
+]

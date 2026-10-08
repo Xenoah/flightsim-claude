@@ -1,0 +1,16 @@
+[package]
+name = "validate-jpeg-replacement"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[features]
+default = ["accelerated"]
+accelerated = ["zune-jpeg/x86"]
+
+[dependencies]
+zune-jpeg = { path = "../../vendor/zune-jpeg", default-features = false, features = ["std", "neon"] }
+zune-core = "=0.5.1"

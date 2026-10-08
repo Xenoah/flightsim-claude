@@ -1,0 +1,1138 @@
+{
+  "schema_version": 1,
+  "packages": [
+    {
+      "id": "zune-jpeg@0.5.15",
+      "source_root": "vendor/zune-jpeg",
+      "upstream": {
+        "registry_checksum": "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296",
+        "revision": "31d81fed7551c8ccea456d9d8e2b1fd8bebb6995"
+      },
+      "patch": {
+        "path": "docs/release/modified-source-patches/zune-jpeg-added-vendor.patch",
+        "sha256": "67aebf789ac0cd7981f05edc5ee2a90407b585a792dd7bd783de48cf66612ffa",
+        "bytes": 470212
+      },
+      "files": [
+        {
+          "path": ".gitignore",
+          "sha256": "937456f730114c410243b25f3587e29a6c608b3a79356adafeefb6b960e004b2",
+          "bytes": 7
+        },
+        {
+          "path": "Benches.md",
+          "sha256": "5e0a2292e9a2b6d5d7923f4b847a9aead7ab656326ef58018d30dfa46c53cf20",
+          "bytes": 2647
+        },
+        {
+          "path": "Cargo.lock",
+          "sha256": "3aa365b4633487152c3e09cef84eb10234b3d01cbab1a000df4b8af7066934a9",
+          "bytes": 595
+        },
+        {
+          "path": "Cargo.toml",
+          "sha256": "7de6a7af7d12cbda372518d8f3d40d2819df869d91f0dc373751ab234070b945",
+          "bytes": 1620
+        },
+        {
+          "path": "Cargo.toml.orig",
+          "sha256": "2997b9ae39b90e388eec2165272176d8a2fd9ce261c24e1e26d82f0f419fb1b5",
+          "bytes": 1071
+        },
+        {
+          "path": "Changelog.md",
+          "sha256": "296a9f6db2fbc8813357d0cafb9c041efce7177d1f7b6026a7af81031defb879",
+          "bytes": 2697
+        },
+        {
+          "path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "sha256": "8a0daaadb8528c948e20008d4dca83d2a5c627a0164967d5539edafe69ad18f8",
+          "bytes": 603
+        },
+        {
+          "path": "FLIGHTSIM-PATCHES.md",
+          "sha256": "e2d2b2481fa0bccba7f89e1e79453b5acf683e425e12339b58e012e524d712b9",
+          "bytes": 2967
+        },
+        {
+          "path": "FLIGHTSIM-TRANSPOSE-PROVENANCE.md",
+          "sha256": "7559d2075bcceed1a7686f95cc18df16e8adbc38a33194632f5e86113d2af24e",
+          "bytes": 3633
+        },
+        {
+          "path": "FLIGHTSIM-TRANSPOSE-README.md",
+          "sha256": "20c35d96a070884dc6c1196ed77f70e27ec7a64933532dee4d3a3f169b0068bf",
+          "bytes": 6659
+        },
+        {
+          "path": "FLIGHTSIM-UPSTREAM-SOURCE.json",
+          "sha256": "5fa317b2f298e42e1dcbae097f25b95e529aa3f6398dcc19b98edce16c53d45b",
+          "bytes": 6689
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        },
+        {
+          "path": "LICENSE-FLIGHTSIM-APACHE",
+          "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+          "bytes": 11359
+        },
+        {
+          "path": "LICENSE-FLIGHTSIM-MIT",
+          "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+          "bytes": 1086
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "d30047bca3b516639339a3c279bb84c3483124fb5a9dafe3c75056a85090e745",
+          "bytes": 1073
+        },
+        {
+          "path": "LICENSE-ZLIB",
+          "sha256": "d201d14804d3bcd3b944147173175e4abfbd838b7c8069b6bd3452496bf13e6c",
+          "bytes": 859
+        },
+        {
+          "path": "README.md",
+          "sha256": "d58a4403ff2b9f7eba16f1284a9b4a4c7125bc92dacd8f0fac1ee112e3a8b8ee",
+          "bytes": 3795
+        },
+        {
+          "path": "src/bitstream.rs",
+          "sha256": "0f053b8d4443b8818fe187be90304a4f3c645ee43bc9984b8baad4c8b39ce387",
+          "bytes": 30157
+        },
+        {
+          "path": "src/color_convert/avx.rs",
+          "sha256": "7be52b218a32ca06d8727dbd5d9ff18f0e09ee05c2147e2469e1b78f25e4f1f5",
+          "bytes": 10276
+        },
+        {
+          "path": "src/color_convert/neon64.rs",
+          "sha256": "7f7f1bf474a9a4778d1a021ebddba7cd98bbd256f14e8158c37c364592fe14d5",
+          "bytes": 5055
+        },
+        {
+          "path": "src/color_convert/scalar.rs",
+          "sha256": "daf7a7595775ce00bec28997330bc72f0fd3cd113d764cf742a7b502ca93c108",
+          "bytes": 4129
+        },
+        {
+          "path": "src/color_convert.rs",
+          "sha256": "e401a9c71beffd50a0b17330a5f64de82ad944e7f7cfe42a8a8bbf6b24ac245a",
+          "bytes": 3500
+        },
+        {
+          "path": "src/components.rs",
+          "sha256": "1699aab5b99818e51bdbfc43afb9567e4ac0ac67e68fbda9bfb3ac86b62489ea",
+          "bytes": 7595
+        },
+        {
+          "path": "src/decoder.rs",
+          "sha256": "7fdf4e5f585a1f7bfdba51b3ab3a851fb519a326324fdb9f44a236864c26a554",
+          "bytes": 36950
+        },
+        {
+          "path": "src/errors.rs",
+          "sha256": "106e9bca458efccd9b290ff5cf9365ad195d7afc3e414108111cc88b9c344e8f",
+          "bytes": 5986
+        },
+        {
+          "path": "src/flightsim_array_transpose.rs",
+          "sha256": "29fe9aa1e69bbe7b0a56d021c7efdb77a201c72604decfd1589244746a05a737",
+          "bytes": 1357
+        },
+        {
+          "path": "src/flightsim_transpose_tests.rs",
+          "sha256": "8ec251dc80db97ff4a6fc2922acd2004d22984ee5993aed10565ba0e118469bb",
+          "bytes": 2043
+        },
+        {
+          "path": "src/flightsim_transpose_tests_body.rs",
+          "sha256": "531e67eb4c6ca2ef994b912ed2a9a3ccdeefefe5527480ff6599cc0744852454",
+          "bytes": 4360
+        },
+        {
+          "path": "src/headers.rs",
+          "sha256": "95d98217434a99171cc17453018658475659516eacefad63f4136550407b6147",
+          "bytes": 23751
+        },
+        {
+          "path": "src/huffman.rs",
+          "sha256": "921649bd61aeeecb11bf91d7e76afad583e54717255824bf0c2d4bb6160d6b10",
+          "bytes": 9033
+        },
+        {
+          "path": "src/idct/avx2.rs",
+          "sha256": "7e2d93e1e0cfe6735a75562866162f3a5d78072301d6189b7b02fba4dfbd2d88",
+          "bytes": 13415
+        },
+        {
+          "path": "src/idct/neon.rs",
+          "sha256": "33ef1506f2d14889f2039e483988ad3afe58c7daadd2d241be61e69908dd32dc",
+          "bytes": 9951
+        },
+        {
+          "path": "src/idct/scalar.rs",
+          "sha256": "1994c32030ac7ff9ab904f3b890dcd44dfa231551bd033749faab565c014b3f9",
+          "bytes": 7840
+        },
+        {
+          "path": "src/idct.rs",
+          "sha256": "be856aec47d17f28dfaa98072f2317eb78be0f6b9dc9535f5d309e97da5cf8e8",
+          "bytes": 6890
+        },
+        {
+          "path": "src/lib.rs",
+          "sha256": "e2ea61768f5dbceab425e44fed063b3b889e502813b5a05d6f63d82d2d366262",
+          "bytes": 6430
+        },
+        {
+          "path": "src/marker.rs",
+          "sha256": "10014f879004c0b1ca4bca66155eb2385820cce02ae6e48a9e9b37ca60ecd294",
+          "bytes": 2777
+        },
+        {
+          "path": "src/mcu.rs",
+          "sha256": "b2234b35227ee76fc43df76b64f5b68e44a395250d187016765d5922849dcfb3",
+          "bytes": 41016
+        },
+        {
+          "path": "src/mcu_prog.rs",
+          "sha256": "bfeba9b8f801baf0ce66b73ed9c688fd789244fe380d7223d3ea39d1ece26fa1",
+          "bytes": 34720
+        },
+        {
+          "path": "src/misc.rs",
+          "sha256": "1ba8300b38095fc0cb2e91f615d401d7a6b45d20115f314df66153add7b776da",
+          "bytes": 18760
+        },
+        {
+          "path": "src/unsafe_utils.rs",
+          "sha256": "8fa830ca67b7f701461fe2382f8843faa33c98b5f83f1845f60c8ef788143c75",
+          "bytes": 208
+        },
+        {
+          "path": "src/unsafe_utils_avx2.rs",
+          "sha256": "3d2ce5ab5b67711ba7262b3d3051cd936040615d150bb1593746a596d32c32da",
+          "bytes": 5914
+        },
+        {
+          "path": "src/unsafe_utils_neon.rs",
+          "sha256": "1c869e09726cec6ae699fddcc8c0551a9e798ebaa5d55b3514b3bfb4874282c5",
+          "bytes": 8219
+        },
+        {
+          "path": "src/upsampler/avx2.rs",
+          "sha256": "3416787605115cee9f7eb918b3dd05f6596c8ed15e4942d18a12d301f5d843bc",
+          "bytes": 6777
+        },
+        {
+          "path": "src/upsampler/neon.rs",
+          "sha256": "91465d872b387de31919d1e29688bd33ca54046f8e1825056bd61f2a28c6b6c8",
+          "bytes": 6019
+        },
+        {
+          "path": "src/upsampler/portable_simd.rs",
+          "sha256": "36bfef56cc9c36c796cfccca77c13c7e394042c9ebf53bb18ffaaeba2311913d",
+          "bytes": 5190
+        },
+        {
+          "path": "src/upsampler/scalar.rs",
+          "sha256": "cc86288e29db2d6cbb25f5238f3064e3ad30179d0c1cfdab35d51fd54b074710",
+          "bytes": 3993
+        },
+        {
+          "path": "src/upsampler.rs",
+          "sha256": "81ca309c31baf578b293abc6dbeb4d37b69f14b0e2811d15fe3bb9aa637cc01a",
+          "bytes": 11047
+        },
+        {
+          "path": "src/worker.rs",
+          "sha256": "6f939fa614844d11b826c196ea56ea13846ba7725025da0e2418b2d453fecc6d",
+          "bytes": 22727
+        },
+        {
+          "path": "third-party-notices/STANFORD-NOTICE.txt",
+          "sha256": "44cbe28eee934caf9f3ffd119df0bc1813343c3928d7456e362b9964a26e299b",
+          "bytes": 528
+        },
+        {
+          "path": "third-party-notices/libjpeg-turbo-LICENSE.ijg",
+          "sha256": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb",
+          "bytes": 12732
+        },
+        {
+          "path": "third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
+          "sha256": "d903a69ab39425283b44e2ea355cbfaf79bcd738b69c2b1c3c700ce80f2d89f9",
+          "bytes": 74
+        },
+        {
+          "path": "third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt",
+          "sha256": "0a98d2f90f69c08b46c65cfeeb2946160cd8884a8470e6607fff6fdfd66c3dc6",
+          "bytes": 545
+        },
+        {
+          "path": "third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt",
+          "sha256": "2e469db250a81fde70a0e62f2e265a13b1d929be5a0e84b4fccdb6418dc0243e",
+          "bytes": 346
+        },
+        {
+          "path": "third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358
+        },
+        {
+          "path": "third-party-notices/libultrahdr-copyright-headers.txt",
+          "sha256": "2352361eb536bdd8650043df3d51e30c99f336e75cd28098db30d332bf3976e9",
+          "bytes": 1233
+        },
+        {
+          "path": "third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
+          "sha256": "746d8c9c414b335bb7c9615918a15a6489a4dcc1c5c3aac2bda410d1072c332a",
+          "bytes": 66
+        },
+        {
+          "path": "third-party-notices/stb-MIT-NOTICE.txt",
+          "sha256": "c5d1e0e499700d8ae2fc2c342210184d603d5bd7640c82a734efa9c2f914c659",
+          "bytes": 1066
+        },
+        {
+          "path": "third-party-notices/stb-upstream-dual-license.txt",
+          "sha256": "bebfe904b14301657e4e5d655c811d51fd31b97c455b9cc2d8600d6bac6cff63",
+          "bytes": 2510
+        }
+      ],
+      "modified_paths": [
+        "Cargo.toml",
+        "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+        "FLIGHTSIM-PATCHES.md",
+        "FLIGHTSIM-TRANSPOSE-PROVENANCE.md",
+        "FLIGHTSIM-TRANSPOSE-README.md",
+        "FLIGHTSIM-UPSTREAM-SOURCE.json",
+        "LICENSE-FLIGHTSIM-APACHE",
+        "LICENSE-FLIGHTSIM-MIT",
+        "src/flightsim_array_transpose.rs",
+        "src/flightsim_transpose_tests.rs",
+        "src/flightsim_transpose_tests_body.rs",
+        "src/lib.rs",
+        "src/unsafe_utils_avx2.rs",
+        "third-party-notices/STANFORD-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-LICENSE.ijg",
+        "third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt",
+        "third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
+        "third-party-notices/libultrahdr-copyright-headers.txt",
+        "third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
+        "third-party-notices/stb-MIT-NOTICE.txt",
+        "third-party-notices/stb-upstream-dual-license.txt"
+      ],
+      "retained_notices": [
+        "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+        "LICENSE-APACHE",
+        "LICENSE-FLIGHTSIM-APACHE",
+        "LICENSE-FLIGHTSIM-MIT",
+        "LICENSE-MIT",
+        "LICENSE-ZLIB",
+        "third-party-notices/STANFORD-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-LICENSE.ijg",
+        "third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt",
+        "third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt",
+        "third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
+        "third-party-notices/libultrahdr-copyright-headers.txt",
+        "third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
+        "third-party-notices/stb-MIT-NOTICE.txt",
+        "third-party-notices/stb-upstream-dual-license.txt"
+      ]
+    },
+    {
+      "id": "bevy_pbr@0.18.1",
+      "source_root": "vendor/bevy_pbr",
+      "upstream": {
+        "registry_checksum": "a5ab6944ffc6fd71604c0fbca68cc3e2a3654edfcdbfd232f9d8b88e3d20fdc0",
+        "revision": "f667c282dad2c1419afb5836ded22a3ec263970e"
+      },
+      "patch": {
+        "path": "docs/release/modified-source-patches/bevy_pbr-added-vendor.patch",
+        "sha256": "f5f59e6dbfb208c5dbb7e6400bf277b870c23e453107e9c9e7ad7ab5652ceae6",
+        "bytes": 4231522
+      },
+      "files": [
+        {
+          "path": "Cargo.lock",
+          "sha256": "eabde9f980ca5445031b30e2d5533755ab4626042176414f9e6fb04132ab8a9a",
+          "bytes": 86172
+        },
+        {
+          "path": "Cargo.toml",
+          "sha256": "54b262e83616e4b805143e219debb271839a24fdc9d9c259c54fcbbfc8fe45cb",
+          "bytes": 4705
+        },
+        {
+          "path": "Cargo.toml.orig",
+          "sha256": "9db1eb6adf8b7ccc2a6d55a3ff9f9e4619bf7fce9d9a72043a1ac4d3a0f6bbda",
+          "bytes": 3448
+        },
+        {
+          "path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287",
+          "bytes": 714
+        },
+        {
+          "path": "FLIGHTSIM-PARALLAX-README.md",
+          "sha256": "b2db7380b9d00fad6becfbad3738b6bb43ad99390a85cbda2cf0e34ccb21f308",
+          "bytes": 8168
+        },
+        {
+          "path": "FLIGHTSIM-PATCHES.md",
+          "sha256": "79549aa643f47a8a4098815b0107ac90ae3915afcf31821234f272c9ffa2a164",
+          "bytes": 3470
+        },
+        {
+          "path": "FLIGHTSIM-UPSTREAM-SOURCE.json",
+          "sha256": "9be3cec5b6df0d3c513927498d2c779677444f39785c890933a380a3fff84b60",
+          "bytes": 24598
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "bytes": 10173
+        },
+        {
+          "path": "LICENSE-FLIGHTSIM-APACHE",
+          "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+          "bytes": 11359
+        },
+        {
+          "path": "LICENSE-FLIGHTSIM-MIT",
+          "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+          "bytes": 1086
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+          "bytes": 1036
+        },
+        {
+          "path": "README.md",
+          "sha256": "ccaaf07764c61f9a85c5b5b5f120dd100597810791cfc6b73094d72d6c33f4a6",
+          "bytes": 571
+        },
+        {
+          "path": "src/atmosphere/aerial_view_lut.wgsl",
+          "sha256": "ed2d84939c88edbff03026593488c9ae5e2e0667d7c989d5c6a51118637fb107",
+          "bytes": 2621
+        },
+        {
+          "path": "src/atmosphere/bindings.wgsl",
+          "sha256": "75e3cd2243e14d9eaae1b016a520e3226f627267ff0ba4a323e54db0fae0a234",
+          "bytes": 1005
+        },
+        {
+          "path": "src/atmosphere/bruneton_functions.wgsl",
+          "sha256": "d39ee45c14f366bceb06f935d2043366dc59c653f9fd0de9dfa4a1498fe349e0",
+          "bytes": 7048
+        },
+        {
+          "path": "src/atmosphere/environment.rs",
+          "sha256": "5464579c0499dab401b2b6c63cf7eb4effc5f8f85caf55ce0ded77b239cde4f8",
+          "bytes": 11926
+        },
+        {
+          "path": "src/atmosphere/environment.wgsl",
+          "sha256": "7453a4b084782d41ff41c4210d7463ca7aa282bc46024462f11cdff235b7a189",
+          "bytes": 1279
+        },
+        {
+          "path": "src/atmosphere/functions.wgsl",
+          "sha256": "c881fa70ad45e25ee7775f61cb352d48fffdf9c10509a54867513184569b06b4",
+          "bytes": 21046
+        },
+        {
+          "path": "src/atmosphere/mod.rs",
+          "sha256": "26598bff74a92661a92ceaa5fa85510d38b33f78650745eabd8279f5792f518f",
+          "bytes": 17152
+        },
+        {
+          "path": "src/atmosphere/multiscattering_lut.wgsl",
+          "sha256": "b5d73e046bba75d3653c7f526f400484465649e391f0207d3554dea9c4305166",
+          "bytes": 5040
+        },
+        {
+          "path": "src/atmosphere/node.rs",
+          "sha256": "cddc9b619ed79925d2de30cad23e1e315f7916a512dce3525feec9c093d674bf",
+          "bytes": 7833
+        },
+        {
+          "path": "src/atmosphere/render_sky.wgsl",
+          "sha256": "92343743e3514496b79682ff3c2703cc98ad21476f71a19077a3c8d995d3cc44",
+          "bytes": 2831
+        },
+        {
+          "path": "src/atmosphere/resources.rs",
+          "sha256": "5b44725c8b789959518b6812a2aba4374b025cb552bc898fbdd86056e99835c0",
+          "bytes": 30225
+        },
+        {
+          "path": "src/atmosphere/sky_view_lut.wgsl",
+          "sha256": "2e318e3b168606663180f743177036d353ea1467ca87af58dc4de31034468442",
+          "bytes": 1322
+        },
+        {
+          "path": "src/atmosphere/transmittance_lut.wgsl",
+          "sha256": "02b16b5d65f7e1184a528eb479228ee44d9aa5324f13bc9b866b110387e6d90a",
+          "bytes": 2049
+        },
+        {
+          "path": "src/atmosphere/types.wgsl",
+          "sha256": "20ecf0775ae98fd2aa51e3871e2346af90b43653888732e6bcb2127a363a112e",
+          "bytes": 1076
+        },
+        {
+          "path": "src/bluenoise/stbn.ktx2",
+          "sha256": "8b7f0244828e3729868f2060e10f184663a3ca87b58e733cb7cf7aa86b168117",
+          "bytes": 1573092
+        },
+        {
+          "path": "src/cluster.rs",
+          "sha256": "9cb650751f40468b3de7fcba466a07ce4e3d4036e6c08ce3564555a7d46bc366",
+          "bytes": 20940
+        },
+        {
+          "path": "src/components.rs",
+          "sha256": "6f82bd78048641f67a885c6730e2f8012ec184e5f27824722bc3d2e3b8b37a2b",
+          "bytes": 1521
+        },
+        {
+          "path": "src/decal/clustered.rs",
+          "sha256": "c168c1b6229a456bd5ac2f80c105948daece20e2720e98fb4f0d32212d484508",
+          "bytes": 19511
+        },
+        {
+          "path": "src/decal/clustered.wgsl",
+          "sha256": "4d3fbbf823bd8c02c406f23777654c71d90ceffe79348a7cf2069155fb7407ce",
+          "bytes": 10693
+        },
+        {
+          "path": "src/decal/forward.rs",
+          "sha256": "b52552289edba02debc46ece431d7728ad857c960c5e825931659c4e5ce63266",
+          "bytes": 6175
+        },
+        {
+          "path": "src/decal/forward_decal.wgsl",
+          "sha256": "2fc2dd9d1edcd1e40f4a3bc944fad7cba3838033c45565e7c6382d2e126d5934",
+          "bytes": 1906
+        },
+        {
+          "path": "src/decal/mod.rs",
+          "sha256": "aeaf97af926241a1563b2f1a0c68d21213623d949f5cfb70293320c1024709cc",
+          "bytes": 383
+        },
+        {
+          "path": "src/deferred/deferred_lighting.wgsl",
+          "sha256": "9974f266a5d2f3ec48f1e48081c2e030ff702e8c0590d99d089995a358df0c8e",
+          "bytes": 3323
+        },
+        {
+          "path": "src/deferred/mod.rs",
+          "sha256": "834fcad1526d4654a9a89bcbb84943ddedc49bfaa20b35ba40ff455bfac03b08",
+          "bytes": 22287
+        },
+        {
+          "path": "src/deferred/pbr_deferred_functions.wgsl",
+          "sha256": "6f937b1a684617f25b237f4f0e08379740de3a28c2b7d71243e4b30f19e21a4e",
+          "bytes": 6092
+        },
+        {
+          "path": "src/deferred/pbr_deferred_types.wgsl",
+          "sha256": "84f7c8e16d69cad0215696f3e6a49f6383300f1835a4719b6b5dfba0312b8fa4",
+          "bytes": 3396
+        },
+        {
+          "path": "src/diagnostic.rs",
+          "sha256": "190aab1da4af1eee3320af3b3a3fc6d1a642cb23a0669bd119be1560c4db3adb",
+          "bytes": 4174
+        },
+        {
+          "path": "src/extended_material.rs",
+          "sha256": "47dd4b50d6df2a4b48f842a9ed83cc337f3ac811dfd1f17bf2ce8cfe7b551654",
+          "bytes": 16000
+        },
+        {
+          "path": "src/fog.rs",
+          "sha256": "69dd85f7eefa5db1b35807347b8b49cefe77c75e146664d2aad03c5d503eb48e",
+          "bytes": 25230
+        },
+        {
+          "path": "src/lib.rs",
+          "sha256": "bfbc08c182dc7d27c677d34d30bf20713a0f4f557646574b9c318a56cec5fc4a",
+          "bytes": 14417
+        },
+        {
+          "path": "src/light_probe/copy.wgsl",
+          "sha256": "ba9155cbd1b2236a43fb6bb6f8970d54c9c9b0caa545c19f541d3b4ffb06452e",
+          "bytes": 746
+        },
+        {
+          "path": "src/light_probe/downsample.wgsl",
+          "sha256": "45e4744c4a28931bb76e83a7b4000e3fd8360a0b73f88e035b3bc95e5be386e4",
+          "bytes": 17242
+        },
+        {
+          "path": "src/light_probe/environment_filter.wgsl",
+          "sha256": "a6e9463f4f132e720d514526124e861221f332a7e818394feb1cdf6c7ac03088",
+          "bytes": 6787
+        },
+        {
+          "path": "src/light_probe/environment_map.rs",
+          "sha256": "e844f46bc5faed0e04264a60ef0bccc7e43a2b6cad0c0914641e8001b6515e5d",
+          "bytes": 12689
+        },
+        {
+          "path": "src/light_probe/environment_map.wgsl",
+          "sha256": "2dd2a7d0d749c0abe66b5edddcb6cad880c39e3e4dc2dee65828400c31938125",
+          "bytes": 11020
+        },
+        {
+          "path": "src/light_probe/generate.rs",
+          "sha256": "da7c0df35584c4fb4c1dccbbacc327a11ab874b4cf4e96d28602bd546bf64037",
+          "bytes": 45437
+        },
+        {
+          "path": "src/light_probe/irradiance_volume.rs",
+          "sha256": "9b1af820bc7e98b71a77e0cc5443c629a964b57aceacbbc7569e0eb83a3ec0ab",
+          "bytes": 14493
+        },
+        {
+          "path": "src/light_probe/irradiance_volume.wgsl",
+          "sha256": "d23c7bea0b4edb32cde4606b9a29680be130f7dfc7080845c0c13a8e48dbc187",
+          "bytes": 2752
+        },
+        {
+          "path": "src/light_probe/light_probe.wgsl",
+          "sha256": "3464b0504573598e01e1f9271832de39bf0acd0de7f30972443f2cf1ea1ff3d6",
+          "bytes": 6147
+        },
+        {
+          "path": "src/light_probe/mod.rs",
+          "sha256": "9edc527657603bf3eef0a4671f0c2bb1f38fd07f59a60d07745b297002c92451",
+          "bytes": 29081
+        },
+        {
+          "path": "src/lightmap/lightmap.wgsl",
+          "sha256": "84ff9e7575090a052721878b8fed77df3d2706a491e8723eba9a9be517e6c10e",
+          "bytes": 3446
+        },
+        {
+          "path": "src/lightmap/mod.rs",
+          "sha256": "a315b15622b235b421ba9ec365b318e415c17b7127a67b24d822ca4d321f44e9",
+          "bytes": 17245
+        },
+        {
+          "path": "src/material.rs",
+          "sha256": "fa9d8f1353d3f2a8e7e617ebf8bb55eabfefda631c4abd56d43256d78b124098",
+          "bytes": 79169
+        },
+        {
+          "path": "src/material_bind_groups.rs",
+          "sha256": "250a0e55465af3d4e38ccd03f12d32bed3fe3bb019f5cd1e1f97b78f65bfb03e",
+          "bytes": 80232
+        },
+        {
+          "path": "src/medium.rs",
+          "sha256": "4a24556c10cc4f600da57d847140dd072d2559633327f1839acc56862afbd38a",
+          "bytes": 23393
+        },
+        {
+          "path": "src/mesh_material.rs",
+          "sha256": "a10c081c7ef25c5f4b48dee09e3eb3c4117914cf6d7953a3ccc8834c9c1074b0",
+          "bytes": 2126
+        },
+        {
+          "path": "src/meshlet/asset.rs",
+          "sha256": "c536fab4cdd24769df2e3b934d86e28286cd5cd64d972979d4ffee0f51946b05",
+          "bytes": 12834
+        },
+        {
+          "path": "src/meshlet/clear_visibility_buffer.wgsl",
+          "sha256": "47772f8ac03a6903acf7050f4efa8f72585808b70076e83c4311d6bb1a7e4ab4",
+          "bytes": 660
+        },
+        {
+          "path": "src/meshlet/cull_bvh.wgsl",
+          "sha256": "82b2276e8b0bf94f2505a4130da8ce3e646f5fdf71592e1b4dc2e4ad12c9eda0",
+          "bytes": 4341
+        },
+        {
+          "path": "src/meshlet/cull_clusters.wgsl",
+          "sha256": "ffbfaabd13b8ac096de336338b994b154d4a86156096853a6a716fe76e3f5ea1",
+          "bytes": 3664
+        },
+        {
+          "path": "src/meshlet/cull_instances.wgsl",
+          "sha256": "bc063b541ddf86ede998807c9834fe981c0f2e6bd254aeae56c95db15f4e9aa8",
+          "bytes": 2515
+        },
+        {
+          "path": "src/meshlet/dummy_visibility_buffer_resolve.wgsl",
+          "sha256": "24cb63cdff55cd7b4d6c29a867ed1e3f398ce334619dfbc7cbfe808eea2a2ae2",
+          "bytes": 254
+        },
+        {
+          "path": "src/meshlet/fill_counts.wgsl",
+          "sha256": "f715506d3c3c916c1c2430f0e757203def3b02756be2a295174af74b878449a6",
+          "bytes": 1199
+        },
+        {
+          "path": "src/meshlet/from_mesh.rs",
+          "sha256": "a7253d45c819cdc8aaf014a1a60152bf25cedff8f9cac38e6e347ff598dfc68b",
+          "bytes": 43100
+        },
+        {
+          "path": "src/meshlet/instance_manager.rs",
+          "sha256": "0de3b51499ed5a6dad69fdd3e4b5b438471ef5aa2df1dcb70a3186674458218a",
+          "bytes": 10842
+        },
+        {
+          "path": "src/meshlet/material_pipeline_prepare.rs",
+          "sha256": "f1bfca2cc511c7fdc70d9cd314052db2f4bf658c09319512ecc74379b907b9cd",
+          "bytes": 19086
+        },
+        {
+          "path": "src/meshlet/material_shade_nodes.rs",
+          "sha256": "0c6236bc3313c267337c95032535406f3573e91ed8ac2fd47267b1ac5b65d389",
+          "bytes": 15141
+        },
+        {
+          "path": "src/meshlet/meshlet_bindings.wgsl",
+          "sha256": "77c8ec438c773dc104cd879ca43392d6747535c57463f5840ea3561552b32ee0",
+          "bytes": 13613
+        },
+        {
+          "path": "src/meshlet/meshlet_cull_shared.wgsl",
+          "sha256": "4449fc0ac0edba495fd6bc52021493277283d411e328a31e98f1977f877c6253",
+          "bytes": 7972
+        },
+        {
+          "path": "src/meshlet/meshlet_mesh_manager.rs",
+          "sha256": "a0e32d934008140051c92c502768f539e6254ae1cf357b6bbaf144c12013a775",
+          "bytes": 6433
+        },
+        {
+          "path": "src/meshlet/meshlet_mesh_material.wgsl",
+          "sha256": "ef584fbee5f890f408be72f216c1102f95503db7c2f753bf57ebdcf73389d16a",
+          "bytes": 1888
+        },
+        {
+          "path": "src/meshlet/mod.rs",
+          "sha256": "b2a113755f0363e031c07bf4b4d62832251166b8c3f4ece24f1841ac58232db7",
+          "bytes": 12199
+        },
+        {
+          "path": "src/meshlet/persistent_buffer.rs",
+          "sha256": "0a48243b1baa7a0fcf1a597d6b11b900df17f7d9ab615c838fd7983931b1df4d",
+          "bytes": 5527
+        },
+        {
+          "path": "src/meshlet/persistent_buffer_impls.rs",
+          "sha256": "3c4c622989815c465f220dca4d85e3eb810b779a7ee8e0393d789022a15479d3",
+          "bytes": 3968
+        },
+        {
+          "path": "src/meshlet/pipelines.rs",
+          "sha256": "df92a9fb0638e6c40c7e5a9782bc4cb2517e99d2919cc4f8ba1c16bc7eaf34fe",
+          "bytes": 25556
+        },
+        {
+          "path": "src/meshlet/remap_1d_to_2d_dispatch.wgsl",
+          "sha256": "2a9b0ab18d76f7fbacd35cb3a86c6903dd2c91333d66c7d86dab7095b35ae33e",
+          "bytes": 829
+        },
+        {
+          "path": "src/meshlet/resolve_render_targets.wgsl",
+          "sha256": "9bfc1f3c59c66a8b49fb976f714d2e4c37a60fa1cb672e0861ebc208ff76b2dc",
+          "bytes": 1594
+        },
+        {
+          "path": "src/meshlet/resource_manager.rs",
+          "sha256": "05a4d3eaa1b4038a83bf4d91b60c234ac9101e34d91a688f17fc86f3288c129b",
+          "bytes": 58403
+        },
+        {
+          "path": "src/meshlet/visibility_buffer_hardware_raster.wgsl",
+          "sha256": "a52397a9ecea58dfbca4c51a81fc1505b6b797731374fad24baf60c1e574f87b",
+          "bytes": 2760
+        },
+        {
+          "path": "src/meshlet/visibility_buffer_raster_node.rs",
+          "sha256": "f9a6cddc3f6668a3ff9783a4b2ebe4bd7a816d53a31d3da5e6b805cc874bd82f",
+          "bytes": 25681
+        },
+        {
+          "path": "src/meshlet/visibility_buffer_resolve.wgsl",
+          "sha256": "337bb136411ecf0fd55da0d92e85a3b82c9c2acb6ce9cb9a4779ffdc4450a8bc",
+          "bytes": 9858
+        },
+        {
+          "path": "src/meshlet/visibility_buffer_software_raster.wgsl",
+          "sha256": "b6860b775337e36fbb39e851379d9905404c3035edfc8a21c6690fbad28076a7",
+          "bytes": 7468
+        },
+        {
+          "path": "src/parallax.rs",
+          "sha256": "2ff0d29bab214014e6336c7fa46a43156f0452dcc66ba60725336a9a16e7f7be",
+          "bytes": 1812
+        },
+        {
+          "path": "src/pbr_material.rs",
+          "sha256": "fea423cde672552f2d9bd367b8de3eb741177cb4eeff900f60c5d5a860aafa8b",
+          "bytes": 68198
+        },
+        {
+          "path": "src/prepass/mod.rs",
+          "sha256": "3e62d89030149e09d95b4077ff8047b377ce0311c02031f8dd61911bddefc0a3",
+          "bytes": 52913
+        },
+        {
+          "path": "src/prepass/prepass.wgsl",
+          "sha256": "fe7a6b16a694de3cb1f921d1bd83418815a3ffbcfee3530af21aa025f411e53c",
+          "bytes": 7755
+        },
+        {
+          "path": "src/prepass/prepass_bindings.rs",
+          "sha256": "e8e427e0a8c5899ece5402e7a29c8353711b424c3f50f06cb832f8ccc0c9ccbf",
+          "bytes": 2522
+        },
+        {
+          "path": "src/prepass/prepass_bindings.wgsl",
+          "sha256": "15fe592a9ff48e54fbecee7d8cb522c8a555d8cecf14ffb273d2f8764721b521",
+          "bytes": 373
+        },
+        {
+          "path": "src/prepass/prepass_io.wgsl",
+          "sha256": "e9ff07deb27f60e0e3048ee086bf31c5ebbe74b819bdab6d40e1298b27e7b73e",
+          "bytes": 2459
+        },
+        {
+          "path": "src/prepass/prepass_utils.wgsl",
+          "sha256": "9d8f9a71215c92159be526d92881b4bd78a4e913cdaa566afeb21fa75b561843",
+          "bytes": 1406
+        },
+        {
+          "path": "src/render/build_indirect_params.wgsl",
+          "sha256": "0e8412b7df808833724b4e9de6d555161508724c994cfba22ba67ac480f6b65a",
+          "bytes": 5943
+        },
+        {
+          "path": "src/render/clustered_forward.wgsl",
+          "sha256": "7c651620cc04c393716c06ac1c7f19ccd7c4f2ac7f8127f8cbec8466b7d1d640",
+          "bytes": 8836
+        },
+        {
+          "path": "src/render/fog.rs",
+          "sha256": "5e3bcae05f5fdd15bbf3e30c3d43e77b711d7b95bc9417fae164e283124c5c70",
+          "bytes": 5550
+        },
+        {
+          "path": "src/render/fog.wgsl",
+          "sha256": "54413b49947dc0060e30f4ca47f61391642a67d963ead00e1037d1a8b61f96f2",
+          "bytes": 2596
+        },
+        {
+          "path": "src/render/forward_io.wgsl",
+          "sha256": "e140ef1063bf097432fc6866749e3fc2b3893dddcdb24ac1240de0f8fdd0ca8a",
+          "bytes": 1487
+        },
+        {
+          "path": "src/render/gpu_preprocess.rs",
+          "sha256": "dc528e856907dddf6a68c55f8bc0fa81ce2830336d60c61fa3e7ded469a1190d",
+          "bytes": 116812
+        },
+        {
+          "path": "src/render/light.rs",
+          "sha256": "d5bf203084c72c5be5704d777cd0056c129169ff73f0d90f8684ea051b71d92f",
+          "bytes": 93022
+        },
+        {
+          "path": "src/render/mesh.rs",
+          "sha256": "afd8e5399c4207a7a56a08ebe039ffe212e07b6acda42164670e8dbd92143142",
+          "bytes": 137069
+        },
+        {
+          "path": "src/render/mesh.wgsl",
+          "sha256": "56f2c5a2a05181a90cf63a5c971c7c91d1f834bcae9d07b65bd85851b9325b50",
+          "bytes": 3560
+        },
+        {
+          "path": "src/render/mesh_bindings.rs",
+          "sha256": "178fd4cf2e67f05594af40974d2ada452b8de9581abd03425ab2e6cd084b4ac5",
+          "bytes": 21595
+        },
+        {
+          "path": "src/render/mesh_bindings.wgsl",
+          "sha256": "aa3204b02c72f8465f01ee8bc57dc476bbf6198c2957a03bb5ae55edd331423a",
+          "bytes": 377
+        },
+        {
+          "path": "src/render/mesh_functions.wgsl",
+          "sha256": "f5262bf381aca69dbcf49698989b63c3caa210d414ac0da0911f6ccdf95b0be6",
+          "bytes": 7091
+        },
+        {
+          "path": "src/render/mesh_preprocess.wgsl",
+          "sha256": "733a94bdf179cf69b08cb6cb7a78029c82cf062878735bfd109639f999fc8de4",
+          "bytes": 16035
+        },
+        {
+          "path": "src/render/mesh_types.wgsl",
+          "sha256": "5b8a264744f7131a66e5c6ffe06aabf20f3aec3ba7b4c913c5edf4b37a474aa4",
+          "bytes": 1689
+        },
+        {
+          "path": "src/render/mesh_view_bindings.rs",
+          "sha256": "4eb82717f4ff70d529c24a453b937002067b5651746fc510a404cf2e309878a1",
+          "bytes": 32760
+        },
+        {
+          "path": "src/render/mesh_view_bindings.wgsl",
+          "sha256": "18d6938807231c512931f1831a5aebe7547de9fbd675b94a1a8edcede78da630",
+          "bytes": 5409
+        },
+        {
+          "path": "src/render/mesh_view_types.wgsl",
+          "sha256": "62c00f6f38ab362be408d02012b47d419898cb71832a4c179b01bd1713d01985",
+          "bytes": 6482
+        },
+        {
+          "path": "src/render/mod.rs",
+          "sha256": "812e393b7ec87849021a1e73f24c346e198cf5c49992297f2744aa0c05423563",
+          "bytes": 399
+        },
+        {
+          "path": "src/render/morph.rs",
+          "sha256": "49283c20d62b05d12b11cad926e53bdd0c69e47bc1ee0fd64043c1f7242ab864",
+          "bytes": 5353
+        },
+        {
+          "path": "src/render/morph.wgsl",
+          "sha256": "fab0a8409f2f1f8e08e8a3e98e348bb0ce64a04608ece65398eb36c418392f99",
+          "bytes": 2123
+        },
+        {
+          "path": "src/render/occlusion_culling.wgsl",
+          "sha256": "f2fb771b3f9dd35d8157103fce03176329d5122d5cf6041e2387c3fe3cc8b564",
+          "bytes": 1518
+        },
+        {
+          "path": "src/render/parallax_mapping.wgsl",
+          "sha256": "65226a61e28f9f7b593e7a59d983a8b52e8c5ced952156e2977774dd5687baf1",
+          "bytes": 5539
+        },
+        {
+          "path": "src/render/pbr.wgsl",
+          "sha256": "c1224225e5a49e9f37de7387d9c8840806e273326a2db8c2ff111c7897111515",
+          "bytes": 3395
+        },
+        {
+          "path": "src/render/pbr_ambient.wgsl",
+          "sha256": "9c044350873f040018fc91d4fb79be056cb620810da90415fa72b3e617a0efb8",
+          "bytes": 1165
+        },
+        {
+          "path": "src/render/pbr_bindings.wgsl",
+          "sha256": "470c6249ef396b48a1548abe0851743f507b6aad1082eb6526147d24a47d4f56",
+          "bytes": 4757
+        },
+        {
+          "path": "src/render/pbr_fragment.wgsl",
+          "sha256": "cb84cf58ac92d1a5ac78fb05f4afceea818d5069b9c67542643e5a444f5d5d9b",
+          "bytes": 31269
+        },
+        {
+          "path": "src/render/pbr_functions.wgsl",
+          "sha256": "8630c0cf8dbacb66e66c206a7805a5c22b3ab356ec6a1f713a672f6612a029ad",
+          "bytes": 39562
+        },
+        {
+          "path": "src/render/pbr_lighting.wgsl",
+          "sha256": "63fd81018ebdee9517df70e111d08e4d3956d827bad9c5f42887e3ce7c8e2a07",
+          "bytes": 35520
+        },
+        {
+          "path": "src/render/pbr_prepass.wgsl",
+          "sha256": "22874194824dd1826ee328cc0c53fcf2afca355109d073dfd3419d46e63ad548",
+          "bytes": 4689
+        },
+        {
+          "path": "src/render/pbr_prepass_functions.wgsl",
+          "sha256": "ba746ecdca0046e0871b5b13172f05d7eb0f0bdaf0febdb891283536ab2540c2",
+          "bytes": 4186
+        },
+        {
+          "path": "src/render/pbr_transmission.wgsl",
+          "sha256": "d164a4d0f94358506248afeec4fe73dfd3c990e96e5923e5ac40536920d6892d",
+          "bytes": 9083
+        },
+        {
+          "path": "src/render/pbr_types.wgsl",
+          "sha256": "7a14ad7b6cadf1438ecee533290739a2a489ae72dcadc4ef85ea1e100c04f654",
+          "bytes": 6945
+        },
+        {
+          "path": "src/render/reset_indirect_batch_sets.wgsl",
+          "sha256": "f7392702fa07f1de5122f00b7328f043a0818b86f83542ba76599aa25e429c68",
+          "bytes": 995
+        },
+        {
+          "path": "src/render/rgb9e5.wgsl",
+          "sha256": "ff66ee626f6d34621d0bb62c7fe7a03026fab229365f2d03c9a0bd5f8004b0d8",
+          "bytes": 2428
+        },
+        {
+          "path": "src/render/shadow_sampling.wgsl",
+          "sha256": "b82c1ed3fbbb715fdfe60b26d5d4ead2a6d7c4fbfea82215c2ecb39b9d98444c",
+          "bytes": 25351
+        },
+        {
+          "path": "src/render/shadows.wgsl",
+          "sha256": "9cf6928101760d3de752628c43d3d3762350deaeade7301235f988407e7bbaf2",
+          "bytes": 9622
+        },
+        {
+          "path": "src/render/skin.rs",
+          "sha256": "0b587b09e015483c8d106062a0329bf131565ab92a9a8e129e6ec40efb5d75ec",
+          "bytes": 23410
+        },
+        {
+          "path": "src/render/skinning.wgsl",
+          "sha256": "67683dfd95b30f338a616c51e7367b75f8b67a33a59d8b88971ead6c9e883104",
+          "bytes": 3204
+        },
+        {
+          "path": "src/render/utils.wgsl",
+          "sha256": "78b6ca68700b452bf3809414b9335a8b1134b7ea92c741271d889e27dbab1d9c",
+          "bytes": 7868
+        },
+        {
+          "path": "src/render/view_transformations.wgsl",
+          "sha256": "82555584e068250626992da2b0bdf86427cb992e92f17771ce074b62834ac8c9",
+          "bytes": 8272
+        },
+        {
+          "path": "src/render/wireframe.wgsl",
+          "sha256": "d34ef0c793f8791c6df904aa9dcf02535bbaa25553fbb0459e174f053be42098",
+          "bytes": 245
+        },
+        {
+          "path": "src/ssao/mod.rs",
+          "sha256": "735cd0cea2c75373282273a3d67f1254cc7ff12b3fbe8e749dfa6c8243fcc458",
+          "bytes": 27958
+        },
+        {
+          "path": "src/ssao/preprocess_depth.wgsl",
+          "sha256": "5f7ff08dfc11028216ac5b3804f17122bbf746d4f2575c6a2c0e3b11be6feac1",
+          "bytes": 6351
+        },
+        {
+          "path": "src/ssao/spatial_denoise.wgsl",
+          "sha256": "d614c7534cdcb6486fd164c904bd6f6e7c4dcaf89fc9fd6b7cc0b5635808c266",
+          "bytes": 4231
+        },
+        {
+          "path": "src/ssao/ssao.wgsl",
+          "sha256": "393ba17afc30e57e8b72e1a2e9703e43cc9a4a38e02d73e8923c05626a4b4778",
+          "bytes": 9165
+        },
+        {
+          "path": "src/ssao/ssao_utils.wgsl",
+          "sha256": "d439322ba372dd1fc0f072e153da669b40e88195cddda727e65365ffa6e8cf5d",
+          "bytes": 571
+        },
+        {
+          "path": "src/ssr/mod.rs",
+          "sha256": "1949f6ce36912bfea9def7f291c32db2cf44ba21b2ae98745d6b85c791a33545",
+          "bytes": 21706
+        },
+        {
+          "path": "src/ssr/raymarch.wgsl",
+          "sha256": "05ed85d974b5bca0153eeb5ce487487c8e6bca744a4f5fd810f59a25fa2f14fc",
+          "bytes": 20574
+        },
+        {
+          "path": "src/ssr/ssr.wgsl",
+          "sha256": "ed08f57be060f728bd5ae6fce0bbc5d793eed4cfbbdfd7bed3f14aade838fa8f",
+          "bytes": 7699
+        },
+        {
+          "path": "src/volumetric_fog/mod.rs",
+          "sha256": "bfc880dd1fcf1c7f41efb8c110f79bad015ac96987a44ceaf73bf10c0adf3a03",
+          "bytes": 4857
+        },
+        {
+          "path": "src/volumetric_fog/render.rs",
+          "sha256": "2294ae0831968350d3170472718dfdebe791d3f084d6d2bec3073c7f24790399",
+          "bytes": 33456
+        },
+        {
+          "path": "src/volumetric_fog/volumetric_fog.wgsl",
+          "sha256": "f80ab6c14dd741836452ee5dfd65f61607ed3a7777a9a041817096ba5af35314",
+          "bytes": 23809
+        },
+        {
+          "path": "src/wireframe.rs",
+          "sha256": "b67e9dbdb4fbe439628497e1fd339eb03abf5cc8a3e7880bd9d3294bc0ba13ee",
+          "bytes": 34126
+        },
+        {
+          "path": "third-party-notices/EA-fastnoise-LICENSE.txt",
+          "sha256": "1b8fc6a4ca2b4d0c2e4621ccc9d08ff701d4526cd02b29239834a606266183e9",
+          "bytes": 1504
+        },
+        {
+          "path": "third-party-notices/EA-fastnoise-NOTICE.txt",
+          "sha256": "250745b263f7248381c7884eb67a667c54d8a0ede6696bb7595788506f75c32d",
+          "bytes": 1151
+        },
+        {
+          "path": "third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt",
+          "sha256": "4081495a79a7ab5a3aeeba5e37843b81f9f7504638450171608b6f1aa4b11ca1",
+          "bytes": 3174
+        },
+        {
+          "path": "third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt",
+          "sha256": "35441edfb6cdb0271e943462598271bb51116856a89e5bd0adfafd7a9940523c",
+          "bytes": 568
+        }
+      ],
+      "modified_paths": [
+        "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+        "FLIGHTSIM-PARALLAX-README.md",
+        "FLIGHTSIM-PATCHES.md",
+        "FLIGHTSIM-UPSTREAM-SOURCE.json",
+        "LICENSE-FLIGHTSIM-APACHE",
+        "LICENSE-FLIGHTSIM-MIT",
+        "src/meshlet/mod.rs",
+        "src/render/parallax_mapping.wgsl",
+        "third-party-notices/EA-fastnoise-LICENSE.txt",
+        "third-party-notices/EA-fastnoise-NOTICE.txt",
+        "third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt",
+        "third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt"
+      ],
+      "retained_notices": [
+        "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+        "LICENSE-APACHE",
+        "LICENSE-FLIGHTSIM-APACHE",
+        "LICENSE-FLIGHTSIM-MIT",
+        "LICENSE-MIT",
+        "third-party-notices/EA-fastnoise-LICENSE.txt",
+        "third-party-notices/EA-fastnoise-NOTICE.txt",
+        "third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt",
+        "third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt"
+      ]
+    }
+  ]
+}

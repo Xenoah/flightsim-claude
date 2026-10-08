@@ -1,0 +1,4 @@
+Local flightsim modifications, 2026-10-08
+
+Modified source paths: src/render/parallax_mapping.wgsl (original ray intersection replacement), src/meshlet/mod.rs (documentation-only preview omission note); src/meshlet/meshlet_preview.png is omitted, with no runtime or meshlet-feature change.
+Original-equivalent replacements and regression tests were authored for this project under its existing MIT OR Apache-2.0 terms. Upstream copyrights, licence texts and retained-code notices are preserved. Exact original-source hashes, modifications and authoring limitations are in FLIGHTSIM-UPSTREAM-SOURCE.json and FLIGHTSIM-PATCHES.md. No upstream endorsement, human authorship or new upstream licence grant is asserted.

@@ -137,7 +137,10 @@ fn render_capture_frame(world: &mut World) {
             })
             .unwrap_or_else(|error| panic!("screenshot GPU backpressure failed: {error}"));
 
-        world.run_schedule(Render);
+        crate::capture_admission::with_restored_views(world, |world| {
+            world.run_schedule(Render);
+        });
+        crate::capture_admission::acknowledge_render(world);
 
         if session.active() {
             let complete = credits.submitted();

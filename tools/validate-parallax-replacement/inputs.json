@@ -1,0 +1,38 @@
+[
+  {
+    "root": "bevy_render",
+    "path": "src/bindless.wgsl",
+    "sha256": "38d50d3c5f9a67ae43e258e708ce634fe5b496aeb6ad7f1ab5cb323f13d0ae46",
+    "bytes": 1882
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/mesh_types.wgsl",
+    "sha256": "5b8a264744f7131a66e5c6ffe06aabf20f3aec3ba7b4c913c5edf4b37a474aa4",
+    "bytes": 1689
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/mesh_bindings.wgsl",
+    "sha256": "aa3204b02c72f8465f01ee8bc57dc476bbf6198c2957a03bb5ae55edd331423a",
+    "bytes": 377
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/pbr_types.wgsl",
+    "sha256": "7a14ad7b6cadf1438ecee533290739a2a489ae72dcadc4ef85ea1e100c04f654",
+    "bytes": 6945
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/pbr_bindings.wgsl",
+    "sha256": "470c6249ef396b48a1548abe0851743f507b6aad1082eb6526147d24a47d4f56",
+    "bytes": 4757
+  },
+  {
+    "root": "repo",
+    "path": "vendor/bevy_pbr/src/render/parallax_mapping.wgsl",
+    "sha256": "65226a61e28f9f7b593e7a59d983a8b52e8c5ced952156e2977774dd5687baf1",
+    "bytes": 5539
+  }
+]

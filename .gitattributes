@@ -20,3 +20,16 @@
 docs/data/global-surface-corrections.json text eol=lf linguist-generated=true
 crates/flightsim-world/data/*.json text eol=lf linguist-generated=true
 docs/data/copernicus-glo90-license.pdf binary
+
+# Unresolved generation-specific model rights: retain development history,
+# exclude the asset from commit/tag ZIP and tar source archives.
+# See docs/release/source-archive-policy.md; this is not a rights grant.
+/assets/aircraft/light_single.glb export-ignore
+
+# Reviewed upstream and modified-source bytes are exact evidence, including
+# notices and binary textures. Do not apply checkout newline conversion.
+/vendor/zune-jpeg/** -text
+/vendor/bevy_pbr/** -text
+/docs/release/modified-source-patches/*.patch -text
+/docs/release/analytical-modified-source-provenance.json text eol=lf
+/docs/release/analytical-source-header-evidence.json text eol=lf

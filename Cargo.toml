@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-exclude = ["vendor/osmpbf"]
+exclude = ["vendor/osmpbf", "vendor/zune-jpeg", "vendor/bevy_pbr"]
 members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
@@ -116,3 +116,8 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Local original-equivalent routine replacement; exact provenance is vendored.
+[patch.crates-io]
+zune-jpeg = { path = "vendor/zune-jpeg" }
+bevy_pbr = { path = "vendor/bevy_pbr" }
