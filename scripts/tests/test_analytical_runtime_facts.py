@@ -3,7 +3,7 @@ import copy
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 import tempfile
 import unittest
@@ -490,13 +490,14 @@ class RuntimeFactsTests(unittest.TestCase):
         path = self.private / facts.PRIVATE_NAME
         manifest = json.loads(path.read_bytes())
         del manifest['final_link']['trace_observation']
+        del manifest['final_link']['output_association']
         path.write_bytes(facts.canonical(manifest))
         value = facts.project(self.private)
         self.assertNotIn('trace_observation', value['final_link'])
         self.assertEqual(value['final_link']['status'], 'observed')
         self.assertEqual(facts.project(self.private, recheck_installed=False), value)
 
-    def test_only_exact_output_argument_and_fingerprint_match(self):
+    def test_only_output_arguments_in_admitted_roots_are_candidates(self):
         trace, executable = self.link_fixture()
         foreign = executable.parent / 'foreign/flightsim-app.exe'
         wrong_deps = executable.parent / 'deps/flightsim_app-ffffffffffffffff.exe'
@@ -515,7 +516,8 @@ class RuntimeFactsTests(unittest.TestCase):
                              encoding='utf-8')
             with self.subTest(args=args):
                 link = facts.final_link_facts(collector, trace, executable)
-                self.assertEqual(link['reason'], 'no_matching_command')
+                self.assertEqual(link['reason'], 'output_identity_unavailable' if args == ['/OUT:' + str(wrong_deps)]
+                                 else 'no_matching_command')
                 self.assertEqual(link['trace_observation']['matching_output_commands'], 0)
                 self.assertIsNone(link['linker'])
 
@@ -529,8 +531,180 @@ class RuntimeFactsTests(unittest.TestCase):
             with self.subTest(extra=extra):
                 link = facts.final_link_facts(collector, trace, executable)
                 self.assertEqual(link['reason'], 'unparseable_command')
-                self.assertEqual(link['trace_observation']['matching_output_commands'], 1)
+                self.assertEqual(link['trace_observation']['matching_output_commands'], 0)
                 self.assertIsNone(link['linker'])
+
+    def replace_link_output(self, trace, old, new):
+        text = trace.read_text(encoding='utf-8')
+        before, after = json.dumps('/OUT:' + str(old)), json.dumps('/OUT:' + str(new))
+        self.assertIn(before, text)
+        trace.write_text(text.replace(before, after), encoding='utf-8')
+
+    def test_unexpected_same_build_output_name_requires_exact_content(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', executable.read_bytes())
+        self.replace_link_output(trace, executable, other)
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        link = value['final_link']
+        self.assertEqual(link['status'], 'observed')
+        self.assertEqual(link['output_association'], {'method': facts.OUTPUT_ASSOCIATION,
+                         'scan': {'candidate_commands': 1, 'missing_outputs': 0, 'mismatched_outputs': 0}})
+        self.assertEqual(link['link_output']['record'], facts.file_record(executable))
+        self.assertEqual(facts.project(self.private), value)
+        with self.assertRaisesRegex(ValueError, 'requires original build files'):
+            facts.project(self.private, recheck_installed=False)
+        self.assertFalse(link['linker_process_execution_observed'])
+        self.assertEqual(link['actual_static_membership'], facts.UNKNOWN)
+        self.assertEqual(link['implicit_sdk_selection'], facts.UNKNOWN)
+        self.assertFalse(value['release_authorized'])
+
+    def test_safe_name_with_same_size_different_content_stays_unknown(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', b'x' * executable.stat().st_size)
+        self.replace_link_output(trace, executable, other)
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        self.assertEqual(value['final_link']['reason'], 'output_hash_mismatch')
+        self.assertEqual(value['final_link']['output_association']['scan']['mismatched_outputs'], 1)
+        self.assertFalse(value['final_link']['constructed_final_command_observed'])
+
+    def test_matching_bytes_outside_roots_or_through_parent_alias_are_not_read(self):
+        trace, executable = self.link_fixture(output='root')
+        foreign = self.write(self.root / 'other-build/release/flightsim-app.exe', executable.read_bytes())
+        same_tree_nested = self.write(executable.parent / 'nested/flightsim-app.exe', executable.read_bytes())
+        alias = str(executable.parent / 'nested') + '/../flightsim-app.exe'
+        for candidate in (foreign, same_tree_nested, alias):
+            args = [str(self.linker), '/OUT:' + str(candidate)]
+            trace.write_text(' INFO rustc_codegen_ssa::back::link ' + ' '.join(map(json.dumps, args)) + '\n')
+            collector = facts.Collector(self.root, {})
+            original = facts.file_record
+            def record(path, *args):
+                self.assertNotEqual(str(path), str(candidate))
+                return original(path, *args)
+            with self.subTest(candidate=candidate), patch.object(facts, 'file_record', side_effect=record):
+                link = facts.final_link_facts(collector, trace, executable)
+                self.assertEqual(link['reason'], 'no_matching_command')
+                self.assertEqual(link['output_association']['scan']['candidate_commands'], 0)
+
+    def test_two_different_names_with_identical_bytes_remain_ambiguous(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', executable.read_bytes())
+        original = trace.read_text()
+        trace.write_text(original + original.replace(json.dumps('/OUT:' + str(executable)), json.dumps('/OUT:' + str(other))))
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        self.assertEqual(value['final_link']['reason'], 'ambiguous_command')
+        self.assertEqual(value['final_link']['trace_observation']['matching_output_commands'], 2)
+        self.assertFalse(value['final_link']['constructed_final_command_observed'])
+
+    def test_other_nonmatching_outputs_do_not_hide_unique_equal_output(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/different.exe', b'different')
+        original = trace.read_text()
+        trace.write_text(original + original.replace(json.dumps('/OUT:' + str(executable)), json.dumps('/OUT:' + str(other))))
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        link = value['final_link']
+        self.assertEqual(link['status'], 'observed')
+        self.assertEqual(link['output_association']['scan'],
+                         {'candidate_commands': 2, 'missing_outputs': 0, 'mismatched_outputs': 1})
+        # Replacing the other output with copied matching bytes changes the
+        # association to ambiguous and must fail native fresh replay.
+        other.write_bytes(executable.read_bytes())
+        with self.assertRaisesRegex(ValueError, 'final link observations changed'):
+            facts.project(self.private)
+
+    def test_link_output_change_and_removal_fail_fresh_replay(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', executable.read_bytes())
+        self.replace_link_output(trace, executable, other)
+        self.collect(linker_trace=trace, audited_executable=executable)
+        other.write_bytes(b'changed')
+        with self.assertRaises(ValueError): facts.project(self.private)
+        other.unlink()
+        with self.assertRaises((ValueError, OSError)): facts.project(self.private)
+
+    def test_candidate_path_link_rejected_before_read(self):
+        trace, executable = self.link_fixture(output='root')
+        alias = executable.parent / 'deps/linked-output.exe'
+        try:
+            alias.symlink_to(executable)
+        except OSError as error:
+            if os.name == 'nt' and getattr(error, 'winerror', None) == 1314:
+                self.skipTest('Windows fixture cannot create a symlink without privilege')
+            raise
+        self.replace_link_output(trace, executable, alias)
+        with self.assertRaisesRegex(ValueError, 'linked or reparse'):
+            self.collect(linker_trace=trace, audited_executable=executable)
+
+    def test_candidate_count_and_hash_budgets_are_bounded(self):
+        trace, executable = self.link_fixture(output='root')
+        with patch.object(facts, 'MAX_OUTPUT_CANDIDATES', 0), self.assertRaisesRegex(ValueError, 'candidate output budget'):
+            facts.final_link_facts(facts.Collector(self.root, {}), trace, executable)
+        with patch.object(facts, 'MAX_OUTPUT_HASH_BYTES', executable.stat().st_size - 1), self.assertRaisesRegex(ValueError, 'candidate hash budget'):
+            facts.final_link_facts(facts.Collector(self.root, {}), trace, executable)
+
+    def test_output_association_schema_is_closed(self):
+        trace, executable = self.link_fixture()
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        for change in ('method', 'raw', 'count', 'bool', 'missing'):
+            modified = copy.deepcopy(value)
+            association = modified['final_link']['output_association']
+            if change == 'method': association['method'] = 'basename'
+            if change == 'raw': association['raw_path'] = 'private'
+            if change == 'count': association['scan']['candidate_commands'] += 1
+            if change == 'bool': association['scan']['candidate_commands'] = True
+            if change == 'missing': association['scan'] = None
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                facts.validate_projection(modified)
+
+    def test_legacy_unknown_result_is_not_reclassified_by_new_association(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', executable.read_bytes())
+        self.replace_link_output(trace, executable, other)
+        original = facts.final_link_facts
+        def legacy(*args, **kwargs):
+            return original(*args, **(kwargs | {'legacy_output_names': True}))
+        with patch.object(facts, 'final_link_facts', side_effect=legacy):
+            value = self.collect(linker_trace=trace, audited_executable=executable)
+        self.assertNotIn('output_association', value['final_link'])
+        self.assertEqual(value['final_link']['reason'], 'no_matching_command')
+        self.assertEqual(facts.project(self.private), value)
+
+    def test_new_association_cannot_be_resealed_as_legacy_observation(self):
+        trace, executable = self.link_fixture(output='root')
+        other = self.write(executable.parent / 'deps/observed-output.exe', executable.read_bytes())
+        self.replace_link_output(trace, executable, other)
+        self.collect(linker_trace=trace, audited_executable=executable)
+        path = self.private / facts.PRIVATE_NAME
+        manifest = json.loads(path.read_bytes())
+        del manifest['final_link']['output_association']
+        path.write_bytes(facts.canonical(manifest))
+        with self.assertRaisesRegex(ValueError, 'foreign final linker output'):
+            facts.project(self.private, recheck_installed=False)
+
+    def test_new_association_retains_unique_fingerprint_requirement(self):
+        trace, executable = self.link_fixture(output='root')
+        directory = executable.parent / '.fingerprint'
+        fingerprint = next(directory.glob('*/bin-flightsim-app.json'))
+        original = fingerprint.read_bytes()
+        fingerprint.unlink()
+        link = facts.final_link_facts(facts.Collector(self.root, {}), trace, executable)
+        self.assertEqual(link['reason'], 'missing_fingerprint')
+        self.assertIsNone(link['output_association']['scan'])
+        fingerprint.write_bytes(original)
+        self.write(directory / 'flightsim-app-ffffffffffffffff/bin-flightsim-app.json', original)
+        link = facts.final_link_facts(facts.Collector(self.root, {}), trace, executable)
+        self.assertEqual(link['reason'], 'ambiguous_fingerprint')
+        self.assertFalse(link['constructed_final_command_observed'])
+
+    def test_windows_output_root_semantics_are_case_insensitive_and_bounded(self):
+        executable = PureWindowsPath(r'C:\build\target\x86_64-pc-windows-msvc\release\flightsim-app.exe')
+        self.assertTrue(facts.admitted_link_output(
+            r'c:\BUILD\target\x86_64-pc-windows-msvc\RELEASE\deps\unexpected.EXE', executable))
+        for path in (r'C:\other\release\flightsim-app.exe',
+                     r'C:\build\target\x86_64-pc-windows-msvc\release\deps\..\flightsim-app.exe',
+                     r'C:\build\target\x86_64-pc-windows-msvc\release\deps\unexpected.exe:stream',
+                     r'\\?\C:\build\target\x86_64-pc-windows-msvc\release\flightsim-app.exe'):
+            with self.subTest(path=path):
+                self.assertFalse(facts.admitted_link_output(path, executable))
 
     def test_windows_command_debug_drive_paths_and_regular_argument_quoting(self):
         # Source-shaped regular OsString Debug formatting, not Windows shell

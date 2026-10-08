@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "kind": "independent_package_scope_packet_verification",
+  "reviewed_at": "2026-10-08",
+  "assessment_sha256": "281b45591a9f3aea2f0508be42c73ce425a149a4815c51110e4b6944c98d66c8",
+  "assessment_status_observed": "package_scope_assessed_pending_independent_review",
+  "checks": [
+    {
+      "check": "base_commit",
+      "passed": true
+    },
+    {
+      "check": "tracked_files_unchanged",
+      "passed": true
+    },
+    {
+      "check": "ordinary_source_binding",
+      "passed": true
+    },
+    {
+      "check": "package_scope_only",
+      "passed": true
+    },
+    {
+      "check": "native_bytes_unchanged",
+      "passed": true
+    },
+    {
+      "check": "portable_inventory_identical",
+      "passed": true
+    },
+    {
+      "check": "portable_assessment_identical",
+      "passed": true
+    },
+    {
+      "check": "inventory_remains_not_reviewed",
+      "passed": true
+    },
+    {
+      "check": "same_exact_13_copy_plan",
+      "passed": true
+    },
+    {
+      "check": "both_original_routes_and_obligations_preserved",
+      "passed": true
+    },
+    {
+      "check": "native_inventory_reference",
+      "passed": true,
+      "sha256": "02797865cac5ecee5f05c33ea1a682b2bd772c8f6de8cdfea6ba7d3d91ef11d8"
+    },
+    {
+      "check": "prior_accepted_assessment_reference",
+      "passed": true,
+      "sha256": "17e7926da925ee1d46bbe6bd2aa20a4f9bc7552b44123811b7533ab5234868be"
+    },
+    {
+      "check": "package_reconciliation_reference",
+      "passed": true,
+      "sha256": "798adaad3a2b20cfb0463b70c50506edb1c17684a617aac9b11749ff26736702"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+      "passed": true,
+      "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+      "passed": true,
+      "sha256": "4059f220c736b6f8462f439079a05a7fda77fffb6215bc9e955b6afca3b9209d"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/source-record.json",
+      "passed": true,
+      "sha256": "72a51f0e30d3c083f3216bb404fbca46e73efd030514481c5f096d3eeceae6e0"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/README.md",
+      "passed": true,
+      "sha256": "ca7fd771ad7ead0110483a8d3ff1afe74c9243b76cfd2d29ba3c538a86fc1ad6"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/standard-license-texts/Apache-2.0.txt",
+      "passed": true,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+      "passed": true,
+      "sha256": "6619bac32b6998490128a6ba0ca0e5fb47b0d19deff0c3fff0c9479e08d57307"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+      "passed": true,
+      "sha256": "1cffd04787a6e52a241cb8914d939b702613d08c265b4e1ceb7578ae977007de"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+      "passed": true,
+      "sha256": "1b123a6429ec21f846fbe0a9b98fd2fd153239484b01272736f9cb93b4b8e07b"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+      "passed": true,
+      "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+      "passed": true,
+      "sha256": "dd7274968556f3f3309df5615d94437ec4e4823777cc440f91177b2170cbe2a7"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+      "passed": true,
+      "sha256": "511b164642efe470e88323b8afe0274e797805ff2441f0173b5b005ad4b4d1b1"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/standard-license-texts/CC0-1.0.txt",
+      "passed": true,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "check": "source_and_portable_evidence:licenses/review-evidence/hexf-parse-0.2.1/upstream/consent-summary.json",
+      "passed": true,
+      "sha256": "931d08fb22728313c78b77a7730cdc1610176592bfeccb07ad701784e212daad"
+    },
+    {
+      "check": "resolutions_reference_every_copied_file",
+      "passed": true
+    },
+    {
+      "check": "native_reconciliation:constgebra@0.1.4",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/.cargo_vcs_info.json",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/.github/workflows/rust.yml",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/.gitignore",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/README.md",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+      "passed": true
+    },
+    {
+      "check": "native_reconciliation:hexf-parse@0.2.1",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/.cargo_vcs_info.json",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+      "passed": true
+    },
+    {
+      "check": "archive_reconciliation:docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "complete_target_review": false,
+  "publication_authorized": false
+}

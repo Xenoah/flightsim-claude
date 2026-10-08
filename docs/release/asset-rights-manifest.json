@@ -2,12 +2,13 @@
   "schema_version": 1,
   "audited_at": "2026-10-02",
   "source_snapshot": "08717b09075e75bda48b61eea87cc7e2e046eea0",
-  "scope": "Engineering rights inventory; not a legal opinion, certificate, or Steam approval",
+  "scope": "Engineering rights inventory; not a legal opinion, certificate, or Steam approval; current candidate asset records are distinct from historical captured inventories; whole-target/native release admission remains pending",
   "commercial_external_assets": [
     "assets/aircraft/swift_sport.glb",
     "assets/aircraft/swift_sport.json"
   ],
   "release_external_assets": [
+    "assets/aircraft/light_single.glb",
     "assets/aircraft/light_single.json",
     "assets/aircraft/swift_sport.glb",
     "assets/aircraft/swift_sport.json",
@@ -18,14 +19,18 @@
       "id": "assets-aircraft-light_single-glb",
       "path": "assets/aircraft/light_single.glb",
       "delivery": "external",
-      "sha256": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
-      "bytes": 4752424,
-      "review_state": "unresolved",
-      "license": "Meshy generation-specific terms; not established by project MIT/Apache",
+      "sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+      "bytes": 140840,
+      "review_state": "original_source_recorded",
+      "license": "MIT OR Apache-2.0",
       "sources": [
+        "tools/blender/build_meadow_trainer.py",
+        "tools/original-highwing/adapt_original_highwing.py",
+        "tools/original-highwing/evidence/source-manifest.json",
+        "docs/release/full-two-aircraft-source-candidate.md",
         "ATTRIBUTION.md"
       ],
-      "notes": "Legacy record says paid plan, generated 2026-08-21. Missing generation task, applicable plan/terms and source-input evidence. Exclude from commercial staging; adding CC-BY credit alone cannot establish a grant."
+      "notes": "Project-original Meadow geometry adapted by exact (x,y,z)->(-z,y,x) rotation for existing Light Single -X/+Y ModelFit. This record applies only to the current pinned bytes. Earlier Meshy bytes remain unresolved in the historical record. Native runtime and complete distribution admission remain pending."
     },
     {
       "id": "assets-aircraft-light_single-json",
@@ -38,7 +43,7 @@
       "sources": [
         "ATTRIBUTION.md"
       ],
-      "notes": "Project-authored configuration. Commercial staging excludes this external legacy profile to keep its model unavailable."
+      "notes": "Byte-identical project-authored Light Single configuration; the current model path names the pinned original high-wing replacement. Numeric dynamics, controls, camera, sound and replay identity inputs are unchanged."
     },
     {
       "id": "assets-aircraft-swift_sport-glb",
@@ -211,22 +216,6 @@
       "reason": ""
     },
     {
-      "id": "bevy-agx-lut",
-      "package": "bevy_core_pipeline",
-      "version": "0.18.1",
-      "source_path": "src/tonemapping/luts/AgX-default_contrast.ktx2",
-      "feature": "tonemapping_luts",
-      "sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
-      "bytes": 17842,
-      "review_state": "unresolved",
-      "license": "License record not yet resolved",
-      "sources": [
-        "https://github.com/MrLixm/AgXc/tree/898198e0490b0551ed81412a0c22e0b72fffb7cd"
-      ],
-      "notice_files": [],
-      "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
-    },
-    {
       "id": "bevy-blender-filmic-lut",
       "package": "bevy_core_pipeline",
       "version": "0.18.1",
@@ -263,5 +252,39 @@
     "docs/release/asset-rights-manifest.json",
     "docs/release/licenses/FiraMono-LICENSE",
     "docs/release/licenses/TonyMcMapface-LICENSE-MIT"
-  ]
+  ],
+  "historical_excluded_assets": [
+    {
+      "id": "assets-aircraft-light_single-glb",
+      "path": "assets/aircraft/light_single.glb",
+      "delivery": "external",
+      "sha256": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+      "bytes": 4752424,
+      "review_state": "unresolved",
+      "license": "Meshy generation-specific terms; not established by project MIT/Apache",
+      "sources": [
+        "ATTRIBUTION.md"
+      ],
+      "notes": "Legacy record says paid plan, generated 2026-08-21. Missing generation task, applicable plan/terms and source-input evidence. Exclude from commercial staging; adding CC-BY credit alone cannot establish a grant."
+    }
+  ],
+  "historical_excluded_dependency_assets": [
+    {
+      "id": "bevy-agx-lut",
+      "package": "bevy_core_pipeline",
+      "version": "0.18.1",
+      "source_path": "src/tonemapping/luts/AgX-default_contrast.ktx2",
+      "feature": "tonemapping_luts",
+      "sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
+      "bytes": 17842,
+      "review_state": "unresolved",
+      "license": "License record not yet resolved",
+      "sources": [
+        "https://github.com/MrLixm/AgXc/tree/898198e0490b0551ed81412a0c22e0b72fffb7cd"
+      ],
+      "notice_files": [],
+      "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
+    }
+  ],
+  "current_source_boundary": "full-two-aircraft-tony-filmic-source-preparation-v1"
 }

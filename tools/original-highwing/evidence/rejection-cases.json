@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "case": "renamed_unrotated_source",
+      "result": "correctly rejected",
+      "reason": "Body-space geometry does not exactly match original"
+    },
+    {
+      "case": "positions_rotated_normals_not_rotated",
+      "result": "correctly rejected",
+      "reason": "Body-space normal changed"
+    },
+    {
+      "case": "one_triangle_winding_reversed",
+      "result": "correctly rejected",
+      "reason": "Index, UV or other binary data changed"
+    },
+    {
+      "case": "external_buffer",
+      "result": "correctly rejected",
+      "reason": "Expected one embedded buffer"
+    },
+    {
+      "case": "nonfinite_position",
+      "result": "correctly rejected",
+      "reason": "Nonfinite binary value"
+    },
+    {
+      "case": "unintended_node_translation",
+      "result": "correctly rejected",
+      "reason": "Unexpected nonidentity node"
+    }
+  ]
+}

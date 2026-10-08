@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "kind": "ordinary_native_two_package_copyright_license_assessment",
+  "status": "package_scope_assessed_pending_independent_review",
+  "assessment_completed_at": "2026-10-08",
+  "assessed_by": "OpenAI assistant; engineering source/license evidence assessment, not a human lawyer or publisher authorization",
+  "source_commit": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "inventory_sha256": "02797865cac5ecee5f05c33ea1a682b2bd772c8f6de8cdfea6ba7d3d91ef11d8",
+  "inventory_scope": "Actual Windows MSVC collector inventory from run 37830779995, artifact 11575502730, for commercial-staging with ordinary tonemapping LUTs enabled. The native candidate is Swift-only; this record makes no deliverable selection and does not clear Light Single or a two-aircraft release.",
+  "complete_target_review": false,
+  "publication_authorized": false,
+  "package_assessments": [
+    {
+      "id": "constgebra@0.1.4",
+      "archive_sha256": "e1aaf9b65849a68662ac6c0810c8893a765c960b907dd7cfab9c4a50bf764fbc",
+      "declared_license_expression": "MIT OR Apache-2.0",
+      "proposed_distribution_route": "Apache-2.0, an alternative explicitly offered in the exact upstream/package manifest",
+      "assessment": "The package-specific primary licensing declaration is established; missing full text is a redistribution-evidence/notice gap, not evidence of no declared license. Pairing this declaration with the unchanged authoritative Apache text supports a narrow copyright-license resolution under the preserved prior independent package assessment; ordinary-native review result is recorded below. The standard text is distributor-supplied, not falsely attributed to the crate.",
+      "obligations": [
+        "Provide the complete unchanged Apache 2.0 license with the distribution.",
+        "Preserve relevant source copyright, patent, trademark and attribution notices; retain the README statement that floating-point code comes through const_soft_float from compiler_builtins/libm.",
+        "Mark altered source files if modifications are made; the archived constgebra files are unmodified.",
+        "Carry any applicable upstream NOTICE content if present. No NOTICE or primary license text is present in this exact nine-file archive or the pinned source tree. Do not invent a copyright holder/year.",
+        "Review const_soft_float and its nested origins separately; the constgebra route does not clear dependencies or Rust native/runtime contributions.",
+        "No trademark permission, warranty or general non-infringement certification is claimed. Apache patent rights are limited by the actual license."
+      ],
+      "independent_review_question": "Accept the exact manifest as the upstream Apache alternative declaration and confirm the distributor-supplied notice/retention plan for these checksum-bound bytes."
+    },
+    {
+      "id": "hexf-parse@0.2.1",
+      "archive_sha256": "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df",
+      "declared_license_expression": "CC0-1.0",
+      "proposed_distribution_route": "Existing CC0-1.0 declaration, without changing the artifact SPDX or relying on later changed source",
+      "assessment": "The exact published/pinned manifest associates CC0 with this package. The official CC0 text supplies a copyright/related-rights waiver and fallback license for use including commercial redistribution. Preserve the original declaration and supply the complete standard text for traceable review. The four documented 0BSD consents are corroborating context; the proposed CC0 route does not depend on back-applying the later source tree.",
+      "obligations": [
+        "Preserve original CC0-1.0 metadata and package identity; do not relabel the published archive as 0BSD.",
+        "Ship the full CC0 text as an explicitly distributor-supplied reference, with package/version/source identification. CC0 does not itself impose attribution or license-copy conditions; retention is the proposed project documentation practice.",
+        "CC0 fallback is non-transferable and non-sublicensable. Each recipient relies on the affirmer’s direct fallback license, not a new underlying license purportedly granted by this distributor.",
+        "No affirmer patent or trademark rights are granted by CC0. Record that limitation rather than asserting patent clearance or implying the 0BSD consents cure it.",
+        "Keep third-party rights and contributor-authority limitations explicit; no guarantee of title or non-infringement is inferred.",
+        "Do not claim later 0BSD source equals 0.2.1: its exponent calculation changed from powf to libm::exp2."
+      ],
+      "independent_review_question": "Confirm evidence sufficiency for this package-specific copyright-license resolution with the stated patent/trademark and other-rights limitations."
+    }
+  ],
+  "resolutions": [
+    {
+      "id": "constgebra@0.1.4",
+      "reason": "Package-scoped resolution for incorporation in a genuine final whole-target review: the checksum-bound published manifest and identical pinned upstream Cargo.toml explicitly offer MIT OR Apache-2.0. For distribution choose the offered Apache-2.0 alternative and package its complete standard text, labeled distributor-supplied. The exact archive/source tree lacks a primary license/NOTICE file; no upstream text or copyright identity is invented. Preserve existing source/README attribution, mark future modifications and separately assess const_soft_float/nested runtime origins. This establishes a primary declaration plus an executable notice plan, not a blanket legal or whole-target approval.",
+      "evidence": [
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+          "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c",
+          "source": "https://github.com/knickish/constgebra/blob/eae8e094e5779f42f1db2a7adf9036aa33744bc8/Cargo.toml"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+          "sha256": "4059f220c736b6f8462f439079a05a7fda77fffb6215bc9e955b6afca3b9209d",
+          "source": "https://static.crates.io/crates/constgebra/constgebra-0.1.4.crate"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/source-record.json",
+          "sha256": "72a51f0e30d3c083f3216bb404fbca46e73efd030514481c5f096d3eeceae6e0",
+          "source": "https://github.com/knickish/constgebra/tree/eae8e094e5779f42f1db2a7adf9036aa33744bc8/"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/README.md",
+          "sha256": "ca7fd771ad7ead0110483a8d3ff1afe74c9243b76cfd2d29ba3c538a86fc1ad6",
+          "source": "https://github.com/knickish/constgebra/blob/eae8e094e5779f42f1db2a7adf9036aa33744bc8/README.md"
+        },
+        {
+          "path": "licenses/review-evidence/standard-license-texts/Apache-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+          "sha256": "6619bac32b6998490128a6ba0ca0e5fb47b0d19deff0c3fff0c9479e08d57307",
+          "source": "https://github.com/knickish/constgebra/blob/eae8e094e5779f42f1db2a7adf9036aa33744bc8/src/lib.rs"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+          "sha256": "1cffd04787a6e52a241cb8914d939b702613d08c265b4e1ceb7578ae977007de",
+          "source": "https://github.com/knickish/constgebra/blob/eae8e094e5779f42f1db2a7adf9036aa33744bc8/src/comptime.rs"
+        },
+        {
+          "path": "licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+          "sha256": "1b123a6429ec21f846fbe0a9b98fd2fd153239484b01272736f9cb93b4b8e07b",
+          "source": "https://github.com/knickish/constgebra/blob/eae8e094e5779f42f1db2a7adf9036aa33744bc8/src/runtime.rs"
+        }
+      ]
+    },
+    {
+      "id": "hexf-parse@0.2.1",
+      "reason": "Package-scoped resolution for incorporation in a genuine final whole-target review: the checksum-bound published manifest and pinned upstream parse/Cargo.toml apply CC0-1.0 to the exact package. CC0 supplies the copyright/related-rights waiver and fallback commercial-use license; the complete official text is packaged as distributor-supplied reference. Original CC0 metadata remains unchanged. The four historical authors’ later 0BSD consents are corroborating evidence only; the changed later parser is not substituted. The fallback is non-transferable and non-sublicensable; recipients rely on the affirmer’s direct fallback rather than a new grant from this distributor. Patent/trademark rights and third-party-rights limitations remain explicit. This is a package copyright-license assessment, not whole-target or publication approval.",
+      "evidence": [
+        {
+          "path": "licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+          "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+          "source": "https://github.com/lifthrasiir/hexf/blob/4225763d744183d720f575ae96d04161b4d08ea0/parse/Cargo.toml"
+        },
+        {
+          "path": "licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+          "sha256": "dd7274968556f3f3309df5615d94437ec4e4823777cc440f91177b2170cbe2a7",
+          "source": "https://static.crates.io/crates/hexf-parse/hexf-parse-0.2.1.crate"
+        },
+        {
+          "path": "licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+          "sha256": "511b164642efe470e88323b8afe0274e797805ff2441f0173b5b005ad4b4d1b1",
+          "source": "https://github.com/lifthrasiir/hexf/blob/4225763d744183d720f575ae96d04161b4d08ea0/parse/src/lib.rs"
+        },
+        {
+          "path": "licenses/review-evidence/standard-license-texts/CC0-1.0.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "source": "https://github.com/creativecommons/cc-legal-tools-data/blob/19d5489b40a726e6c5bfb9cab15d03e7853ba435/COPYING"
+        },
+        {
+          "path": "licenses/review-evidence/hexf-parse-0.2.1/upstream/consent-summary.json",
+          "sha256": "931d08fb22728313c78b77a7730cdc1610176592bfeccb07ad701784e212daad",
+          "source": "https://github.com/lifthrasiir/hexf/issues/26"
+        }
+      ]
+    }
+  ],
+  "evidence_copy_plan": [
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+      "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+      "sha256": "4059f220c736b6f8462f439079a05a7fda77fffb6215bc9e955b6afca3b9209d"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/source-record.json",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/source-record.json",
+      "sha256": "72a51f0e30d3c083f3216bb404fbca46e73efd030514481c5f096d3eeceae6e0"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/README.md",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/README.md",
+      "sha256": "ca7fd771ad7ead0110483a8d3ff1afe74c9243b76cfd2d29ba3c538a86fc1ad6"
+    },
+    {
+      "path": "licenses/review-evidence/standard-license-texts/Apache-2.0.txt",
+      "source_file": "docs/release/licenses/review-evidence/standard-license-texts/Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+      "sha256": "6619bac32b6998490128a6ba0ca0e5fb47b0d19deff0c3fff0c9479e08d57307"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+      "sha256": "1cffd04787a6e52a241cb8914d939b702613d08c265b4e1ceb7578ae977007de"
+    },
+    {
+      "path": "licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+      "source_file": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+      "sha256": "1b123a6429ec21f846fbe0a9b98fd2fd153239484b01272736f9cb93b4b8e07b"
+    },
+    {
+      "path": "licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+      "source_file": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+      "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70"
+    },
+    {
+      "path": "licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+      "source_file": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+      "sha256": "dd7274968556f3f3309df5615d94437ec4e4823777cc440f91177b2170cbe2a7"
+    },
+    {
+      "path": "licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+      "source_file": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+      "sha256": "511b164642efe470e88323b8afe0274e797805ff2441f0173b5b005ad4b4d1b1"
+    },
+    {
+      "path": "licenses/review-evidence/standard-license-texts/CC0-1.0.txt",
+      "source_file": "docs/release/licenses/review-evidence/standard-license-texts/CC0-1.0.txt",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "path": "licenses/review-evidence/hexf-parse-0.2.1/upstream/consent-summary.json",
+      "source_file": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/upstream/consent-summary.json",
+      "sha256": "931d08fb22728313c78b77a7730cdc1610176592bfeccb07ad701784e212daad"
+    }
+  ],
+  "activation_requirements": [
+    "Keep this record package-scoped. Never rename it into a completed dependency-review.json or change status to reviewed to satisfy the existing gate.",
+    "Reconcile both exact package identities with the final target inventory and include all 13 referenced unchanged files via evidence_copy_plan in that inventory notice root.",
+    "A genuine whole-target dependency, embedded-source and native/runtime review must incorporate these package resolutions and its own complete obligations, then bind the final exact inventory.",
+    "Retain original unresolved collector records. Distributor-supplied standard legal instruments are not upstream-packaged notices and cannot be added to the revision-pinned upstream supplement manifest.",
+    "AgX, final runtime/appearance acceptance, release variant choice, Light Single rights where included, source-archive review and publication authorization remain separate requirements."
+  ],
+  "primary_guidance_sources": [
+    "https://doc.rust-lang.org/cargo/reference/manifest.html#the-license-and-license-file-fields",
+    "https://www.apache.org/licenses/LICENSE-2.0",
+    "https://creativecommons.org/publicdomain/zero/1.0/legalcode.en",
+    "https://wiki.creativecommons.org/wiki/CC0_FAQ"
+  ],
+  "independent_review": {
+    "status": "pending",
+    "complete_target_review": false,
+    "publication_authorized": false
+  },
+  "prior_accepted_assessment": {
+    "path": "docs/release/licenses/review-evidence/two-package-ordinary/prior-package-assessment.json",
+    "sha256": "17e7926da925ee1d46bbe6bd2aa20a4f9bc7552b44123811b7533ab5234868be",
+    "bytes": 15554
+  },
+  "native_inventory": {
+    "path": "docs/release/licenses/review-evidence/two-package-ordinary/native-inventory.json",
+    "sha256": "02797865cac5ecee5f05c33ea1a682b2bd772c8f6de8cdfea6ba7d3d91ef11d8",
+    "bytes": 418142,
+    "source": "https://github.com/Xenoah/flightsim-claude/actions/runs/37830779995/artifacts/11575502730"
+  },
+  "package_reconciliation": {
+    "path": "docs/release/licenses/review-evidence/two-package-ordinary/reconciliation.json",
+    "sha256": "798adaad3a2b20cfb0463b70c50506edb1c17684a617aac9b11749ff26736702",
+    "bytes": 9160
+  },
+  "source_scope": "Only the two unchanged registry package archives; no derived source, native runtime or whole-inventory conclusion follows."
+}

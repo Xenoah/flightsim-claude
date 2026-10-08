@@ -118,11 +118,11 @@ CC BY 4.0。https://esa-worldcover.org/
 使用したプランの規約で商用利用・再配布が許されているかを確認すること。
 生成物をリポジトリに含める場合は、どのプランで生成したかをここに記録する。
 
-### 含めているモデル
+### 旧モデルの履歴（現在の同名ファイルとは異なる）
 
 | ファイル | 生成 | プラン |
 |---|---|---|
-| `assets/aircraft/light_single.glb` | 2026-08-21、Meshy text-to-3D（preview → refine） | 過去の記録: **有料プラン・再配布可**。生成時の根拠資料は未検証 |
+| 旧 `assets/aircraft/light_single.glb`（SHA-256 `8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9`） | 2026-08-21、Meshy text-to-3D（preview → refine） | 過去の記録: **有料プラン・再配布可**。生成時の根拠資料は未検証 |
 
 **2026-10-02 商用配布監査での留保:** 上のプラン記録は履歴として残していますが、
 生成 task、当日のプラン・適用規約、入力素材の権利を確認する資料は、今回の
@@ -175,10 +175,13 @@ MIT / Apache-2.0 に置き換えることはありません。配布対象と一
   同梱してください。これは Bevy のソースコード向け MIT / Apache 条件とは別です
 - **Tony McMapface:** `tonemapping_luts` が埋め込む LUT の、Tomasz Stachowiak による
   [MIT の原文](docs/release/licenses/TonyMcMapface-LICENSE-MIT) を保存しています
-- **AgX / Blender Filmic LUT:** 同じ feature で埋め込まれます。特定の上流素材の
-  権利根拠・版の記録には未解決項目があります。Bevy の crate ライセンス欄だけで
-  全素材が確認済みとはせず、[監査の残項目](docs/release/commercial-distribution-audit.md)
-  を商用配布前に解決してください
+- **Blender Filmic LUT:** 現在の候補は Tony と Filmic の正確な上流バイトを保持します。
+  Filmic の BSD-3-Clause 根拠と必要な表示は
+  [source decision](docs/release/filmic-asset-source-decision.md) と
+  [notice](docs/release/licenses/Blender-Filmic-NOTICE.txt) を参照してください。
+- **AgX LUT:** この候補から payload と埋め込みを除外しました。旧版の権利根拠は
+  未解決のままで、現在の候補でも AgX の選択は明示的に拒否します。
+  全体の依存・native 審査と配布承認は別途必要です。
 
 ## Original Swift Sport aircraft (2026-10-01)
 
@@ -211,3 +214,7 @@ dynamics and controls exactly; it does not add newly calibrated real-aircraft
 performance data. See [provenance, axes and validation](docs/aircraft/meadow-trainer.md).
 This addition does not alter the existing models' terms or the commercial
 candidate's asset allowlist, and does not constitute release or rights clearance.
+
+## Current original Light Single exterior (2026-10-08 candidate)
+
+The current `assets/aircraft/light_single.glb` is the project-original Meadow Trainer exterior, adapted for the existing Light Single -X/+Y model basis. The deterministic adapter, unchanged original source, license texts and independent asset review are retained in `tools/original-highwing/`. Its 140,840-byte SHA-256 is `b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc`. Geometry/materials and adapter use the project MIT OR Apache-2.0 terms. No old Meshy geometry or texture is incorporated. This does not relicense the old asset; its unresolved record above remains historical. See [candidate scope and remaining gates](docs/release/full-two-aircraft-source-candidate.md).

@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 ASSETS=ROOT/'assets/aircraft'
-BASELINE = {'assets/aircraft/.gitattributes': 'b2b276e35044f3217231b6d4874589137762a45efad7d42c92cf967fe396740f',
+CREATION_BASELINE = {'assets/aircraft/.gitattributes': 'b2b276e35044f3217231b6d4874589137762a45efad7d42c92cf967fe396740f',
  'assets/aircraft/light_single.glb': '8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9',
  'assets/aircraft/light_single.json': '8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25',
  'assets/aircraft/meadow_trainer.blend': '5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db',
@@ -23,6 +23,13 @@ BASELINE = {'assets/aircraft/.gitattributes': 'b2b276e35044f3217231b6d4874589137
  'assets/aircraft/swift_sport.glb': '9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1',
  'assets/aircraft/swift_sport.json': '319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663',
  'docs/examples/aircraft-profiles-v2/numerical-jet.json': '8339b68183ea31c228082e56984a39775f7f23df5633dd8a333fe06a65be7c74'}
+
+# Creation-time hashes above are historical evidence. These exact current
+# replacements are reviewed separately; no arbitrary alternate bytes are allowed.
+# See docs/release/full-two-aircraft-source-candidate.md.
+CURRENT_REPLACEMENTS = {'assets/aircraft/light_single.glb': 'b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc'}
+BASELINE = {**CREATION_BASELINE, **CURRENT_REPLACEMENTS}
+
 
 def require(condition, message):
     if not condition:
@@ -284,7 +291,7 @@ def main():
         'maximum_arbitrary_attitude_rebase_contact_error_m':max(transform_errors),
         'sea_level_static_thrust_n':thrust['cells'][8],
         'controls_match_initial_numerical_fixture':profile['controls']==fixture['controls'],
-        'preview_sha256':previews,'unchanged_baseline_sha256':BASELINE,
+        'preview_sha256':previews,'historical_creation_baseline_sha256':CREATION_BASELINE,'current_expected_sha256':BASELINE,
         'sha256':{p.name:sha(p) for p in [ASSETS/'kestrel_jet_trainer.glb',
            ASSETS/'kestrel_jet_trainer.blend',ASSETS/'kestrel_jet_trainer.json',
            ROOT/'tools/blender/build_kestrel_jet_trainer.py']}}

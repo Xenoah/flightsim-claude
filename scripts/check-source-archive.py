@@ -18,6 +18,15 @@ import zipfile
 
 DENIED_PATH = 'assets/aircraft/light_single.glb'
 DENIED_SHA256 = '8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9'
+ORIGINAL_HIGHWING_POLICY = 'original-highwing-v1'
+LEGACY_POLICY = 'legacy-meshy-excluded-v1'
+ORIGINAL_HIGHWING_SHA256 = 'b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc'
+ORIGINAL_HIGHWING_REQUIRED = (
+    'assets/aircraft/light_single.json', 'assets/aircraft/meadow_trainer.glb',
+    'tools/blender/build_meadow_trainer.py', 'tools/original-highwing/adapt_original_highwing.py',
+    'tools/original-highwing/evidence/source-manifest.json',
+    'docs/release/history/mesh-and-lut-boundary-d918943.json',
+)
 MAX_TOTAL = 512 * 1024 * 1024
 MAX_MEMBERS = 20000
 REQUIRED = ('LICENSE-MIT', 'LICENSE-APACHE', 'ATTRIBUTION.md',
@@ -122,12 +131,28 @@ def committed_archive(repo: Path, commit: str, fmt: str) -> tuple[str, bytes]:
              '--prefix=source/', full_commit], env=environment)
     return full_commit, payload
 
-def verify(repo: Path, commit: str, supplied: bytes | None = None, fmt: str = 'zip') -> dict:
+def verify(repo: Path, commit: str, supplied: bytes | None = None, fmt: str = 'zip', *, policy: str = LEGACY_POLICY) -> dict:
     full_commit, expected_bytes = committed_archive(repo, commit, fmt)
     expected = normalized_members(expected_bytes)
-    if DENIED_PATH in expected:
-        raise ValueError('commit export policy still includes unresolved model')
-    if any(path not in expected for path in REQUIRED):
+    if policy not in (LEGACY_POLICY, ORIGINAL_HIGHWING_POLICY):
+        raise ValueError('unknown source archive policy')
+    required = REQUIRED
+    if policy == LEGACY_POLICY:
+        if DENIED_PATH in expected:
+            raise ValueError('legacy commit export policy still includes excluded model path')
+    else:
+        # Explicit new policy: the old denied payload stays denied at every path.
+        # This path is admitted only for one reviewed project-original byte string.
+        if sha(expected.get(DENIED_PATH, b'')) != ORIGINAL_HIGHWING_SHA256:
+            raise ValueError('exact original high-wing replacement missing or changed')
+        if sha(expected.get('assets/aircraft/light_single.json', b'')) != '8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25':
+            raise ValueError('Light Single profile changed')
+        manifest = json.loads(expected['docs/release/asset-rights-manifest.json'])
+        records = [a for a in manifest['assets'] if a['path'] == DENIED_PATH]
+        if len(records) != 1 or records[0]['sha256'] != ORIGINAL_HIGHWING_SHA256 or records[0]['review_state'] != 'original_source_recorded':
+            raise ValueError('current original high-wing provenance record disagrees')
+        required += ORIGINAL_HIGHWING_REQUIRED
+    if any(path not in expected for path in required):
         raise ValueError('required source or notice missing')
     observed_bytes = expected_bytes if supplied is None else supplied
     observed = normalized_members(observed_bytes)
@@ -142,7 +167,11 @@ def verify(repo: Path, commit: str, supplied: bytes | None = None, fmt: str = 'z
             'evidence_scope': 'local_git_archive' if supplied is None else 'supplied_archive_bytes_origin_not_attested',
             'archive_sha256': sha(observed_bytes), 'archive_bytes': len(observed_bytes),
             'member_count': len(rows), 'members_sha256': sha(json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()),
-            'excluded_path': DENIED_PATH, 'identical_model_bytes_found': False,
+            'archive_policy': policy,
+            'excluded_path': DENIED_PATH if policy == LEGACY_POLICY else None,
+            'original_highwing_included': policy == ORIGINAL_HIGHWING_POLICY,
+            'forbidden_historical_model_sha256': DENIED_SHA256,
+            'identical_model_bytes_found': False,
             'hosted_origin_attested': False, 'publication_authorized': False}
 
 def main() -> None:
@@ -151,8 +180,9 @@ def main() -> None:
     parser.add_argument('--commit', required=True)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--format', choices=('zip', 'tar'), default='zip')
+    parser.add_argument('--policy', choices=(LEGACY_POLICY, ORIGINAL_HIGHWING_POLICY), default=LEGACY_POLICY)
     args = parser.parse_args()
-    result = verify(args.repo, args.commit, args.archive.read_bytes() if args.archive else None, args.format)
+    result = verify(args.repo, args.commit, args.archive.read_bytes() if args.archive else None, args.format, policy=args.policy)
     print(json.dumps(result, indent=2))
 if __name__ == '__main__':
     main()

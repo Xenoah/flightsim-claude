@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-exclude = ["vendor/osmpbf", "vendor/zune-jpeg", "vendor/bevy_pbr"]
+exclude = ["vendor/osmpbf", "vendor/zune-jpeg", "vendor/bevy_pbr", "vendor/bevy_core_pipeline"]
 members = [
     "crates/flightsim-core",
     "crates/flightsim-fdm",
@@ -121,3 +121,4 @@ codegen-units = 1
 [patch.crates-io]
 zune-jpeg = { path = "vendor/zune-jpeg" }
 bevy_pbr = { path = "vendor/bevy_pbr" }
+bevy_core_pipeline = { path = "vendor/bevy_core_pipeline" }

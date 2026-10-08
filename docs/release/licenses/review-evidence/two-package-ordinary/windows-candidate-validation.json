@@ -1,0 +1,99 @@
+{
+  "observed_at": "2026-10-08T20:01:08.324109+00:00",
+  "source_sha": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "source_tree": "94efd6ff4cc9c421dd5d4ef008e710c094e4a7f9",
+  "source_files": 2718,
+  "run_id": 37830779995,
+  "job_id": 113495242683,
+  "artifact_id": 11575502730,
+  "status": "engineering_checks_passed",
+  "portable_existing_evidence_validator": "passed",
+  "canonical_source_record_comparison": "exact semantic equality, including canonical Git blob and checkout byte hashes for all 2718 files; original exported source-inputs JSON byte hash retained",
+  "origin_windows_evidence_validator": "passed",
+  "required_acceptance_checks": {
+    "absent_light_single": {
+      "exit_code": 2,
+      "status": "passed"
+    },
+    "default_rejects_legacy": {
+      "exit_code": 2,
+      "status": "passed"
+    },
+    "default_swift": {
+      "exit_code": 0,
+      "log_sha256": "7c0a47bf25df7a41d4ede5981b24b2db32081109dada60e646182176f20bebb1",
+      "png": {
+        "height": 720,
+        "sha256": "c1ecabc6d40502535d9515d72cf4bdbfdf072a0e678e4c733a13a37255e5751a",
+        "width": 1280
+      },
+      "status": "passed"
+    },
+    "legacy_no_model": {
+      "exit_code": 0,
+      "fingerprint": "0505e6644bb29a53",
+      "historical_yaw_verified": false,
+      "identity_evidence": "legacy_partial",
+      "legacy_opt_in": true,
+      "log_sha256": "23ee4b83752cf7c4e14754bfd870b0610abe2d67195c73a77b109e992814cbb5",
+      "notice": "LEGACY PARTIAL IDENTITY: historical yaw_rate_p was not recorded or verified",
+      "status": "passed"
+    }
+  },
+  "replay_tests": {
+    "legacy_layout_test": {
+      "status": "passed",
+      "test": "replay_migration_tests::real_replay_notices_fit_narrow_resizes_and_keep_live_tutorial_clear"
+    },
+    "legacy_notice_test": {
+      "status": "passed",
+      "test": "replay_migration_tests::light_and_swift_all_versions_keep_exact_controls_clock_rewind_and_export"
+    },
+    "legacy_policy_test": {
+      "status": "passed",
+      "test": "replay_policy::tests::legacy_requires_explicit_choice_and_selected_complete_baseline"
+    }
+  },
+  "image": {
+    "path": "windows-candidate/default-swift.png",
+    "width": 1280,
+    "height": 720,
+    "bytes": 1007340,
+    "sha256": "c1ecabc6d40502535d9515d72cf4bdbfdf072a0e678e4c733a13a37255e5751a",
+    "distinct_rgb_colors": 6973,
+    "actual_pixels_inspected": true,
+    "observation": "Swift Sport rendered in chase view on a runway, with cloudy sky, flight HUD and help overlay. Ground/runway are dark, model and centerline are visible."
+  },
+  "readiness": "blocked",
+  "candidate_readiness_blockers": [
+    {
+      "category": "review",
+      "code": "DEPENDENCY_REVIEW_REQUIRED",
+      "message": "Notice collection does not select license alternatives or verify nested/platform obligations; reviewer record is required"
+    },
+    {
+      "category": "review",
+      "code": "DEPENDENCY_UNRESOLVED",
+      "message": "bevy-agx-lut: Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
+    },
+    {
+      "category": "review",
+      "code": "DEPENDENCY_UNRESOLVED",
+      "message": "constgebra@0.1.4: No root/declared primary license text found in exact packaged source or pinned supplements; nested third-party notices do not substitute for the crate's own grant"
+    },
+    {
+      "category": "review",
+      "code": "DEPENDENCY_UNRESOLVED",
+      "message": "hexf-parse@0.2.1: No root/declared primary license text found in exact packaged source or pinned supplements; nested third-party notices do not substitute for the crate's own grant"
+    }
+  ],
+  "release_authorized": false,
+  "whole_target_qualified": false,
+  "limits": [
+    "Engineering acceptance only; rights, dependency review and release authorization remain independent",
+    "Bundled AgX/Filmic LUTs remain enabled; Filmic has a scoped source-notice decision, while AgX rights and whole-target dependency review remain unresolved",
+    "Software D3D12 fallback is not physical GPU/controller/audio or Steam qualification",
+    "Legacy smoke checks the original partial fingerprint and replay startup under explicit baseline assumption; historical yaw_rate_p is not verified, nor whole-flight/cross-version reproduction"
+  ],
+  "executables_exported": false
+}

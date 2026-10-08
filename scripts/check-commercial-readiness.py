@@ -64,7 +64,8 @@ def check(repo: Path, bundle: Path | None, dependency_inventory: Path | None = N
         if not bundle.is_dir() or bundle.is_symlink():
             raise ValueError("bundle must be a regular directory")
         allowed_assets = set(manifest["commercial_external_assets"])
-        blocked_hashes = {a["sha256"] for a in assets.values() if a["review_state"] == "unresolved"}
+        blocked_hashes = {a["sha256"] for a in [*assets.values(), *manifest.get("historical_excluded_assets", [])]
+                          if a["review_state"] == "unresolved"}
         for path in sorted(bundle.rglob("*")):
             relative = path.relative_to(bundle).as_posix()
             safe_path(bundle, relative)

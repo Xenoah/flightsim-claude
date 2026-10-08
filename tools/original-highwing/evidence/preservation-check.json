@@ -1,0 +1,10 @@
+{
+  "repository": "/workspace/scratch/193080ebc0b3/flightsim-runtime-admission-remote",
+  "head": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "git_status_porcelain": "",
+  "source_snapshot_hashes_match": true,
+  "production_light_profile_unchanged": true,
+  "production_assets_and_source_unchanged": true,
+  "rust_or_shared_target_used": false,
+  "installed_blender_sha256": "0dfe9af0f3e67643ecf15327fa5e14e7315f61d1a81afdcafe76a71b1918e2b4"
+}

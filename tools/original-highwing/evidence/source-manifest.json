@@ -1,0 +1,46 @@
+{
+  "repository": "Xenoah/flightsim-claude",
+  "commit": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "source_files": {
+    "assets/aircraft/meadow_trainer.glb": {
+      "local_copy": "source/meadow_trainer.glb",
+      "sha256": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+      "bytes": 140864
+    },
+    "assets/aircraft/meadow_trainer.blend": {
+      "local_copy": "source/meadow_trainer.blend",
+      "sha256": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+      "bytes": 148936
+    },
+    "assets/aircraft/meadow_trainer.json": {
+      "local_copy": "source/meadow_trainer.json",
+      "sha256": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+      "bytes": 2739
+    },
+    "tools/blender/build_meadow_trainer.py": {
+      "local_copy": "source/build_meadow_trainer.py",
+      "sha256": "3b7ed8696b0e2d4a656645ceca9b5acddfd3242047cee698f98605eb68d49a1d",
+      "bytes": 19197
+    },
+    "tools/blender/validate_meadow_trainer.py": {
+      "local_copy": "source/validate_meadow_trainer.py",
+      "sha256": "85dc707800b808d66c1bd24a65f6ca4cf56cf6394a317487fa943271379c6bd1",
+      "bytes": 10517
+    },
+    "assets/aircraft/light_single.json": {
+      "local_copy": "source/light_single.json",
+      "sha256": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+      "bytes": 2734
+    },
+    "LICENSE-MIT": {
+      "local_copy": "source/LICENSE-MIT",
+      "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+      "bytes": 1086
+    },
+    "LICENSE-APACHE": {
+      "local_copy": "source/LICENSE-APACHE",
+      "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+      "bytes": 11359
+    }
+  }
+}

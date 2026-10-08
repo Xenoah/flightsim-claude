@@ -85,6 +85,10 @@ LIBRARY_ORIGINS = {'rust_target_libraries', 'cargo_release_deps', 'vc_runtime_x6
 TRACE_COUNTERS = ('total_lines', 'link_module_lines', 'recognized_info_lines', 'quoted_command_lines',
                   'parsed_command_lines', 'rejected_command_lines', 'output_switch_commands',
                   'matching_output_commands')
+OUTPUT_ASSOCIATION = 'admitted_build_root_exact_content_v1'
+OUTPUT_COUNTERS = ('candidate_commands', 'missing_outputs', 'mismatched_outputs')
+MAX_OUTPUT_CANDIDATES = 64
+MAX_OUTPUT_HASH_BYTES = MAX_TOTAL
 
 
 def require(condition, message):
@@ -521,7 +525,21 @@ def library_path_origin(value, collector, executable):
     return {'origin': 'unclassified', 'version': None}
 
 
-def final_link_facts(collector, trace=None, executable=None):
+def admitted_link_output(value, executable):
+    """Lexical admission only; file/reparse checks follow before any read.
+
+    Also works on PureWindowsPath during offline origin validation. Do not
+    resolve a path through links, accept parent aliases, or infer from a name.
+    """
+    raw = str(value).replace('\\', '/')
+    path = type(executable)(value)
+    return (path.is_absolute() and not raw.startswith('//')
+            and not any(part in ('.', '..') for part in raw.split('/'))
+            and re.fullmatch(r'[A-Za-z0-9_.+-]+\.exe', path.name, re.I) is not None
+            and path.parent in (executable.parent, executable.parent / 'deps'))
+
+
+def final_link_facts(collector, trace=None, executable=None, *, legacy_output_names=False):
     """Bind one logged constructed final-app command to an audited executable.
 
     The caller must first audit the frozen build/executable with the existing
@@ -535,6 +553,8 @@ def final_link_facts(collector, trace=None, executable=None):
               'constructed_final_command_observed': False, 'linker_process_execution_observed': False,
               'requested_libraries': [], 'rlib_input_names': [], 'explicit_library_paths': [],
               'actual_static_membership': UNKNOWN, 'implicit_sdk_selection': UNKNOWN}
+    if not legacy_output_names:
+        result['output_association'] = {'method': OUTPUT_ASSOCIATION, 'scan': None}
     if trace is None and executable is None:
         return result
     require(trace is not None and executable is not None, 'trace and audited executable are required together')
@@ -565,6 +585,7 @@ def final_link_facts(collector, trace=None, executable=None):
     deps_output = executable.parent / 'deps' / ('flightsim_app-' + suffix + '.exe')
     matches, malformed = [], False
     observation = dict.fromkeys(TRACE_COUNTERS, 0)
+    output_scan, hashed_bytes = dict.fromkeys(OUTPUT_COUNTERS, 0), 0
     with trace.open('r', encoding='utf-8-sig') as stream:
         while line := stream.readline(MAX_LINK_LINE + 2):
             require(len(line) <= MAX_LINK_LINE + 1, 'trace line budget exceeded')
@@ -587,20 +608,56 @@ def final_link_facts(collector, trace=None, executable=None):
             outputs = [arg[5:] for arg in args[1:] if arg.upper().startswith('/OUT:')]
             if outputs:
                 observation['output_switch_commands'] += 1
-            if any(Path(path).is_absolute() and (same_path(path, executable) or same_path(path, deps_output)) for path in outputs):
+            if legacy_output_names and any(Path(path).is_absolute() and (same_path(path, executable) or same_path(path, deps_output)) for path in outputs):
                 observation['matching_output_commands'] += 1
                 if len(outputs) != 1:
                     malformed = True
                 else:
                     matches.append((args, Path(outputs[0])))
+            elif not legacy_output_names and outputs:
+                if len(outputs) != 1:
+                    malformed = True
+                    continue
+                if not admitted_link_output(outputs[0], executable):
+                    continue
+                output = Path(outputs[0])
+                output_scan['candidate_commands'] += 1
+                require(output_scan['candidate_commands'] <= MAX_OUTPUT_CANDIDATES,
+                        'candidate output budget exceeded')
+                no_links(output)
+                try:
+                    info = output.stat()
+                    require(stat.S_ISREG(info.st_mode), 'candidate output is not a regular file')
+                    if info.st_size != result['executable']['record']['bytes']:
+                        output_scan['mismatched_outputs'] += 1
+                        continue
+                    hashed_bytes += info.st_size
+                    require(hashed_bytes <= MAX_OUTPUT_HASH_BYTES, 'candidate hash budget exceeded')
+                    candidate = file_record(output, result['executable']['record']['bytes'])
+                except (FileNotFoundError, PermissionError):
+                    output_scan['missing_outputs'] += 1
+                    continue
+                if candidate != result['executable']['record']:
+                    output_scan['mismatched_outputs'] += 1
+                    continue
+                observation['matching_output_commands'] += 1
+                matches.append((args, output))
             require(len(matches) <= 16, 'matching command budget exceeded')
     # Counts diagnose unsupported prefixes/quoting without publishing any
     # command text, path, environment, or inferred explanation of a mismatch.
     result['trace_observation'] = observation
+    if not legacy_output_names:
+        result['output_association']['scan'] = output_scan
     if malformed:
         result['reason'] = 'unparseable_command'; return result
     if len(matches) != 1:
-        result['reason'] = 'no_matching_command' if not matches else 'ambiguous_command'; return result
+        result['reason'] = 'no_matching_command' if not matches else 'ambiguous_command'
+        if not matches and not legacy_output_names:
+            if output_scan['mismatched_outputs']:
+                result['reason'] = 'output_hash_mismatch'
+            elif output_scan['missing_outputs']:
+                result['reason'] = 'output_identity_unavailable'
+        return result
     args, output = matches[0]
     result['link_output'] = collector.observe(output)
     if result['link_output']['status'] != 'observed':
@@ -750,7 +807,11 @@ def validate_origins(manifest, records, query_text):
             if link['link_output'] is not None and link['link_output']['status'] == 'observed':
                 output = pure(records[link['link_output']['evidence_id']]['source'])
                 suffix = fingerprint.parent.name.removeprefix('flightsim-app-')
-                require(output in (executable, executable.parent / 'deps' / ('flightsim_app-' + suffix + '.exe')), 'foreign final linker output')
+                if 'output_association' in link:
+                    require(admitted_link_output(records[link['link_output']['evidence_id']]['source'], executable),
+                            'foreign final linker output')
+                else:
+                    require(output in (executable, executable.parent / 'deps' / ('flightsim_app-' + suffix + '.exe')), 'foreign final linker output')
                 bind(link['link_output'], output)
         if link['linker'] is not None and link['linker']['status'] == 'observed':
             source = pure(records[link['linker']['evidence_id']]['source'])
@@ -876,7 +937,7 @@ def validate_projection(value):
             require(library['family'] in SDK_LIBS and library['name'] in SDK_LIBS[library['family']], 'unexpected SDK library')
             public_observation({k: v for k, v in library.items() if k not in ('family', 'name')})
     link = value['final_link']
-    require(set(link) - {'trace_observation'} == {'status', 'reason', 'trace', 'executable', 'fingerprint', 'link_output', 'linker',
+    require(set(link) - {'trace_observation', 'output_association'} == {'status', 'reason', 'trace', 'executable', 'fingerprint', 'link_output', 'linker',
                          'installed_candidate_evidence_id',
                          'constructed_final_command_observed', 'linker_process_execution_observed',
                          'requested_libraries', 'rlib_input_names', 'explicit_library_paths',
@@ -912,6 +973,20 @@ def validate_projection(value):
             if link['status'] == 'observed':
                 require(observation['matching_output_commands'] == 1 and observation['rejected_command_lines'] == 0,
                         'observed command lacks unique parsed output')
+    if 'output_association' in link:
+        association = link['output_association']
+        require(type(association) is dict and set(association) == {'method', 'scan'}
+                and association['method'] == OUTPUT_ASSOCIATION and 'trace_observation' in link,
+                'invalid output association method')
+        scan, observation = association['scan'], link['trace_observation']
+        require((scan is None) == (observation is None), 'unbound output association scan')
+        if scan is not None:
+            require(type(scan) is dict and set(scan) == set(OUTPUT_COUNTERS)
+                    and all(type(count) is int and 0 <= count <= MAX_OUTPUT_CANDIDATES for count in scan.values()),
+                    'invalid output association counters')
+            require(scan['candidate_commands'] <= observation['output_switch_commands']
+                    and scan['candidate_commands'] == scan['missing_outputs'] + scan['mismatched_outputs']
+                    + observation['matching_output_commands'], 'inconsistent output association counts')
     for key, pattern in (('requested_libraries', r'[A-Za-z0-9_.+-]+\.lib'),
                          ('rlib_input_names', r'lib[A-Za-z0-9_]+-[0-9a-f]+\.rlib')):
         require(type(link[key]) is list and len(link[key]) <= 1024 and sorted(set(link[key])) == link[key], 'invalid link input list')
@@ -1001,8 +1076,13 @@ def validate_private(private, projection, *, recheck_installed=True):
     The default detects changed rlibs/linkers/libraries as well as raw evidence.
     Offline revalidation may explicitly skip installed files; it then verifies
     only captured receipts/snapshots and cannot assert current machine identity.
+    A new content-based positive output association requires original build
+    files for fresh replay; receipts alone cannot establish that association.
     """
     validate_projection(projection)
+    require(recheck_installed or 'output_association' not in projection['final_link']
+            or projection['final_link']['status'] != 'observed',
+            'content output association requires original build files for replay')
     private = Path(private)
     require(file_record(private / PRIVATE_NAME, MAX_PRIVATE) == projection['private_manifest'], 'private manifest changed')
     raw = (private / PRIVATE_NAME).read_bytes()
@@ -1080,7 +1160,8 @@ def validate_private(private, projection, *, recheck_installed=True):
         replay = ReplayCollector(private, manifest)
         require(rust_facts(replay, prefix, recipe_args) == manifest['rust'], 'Rust discoveries changed')
         require(microsoft_facts(replay) == manifest['microsoft'], 'Microsoft discoveries changed')
-        replay_link = final_link_facts(replay, manifest['linker_inputs']['trace'], manifest['linker_inputs']['executable'])
+        replay_link = final_link_facts(replay, manifest['linker_inputs']['trace'], manifest['linker_inputs']['executable'],
+                                       legacy_output_names='output_association' not in manifest['final_link'])
         if 'trace_observation' not in manifest['final_link']:
             del replay_link['trace_observation']
         require(replay_link == manifest['final_link'], 'final link observations changed')

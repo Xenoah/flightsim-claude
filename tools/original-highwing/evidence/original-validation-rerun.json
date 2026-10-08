@@ -1,0 +1,98 @@
+{
+  "asset": "Meadow Trainer",
+  "status": "asset contract PASS; FlightSim checks not run by this script",
+  "glb_bytes": 140864,
+  "mesh_count": 46,
+  "primitive_count": 46,
+  "material_count": 8,
+  "exported_vertices": 3759,
+  "triangles": 5756,
+  "gltf_bounds_m": {
+    "min": [
+      -5.5,
+      -1.0,
+      -5.050000190734863
+    ],
+    "max": [
+      5.5,
+      2.2200000286102295,
+      3.250000238418579
+    ],
+    "extents": [
+      11.0,
+      3.2200000286102295,
+      8.300000429153442
+    ]
+  },
+  "model_fit_scale": 0.9999999482947688,
+  "wheel_contacts": [
+    {
+      "mesh": "Nose tyre",
+      "actual_body_contact_m": [
+        1.600000023841858,
+        -0.0,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        1.6,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "mesh": "Port main tyre",
+      "actual_body_contact_m": [
+        -0.7999999821186066,
+        -1.300000011920929,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        -0.8,
+        -1.3,
+        1.0
+      ]
+    },
+    {
+      "mesh": "Starboard main tyre",
+      "actual_body_contact_m": [
+        -0.7999999821186066,
+        1.300000011920929,
+        1.0
+      ],
+      "expected_body_contact_m": [
+        -0.8,
+        1.3,
+        1.0
+      ]
+    }
+  ],
+  "camera_eye_body_m": [
+    0.6,
+    -0.25,
+    -0.9
+  ],
+  "camera_eye_gltf_m": [
+    0.25,
+    0.9,
+    0.6
+  ],
+  "camera_eye_and_cg_inside_fuselage": true,
+  "preview_sha256": {
+    "meadow-trainer-three-quarter.jpg": "1ef80f070b9db8072a2e1bd14974f20d73a2dfd9a9e2cc3b4129c7c823d16d1a",
+    "meadow-trainer-starboard.jpg": "7cfffebac361184fefaa5e2dc6ef49aa2712f54200488889de894546d558c15c",
+    "meadow-trainer-front.jpg": "470d12f9113929201e1ac3658b3879e60a77cedba2b402c15ac347dbcd4b7c0e"
+  },
+  "unchanged_baseline_sha256": {
+    "light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+    "light_single.glb": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+    "swift_sport.json": "319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663",
+    "swift_sport.glb": "9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1",
+    "swift_sport.blend": "29a25578733be83d25ccff12c117b29124b57b5e69e8356bd8189d128e514e77"
+  },
+  "sha256": {
+    "meadow_trainer.glb": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+    "meadow_trainer.blend": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+    "meadow_trainer.json": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+    "build_meadow_trainer.py": "3b7ed8696b0e2d4a656645ceca9b5acddfd3242047cee698f98605eb68d49a1d"
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "kind": "generated_source_provenance_summary",
+  "package": "constgebra@0.1.4",
+  "source": "https://github.com/knickish/constgebra/tree/eae8e094e5779f42f1db2a7adf9036aa33744bc8",
+  "archive_source": "https://static.crates.io/crates/constgebra/constgebra-0.1.4.crate",
+  "archive_sha256": "e1aaf9b65849a68662ac6c0810c8893a765c960b907dd7cfab9c4a50bf764fbc",
+  "revision": "eae8e094e5779f42f1db2a7adf9036aa33744bc8",
+  "declared_license_expression": "MIT OR Apache-2.0",
+  "tree": [
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "git_object_sha1": "0a62e8a8e141ab9d0f261130a8fe7f4882f79f32",
+      "bytes": null
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "git_object_sha1": "a451582ff9228fcf96989751f9bf744d9b794958",
+      "bytes": null
+    },
+    {
+      "path": ".github/workflows/rust.yml",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "18d908f7a8051e5af934b197ff9ab0ff758a7757",
+      "bytes": 2321
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "4fffb2f89cbd8f2169ce9914bd16bd43785bb368",
+      "bytes": 20
+    },
+    {
+      "path": "Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "d2700e177a7f45ee2554f267bb3e8d30032529c9",
+      "bytes": 493
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "a6fe468d7eec8ad04629df282d308a627e18781f",
+      "bytes": 960
+    },
+    {
+      "path": "src",
+      "mode": "040000",
+      "type": "tree",
+      "git_object_sha1": "b088d073946e33e341af5e129591d5c034641b64",
+      "bytes": null
+    },
+    {
+      "path": "src/comptime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "d2ece9f40fdc0c147f908f6d335211596f7d9abf",
+      "bytes": 37676
+    },
+    {
+      "path": "src/lib.rs",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "5fe0faeaba2d57a0cbacd6978b9791653bb64fa5",
+      "bytes": 153
+    },
+    {
+      "path": "src/runtime.rs",
+      "mode": "100644",
+      "type": "blob",
+      "git_object_sha1": "2e75cee43fdcfd6092da32b80b58589065c7a096",
+      "bytes": 40888
+    }
+  ],
+  "history": [
+    {
+      "revision": "eae8e094e5779f42f1db2a7adf9036aa33744bc8",
+      "author_login": "knickish",
+      "authored_at": "2024-03-15T23:31:42Z",
+      "source": "https://github.com/knickish/constgebra/commit/eae8e094e5779f42f1db2a7adf9036aa33744bc8"
+    },
+    {
+      "revision": "dbaf64abc97e2192675d79f50353f06dda8c8bd6",
+      "author_login": "knickish",
+      "authored_at": "2024-03-15T22:56:05Z",
+      "source": "https://github.com/knickish/constgebra/commit/dbaf64abc97e2192675d79f50353f06dda8c8bd6"
+    },
+    {
+      "revision": "b2bf3c6e538bdd710f556e852e0433d5822eb89b",
+      "author_login": "knickish",
+      "authored_at": "2023-05-01T03:43:48Z",
+      "source": "https://github.com/knickish/constgebra/commit/b2bf3c6e538bdd710f556e852e0433d5822eb89b"
+    },
+    {
+      "revision": "25bcf550cdcc75db0374a7491cc1ffec734359fb",
+      "author_login": "knickish",
+      "authored_at": "2023-04-30T22:12:40Z",
+      "source": "https://github.com/knickish/constgebra/commit/25bcf550cdcc75db0374a7491cc1ffec734359fb"
+    },
+    {
+      "revision": "10ab41112efb83e0a9ef35d9636537f286bed0c4",
+      "author_login": "knickish",
+      "authored_at": "2023-04-30T19:34:25Z",
+      "source": "https://github.com/knickish/constgebra/commit/10ab41112efb83e0a9ef35d9636537f286bed0c4"
+    },
+    {
+      "revision": "72bfaa010a29bc5039f0590aec618b45a8e24faa",
+      "author_login": "elpiel",
+      "authored_at": "2023-04-15T07:51:59Z",
+      "source": "https://github.com/knickish/constgebra/commit/72bfaa010a29bc5039f0590aec618b45a8e24faa"
+    },
+    {
+      "revision": "f36f802ed1bf4d95cd75a821f4a5a90131bcf454",
+      "author_login": "knickish",
+      "authored_at": "2023-04-13T23:20:38Z",
+      "source": "https://github.com/knickish/constgebra/commit/f36f802ed1bf4d95cd75a821f4a5a90131bcf454"
+    },
+    {
+      "revision": "317b3b4e7a140a0c26613c3b207f2743a5da8c93",
+      "author_login": "knickish",
+      "authored_at": "2023-04-13T22:38:58Z",
+      "source": "https://github.com/knickish/constgebra/commit/317b3b4e7a140a0c26613c3b207f2743a5da8c93"
+    },
+    {
+      "revision": "8264c3521e9c5b2dce85859190979d9313ce1e9c",
+      "author_login": "knickish",
+      "authored_at": "2023-04-08T01:12:29Z",
+      "source": "https://github.com/knickish/constgebra/commit/8264c3521e9c5b2dce85859190979d9313ce1e9c"
+    },
+    {
+      "revision": "b6ad0464fc3d0b5932cdb3075c8aea47e1b00341",
+      "author_login": "knickish",
+      "authored_at": "2023-02-18T17:33:44Z",
+      "source": "https://github.com/knickish/constgebra/commit/b6ad0464fc3d0b5932cdb3075c8aea47e1b00341"
+    },
+    {
+      "revision": "116616f8954ee687692c4d3f15225b55d407c75c",
+      "author_login": "knickish",
+      "authored_at": "2023-02-17T00:11:21Z",
+      "source": "https://github.com/knickish/constgebra/commit/116616f8954ee687692c4d3f15225b55d407c75c"
+    },
+    {
+      "revision": "15d6e250a0e3bf46ef9c91b2d844548eba2928e8",
+      "author_login": "knickish",
+      "authored_at": "2023-02-17T00:01:18Z",
+      "source": "https://github.com/knickish/constgebra/commit/15d6e250a0e3bf46ef9c91b2d844548eba2928e8"
+    },
+    {
+      "revision": "9a3971e03bd56b386212eb4f0bfd2f585213152b",
+      "author_login": "knickish",
+      "authored_at": "2023-02-12T01:16:53Z",
+      "source": "https://github.com/knickish/constgebra/commit/9a3971e03bd56b386212eb4f0bfd2f585213152b"
+    }
+  ],
+  "description": "Factual projection of pinned upstream tree and commit history. No upstream discussion or commit-message quotations. The upstream Cargo manifest is the package-specific licensing declaration; separately supplied standard license text is not an upstream-published notice.",
+  "archive_files": [
+    {
+      "path": "package/.cargo_vcs_info.json",
+      "bytes": 94,
+      "sha256": "ef23343f75c1ea4dd39e5d3cc273f4caed28de8e22188b975a99dec1f83833b5",
+      "git_blob_sha1": "e8421abce8263282c7f8478718b11bd443d62ff5"
+    },
+    {
+      "path": "package/.github/workflows/rust.yml",
+      "bytes": 2321,
+      "sha256": "4138269590e91810602eb9edb08a56eb2f4f0d1110d1cb4a9c48af8c67ece725",
+      "git_blob_sha1": "18d908f7a8051e5af934b197ff9ab0ff758a7757"
+    },
+    {
+      "path": "package/.gitignore",
+      "bytes": 20,
+      "sha256": "c1e953ee360e77de57f7b02f1b7880bd6a3dc22d1a69e953c2ac2c52cc52d247",
+      "git_blob_sha1": "4fffb2f89cbd8f2169ce9914bd16bd43785bb368"
+    },
+    {
+      "path": "package/Cargo.toml",
+      "bytes": 906,
+      "sha256": "4059f220c736b6f8462f439079a05a7fda77fffb6215bc9e955b6afca3b9209d",
+      "git_blob_sha1": "26cf590f46a0505969359434401f109648065be4"
+    },
+    {
+      "path": "package/Cargo.toml.orig",
+      "bytes": 493,
+      "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c",
+      "git_blob_sha1": "d2700e177a7f45ee2554f267bb3e8d30032529c9"
+    },
+    {
+      "path": "package/README.md",
+      "bytes": 960,
+      "sha256": "ca7fd771ad7ead0110483a8d3ff1afe74c9243b76cfd2d29ba3c538a86fc1ad6",
+      "git_blob_sha1": "a6fe468d7eec8ad04629df282d308a627e18781f"
+    },
+    {
+      "path": "package/src/comptime.rs",
+      "bytes": 37676,
+      "sha256": "1cffd04787a6e52a241cb8914d939b702613d08c265b4e1ceb7578ae977007de",
+      "git_blob_sha1": "d2ece9f40fdc0c147f908f6d335211596f7d9abf"
+    },
+    {
+      "path": "package/src/lib.rs",
+      "bytes": 153,
+      "sha256": "6619bac32b6998490128a6ba0ca0e5fb47b0d19deff0c3fff0c9479e08d57307",
+      "git_blob_sha1": "5fe0faeaba2d57a0cbacd6978b9791653bb64fa5"
+    },
+    {
+      "path": "package/src/runtime.rs",
+      "bytes": 40888,
+      "sha256": "1b123a6429ec21f846fbe0a9b98fd2fd153239484b01272736f9cb93b4b8e07b",
+      "git_blob_sha1": "2e75cee43fdcfd6092da32b80b58589065c7a096"
+    }
+  ]
+}

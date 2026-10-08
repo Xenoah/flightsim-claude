@@ -1,0 +1,365 @@
+Extensions: writing cache failed ([Errno 30] Read-only file system: '/home/agent/.config/blender').
+06:34:57 | INFO: Data are loaded, start creating Blender stuff
+06:34:57 | INFO: Blender create Mesh node Fuselage | CG at origin
+06:34:57 | INFO: Blender create Mesh node Port forward cabin window
+06:34:57 | INFO: Blender create Mesh node Port rear cabin window
+06:34:57 | INFO: Blender create Mesh node Port windshield
+06:34:57 | INFO: Blender create Mesh node Port teal belt
+06:34:57 | INFO: Blender create Mesh node Cylinder
+06:34:57 | INFO: Blender create Mesh node Cylinder.001
+06:34:57 | INFO: Blender create Mesh node Starboard forward cabin window
+06:34:57 | INFO: Blender create Mesh node Starboard rear cabin window
+06:34:57 | INFO: Blender create Mesh node Starboard windshield
+06:34:57 | INFO: Blender create Mesh node Starboard teal belt
+06:34:57 | INFO: Blender create Mesh node Cylinder.002
+06:34:57 | INFO: Blender create Mesh node Cylinder.003
+06:34:57 | INFO: Blender create Mesh node Port high wing
+06:34:57 | INFO: Blender create Mesh node Port amber wingtip
+06:34:57 | INFO: Blender create Mesh node Cylinder.004
+06:34:57 | INFO: Blender create Mesh node Cylinder.005
+06:34:57 | INFO: Blender create Mesh node Cylinder.006
+06:34:57 | INFO: Blender create Mesh node Cylinder.007
+06:34:57 | INFO: Blender create Mesh node Sphere
+06:34:57 | INFO: Blender create Mesh node Starboard high wing
+06:34:57 | INFO: Blender create Mesh node Starboard amber wingtip
+06:34:57 | INFO: Blender create Mesh node Cylinder.008
+06:34:57 | INFO: Blender create Mesh node Cylinder.009
+06:34:57 | INFO: Blender create Mesh node Cylinder.010
+06:34:57 | INFO: Blender create Mesh node Cylinder.011
+06:34:57 | INFO: Blender create Mesh node Sphere.001
+06:34:57 | INFO: Blender create Mesh node Port tailplane
+06:34:57 | INFO: Blender create Mesh node Cylinder.012
+06:34:57 | INFO: Blender create Mesh node Starboard tailplane
+06:34:57 | INFO: Blender create Mesh node Cylinder.013
+06:34:57 | INFO: Blender create Mesh node Swept vertical fin
+06:34:57 | INFO: Blender create Mesh node Port fin amber flash
+06:34:57 | INFO: Blender create Mesh node Starboard fin amber flash
+06:34:57 | INFO: Blender create Mesh node Cylinder.014
+06:34:57 | INFO: Blender create Mesh node Nose tyre
+06:34:57 | INFO: Blender create Mesh node Cylinder.015
+06:34:57 | INFO: Blender create Mesh node Cylinder.016
+06:34:57 | INFO: Blender create Mesh node Port main tyre
+06:34:57 | INFO: Blender create Mesh node Cylinder.017
+06:34:57 | INFO: Blender create Mesh node Cylinder.018
+06:34:57 | INFO: Blender create Mesh node Starboard main tyre
+06:34:57 | INFO: Blender create Mesh node Cylinder.019
+06:34:57 | INFO: Blender create Mesh node Sphere.002
+06:34:57 | INFO: Blender create Mesh node Lower propeller blade
+06:34:57 | INFO: Blender create Mesh node Upper propeller blade
+06:34:57 | INFO: glTF import finished in 0.04s
+Blender 4.3.2
+Fra:1 Mem:14.98M (Peak 14.98M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Fuselage | CG at origin
+Fra:1 Mem:17.00M (Peak 17.00M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | QA ground, never exported
+Fra:1 Mem:17.00M (Peak 17.00M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Upper propeller blade
+Fra:1 Mem:17.06M (Peak 17.06M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Lower propeller blade
+Fra:1 Mem:17.09M (Peak 17.09M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Spinner
+Fra:1 Mem:17.13M (Peak 17.13M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main axle and hub
+Fra:1 Mem:17.14M (Peak 17.14M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port forward cabin window
+Fra:1 Mem:17.14M (Peak 17.14M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main tyre
+Fra:1 Mem:17.18M (Peak 17.18M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main gear leg
+Fra:1 Mem:17.19M (Peak 17.19M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main axle and hub
+Fra:1 Mem:17.21M (Peak 17.21M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main tyre
+Fra:1 Mem:17.24M (Peak 17.24M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main gear leg
+Fra:1 Mem:17.24M (Peak 17.24M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear cabin window
+Fra:1 Mem:17.24M (Peak 17.24M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose axle and hub
+Fra:1 Mem:17.27M (Peak 17.27M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose tyre
+Fra:1 Mem:17.29M (Peak 17.29M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port windshield
+Fra:1 Mem:17.30M (Peak 17.30M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port teal belt
+Fra:1 Mem:17.30M (Peak 17.30M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose gear leg
+Fra:1 Mem:17.31M (Peak 17.31M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door sill
+Fra:1 Mem:17.32M (Peak 17.32M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard fin amber flash
+Fra:1 Mem:17.32M (Peak 17.32M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door handle
+Fra:1 Mem:17.32M (Peak 17.32M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port fin amber flash
+Fra:1 Mem:17.32M (Peak 17.32M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard forward cabin window
+Fra:1 Mem:17.33M (Peak 17.33M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Swept vertical fin
+Fra:1 Mem:17.35M (Peak 17.35M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard elevator hinge
+Fra:1 Mem:17.36M (Peak 17.36M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard tailplane
+Fra:1 Mem:17.35M (Peak 17.36M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear cabin window
+Fra:1 Mem:17.39M (Peak 17.39M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port elevator hinge
+Fra:1 Mem:17.39M (Peak 17.39M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port tailplane
+Fra:1 Mem:17.38M (Peak 17.39M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard windshield
+Fra:1 Mem:17.40M (Peak 17.40M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard teal belt
+Fra:1 Mem:17.41M (Peak 17.41M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard navigation lens
+Fra:1 Mem:17.42M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door sill
+Fra:1 Mem:17.44M (Peak 17.44M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door handle
+Fra:1 Mem:17.44M (Peak 17.44M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port high wing
+Fra:1 Mem:17.44M (Peak 17.44M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard aileron hinge
+Fra:1 Mem:17.47M (Peak 17.47M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard flap hinge
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear lift strut
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard wing lift strut
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port amber wingtip
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard amber wingtip
+Fra:1 Mem:17.52M (Peak 17.52M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port wing lift strut
+Fra:1 Mem:17.53M (Peak 17.53M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard high wing
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear lift strut
+Fra:1 Mem:17.57M (Peak 17.57M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port flap hinge
+Fra:1 Mem:17.58M (Peak 17.58M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port aileron hinge
+Fra:1 Mem:17.58M (Peak 17.58M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port navigation lens
+Fra:1 Mem:17.60M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Initializing
+Fra:1 Mem:15.63M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Waiting for render to start
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Loading render kernels (may take a few minutes the first time)
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Scene
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Shaders
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Procedurals
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Background
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Camera
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Meshes Flags
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects | Copying Transformations to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Objects | Applying Static Transformations
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems | Copying Particles to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Meshes
+Fra:1 Mem:15.82M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Computing attributes
+Fra:1 Mem:15.88M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Copying Attributes to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building BVH
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.02 | Mem:0.24M, Peak:0.24M | Scene, ViewLayer | Updating Scene BVH | Building BVH 0%
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.02 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Scene BVH | Copying BVH to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.02 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Computing normals
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Copying Mesh to device
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Objects Flags
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Primitive Offsets
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Images
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Camera Volume
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights | Computing tree
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Integrator
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Film
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.02 | Mem:0.67M, Peak:0.75M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Baking
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Device | Writing constant memory
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.02 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Sample 0/32
+Fra:1 Mem:49.07M (Peak 49.07M) | Time:00:00.97 | Remaining:00:29.44 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 1/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:27.57 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 32/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:27.57 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Finished
+Saved: '/workspace/scratch/193080ebc0b3/original-highwing-light-single-candidate/previews/candidate-three-quarter.jpg'
+Time: 00:27.61 (Saving: 00:00.03)
+
+Fra:1 Mem:17.31M (Peak 17.31M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Fuselage | CG at origin
+Fra:1 Mem:17.35M (Peak 17.35M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port forward cabin window
+Fra:1 Mem:17.36M (Peak 17.36M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear cabin window
+Fra:1 Mem:17.36M (Peak 17.36M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port windshield
+Fra:1 Mem:17.37M (Peak 17.37M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port teal belt
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door sill
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | QA ground, never exported
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door handle
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Upper propeller blade
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard forward cabin window
+Fra:1 Mem:17.40M (Peak 17.40M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Lower propeller blade
+Fra:1 Mem:17.42M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Spinner
+Fra:1 Mem:17.41M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main axle and hub
+Fra:1 Mem:17.41M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear cabin window
+Fra:1 Mem:17.43M (Peak 17.43M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main tyre
+Fra:1 Mem:17.45M (Peak 17.45M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main gear leg
+Fra:1 Mem:17.46M (Peak 17.46M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main axle and hub
+Fra:1 Mem:17.46M (Peak 17.46M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main tyre
+Fra:1 Mem:17.45M (Peak 17.46M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard windshield
+Fra:1 Mem:17.46M (Peak 17.46M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard teal belt
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main gear leg
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door sill
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose axle and hub
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose tyre
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose gear leg
+Fra:1 Mem:17.50M (Peak 17.50M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard fin amber flash
+Fra:1 Mem:17.50M (Peak 17.50M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port fin amber flash
+Fra:1 Mem:17.50M (Peak 17.50M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Swept vertical fin
+Fra:1 Mem:17.51M (Peak 17.51M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door handle
+Fra:1 Mem:17.51M (Peak 17.51M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port high wing
+Fra:1 Mem:17.50M (Peak 17.51M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard elevator hinge
+Fra:1 Mem:17.52M (Peak 17.52M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard tailplane
+Fra:1 Mem:17.52M (Peak 17.52M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port amber wingtip
+Fra:1 Mem:17.53M (Peak 17.53M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port elevator hinge
+Fra:1 Mem:17.53M (Peak 17.53M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port wing lift strut
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port tailplane
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear lift strut
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard navigation lens
+Fra:1 Mem:17.55M (Peak 17.55M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard aileron hinge
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard flap hinge
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear lift strut
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard wing lift strut
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard amber wingtip
+Fra:1 Mem:17.57M (Peak 17.57M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard high wing
+Fra:1 Mem:17.58M (Peak 17.58M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port navigation lens
+Fra:1 Mem:17.59M (Peak 17.59M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port aileron hinge
+Fra:1 Mem:17.60M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Initializing
+Fra:1 Mem:15.63M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Waiting for render to start
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Loading render kernels (may take a few minutes the first time)
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Scene
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Shaders
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Procedurals
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Background
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Camera
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Meshes Flags
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects | Copying Transformations to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Objects | Applying Static Transformations
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems | Copying Particles to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Meshes
+Fra:1 Mem:15.82M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Computing attributes
+Fra:1 Mem:15.88M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Copying Attributes to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building BVH
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.24M, Peak:0.24M | Scene, ViewLayer | Updating Scene BVH | Building BVH 0%
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Scene BVH | Copying BVH to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Computing normals
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Copying Mesh to device
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Objects Flags
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Primitive Offsets
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Images
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Camera Volume
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights | Computing tree
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Integrator
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Film
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.75M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Baking
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Device | Writing constant memory
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Sample 0/32
+Fra:1 Mem:49.07M (Peak 49.07M) | Time:00:01.04 | Remaining:00:32.09 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 1/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:28.43 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 32/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:28.43 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Finished
+Saved: '/workspace/scratch/193080ebc0b3/original-highwing-light-single-candidate/previews/candidate-starboard.jpg'
+Time: 00:28.47 (Saving: 00:00.03)
+
+Fra:1 Mem:17.31M (Peak 17.31M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Fuselage | CG at origin
+Fra:1 Mem:17.35M (Peak 17.35M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port forward cabin window
+Fra:1 Mem:17.37M (Peak 17.37M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | QA ground, never exported
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Upper propeller blade
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Lower propeller blade
+Fra:1 Mem:17.38M (Peak 17.38M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Spinner
+Fra:1 Mem:17.40M (Peak 17.40M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main axle and hub
+Fra:1 Mem:17.41M (Peak 17.41M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main tyre
+Fra:1 Mem:17.42M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard main gear leg
+Fra:1 Mem:17.42M (Peak 17.42M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main axle and hub
+Fra:1 Mem:17.43M (Peak 17.43M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main tyre
+Fra:1 Mem:17.44M (Peak 17.44M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port main gear leg
+Fra:1 Mem:17.45M (Peak 17.45M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose axle and hub
+Fra:1 Mem:17.46M (Peak 17.46M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose tyre
+Fra:1 Mem:17.47M (Peak 17.47M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Nose gear leg
+Fra:1 Mem:17.45M (Peak 17.47M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear cabin window
+Fra:1 Mem:17.46M (Peak 17.47M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard fin amber flash
+Fra:1 Mem:17.47M (Peak 17.47M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port fin amber flash
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Swept vertical fin
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port windshield
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard elevator hinge
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port teal belt
+Fra:1 Mem:17.47M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard tailplane
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port elevator hinge
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door sill
+Fra:1 Mem:17.48M (Peak 17.48M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port tailplane
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port door handle
+Fra:1 Mem:17.49M (Peak 17.49M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard forward cabin window
+Fra:1 Mem:17.50M (Peak 17.50M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard navigation lens
+Fra:1 Mem:17.52M (Peak 17.52M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard aileron hinge
+Fra:1 Mem:17.53M (Peak 17.53M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard flap hinge
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear lift strut
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard wing lift strut
+Fra:1 Mem:17.54M (Peak 17.54M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard amber wingtip
+Fra:1 Mem:17.55M (Peak 17.55M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard high wing
+Fra:1 Mem:17.56M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port navigation lens
+Fra:1 Mem:17.55M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard rear cabin window
+Fra:1 Mem:17.55M (Peak 17.56M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port aileron hinge
+Fra:1 Mem:17.57M (Peak 17.57M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port flap hinge
+Fra:1 Mem:17.57M (Peak 17.57M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port rear lift strut
+Fra:1 Mem:17.58M (Peak 17.58M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port wing lift strut
+Fra:1 Mem:17.59M (Peak 17.59M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port amber wingtip
+Fra:1 Mem:17.58M (Peak 17.59M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard windshield
+Fra:1 Mem:17.58M (Peak 17.59M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Port high wing
+Fra:1 Mem:17.59M (Peak 17.59M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard teal belt
+Fra:1 Mem:17.60M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door handle
+Fra:1 Mem:17.60M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Synchronizing object | Starboard door sill
+Fra:1 Mem:17.60M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Initializing
+Fra:1 Mem:15.63M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Waiting for render to start
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Loading render kernels (may take a few minutes the first time)
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Scene
+Fra:1 Mem:15.64M (Peak 17.60M) | Time:00:00.00 | Mem:0.00M, Peak:0.00M | Scene, ViewLayer | Updating Shaders
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Procedurals
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Background
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Camera
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Meshes Flags
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects
+Fra:1 Mem:15.72M (Peak 17.60M) | Time:00:00.00 | Mem:0.01M, Peak:0.01M | Scene, ViewLayer | Updating Objects | Copying Transformations to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Objects | Applying Static Transformations
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Particle Systems | Copying Particles to device
+Fra:1 Mem:15.73M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Meshes
+Fra:1 Mem:15.82M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Computing attributes
+Fra:1 Mem:15.88M (Peak 17.60M) | Time:00:00.00 | Mem:0.02M, Peak:0.02M | Scene, ViewLayer | Updating Mesh | Copying Attributes to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.07M, Peak:0.07M | Scene, ViewLayer | Updating Scene BVH | Building BVH
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.24M, Peak:0.24M | Scene, ViewLayer | Updating Scene BVH | Building BVH 0%
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Scene BVH | Copying BVH to device
+Fra:1 Mem:15.87M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Computing normals
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.44M, Peak:0.61M | Scene, ViewLayer | Updating Mesh | Copying Mesh to device
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Objects Flags
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Primitive Offsets
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Images
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Camera Volume
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.67M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Lights | Computing tree
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Integrator
+Fra:1 Mem:16.10M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Film
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.67M, Peak:0.75M | Scene, ViewLayer | Updating Lookup Tables
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Baking
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Updating Device | Writing constant memory
+Fra:1 Mem:16.11M (Peak 17.60M) | Time:00:00.00 | Mem:0.75M, Peak:0.75M | Scene, ViewLayer | Sample 0/32
+Fra:1 Mem:49.07M (Peak 49.07M) | Time:00:00.86 | Remaining:00:26.53 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 1/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:25.36 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Sample 32/32
+Fra:1 Mem:63.72M (Peak 93.02M) | Time:00:25.36 | Mem:33.71M, Peak:33.71M | Scene, ViewLayer | Finished
+Saved: '/workspace/scratch/193080ebc0b3/original-highwing-light-single-candidate/previews/candidate-front.jpg'
+Time: 00:25.40 (Saving: 00:00.03)
+
+{
+  "status": "PASS: Blender independently imported emitted GLB",
+  "blender_version": "4.3.2",
+  "blender_build_hash": "Unknown",
+  "glb_sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+  "imported_mesh_objects": 46,
+  "imported_materials": 8,
+  "blender_bounds_m": {
+    "min": [
+      -3.250000238418579,
+      -5.5,
+      -1.0
+    ],
+    "max": [
+      5.050000190734863,
+      5.5,
+      2.2200000286102295
+    ]
+  },
+  "render_type": "asset-only studio render, not a simulator screenshot",
+  "images": [
+    {
+      "path": "previews/candidate-three-quarter.jpg",
+      "sha256": "ee23f0a80e9265b5eabbdbdaf4210c1e77ef2e763f70dbcdf4be55ef54985ef9"
+    },
+    {
+      "path": "previews/candidate-starboard.jpg",
+      "sha256": "9ab03659591b40bab709c68d044047a6b5d19e27227159826e7b4518d5c4abfc"
+    },
+    {
+      "path": "previews/candidate-front.jpg",
+      "sha256": "a4d28c3172f3688e4d64213ebd63b3ab3871068a80533b3b971b6e92a665d4ad"
+    }
+  ],
+  "render_settings": {
+    "engine": "Cycles",
+    "device": "CPU",
+    "samples": 32,
+    "denoising": false,
+    "size": [
+      1200,
+      800
+    ],
+    "view_transform": "Standard",
+    "look": "None"
+  }
+}
+
+Blender quit

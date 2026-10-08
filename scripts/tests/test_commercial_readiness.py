@@ -147,6 +147,16 @@ class StagingChecks(unittest.TestCase):
         result = gate.check(self.repo, None)
         self.assertIn("BUNDLE_NOT_CHECKED", {b["code"] for b in result["blockers"]})
 
+    def test_historical_meshy_hash_stays_denied_after_current_asset_replacement(self):
+        historical = dict(next(a for a in self.manifest['assets'] if a['path'] == self.legacy))
+        self.manifest['historical_excluded_assets'] = [historical]
+        current = next(a for a in self.manifest['assets'] if a['path'] == self.legacy)
+        (self.bundle/'renamed-historical.dat').write_bytes((self.repo/self.legacy).read_bytes())
+        (self.repo/self.legacy).write_bytes(b'current original asset')
+        current.update(review_state='original_source_recorded', sha256=gate.digest(self.repo/self.legacy))
+        write_json(self.manifest_path, self.manifest)
+        self.assertIn('UNRESOLVED_ASSET_RIGHTS', self.codes())
+
     def test_meshy_renamed_outside_assets_is_still_blocked(self):
         shutil.copyfile(self.repo / self.legacy, self.bundle / "unrelated.dat")
         self.assertIn("UNRESOLVED_ASSET_RIGHTS", self.codes())

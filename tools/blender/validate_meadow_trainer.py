@@ -13,13 +13,20 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 ASSETS=ROOT/'assets/aircraft'
-BASELINE={
+CREATION_BASELINE={
     'light_single.json':'8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25',
     'light_single.glb':'8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9',
     'swift_sport.json':'319257c8363cf5b0d480b914796f43bbec8b7935adc32d095c706c86b8c3e663',
     'swift_sport.glb':'9f30f6f9babe87a54d0f1f5da104f719d7e99cb05aada2848f8ea88b0bf9e3b1',
     'swift_sport.blend':'29a25578733be83d25ccff12c117b29124b57b5e69e8356bd8189d128e514e77',
 }
+
+
+# Creation-time hashes above are historical evidence. These exact current
+# replacements are reviewed separately; no arbitrary alternate bytes are allowed.
+# See docs/release/full-two-aircraft-source-candidate.md.
+CURRENT_REPLACEMENTS = {'light_single.glb': 'b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc'}
+BASELINE = {**CREATION_BASELINE, **CURRENT_REPLACEMENTS}
 
 
 def require(condition, message):
@@ -191,7 +198,7 @@ def main():
         'camera_eye_and_cg_inside_fuselage':True,
         'preview_sha256':{f'meadow-trainer-{suffix}.jpg':sha(ROOT/'docs/qa/images'/f'meadow-trainer-{suffix}.jpg')
                           for suffix in ['three-quarter','starboard','front']},
-        'unchanged_baseline_sha256':BASELINE,'sha256':{p.name:sha(p) for p in [
+        'historical_creation_baseline_sha256':CREATION_BASELINE,'current_expected_sha256':BASELINE,'sha256':{p.name:sha(p) for p in [
             ASSETS/'meadow_trainer.glb',ASSETS/'meadow_trainer.blend',ASSETS/'meadow_trainer.json',
             ROOT/'tools/blender/build_meadow_trainer.py']}}
     print(json.dumps(report,indent=2))

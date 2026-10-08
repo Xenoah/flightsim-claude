@@ -1,0 +1,47 @@
+{
+  "status": "PASS: Blender independently imported emitted GLB",
+  "blender_version": "4.3.2",
+  "blender_build_hash": "Unknown",
+  "glb_sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+  "imported_mesh_objects": 46,
+  "imported_materials": 8,
+  "blender_bounds_m": {
+    "min": [
+      -3.250000238418579,
+      -5.5,
+      -1.0
+    ],
+    "max": [
+      5.050000190734863,
+      5.5,
+      2.2200000286102295
+    ]
+  },
+  "render_type": "asset-only studio render, not a simulator screenshot",
+  "images": [
+    {
+      "path": "previews/candidate-three-quarter.jpg",
+      "sha256": "ee23f0a80e9265b5eabbdbdaf4210c1e77ef2e763f70dbcdf4be55ef54985ef9"
+    },
+    {
+      "path": "previews/candidate-starboard.jpg",
+      "sha256": "9ab03659591b40bab709c68d044047a6b5d19e27227159826e7b4518d5c4abfc"
+    },
+    {
+      "path": "previews/candidate-front.jpg",
+      "sha256": "a4d28c3172f3688e4d64213ebd63b3ab3871068a80533b3b971b6e92a665d4ad"
+    }
+  ],
+  "render_settings": {
+    "engine": "Cycles",
+    "device": "CPU",
+    "samples": 32,
+    "denoising": false,
+    "size": [
+      1200,
+      800
+    ],
+    "view_transform": "Standard",
+    "look": "None"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "source_commit": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "scope": "Historical records, not current path identities or newly cleared rights",
+  "light_single_asset": {
+    "id": "assets-aircraft-light_single-glb",
+    "path": "assets/aircraft/light_single.glb",
+    "delivery": "external",
+    "sha256": "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9",
+    "bytes": 4752424,
+    "review_state": "unresolved",
+    "license": "Meshy generation-specific terms; not established by project MIT/Apache",
+    "sources": [
+      "ATTRIBUTION.md"
+    ],
+    "notes": "Legacy record says paid plan, generated 2026-08-21. Missing generation task, applicable plan/terms and source-input evidence. Exclude from commercial staging; adding CC-BY credit alone cannot establish a grant."
+  },
+  "agx_dependency_asset": {
+    "id": "bevy-agx-lut",
+    "package": "bevy_core_pipeline",
+    "version": "0.18.1",
+    "source_path": "src/tonemapping/luts/AgX-default_contrast.ktx2",
+    "feature": "tonemapping_luts",
+    "sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
+    "bytes": 17842,
+    "review_state": "unresolved",
+    "license": "License record not yet resolved",
+    "sources": [
+      "https://github.com/MrLixm/AgXc/tree/898198e0490b0551ed81412a0c22e0b72fffb7cd"
+    ],
+    "notice_files": [],
+    "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
+  },
+  "source_export_rule": "/assets/aircraft/light_single.glb export-ignore",
+  "replaced_by": "../full-two-aircraft-source-candidate.md"
+}

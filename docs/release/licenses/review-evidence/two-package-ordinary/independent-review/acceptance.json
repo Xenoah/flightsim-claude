@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "kind": "independent_two_package_scope_acceptance_not_whole_target_review",
+  "status": "accepted_package_scope_with_stated_distribution_steps",
+  "reviewed_at": "2026-10-08",
+  "reviewed_by": "Independent OpenAI assistant engineering source/license-evidence reviewer; not a human lawyer or publisher",
+  "result": "accept_constgebra_apache_alternative_and_hexf_original_cc0_route_for_exact_bytes",
+  "source_sha": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "inventory_sha256": "02797865cac5ecee5f05c33ea1a682b2bd772c8f6de8cdfea6ba7d3d91ef11d8",
+  "reviewed_assessment_sha256": "281b45591a9f3aea2f0508be42c73ce425a149a4815c51110e4b6944c98d66c8",
+  "package_ids": [
+    "constgebra@0.1.4",
+    "hexf-parse@0.2.1"
+  ],
+  "scope": "Evidence sufficiency and distribution steps for these exact two package archives, including native inventory rebinding and portable exact-13 assembly sources. Not final linkage, nested-source, native-runtime, complete inventory, asset, bundle or release approval.",
+  "checks": {
+    "cited_original_inputs_verified": 13,
+    "complete_archive_files_verified": 13,
+    "upstream_authored_git_blobs_verified": 9,
+    "fresh_per_file_histories_verified": 7,
+    "candidate_checks_passed": 42
+  },
+  "conditions": [
+    "Keep all original package routes, obligations, primary declarations and exact evidence hashes.",
+    "Supply full unchanged standard legal texts as distributor-supplied references, preserve source attribution and mark future modifications.",
+    "Keep const_soft_float/compiler_builtins/libm origin obligations separately open.",
+    "Keep CC0 direct non-transferable/non-sublicensable fallback, patent/trademark exclusions, contributor/third-party-rights limitations, warranty/liability disclaimers and nonparty limitation explicit through complete text; do not relabel hexf as 0BSD.",
+    "Keep original native inventory and unresolved records unchanged; use resolutions only in a later genuine complete review bound to the final inventory.",
+    "Swift-only commercial-staging candidate with ordinary LUTs is evidence scope, not a deliverable selection or Light Single clearance."
+  ],
+  "permitted_administrative_finalization": "Set only package_scope_reviewed, add this bounded independent-review result/references, update corresponding prose and portable assessment copy. Any substantive route, evidence, obligation or scope change requires new review.",
+  "complete_target_review": false,
+  "publication_authorized": false,
+  "legal_agreement_accepted": false,
+  "artifacts": [
+    {
+      "path": "REVIEW.md",
+      "sha256": "abca6af4d4ca88bd51504aa73a1f51f811ccf9f33e9adf1d5d2abee593da9c2e",
+      "bytes": 9153
+    },
+    {
+      "path": "original-verification.json",
+      "sha256": "c8c55306c2e84124200105e5c310306a3c8a82ecc09cc7382e8b8e5bfb4345de",
+      "bytes": 10497
+    },
+    {
+      "path": "candidate-verification.json",
+      "sha256": "01f9972a64bebadc3d46fb3094c13d9fbaaf8e5371eb0f54a9fde0acc3257e9a",
+      "bytes": 6918
+    },
+    {
+      "path": "fresh-primary-records.json",
+      "sha256": "905b3a542e2fc4abcbc7a786ff43264ade78e476646e520b170d05802273f402",
+      "bytes": 18942
+    },
+    {
+      "path": "fresh-per-file-histories.json",
+      "sha256": "44941953f6f78212a87fe9d1bf515b2f49b553a1238f96b447be367ae11db0cc",
+      "bytes": 9290
+    },
+    {
+      "path": "verify_original.py",
+      "sha256": "39908e086299de0fbf8b8307d258820ace76dcc24dc3ef6ac857665a06388e24",
+      "bytes": 5963
+    },
+    {
+      "path": "verify_candidate.py",
+      "sha256": "c26298331cf6f78b2d7e4d36d0817951f837c67e4a5083d5c2376a4c5580ec5b",
+      "bytes": 5390
+    },
+    {
+      "path": "reviewed-assessment-snapshot.json",
+      "sha256": "281b45591a9f3aea2f0508be42c73ce425a149a4815c51110e4b6944c98d66c8",
+      "bytes": 16491
+    },
+    {
+      "path": "VERIFICATION.md",
+      "sha256": "cf8c1c87e769ea1593e4609dd202e7779945231abbdc3aa7824aa29ef417b774",
+      "bytes": 2241
+    }
+  ]
+}

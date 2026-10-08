@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "kind": "exact_package_reconciliation_not_whole_target_review",
+  "source_sha": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "source_tree": "94efd6ff4cc9c421dd5d4ef008e710c094e4a7f9",
+  "native_inventory": {
+    "path": "docs/release/licenses/review-evidence/two-package-ordinary/native-inventory.json",
+    "sha256": "02797865cac5ecee5f05c33ea1a682b2bd772c8f6de8cdfea6ba7d3d91ef11d8",
+    "bytes": 418142,
+    "source": "https://github.com/Xenoah/flightsim-claude/actions/runs/37830779995/artifacts/11575502730"
+  },
+  "prior_assessment": {
+    "path": "docs/release/licenses/review-evidence/two-package-ordinary/prior-package-assessment.json",
+    "sha256": "17e7926da925ee1d46bbe6bd2aa20a4f9bc7552b44123811b7533ab5234868be",
+    "bytes": 15554
+  },
+  "packages": [
+    {
+      "id": "constgebra@0.1.4",
+      "native_package_record": {
+        "id": "constgebra@0.1.4",
+        "name": "constgebra",
+        "version": "0.1.4",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "source_checksum": "e1aaf9b65849a68662ac6c0810c8893a765c960b907dd7cfab9c4a50bf764fbc",
+        "source_revision": "eae8e094e5779f42f1db2a7adf9036aa33744bc8",
+        "source_path_in_repository": "",
+        "repository": "https://github.com/knickish/constgebra",
+        "license_expression": "MIT OR Apache-2.0",
+        "features": [],
+        "notices": [],
+        "unresolved": [
+          "No root/declared primary license text found in exact packaged source or pinned supplements; nested third-party notices do not substitute for the crate's own grant"
+        ]
+      },
+      "exact_native_record_equals_prior_assessed_package": true,
+      "archive": {
+        "source": "https://static.crates.io/crates/constgebra/constgebra-0.1.4.crate",
+        "sha256": "e1aaf9b65849a68662ac6c0810c8893a765c960b907dd7cfab9c4a50bf764fbc",
+        "bytes": 15045
+      },
+      "complete_archive_files": [
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/.cargo_vcs_info.json",
+          "sha256": "ef23343f75c1ea4dd39e5d3cc273f4caed28de8e22188b975a99dec1f83833b5",
+          "bytes": 94,
+          "archive_path": ".cargo_vcs_info.json",
+          "git_blob_sha1": "e8421abce8263282c7f8478718b11bd443d62ff5"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/.github/workflows/rust.yml",
+          "sha256": "4138269590e91810602eb9edb08a56eb2f4f0d1110d1cb4a9c48af8c67ece725",
+          "bytes": 2321,
+          "archive_path": ".github/workflows/rust.yml",
+          "git_blob_sha1": "18d908f7a8051e5af934b197ff9ab0ff758a7757"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/.gitignore",
+          "sha256": "c1e953ee360e77de57f7b02f1b7880bd6a3dc22d1a69e953c2ac2c52cc52d247",
+          "bytes": 20,
+          "archive_path": ".gitignore",
+          "git_blob_sha1": "4fffb2f89cbd8f2169ce9914bd16bd43785bb368"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml",
+          "sha256": "4059f220c736b6f8462f439079a05a7fda77fffb6215bc9e955b6afca3b9209d",
+          "bytes": 906,
+          "archive_path": "Cargo.toml",
+          "git_blob_sha1": "26cf590f46a0505969359434401f109648065be4"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+          "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c",
+          "bytes": 493,
+          "archive_path": "Cargo.toml.orig",
+          "git_blob_sha1": "d2700e177a7f45ee2554f267bb3e8d30032529c9"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/README.md",
+          "sha256": "ca7fd771ad7ead0110483a8d3ff1afe74c9243b76cfd2d29ba3c538a86fc1ad6",
+          "bytes": 960,
+          "archive_path": "README.md",
+          "git_blob_sha1": "a6fe468d7eec8ad04629df282d308a627e18781f"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs",
+          "sha256": "1cffd04787a6e52a241cb8914d939b702613d08c265b4e1ceb7578ae977007de",
+          "bytes": 37676,
+          "archive_path": "src/comptime.rs",
+          "git_blob_sha1": "d2ece9f40fdc0c147f908f6d335211596f7d9abf"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs",
+          "sha256": "6619bac32b6998490128a6ba0ca0e5fb47b0d19deff0c3fff0c9479e08d57307",
+          "bytes": 153,
+          "archive_path": "src/lib.rs",
+          "git_blob_sha1": "5fe0faeaba2d57a0cbacd6978b9791653bb64fa5"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs",
+          "sha256": "1b123a6429ec21f846fbe0a9b98fd2fd153239484b01272736f9cb93b4b8e07b",
+          "bytes": 40888,
+          "archive_path": "src/runtime.rs",
+          "git_blob_sha1": "2e75cee43fdcfd6092da32b80b58589065c7a096"
+        }
+      ],
+      "all_archive_files_equal_prior_reviewed_bytes": true
+    },
+    {
+      "id": "hexf-parse@0.2.1",
+      "native_package_record": {
+        "id": "hexf-parse@0.2.1",
+        "name": "hexf-parse",
+        "version": "0.2.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "source_checksum": "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df",
+        "source_revision": "4225763d744183d720f575ae96d04161b4d08ea0",
+        "source_path_in_repository": null,
+        "repository": "https://github.com/lifthrasiir/hexf",
+        "license_expression": "CC0-1.0",
+        "features": [],
+        "notices": [],
+        "unresolved": [
+          "No root/declared primary license text found in exact packaged source or pinned supplements; nested third-party notices do not substitute for the crate's own grant"
+        ]
+      },
+      "exact_native_record_equals_prior_assessed_package": true,
+      "archive": {
+        "source": "https://static.crates.io/crates/hexf-parse/hexf-parse-0.2.1.crate",
+        "sha256": "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df",
+        "bytes": 4662
+      },
+      "complete_archive_files": [
+        {
+          "path": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/.cargo_vcs_info.json",
+          "sha256": "7c5579b3abe5e2dcdcba1c845849b7d2f20f028de49fb27437227fd32545aae7",
+          "bytes": 74,
+          "archive_path": ".cargo_vcs_info.json",
+          "git_blob_sha1": "95f01bedf6eac6ce0c277722623719702114e3e5"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml",
+          "sha256": "dd7274968556f3f3309df5615d94437ec4e4823777cc440f91177b2170cbe2a7",
+          "bytes": 868,
+          "archive_path": "Cargo.toml",
+          "git_blob_sha1": "31287dc85a3f3daa1d5cca144cb6d513343a5a3c"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+          "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+          "bytes": 344,
+          "archive_path": "Cargo.toml.orig",
+          "git_blob_sha1": "2833f557b25322ab20cc78254e057f132c6e6a0e"
+        },
+        {
+          "path": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/src/lib.rs",
+          "sha256": "511b164642efe470e88323b8afe0274e797805ff2441f0173b5b005ad4b4d1b1",
+          "bytes": 19527,
+          "archive_path": "src/lib.rs",
+          "git_blob_sha1": "60439bb5beadd6823330d0293cc3d74e2790171f"
+        }
+      ],
+      "all_archive_files_equal_prior_reviewed_bytes": true
+    }
+  ],
+  "fresh_primary_reads": [
+    {
+      "path": "docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig",
+      "source": "https://raw.githubusercontent.com/knickish/constgebra/eae8e094e5779f42f1db2a7adf9036aa33744bc8/Cargo.toml",
+      "sha256": "dd3370ff7a11ee8ac10e8f96f9ba599c1fb2cd73379a301f43ea056fa2e7b87c",
+      "bytes": 493,
+      "fresh_connector_content_matches_preserved_bytes": true
+    },
+    {
+      "path": "docs/release/licenses/review-evidence/hexf-parse-0.2.1/package/Cargo.toml.orig",
+      "source": "https://raw.githubusercontent.com/lifthrasiir/hexf/4225763d744183d720f575ae96d04161b4d08ea0/parse/Cargo.toml",
+      "sha256": "4a56dbdbc12054fd33b7a2634a45cbbe6fe12f5e6f4081002cbfa527f7220c70",
+      "bytes": 344,
+      "fresh_connector_content_matches_preserved_bytes": true
+    },
+    {
+      "path": "docs/release/licenses/review-evidence/standard-license-texts/CC0-1.0.txt",
+      "source": "https://raw.githubusercontent.com/creativecommons/cc-legal-tools-data/19d5489b40a726e6c5bfb9cab15d03e7853ba435/COPYING",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+      "bytes": 7048,
+      "fresh_connector_content_matches_preserved_bytes": true
+    }
+  ],
+  "evidence_file_count": 13,
+  "all_prior_evidence_hashes_verified": true,
+  "native_inventory_modified": false,
+  "complete_target_review": false,
+  "release_authorized": false
+}

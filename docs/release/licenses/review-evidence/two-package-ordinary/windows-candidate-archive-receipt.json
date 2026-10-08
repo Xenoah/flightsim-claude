@@ -1,0 +1,21 @@
+{
+  "artifact_id": 11575502730,
+  "run_id": 37830779995,
+  "source_sha": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "bytes": 1686354,
+  "sha256": "180ad799c4192458f3648997f813c536016737ba2c981a62e3e52febde4b8fa0",
+  "members": [
+    "acceptance.json",
+    "dependency-inventory.json",
+    "source-inputs.json",
+    "commercial-readiness.json",
+    "commands.log",
+    "default-swift.log",
+    "absent-light-single.log",
+    "default-rejects-legacy.log",
+    "legacy-no-model.log",
+    "default-swift.png"
+  ],
+  "verified_against_api": true,
+  "existing_portable_evidence_validator": "passed"
+}

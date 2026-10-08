@@ -1,0 +1,74 @@
+Extensions: writing cache failed ([Errno 30] Read-only file system: '/home/agent/.config/blender').
+06:27:03 | INFO: Data are loaded, start creating Blender stuff
+06:27:03 | INFO: Blender create Mesh node Fuselage | CG at origin
+06:27:03 | INFO: Blender create Mesh node Port forward cabin window
+06:27:03 | INFO: Blender create Mesh node Port rear cabin window
+06:27:03 | INFO: Blender create Mesh node Port windshield
+06:27:03 | INFO: Blender create Mesh node Port teal belt
+06:27:03 | INFO: Blender create Mesh node Cylinder
+06:27:03 | INFO: Blender create Mesh node Cylinder.001
+06:27:03 | INFO: Blender create Mesh node Starboard forward cabin window
+06:27:03 | INFO: Blender create Mesh node Starboard rear cabin window
+06:27:03 | INFO: Blender create Mesh node Starboard windshield
+06:27:03 | INFO: Blender create Mesh node Starboard teal belt
+06:27:03 | INFO: Blender create Mesh node Cylinder.002
+06:27:03 | INFO: Blender create Mesh node Cylinder.003
+06:27:03 | INFO: Blender create Mesh node Port high wing
+06:27:03 | INFO: Blender create Mesh node Port amber wingtip
+06:27:03 | INFO: Blender create Mesh node Cylinder.004
+06:27:03 | INFO: Blender create Mesh node Cylinder.005
+06:27:03 | INFO: Blender create Mesh node Cylinder.006
+06:27:03 | INFO: Blender create Mesh node Cylinder.007
+06:27:03 | INFO: Blender create Mesh node Sphere
+06:27:03 | INFO: Blender create Mesh node Starboard high wing
+06:27:03 | INFO: Blender create Mesh node Starboard amber wingtip
+06:27:03 | INFO: Blender create Mesh node Cylinder.008
+06:27:03 | INFO: Blender create Mesh node Cylinder.009
+06:27:03 | INFO: Blender create Mesh node Cylinder.010
+06:27:03 | INFO: Blender create Mesh node Cylinder.011
+06:27:03 | INFO: Blender create Mesh node Sphere.001
+06:27:03 | INFO: Blender create Mesh node Port tailplane
+06:27:03 | INFO: Blender create Mesh node Cylinder.012
+06:27:03 | INFO: Blender create Mesh node Starboard tailplane
+06:27:03 | INFO: Blender create Mesh node Cylinder.013
+06:27:03 | INFO: Blender create Mesh node Swept vertical fin
+06:27:03 | INFO: Blender create Mesh node Port fin amber flash
+06:27:03 | INFO: Blender create Mesh node Starboard fin amber flash
+06:27:03 | INFO: Blender create Mesh node Cylinder.014
+06:27:03 | INFO: Blender create Mesh node Nose tyre
+06:27:03 | INFO: Blender create Mesh node Cylinder.015
+06:27:03 | INFO: Blender create Mesh node Cylinder.016
+06:27:03 | INFO: Blender create Mesh node Port main tyre
+06:27:03 | INFO: Blender create Mesh node Cylinder.017
+06:27:03 | INFO: Blender create Mesh node Cylinder.018
+06:27:03 | INFO: Blender create Mesh node Starboard main tyre
+06:27:03 | INFO: Blender create Mesh node Cylinder.019
+06:27:03 | INFO: Blender create Mesh node Sphere.002
+06:27:03 | INFO: Blender create Mesh node Lower propeller blade
+06:27:03 | INFO: Blender create Mesh node Upper propeller blade
+06:27:03 | INFO: glTF import finished in 0.05s
+{
+  "status": "PASS: Blender independently imported emitted GLB",
+  "blender_version": "4.3.2",
+  "blender_build_hash": "Unknown",
+  "glb_sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+  "imported_mesh_objects": 46,
+  "imported_materials": 8,
+  "blender_bounds_m": {
+    "min": [
+      -3.250000238418579,
+      -5.5,
+      -1.0
+    ],
+    "max": [
+      5.050000190734863,
+      5.5,
+      2.2200000286102295
+    ]
+  },
+  "render_type": "asset-only studio render, not a simulator screenshot",
+  "images": []
+}
+Blender 4.3.2
+
+Blender quit

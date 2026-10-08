@@ -1,0 +1,17 @@
+Local FlightSim modifications, 2026-10-08
+
+This is a modified local bevy_core_pipeline 0.18.1, not a pristine registry
+package. src/tonemapping/mod.rs omits the AgX LUT embedding and explicitly
+rejects AgX render selection at HDR specialization and shared LUT bindings.
+The AgX KTX2 source payload is omitted. Exact TonyMcMapface and Blender Filmic
+payloads, decoding/sampling settings and shader source remain unchanged.
+
+The changes are provided under the project's existing MIT OR Apache-2.0 terms.
+Upstream licence texts and retained-code notices are preserved. Supplemental
+asset notices are in third-party-notices. The package's code licence expression
+does not replace these asset-specific terms. No new AgX grant, human authorship,
+upstream endorsement or qualification for publication is asserted.
+
+See FLIGHTSIM-PATCHES.md and FLIGHTSIM-UPSTREAM-SOURCE.json for exact scope and
+upstream archive/member provenance. The original .crate archive and omitted
+AgX payload are not included in this source subset.

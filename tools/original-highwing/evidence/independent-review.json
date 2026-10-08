@@ -1,0 +1,265 @@
+{
+  "review_scope": "independent static, lightweight asset and actual three-view studio-image review; native simulator checks unrun",
+  "repository_commit": "d918943a70d01644b5a6bebb8a903a5bbc89139f",
+  "source_files_verified_against_git": [
+    {
+      "path": "assets/aircraft/meadow_trainer.glb",
+      "sha256": "c873b59a5e638c16bd2fb36c789704a41b1146ea90c7c44950257cbf5f806412",
+      "bytes": 140864,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "assets/aircraft/meadow_trainer.blend",
+      "sha256": "5a11c5453d62a68add7706230832d2e289c6626331c066a7fd1f25b650dc37db",
+      "bytes": 148936,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "assets/aircraft/meadow_trainer.json",
+      "sha256": "8ce67e37e40ece15bdaba239a058632b11efd73755d8965ca014bbaeb39313c0",
+      "bytes": 2739,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "tools/blender/build_meadow_trainer.py",
+      "sha256": "3b7ed8696b0e2d4a656645ceca9b5acddfd3242047cee698f98605eb68d49a1d",
+      "bytes": 19197,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "tools/blender/validate_meadow_trainer.py",
+      "sha256": "85dc707800b808d66c1bd24a65f6ca4cf56cf6394a317487fa943271379c6bd1",
+      "bytes": 10517,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "assets/aircraft/light_single.json",
+      "sha256": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+      "bytes": 2734,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "LICENSE-MIT",
+      "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+      "bytes": 1086,
+      "equals_pinned_commit": true
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+      "bytes": 11359,
+      "equals_pinned_commit": true
+    }
+  ],
+  "candidate_sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+  "candidate_bytes": 140840,
+  "profile_sha256": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
+  "adapter_sha256": "d591f027d757abe60ca050b9c12d1ad8d70b044704b5555d0f66a34e6be84d1a",
+  "validator_sha256": "46e48e65288c2cc15da6f782e4211a0998b4b640804995dd226e9eaae3bf95c0",
+  "adapter_reproduction_exact": true,
+  "adapter_rejects_wrong_source": true,
+  "binary_vector_bit_transforms_verified": 7169,
+  "all_other_bin_bytes_equal": true,
+  "metadata_equal_except_geometric_accessor_bounds": true,
+  "unique_geometric_accessors": 88,
+  "meshes": 46,
+  "vertices": 3759,
+  "triangles": 5756,
+  "materials": 8,
+  "attribute_semantics": [
+    "NORMAL",
+    "POSITION",
+    "TEXCOORD_0"
+  ],
+  "bounds_m": {
+    "min": [
+      -3.250000238418579,
+      -1.0,
+      -5.5
+    ],
+    "max": [
+      5.050000190734863,
+      2.2200000286102295,
+      5.5
+    ]
+  },
+  "contacts": [
+    {
+      "name": "Nose tyre",
+      "computed_body_contact": [
+        1.600000023841858,
+        0.0,
+        1.0
+      ],
+      "max_error_m": 2.3841857821338408e-08
+    },
+    {
+      "name": "Port main tyre",
+      "computed_body_contact": [
+        -0.7999999821186066,
+        -1.300000011920929,
+        1.0
+      ],
+      "max_error_m": 1.788139347702611e-08
+    },
+    {
+      "name": "Starboard main tyre",
+      "computed_body_contact": [
+        -0.7999999821186066,
+        1.300000011920929,
+        1.0
+      ],
+      "max_error_m": 1.788139347702611e-08
+    }
+  ],
+  "eye_model_m": [
+    -0.6,
+    0.9,
+    0.25
+  ],
+  "independent_solid_angle_containment": {
+    "radians": {
+      "cg": 12.56637061435917,
+      "eye": 12.566370614359176
+    },
+    "expected_abs_radians": 12.566370614359172
+  },
+  "validator_rejection_controls": [
+    {
+      "name": "unadapted original geometry",
+      "rejected": true,
+      "reason": "Body-space geometry does not exactly match original",
+      "exception": "ValueError"
+    },
+    {
+      "name": "position perturbation",
+      "rejected": true,
+      "reason": "Body-space geometry does not exactly match original",
+      "exception": "ValueError"
+    },
+    {
+      "name": "normal perturbation",
+      "rejected": true,
+      "reason": "Body-space normal changed",
+      "exception": "ValueError"
+    },
+    {
+      "name": "triangle winding flip",
+      "rejected": true,
+      "reason": "Index, UV or other binary data changed",
+      "exception": "ValueError"
+    },
+    {
+      "name": "node translation",
+      "rejected": true,
+      "reason": "Unexpected nonidentity node",
+      "exception": "ValueError"
+    },
+    {
+      "name": "material metadata",
+      "rejected": true,
+      "reason": "Metadata changed beyond geometric accessor bounds",
+      "exception": "ValueError"
+    },
+    {
+      "name": "external buffer URI",
+      "rejected": true,
+      "reason": "Expected one embedded buffer",
+      "exception": "ValueError"
+    },
+    {
+      "name": "position bound",
+      "rejected": true,
+      "reason": "Incorrect position bounds",
+      "exception": "ValueError"
+    },
+    {
+      "name": "nonfinite position",
+      "rejected": true,
+      "reason": "Nonfinite binary value",
+      "exception": "ValueError"
+    }
+  ],
+  "validator_report_reproduced_exactly": true,
+  "repository_status_porcelain": "",
+  "render_review": "PASS: actual pixels of all three pinned 1200x800 studio previews independently inspected",
+  "native_runtime_review": "Not run. Reviewer executed no Cargo/Rust, Blender or native simulator; reviewed the author-generated Blender import/render evidence and actual pixels.",
+  "conclusion": "PASS for isolated asset preparation and reviewed studio views; native simulator integration remains unverified",
+  "blocking_findings": [],
+  "scope_limits": [
+    "Static basis equality is exact; live Bevy quaternion/AABB floating-point and renderer behavior were not executed",
+    "Predicted f32 scale 1.0 is an analytic value, not a captured live simulator measurement",
+    "Body CG is a placement convention, not a mesh-mass/inertia calculation",
+    "Existing source provenance declarations and exact source hashes were checked; this is not an independent legal title guarantee or commercial packaging approval",
+    "No native replay/input/camera lifecycle run; unchanged JSON and unchanged repository code preserve their configuration and implementation inputs",
+    "Original Meadow .blend remains the +Z source; candidate -X geometry is reproduced through the documented adapter"
+  ],
+  "additional_reviewed_files_sha256": {
+    "README.md": "3cf79da474acd6cc2c9c0427a1d321526d922ddd774c32ff12c72c516686fc0b",
+    "render_candidate.py": "0603aae8118f1097e7f19940317620a011c9e8c18c484586703b147c308b63a1",
+    "check_rejection_cases.py": "72cda437d53ff38f29bbc054cc394884f513de91f1761d393a4c56a91160558f",
+    "evidence/blender-import-and-render.json": "97b21934346f160e9a9212c1463aa04b4091c56df7450fdf942171b4da023725"
+  },
+  "author_blender_import_record_reviewed": {
+    "candidate_sha256_matches": true,
+    "imported_mesh_objects": 46,
+    "imported_materials": 8,
+    "bounds_match_candidate_after_gltf_to_blender": true,
+    "images_reported": 3,
+    "reviewer_executed_blender": false
+  },
+  "readme_review": "Final README including completed previews inspected; no blocking claim discrepancy. Analytical fit, source-only boundaries, unchanged profile/replay inputs, studio-image limits and unrun native acceptance are explicit.",
+  "visual_review": {
+    "candidate_sha256": "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc",
+    "images": [
+      {
+        "path": "previews/candidate-three-quarter.jpg",
+        "sha256": "ee23f0a80e9265b5eabbdbdaf4210c1e77ef2e763f70dbcdf4be55ef54985ef9"
+      },
+      {
+        "path": "previews/candidate-starboard.jpg",
+        "sha256": "9ab03659591b40bab709c68d044047a6b5d19e27227159826e7b4518d5c4abfc"
+      },
+      {
+        "path": "previews/candidate-front.jpg",
+        "sha256": "a4d28c3172f3688e4d64213ebd63b3ab3871068a80533b3b971b6e92a665d4ad"
+      }
+    ],
+    "render_settings": {
+      "engine": "Cycles",
+      "device": "CPU",
+      "samples": 32,
+      "denoising": false,
+      "size": [
+        1200,
+        800
+      ],
+      "view_transform": "Standard",
+      "look": "None"
+    },
+    "reviewed_actual_pixels": true,
+    "three_quarter_findings": [
+      "Coherent upright high-wing silhouette, joined fuselage/wing/tail, intact propeller and visible landing gear",
+      "Port-side glazing, paint bands and struts appear continuous at this angle; no obvious missing or inverted faces"
+    ],
+    "starboard_findings": [
+      "Opposite-side fuselage, glazing and paint bands remain coherent; tail and wing shapes are intact",
+      "Three wheels and attached struts are visible with plausible parked stance and studio contact shadows"
+    ],
+    "front_findings": [
+      "Wings, high-wing support struts and main gear appear symmetric and upright",
+      "Centered nose, propeller, divided windscreen and vertical tail align; three tyres are visible"
+    ],
+    "blocking_findings": [],
+    "nonblocking_image_limits": [
+      "Bright white upper-surface highlights reduce fine shading detail",
+      "Expected Cycles 32-sample undenoised grain is visible",
+      "Front preview has a narrow studio-floor/background boundary along its bottom edge"
+    ],
+    "acceptance_limits": [
+      "Asset-only studio images, not FlightSim screenshots",
+      "No proof of live ModelFit, cockpit visibility, async loading, aircraft switching, animation, replay or control behavior",
+      "No renderer performance, flight-dynamics or commercial-release acceptance"
+    ]
+  }
+}

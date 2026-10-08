@@ -1,0 +1,11 @@
+# Reproducing the independent evidence checks
+
+Both scripts use Python's standard library. Run each with `--help` for its explicit input paths. Relative defaults describe the original sibling-directory layout; no absolute executor path is required. Inputs are read-only, and `--output` selects the JSON verification receipt destination.
+
+`verify_original.py` needs the original accepted assessment, its source evidence root, the preserved accepted assessment copy, exact native inventory, registry archive/source roots, and this directory's fresh primary-source records. When using the new candidate as the source root, pass its preserved `prior-package-assessment.json` as `--assessment` and provide the historical accepted copy separately through `--accepted-assessment`. The registry root must contain `cache/` and `src/index.crates.io-1949cf8c6b5b557f/`. The portable exact-13 assembly directory intentionally does not contain complete registry archives or every historical source file.
+
+`verify_candidate.py` reproduces the 42 checks against the isolated, uncommitted candidate at source base `d918943a70d01644b5a6bebb8a903a5bbc89139f`. Supply the candidate checkout, portable assembly-input directory, historical source-evidence root, and native inventory with the corresponding flags. Its exact-base/unchanged-tracked-file checks describe the recorded pre-commit review boundary; a later documentation commit is a distinct artifact requiring separate commit verification. This script does not claim a committed candidate can pass those unchanged-tracked-file checks.
+
+The reports in this directory retain the reviewed assessment's original pre-finalization hash. The allowed administrative finalization may set package-scope reviewed status and insert bounded acceptance references. It must preserve all package routes, obligations, evidence, native inventory and false whole-target/publication flags. The independent review is not a `dependency-review.json` and cannot activate the readiness gate.
+
+These scripts verify bytes and consistency. The substantive declaration, source-history, license-route and limitation assessment is recorded in `REVIEW.md`; rerunning a hash checker does not create a new legal or whole-target review.
