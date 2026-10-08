@@ -1,0 +1,63 @@
+{
+  "archive_bytes": 223772600,
+  "archive_sha256": "1497f83f93e9bbbde745422c795ed10fe15f92f5622b4421768f149fbe776981",
+  "archive_url": "https://download.blender.org/release/Blender3.4/blender-3.4.1-linux-x64.tar.xz",
+  "assets": [
+    {
+      "bytes": 8234,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/config.ocio",
+      "git_blob": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+      "sha256": "87b8abe0f57f8b3cb3132f43f84b240666c7f19f4505cedd5abb81df3cda4bf9",
+      "upstream_path": "release/datafiles/colormanagement/config.ocio",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio"
+    },
+    {
+      "bytes": 9121032,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+      "git_blob": "66778b93e4ec6d311114396904de6d9e63849f40",
+      "sha256": "2c3dcccb5db817156737691924ade43d8daad16282cc6be3a9e242744002a0bb",
+      "upstream_path": "release/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d"
+    },
+    {
+      "bytes": 94270,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+      "git_blob": "24f2dffda57577b6898cfd5910e937c897a257c9",
+      "sha256": "ff0e4cd3745c3d6857c163ee33caa2c796d6c5bddd91859e4646518110bf5b13",
+      "upstream_path": "release/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d"
+    },
+    {
+      "bytes": 1460811,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/luts/srgb.spi1d",
+      "git_blob": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+      "sha256": "0928cc0b9f3c42b8101c67b701dcc4ba002c8a38060f0569522cac1eb7f0ce04",
+      "upstream_path": "release/datafiles/colormanagement/luts/srgb.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/luts/srgb.spi1d"
+    },
+    {
+      "bytes": 1728015,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/luts/srgb_inv.spi1d",
+      "git_blob": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677",
+      "sha256": "82be644be7667c32ac656006c1c430b73e4f9765892f9a0bf6ead5961e179806",
+      "upstream_path": "release/datafiles/colormanagement/luts/srgb_inv.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/luts/srgb_inv.spi1d"
+    },
+    {
+      "bytes": 1520,
+      "distribution_relative_path": "license/OpenColorIO.txt",
+      "git_blob": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+      "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc",
+      "upstream_path": "release/license/OpenColorIO.txt",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt"
+    }
+  ],
+  "build_hash": "55485cb379f7",
+  "executable_sha256": "40999207b8b7f8a43a8902535cd6e3a35724b9590cb08715b161c39c5a0119f6",
+  "kind": "public_evaluator_identity_projection_without_private_logs",
+  "ocio_version": "2.1.1",
+  "official_checksum_matches": true,
+  "official_checksum_url": "https://download.blender.org/release/Blender3.4/blender-3.4.1.sha256",
+  "official_index_url": "https://download.blender.org/release/Blender3.4/",
+  "version": "3.4.1"
+}

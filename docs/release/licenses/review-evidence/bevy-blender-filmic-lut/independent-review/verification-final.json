@@ -1,0 +1,214 @@
+{
+  "evaluator": {
+    "archive_sha256": "1497f83f93e9bbbde745422c795ed10fe15f92f5622b4421768f149fbe776981",
+    "executable_sha256": "40999207b8b7f8a43a8902535cd6e3a35724b9590cb08715b161c39c5a0119f6",
+    "historical_bevy_evaluator_established": false,
+    "matches_prior_official_checksum": true,
+    "matches_recorded_executable": true,
+    "production_build": "55485cb379f7",
+    "relevant_data_blob_identity_confirmed": true,
+    "source_tag_commit": "ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a"
+  },
+  "evaluator_rerun": false,
+  "independent_exr_decode": {
+    "run-5": {
+      "all_intermediate_finite": true,
+      "channel_type": "FLOAT32",
+      "compression": "ZIP16",
+      "dimensions": [
+        64,
+        4096
+      ],
+      "line_order": "increasing Y",
+      "linear_exr_equals_output_rgba32": true,
+      "stimulus_equals_top_first_rgba32": true
+    },
+    "run-6": {
+      "all_intermediate_finite": true,
+      "channel_type": "FLOAT32",
+      "compression": "ZIP16",
+      "dimensions": [
+        64,
+        4096
+      ],
+      "line_order": "increasing Y",
+      "linear_exr_equals_output_rgba32": true,
+      "stimulus_equals_top_first_rgba32": true
+    }
+  },
+  "input_assets": [
+    {
+      "bytes": 8234,
+      "git_blob": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+      "matches_recorded_upstream_blob": true,
+      "path": "3.4/datafiles/colormanagement/config.ocio",
+      "sha256": "87b8abe0f57f8b3cb3132f43f84b240666c7f19f4505cedd5abb81df3cda4bf9"
+    },
+    {
+      "bytes": 9121032,
+      "git_blob": "66778b93e4ec6d311114396904de6d9e63849f40",
+      "matches_recorded_upstream_blob": true,
+      "path": "3.4/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+      "sha256": "2c3dcccb5db817156737691924ade43d8daad16282cc6be3a9e242744002a0bb"
+    },
+    {
+      "bytes": 94270,
+      "git_blob": "24f2dffda57577b6898cfd5910e937c897a257c9",
+      "matches_recorded_upstream_blob": true,
+      "path": "3.4/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+      "sha256": "ff0e4cd3745c3d6857c163ee33caa2c796d6c5bddd91859e4646518110bf5b13"
+    },
+    {
+      "bytes": 1460811,
+      "git_blob": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+      "matches_recorded_upstream_blob": true,
+      "path": "3.4/datafiles/colormanagement/luts/srgb.spi1d",
+      "sha256": "0928cc0b9f3c42b8101c67b701dcc4ba002c8a38060f0569522cac1eb7f0ce04"
+    },
+    {
+      "bytes": 1728015,
+      "git_blob": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677",
+      "matches_recorded_upstream_blob": true,
+      "path": "3.4/datafiles/colormanagement/luts/srgb_inv.spi1d",
+      "sha256": "82be644be7667c32ac656006c1c430b73e4f9765892f9a0bf6ead5961e179806"
+    },
+    {
+      "bytes": 1520,
+      "git_blob": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+      "matches_recorded_upstream_blob": true,
+      "path": "license/OpenColorIO.txt",
+      "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc"
+    }
+  ],
+  "invocation_checks": {
+    "run-5": {
+      "ambient_ocio_removed": true,
+      "configuration_acknowledged": true,
+      "current_script_hash_matches": true,
+      "current_stimulus_hash_matches": true,
+      "invocation_sha256": "78df53c74ab7c61b78094990d6fce2b8c1ab57cd04478a7790f9110bb92ef43d",
+      "no_authorization": true,
+      "observation_binding_matches": true,
+      "process_exited_successfully": true
+    },
+    "run-6": {
+      "ambient_ocio_removed": true,
+      "configuration_acknowledged": true,
+      "current_script_hash_matches": true,
+      "current_stimulus_hash_matches": true,
+      "invocation_sha256": "78df53c74ab7c61b78094990d6fce2b8c1ab57cd04478a7790f9110bb92ef43d",
+      "no_authorization": true,
+      "observation_binding_matches": true,
+      "process_exited_successfully": true
+    }
+  },
+  "kind": "independent_read_only_bounded_filmic_audit",
+  "reference": {
+    "all_alpha_1": true,
+    "decoded_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+    "file_sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
+    "git_blob": "db07c847a1879aabe14cbcc1a4d00ec402bc9f1e",
+    "header": {
+      "dfdByteLength": 12,
+      "dfdByteOffset": 104,
+      "faceCount": 1,
+      "kvdByteLength": 0,
+      "kvdByteOffset": 0,
+      "layerCount": 0,
+      "levelCount": 1,
+      "pixelDepth": 64,
+      "pixelHeight": 64,
+      "pixelWidth": 64,
+      "sgdByteLength": 0,
+      "sgdByteOffset": 0,
+      "supercompressionScheme": 2,
+      "typeSize": 1,
+      "vkFormat": 97
+    },
+    "level": [
+      116,
+      308789,
+      2097152
+    ],
+    "path": "bevy_core_pipeline-0.18.1/src/tonemapping/luts/Blender_-11_12.ktx2"
+  },
+  "release_authorized": false,
+  "reviewed_files": {
+    "bevy-recipe.txt": {
+      "bytes": 1172,
+      "git_blob": "43d4b695151f5537811749b7608a0bb69398dbb1",
+      "sha256": "7eb6a83f143929a59b781dad34812489786c9a31b809938b796e8f571d5b6d30"
+    },
+    "gist-evidence/conversion-0.txt": {
+      "bytes": 9106,
+      "git_blob": "1a116947652603a1d902a50ed638348b0b3048be",
+      "sha256": "31dc8e31e282e7c9b3243a24664207936918403312de598107e699615023d00d"
+    },
+    "gist-evidence/stimulus-0.txt": {
+      "bytes": 1465,
+      "git_blob": "f2a4c9a3190cbe30f75b26e13ef409932a181d0d",
+      "sha256": "6b289874908fd89ceab101c33d8e8f0f62910843e62cc790e1335778e2c406ca"
+    },
+    "reproduce.py": {
+      "bytes": 4870,
+      "git_blob": "42ff28c840a3d5356cff9fa814e2c002fb093bc8",
+      "sha256": "79a98984849c468495fd0bd4e99fd990757e9a79707c08d2c3ec5a14d953e602"
+    },
+    "run_pinned.py": {
+      "bytes": 2497,
+      "git_blob": "36d9feef859d65300ee25f1d1b250964b6bf4513",
+      "sha256": "1205cbf58a60680cf7d3f8b974ffad8fa3ba9a7aee7c8345ec3f1de4d18d7c16"
+    },
+    "stimulus.rs": {
+      "bytes": 780,
+      "git_blob": "abcd4945fcc05145993e5254c0cb735ca0afd545",
+      "sha256": "d12c2d58e14c92d54091eb4763eb522ea3a3c387a9a31b2c7ed7b5302b84d625"
+    },
+    "test_comparison.py": {
+      "bytes": 2177,
+      "git_blob": "48efcafd7470e71f425065b5f0e10655862d5b68",
+      "sha256": "82d915153b502e4552ecf4c93f794941a886f4081103370ed3c3dda9a1bbd22e"
+    },
+    "verify_reproduction.py": {
+      "bytes": 7150,
+      "git_blob": "d5422606d7b2763daf01fd9c5ce84d9c026ac20f",
+      "sha256": "1f505fd3d068e05e5a0fd11d175320fd3e2cc9a1c4276674c32bd81663e24aa0"
+    }
+  },
+  "run_observations_identical": true,
+  "runs": {
+    "run-5": {
+      "decoded_bytes": 2097152,
+      "different_bytes": 0,
+      "exact_reference_decoded_bytes": true,
+      "float32_all_finite": true,
+      "float32_alpha_exactly_one": true,
+      "nearest_even_stdlib_conversion_matches": true,
+      "observation_all_file_hashes_valid": true,
+      "observation_sha256": "8a2e3e774e65fc95ee231b01e7589562eb8eed1bf54d62690691077c8371382a",
+      "output16_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+      "output32_sha256": "be58e2309dd3a4c356860d582dcc4d6a4b81d9a6fef60084acc3243dd122c959"
+    },
+    "run-6": {
+      "decoded_bytes": 2097152,
+      "different_bytes": 0,
+      "exact_reference_decoded_bytes": true,
+      "float32_all_finite": true,
+      "float32_alpha_exactly_one": true,
+      "nearest_even_stdlib_conversion_matches": true,
+      "observation_all_file_hashes_valid": true,
+      "observation_sha256": "8a2e3e774e65fc95ee231b01e7589562eb8eed1bf54d62690691077c8371382a",
+      "output16_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+      "output32_sha256": "be58e2309dd3a4c356860d582dcc4d6a4b81d9a6fef60084acc3243dd122c959"
+    }
+  },
+  "stimulus": {
+    "first_level": 8.789062849245965e-05,
+    "last_exposure": 11.640625,
+    "last_level": 574.71142578125,
+    "matches_all_documented_grid_coordinates": true,
+    "order": "R fastest; G next; B slowest; strip x=R,y=64*B+G; alpha=1",
+    "sha256": "34259aa96f64dab1427ed9af0d6f4ae2842673147d0c18376c01dc828ea6bdb7"
+  },
+  "whole_release_review": false
+}

@@ -1,0 +1,23 @@
+{
+  "ambient_ocio_variables_removed_before_start": true,
+  "command_template": [
+    "blender-3.4.1-linux-x64/blender",
+    "--background",
+    "--factory-startup",
+    "-noaudio",
+    "--python-exit-code",
+    "1",
+    "--python",
+    "reproduce.py",
+    "--",
+    "<fresh-output-directory>"
+  ],
+  "explicit_ocio_configuration_acknowledged": true,
+  "kind": "actual_pinned_evaluator_invocation_not_authorization",
+  "observation_sha256": "8a2e3e774e65fc95ee231b01e7589562eb8eed1bf54d62690691077c8371382a",
+  "ocio_configuration_relative_path": "3.4/datafiles/colormanagement/config.ocio",
+  "process_exit_code": 0,
+  "release_authorized": false,
+  "reproduction_script_sha256": "79a98984849c468495fd0bd4e99fd990757e9a79707c08d2c3ec5a14d953e602",
+  "stimulus_sha256": "34259aa96f64dab1427ed9af0d6f4ae2842673147d0c18376c01dc828ea6bdb7"
+}

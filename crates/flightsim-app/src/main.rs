@@ -4504,6 +4504,7 @@ fn update_camera(
     tower: Res<TowerViewAnchor>,
     playback: Option<Res<ReplayPlayback>>,
     mut was_seeking: Local<bool>,
+    mut previous_frame: Local<Option<flightsim_core::RenderFrame>>,
     mut rig: ResMut<CameraRig>,
     mut camera: Query<&mut Transform, With<Camera3d>>,
     aircraft: Query<&Transform, (With<Aircraft>, Without<Camera3d>)>,
@@ -4520,11 +4521,17 @@ fn update_camera(
             playback.as_ref().map_or(0.0, |p| p.elapsed.get())
         );
     }
-    if mode.is_changed() || origin.is_changed() || seeking || *was_seeking {
-        // A rebased origin invalidates smoothed render-space coordinates too.
+    if mode.is_changed() || seeking || *was_seeking {
         // 切り替えた瞬間にカメラが数キロ飛んでいくのを防ぐ。
         rig.reset();
+    } else if origin.is_changed()
+        && let Some(previous) = *previous_frame
+    {
+        // Rebasing changes both the origin and the tangent-plane basis. Keep
+        // the smoothed eye at the same world position before normal following.
+        rig.map_smoothed_position(|eye| origin.0.to_render(previous.to_world(eye)));
     }
+    *previous_frame = Some(origin.0);
     *was_seeking = seeking;
 
     let Ok(aircraft) = aircraft.single() else {

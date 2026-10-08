@@ -1,0 +1,105 @@
+{
+  "checked_at_utc": "2026-10-08T15:29:30Z",
+  "method": "Connected GitHub read-only API; initial web opens failed with cache misses",
+  "configuration_header": {
+    "content": "# OpenColorIO configuration file for Blender\n#\n# Based on aces, nuke-default and spi configurations from OpenColorIO-Config\n#\n# Filmic Dynamic Range LUT configuration crafted by Troy James Sobotka with\n# special thanks and feedback from Guillermo, Claudio Rocha, Bassam Kurdali,\n# Eugenio Pignataro, Henri Hebeisen, Jason Clarke, Haarm-Peter Duiker, Thomas\n# Mansencal, and Timothy Lottes.\n#\n# See ocio-license.txt for details.\n\nocio_profile_version: 2",
+    "encoding": "utf-8",
+    "sha": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+    "display_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio",
+    "display_title": "config.ocio"
+  },
+  "licence": {
+    "content": "Copyright (c) 2003-2010 Sony Pictures Imageworks Inc., et al.\nAll Rights Reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n* Redistributions of source code must retain the above copyright\n  notice, this list of conditions and the following disclaimer.\n* Redistributions in binary form must reproduce the above copyright\n  notice, this list of conditions and the following disclaimer in the\n  documentation and/or other materials provided with the distribution.\n* Neither the name of Sony Pictures Imageworks nor the names of its\n  contributors may be used to endorse or promote products derived from\n  this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\nLIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\nA PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT\nOWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\nSPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\nDATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\nTHEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n",
+    "encoding": "utf-8",
+    "sha": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+    "display_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt",
+    "display_title": "OpenColorIO.txt"
+  },
+  "licence_relocation": {
+    "sha": "0434efa09ddc451675ce8f8e8e7df61f5cc34e89",
+    "message": "Move license files to license subfolder\n\nFor the final builds instead of leaving all the license files in the main\nfolder, we move them to a \"license\" folder.\n\nAlso, adding more licenses here (MIT, Apache, ...).\n\nDifferential Revision: https://developer.blender.org/D8999",
+    "url": "https://github.com/blender/blender/commit/0434efa09ddc451675ce8f8e8e7df61f5cc34e89",
+    "files": [
+      {
+        "sha": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+        "filename": "release/license/OpenColorIO.txt",
+        "status": "renamed",
+        "additions": 0,
+        "deletions": 0,
+        "changes": 0,
+        "blob_url": "https://github.com/blender/blender/blob/0434efa09ddc451675ce8f8e8e7df61f5cc34e89/release%2Flicense%2FOpenColorIO.txt",
+        "raw_url": "https://github.com/blender/blender/raw/0434efa09ddc451675ce8f8e8e7df61f5cc34e89/release%2Flicense%2FOpenColorIO.txt",
+        "contents_url": "https://api.github.com/repos/blender/blender/contents/release%2Flicense%2FOpenColorIO.txt?ref=0434efa09ddc451675ce8f8e8e7df61f5cc34e89",
+        "previous_filename": "release/text/ocio-license.txt"
+      }
+    ]
+  },
+  "tag_tree": {
+    "commit": "ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a",
+    "truncated": false,
+    "url": "https://api.github.com/repos/blender/blender/git/trees/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a?recursive=1",
+    "files": [
+      {
+        "path": "release/datafiles/colormanagement/config.ocio",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+        "size": 8234,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/8f7f2b9aaf48555b100aedbe226f3db2026d34d9"
+      },
+      {
+        "path": "release/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "66778b93e4ec6d311114396904de6d9e63849f40",
+        "size": 9121032,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/66778b93e4ec6d311114396904de6d9e63849f40"
+      },
+      {
+        "path": "release/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "24f2dffda57577b6898cfd5910e937c897a257c9",
+        "size": 94270,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/24f2dffda57577b6898cfd5910e937c897a257c9"
+      },
+      {
+        "path": "release/datafiles/colormanagement/luts/srgb.spi1d",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+        "size": 1460811,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/9959867e472d725b9259e905f2fd4cefd883b4ec"
+      },
+      {
+        "path": "release/datafiles/colormanagement/luts/srgb_inv.spi1d",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677",
+        "size": 1728015,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/2c1452fbb08d8b703e6c4c5c9bca698af95ce677"
+      },
+      {
+        "path": "release/license/OpenColorIO.txt",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+        "size": 1520,
+        "url": "https://api.github.com/repos/blender/blender/git/blobs/3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c"
+      }
+    ]
+  },
+  "filmic_introduction": {
+    "sha": "3cd27374ee53bc2ae3fd08b0b73c0a3118f81020",
+    "message": "Color management: add Filmic view transform to Blender configuration.\n\n* \"Filmic\" and \"False Color\" view transforms added (sRGB display device only).\n* \"Very Low/Low/Base/High/Very High Contrast\" looks added.\n* Added filtering so that Filmic only shows look names prefixed with \"Filmic - \".\n\nFilmic Dynamic Range LUT configuration created by Troy James Sobotka with\nspecial thanks and feedback from Guillermo, Claudio Rocha, Bassam Kurdali,\nEugenio Pignataro, Henri Hebeisen, Jason Clarke, Haarm-Peter Duiker, Thomas\nMansencal, and Timothy Lottes.\n\nDifferential Revision: https://developer.blender.org/D2659",
+    "url": "https://github.com/blender/blender/commit/3cd27374ee53bc2ae3fd08b0b73c0a3118f81020",
+    "config_diff": "@@ -2,11 +2,16 @@\n #\n # Based on aces, nuke-default and spi configurations from OpenColorIO-Config\n #\n+# Filmic Dynamic Range LUT configuration crafted by Troy James Sobotka with\n+# special thanks and feedback from Guillermo, Claudio Rocha, Bassam Kurdali,\n+# Eugenio Pignataro, Henri Hebeisen, Jason Clarke, Haarm-Peter Duiker, Thomas\n+# Mansencal, and Timothy Lottes.\n+#\n # See ocio-license.txt for details.\n \n ocio_profile_version: 1\n \n-search_path: luts\n+search_path: \"luts:filmic\"\n strictparsing: true\n luma: [0.2126, 0.7152, 0.0722]\n \n@@ -17,6 +22,7 @@ roles:\n \n   # Internal scene linear space\n   scene_linear: Linear\n+  rendering: Linear\n \n   # Default color space for byte image\n   default_byte: sRGB\n@@ -31,13 +37,18 @@ roles:\n   color_picking: Raw\n   texture_paint: Raw\n \n+  # Non-color data\n+  data: Non-Color\n+\n displays:\n   sRGB:\n     - !<View> {name: Default, colorspace: sRGB}\n+    - !<View> {name: Filmic, colorspace: Filmic sRGB}\n     - !<View> {name: RRT, colorspace: rrt_srgb}\n     - !<View> {name: Film, colorspace: srgb8}\n     - !<View> {name: Raw, colorspace: Raw}\n     - !<View> {name: Log, colorspace: lg10}\n+    - !<View> {name: False Color, colorspace: False Color}\n   DCI-P3:\n     - !<View> {name: RRT, colorspace: rrt_p3dci}\n     - !<View> {name: Film, colorspace: p3dci8}\n@@ -61,7 +72,7 @@ active_views: [Default, RRT, Raw, Log]\n colorspaces:\n   - !<ColorSpace>\n     name: Linear\n-    family: aces\n+    family: linear\n     equalitygroup:\n     bitdepth: 32f\n     description: |\n@@ -101,7 +112,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: Linear ACES\n-    family:\n+    family: linear\n     equalitygroup:\n     bitdepth: 32f\n     description: |\n@@ -113,7 +124,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: rrt_srgb\n-    family: rrt\n+    family: display\n     equalitygroup:\n     bitdepth: 32f\n     isdata: false\n@@ -141,7 +152,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: rrt_rec709\n-    family: rrt\n+    family: display\n     equalitygroup:\n     bitdepth: 32f\n     isdata: false\n@@ -155,7 +166,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: rrt_p3dci\n-    family: rrt\n+    family: display\n     equalitygroup:\n     bitdepth: 32f\n     isdata: false\n@@ -169,7 +180,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: XYZ\n-    family:\n+    family: linear\n     equalitygroup:\n     bitdepth: 32f\n     isdata: false\n@@ -182,7 +193,7 @@ colorspaces:\n \n   - !<ColorSpace>\n     name: rrt_xyz\n-    family: rrt\n+    family: display\n     equalitygroup:\n     bitdepth: 32f\n     isdata: false\n@@ -287,7 +298,107 @@ colorspaces:\n         - !<ColorSpaceTransform> {src: Linear, dst: lg10}\n         - !<FileTransform> {src: colorworks_filmlg_to_p3.3dl, interpolation: linear}\n \n+  - !<ColorSpace>\n+    name: Filmic Log\n+    family: log\n+    equalitygroup:\n+    bitdepth: 32f\n+    description: |\n+      Log based filmic shaper with 16.5 stops of latitude, and 25 stops of dynamic range.\n+    isdata: false\n+    allocation: lg2\n+    allocationvars: [-12.473931188, 12.526068812]\n+    from_reference: !<GroupTransform>\n+        children:\n+            - !<AllocationTransform> {allocation: lg2, vars: [-12.473931188, 12.526068812]}\n+            - !<FileTransform> {src: filmic_desat65cube.spi3d, interpolation: best}\n+            - !<AllocationTransform> {allocation: uniform, vars: [0, 0.66]}\n+    to_reference: !<AllocationTransform> {allocation: lg2, vars: [-12.473931188, 4.026068812], direction: inverse}\n+\n+  - !<ColorSpace>\n+    name: Filmic sRGB\n+    family: display\n+    equalitygroup:\n+    bitdepth: 32f\n+    description: |\n+      Filmic sRGB view transform\n+    isdata: false\n+    allocation: lg2\n+    allocationvars: [-12.473931188, 12.526068812]\n+    from_reference: !<GroupTransform>\n+        children:\n+            - !<ColorSpaceTransform> {src: Linear, dst: Filmic Log}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear}\n+\n+  - !<ColorSpace>\n+    name: False Color\n+    family: display\n+    equalitygroup:\n+    bitdepth: 32f\n+    description: |\n+      Filmic false color view transform\n+    isdata: false\n+    allocation: lg2\n+    allocationvars: [-12.473931188, 12.526068812]\n+    from_reference: !<GroupTransform>\n+        children:\n+            - !<ColorSpaceTransform> {src: Linear, dst: Filmic Log}\n+            - !<FileTransform> {src: filmic_false_color.spi3d, interpolation: best}\n looks:\n+  - !<Look>\n+    name: Filmic - Very High Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_1.20_1-00.spi1d, interpolation: linear}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n+  - !<Look>\n+    name: Filmic - High Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_0.99_1-0075.spi1d, interpolation: linear}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n+  - !<Look>\n+    name: Filmic - Medium High Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_0-85_1-011.spi1d, interpolation: best}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n+  - !<Look>\n+    name: Filmic - Base Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+\n+  - !<Look>\n+    name: Filmic - Medium Low Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_0-60_1-04.spi1d, interpolation: linear}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n+  - !<Look>\n+    name: Filmic - Low Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_0-48_1-09.spi1d, interpolation: linear}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n+  - !<Look>\n+    name: Filmic - Very Low Contrast\n+    process_space: Filmic Log\n+    transform: !<GroupTransform>\n+        children:\n+            - !<FileTransform> {src: filmic_to_0-35_1-30.spi1d, interpolation: linear}\n+            - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear, direction: inverse}\n+\n   - !<Look>\n     name: Agfa Agfacolor Futura 100\n     process_space: linear"
+  },
+  "bevy_recipe": {
+    "content": "--- Process for recreating AgX-default_contrast.ktx2 ---\nDownload: \nhttps://github.com/MrLixm/AgXc/blob/898198e0490b0551ed81412a0c22e0b72fffb7cd/obs/obs-script/AgX-default_contrast.lut.png\nConvert to vertical strip exr with: \nhttps://gist.github.com/DGriffin91/fc8e0cfd55aaa175ac10199403bc19b8\nConvert exr to 3D ktx2 with:\nhttps://gist.github.com/DGriffin91/49401c43378b58bce32059291097d4ca\n\n--- Process for recreating tony_mc_mapface.ktx2 ---\nDownload: \nhttps://github.com/h3r2tic/tony-mc-mapface/blob/909e51c8a74251fd828770248476cb084081e08c/tony_mc_mapface.dds\nConvert dds to 3D ktx2 with:\nhttps://gist.github.com/DGriffin91/49401c43378b58bce32059291097d4ca\n\n--- Process for recreating Blender_-11_12.ktx2 ---\nCreate LUT stimulus with:\nhttps://gist.github.com/DGriffin91/e119bf32b520e219f6e102a6eba4a0cf\nOpen LUT image in Blender's image editor and make sure color space is set to linear.\nExport from Blender as 32bit EXR, override color space to Filmic sRGB.\nImport EXR back into blender set color space to sRGB, then export as 32bit EXR override color space to linear.\nConvert exr to 3D ktx2 with:\nhttps://gist.github.com/DGriffin91/49401c43378b58bce32059291097d4ca\n",
+    "encoding": "utf-8",
+    "sha": "e3b6b8a17f4296ab6ceb7d2338a1e93965f561ea",
+    "display_url": "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt",
+    "display_title": "info.txt"
+  }
+}

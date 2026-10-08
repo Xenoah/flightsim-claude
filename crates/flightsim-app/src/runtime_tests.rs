@@ -56,7 +56,138 @@ fn camera_app(mode: ViewMode) -> (App, Entity, Entity) {
 }
 
 #[test]
-fn chase_and_free_cameras_do_not_keep_coordinates_from_the_old_origin() {
+fn chase_and_free_cameras_preserve_world_space_following_across_continuous_rebases() {
+    for mode in [ViewMode::Chase, ViewMode::Free] {
+        for dt in [0.0, 0.25] {
+            let (mut app, aircraft, camera) = camera_app(mode);
+            let start = app.world().resource::<RenderOrigin>().0.anchor();
+            // Establish smoothing lag before the ordinary 4 km threshold, then
+            // fly through it in 20 m steps, with no teleport or explicit reset.
+            move_camera_aircraft(
+                &mut app,
+                aircraft,
+                start.offset_by(Meters(3970.0), Meters::ZERO),
+            );
+            app.update();
+            move_camera_aircraft(
+                &mut app,
+                aircraft,
+                start.offset_by(Meters(3990.0), Meters::ZERO),
+            );
+            app.world_mut()
+                .resource_mut::<Time>()
+                .advance_by(std::time::Duration::from_secs_f64(0.125));
+            app.update();
+            assert_eq!(app.world().resource::<RenderOrigin>().0.anchor(), start);
+            assert!(
+                (app.world().get::<Transform>(camera).unwrap().translation
+                    - camera_follow_target(&app, aircraft, mode))
+                .length()
+                    > 10.0,
+                "the rebase fixture must start with an existing smoothing lag"
+            );
+            for north in [4010.0, 4030.0] {
+                let previous_eye = camera_world_eye(&app, camera);
+                move_camera_aircraft(
+                    &mut app,
+                    aircraft,
+                    start.offset_by(Meters(north), Meters::ZERO),
+                );
+                app.world_mut()
+                    .resource_mut::<Time>()
+                    .advance_by(std::time::Duration::from_secs_f64(dt));
+                app.update();
+                let frame = app.world().resource::<RenderOrigin>().0;
+                assert_ne!(frame.anchor(), start, "the threshold must actually rebase");
+                let target = frame.to_world(camera_follow_target(&app, aircraft, mode));
+                let alpha = 1.0 - (-dt / 0.25).exp();
+                let expected = previous_eye.0.lerp(target.0, alpha);
+                let actual = camera_world_eye(&app, camera);
+                assert!(
+                    (actual.0 - expected).length() < 0.001,
+                    "{mode:?}, dt {dt}: the rebase changed world-space following"
+                );
+                assert!(
+                    (actual.0 - target.0).length() > 5.0,
+                    "{mode:?}, dt {dt}: smoothing lag was discarded"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn chase_and_free_camera_eyes_stay_fixed_when_only_the_render_basis_changes() {
+    for mode in [ViewMode::Chase, ViewMode::Free] {
+        let (mut app, aircraft, camera) = camera_app(mode);
+        app.update();
+        let start = app.world().resource::<RenderOrigin>().0.anchor();
+        move_camera_aircraft(
+            &mut app,
+            aircraft,
+            start.offset_by(Meters(500.0), Meters(300.0)),
+        );
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_secs_f64(0.125));
+        app.update();
+        let before = camera_world_eye(&app, camera);
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::ZERO);
+        // Move only the render observer. The aircraft and smoothed world eye
+        // must stay put, including when rebasing back on the following frame.
+        for anchor in [Geodetic::from_degrees(35.60, 139.84, 0.0), start] {
+            let previous = app.world().resource::<RenderOrigin>().0;
+            let old_render_eye = app.world().get::<Transform>(camera).unwrap().translation;
+            app.world_mut().resource_mut::<CameraWorldPosition>().0 = anchor;
+            app.update();
+            let frame = app.world().resource::<RenderOrigin>().0;
+            assert_eq!(frame.anchor(), anchor);
+            let actual = camera_world_eye(&app, camera);
+            assert!(
+                (actual.0 - before.0).length() < 0.001,
+                "{mode:?}: a basis-only change moved the world eye"
+            );
+            // This fixture must reject a translation-only repair: tangent-plane
+            // axes rotate too, not just the coordinates of the origin.
+            let translation_only = old_render_eye + frame.to_render(previous.to_world(Vec3::ZERO));
+            assert!(
+                (frame.to_world(translation_only).0 - before.0).length() > 0.01,
+                "the fixture must expose the changed tangent basis"
+            );
+        }
+    }
+}
+
+fn move_camera_aircraft(app: &mut App, aircraft: Entity, position: Geodetic) {
+    app.world_mut().resource_mut::<CameraWorldPosition>().0 = position;
+    app.world_mut()
+        .get_mut::<WorldPosition>(aircraft)
+        .unwrap()
+        .0 = position.to_ecef();
+}
+
+fn camera_world_eye(app: &App, camera: Entity) -> flightsim_core::Ecef {
+    app.world()
+        .resource::<RenderOrigin>()
+        .0
+        .to_world(app.world().get::<Transform>(camera).unwrap().translation)
+}
+
+fn camera_follow_target(app: &App, aircraft: Entity, mode: ViewMode) -> Vec3 {
+    let plane = app.world().get::<Transform>(aircraft).unwrap();
+    match mode {
+        ViewMode::Chase => {
+            plane.translation + plane.rotation * Vec3::new(-35.0, 0.0, 0.0) + Vec3::Y * 10.0
+        }
+        ViewMode::Free => plane.translation + Vec3::new(120.0, 60.0, 120.0),
+        _ => panic!("this fixture requires a smoothed camera"),
+    }
+}
+
+#[test]
+fn explicitly_reset_chase_and_free_cameras_snap_after_a_teleport_and_rebase() {
     for mode in [ViewMode::Chase, ViewMode::Free] {
         let (mut app, aircraft, camera) = camera_app(mode);
         app.update();
@@ -66,6 +197,8 @@ fn chase_and_free_cameras_do_not_keep_coordinates_from_the_old_origin() {
             .get_mut::<WorldPosition>(aircraft)
             .unwrap()
             .0 = far.to_ecef();
+        app.world_mut().resource_mut::<CameraRig>().reset();
+        assert!(!app.world().resource::<CameraRig>().is_initialised());
         app.update();
         let plane = app.world().get::<Transform>(aircraft).unwrap();
         let actual = app.world().get::<Transform>(camera).unwrap().translation;
@@ -89,6 +222,64 @@ fn chase_and_free_cameras_do_not_keep_coordinates_from_the_old_origin() {
             app.world().get::<Transform>(camera).unwrap().translation,
             actual
         );
+    }
+}
+
+#[test]
+fn view_changes_take_precedence_over_rebase_transport() {
+    for (before, after) in [
+        (ViewMode::Chase, ViewMode::Free),
+        (ViewMode::Free, ViewMode::Chase),
+    ] {
+        let (mut app, aircraft, camera) = camera_app(before);
+        app.update();
+        move_camera_aircraft(
+            &mut app,
+            aircraft,
+            Geodetic::from_degrees(35.60, 139.78, 0.0),
+        );
+        *app.world_mut().resource_mut::<ViewMode>() = after;
+        app.update();
+        assert_eq!(
+            app.world().get::<Transform>(camera).unwrap().translation,
+            camera_follow_target(&app, aircraft, after)
+        );
+    }
+}
+
+#[test]
+fn seeking_and_the_first_frame_after_seeking_snap_even_during_rebases() {
+    for mode in [ViewMode::Chase, ViewMode::Free] {
+        let (mut app, aircraft, camera) = camera_app(mode);
+        app.update();
+        let mut sim = simulation();
+        let recording =
+            single_frame_recording(sim.0.state(), flightsim_sim::replay::Conditions::default());
+        let mut playback = ReplayPlayback::new(flightsim_sim::ReplayFile::V1(recording));
+        playback.rewind(sim.0.legacy_mut());
+        assert!(playback.is_seeking());
+        app.insert_resource(playback);
+        for latitude in [35.60, 35.65] {
+            move_camera_aircraft(
+                &mut app,
+                aircraft,
+                Geodetic::from_degrees(latitude, 139.78, 0.0),
+            );
+            app.update();
+            assert_eq!(
+                app.world().get::<Transform>(camera).unwrap().translation,
+                camera_follow_target(&app, aircraft, mode)
+            );
+            app.world_mut().remove_resource::<ReplayPlayback>();
+        }
+        let after_seek = camera_world_eye(&app, camera);
+        move_camera_aircraft(
+            &mut app,
+            aircraft,
+            Geodetic::from_degrees(35.65, 139.78, 0.0).offset_by(Meters(20.0), Meters::ZERO),
+        );
+        app.update();
+        assert_eq!(camera_world_eye(&app, camera), after_seek);
     }
 }
 

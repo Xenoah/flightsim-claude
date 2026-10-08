@@ -1,0 +1,11 @@
+{
+  "command": "python -m unittest discover -s . -p test_comparison.py -v",
+  "errors": 0,
+  "failures": 0,
+  "kind": "synthetic_comparison_unit_tests_not_runtime_evidence",
+  "passed": 6,
+  "release_authorized": false,
+  "skipped": 0,
+  "tests_sha256": "82d915153b502e4552ecf4c93f794941a886f4081103370ed3c3dda9a1bbd22e",
+  "total": 6
+}

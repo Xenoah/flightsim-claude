@@ -1,0 +1,37 @@
+{
+  "bevy_recipe": {
+    "bytes": 1171,
+    "sha256": "e49669e0d8444697e9a564169c11620dc8b9a80c65bacdc4226613b636ea626b"
+  },
+  "bevy_recipe_blob": "e3b6b8a17f4296ab6ceb7d2338a1e93965f561ea",
+  "gists": [
+    {
+      "downloaded_code_executed": false,
+      "full_gist_in_packet": false,
+      "id": "e119bf32b520e219f6e102a6eba4a0cf",
+      "purpose": "stimulus",
+      "retrieved_text": {
+        "bytes": 1465,
+        "sha256": "6b289874908fd89ceab101c33d8e8f0f62910843e62cc790e1335778e2c406ca"
+      },
+      "revision": "a9aa0fe151d98ba0f706f8225fce919b1d0fb2b9",
+      "revision_date": "2023-02-17T21:57:46Z",
+      "upstream_raw_url": "https://gist.githubusercontent.com/DGriffin91/e119bf32b520e219f6e102a6eba4a0cf/raw/f2a4c9a3190cbe30f75b26e13ef409932a181d0d/main.rs",
+      "url": "https://gist.github.com/DGriffin91/e119bf32b520e219f6e102a6eba4a0cf"
+    },
+    {
+      "downloaded_code_executed": false,
+      "full_gist_in_packet": false,
+      "id": "49401c43378b58bce32059291097d4ca",
+      "purpose": "conversion",
+      "retrieved_text": {
+        "bytes": 9106,
+        "sha256": "31dc8e31e282e7c9b3243a24664207936918403312de598107e699615023d00d"
+      },
+      "revision": "820776c9c34fbc5ce9e9cca868b85441a382897f",
+      "revision_date": "2023-02-17T21:47:51Z",
+      "upstream_raw_url": "https://gist.githubusercontent.com/DGriffin91/49401c43378b58bce32059291097d4ca/raw/1a116947652603a1d902a50ed638348b0b3048be/main.rs",
+      "url": "https://gist.github.com/DGriffin91/49401c43378b58bce32059291097d4ca"
+    }
+  ]
+}

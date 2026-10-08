@@ -1,0 +1,84 @@
+{
+  "asset": {
+    "bytes": 308905,
+    "feature": "tonemapping_luts",
+    "id": "bevy-blender-filmic-lut",
+    "package": "bevy_core_pipeline",
+    "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
+    "source_path": "src/tonemapping/luts/Blender_-11_12.ktx2",
+    "version": "0.18.1"
+  },
+  "determination": {
+    "asset_bytes_modified": false,
+    "basis": "Exact decoded-byte reproduction using pinned Blender configuration and associated numeric tables. Applying the configuration-level notice reference to those tables is explicit scope inference, independently assessed in the preserved source review.",
+    "candidate_manifest_state": "licensed_with_notices",
+    "decoded_bytes": 2097152,
+    "decoded_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+    "historical_evaluator_version_established": false,
+    "individual_table_license_headers_present": false,
+    "notices": [
+      {
+        "bytes": 1520,
+        "path": "docs/release/licenses/Blender-Filmic-OpenColorIO-LICENSE",
+        "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc"
+      },
+      {
+        "bytes": 2054,
+        "path": "docs/release/licenses/Blender-Filmic-NOTICE.txt",
+        "sha256": "f3e625d50741f33f0ef700f5732fe8f06fccf466110f64ca3d38f0bb2844dcce"
+      }
+    ],
+    "selected_source_notice_route": "BSD-3-Clause"
+  },
+  "evidence": {
+    "exact_comparison": {
+      "bytes": 1693,
+      "path": "docs/release/licenses/review-evidence/bevy-blender-filmic-lut/final-comparison.json",
+      "sha256": "3a2b13aee6f628925ef039de8ec2f2bcbc99a25a87fc24c5c278d60702bf0c64"
+    },
+    "independent_source_review": {
+      "bytes": 3433,
+      "path": "docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/review-result.json",
+      "sha256": "39e08d498bceaaac70bb97113cf895b949fde7b6a1ebf853ec3b2ad3a59605c9"
+    },
+    "packet_manifest": {
+      "bytes": 4916,
+      "path": "docs/release/licenses/review-evidence/bevy-blender-filmic-lut/MANIFEST.json",
+      "sha256": "f79bcb6bf7fcc86ce5eefb0bb15b66c3237e65b921dd9e2ce8178ee342f71d57"
+    },
+    "prior_packet_archive_sha256": "e6208cdca88abbde45782a5e7f2b969e6ba506ad42a03e6e61b7eedbec86e217",
+    "source_bindings": {
+      "bytes": 8113,
+      "path": "docs/release/licenses/review-evidence/bevy-blender-filmic-lut/source-bindings.json",
+      "sha256": "4d1df18e012858045db0f3cad2d5c12139c3d8ac2ab86e29001d8aa7dae66b64"
+    }
+  },
+  "kind": "single-embedded-asset-source-rights-decision",
+  "native_platform_review_complete": false,
+  "release_authorized": false,
+  "remaining_scopes": [
+    "AgX specific source grant",
+    "Light Single generation/task/input entitlement",
+    "whole dependency and Microsoft/platform obligations",
+    "final same-bundle runtime and UI acceptance",
+    "user variant choice and independently reviewed publication decision"
+  ],
+  "runtime_appearance_accepted": false,
+  "schema_version": 1,
+  "scope": "Only the exact unchanged bevy-blender-filmic-lut source-rights and notice route; not a whole-target dependency review or publication decision.",
+  "source_observation": {
+    "candidate_requires_fresh_inventory": true,
+    "prior_inventory_edited": false,
+    "prior_native_inventory": {
+      "bytes": 417334,
+      "path": "docs/release/licenses/review-evidence/bevy-blender-filmic-lut/prior-native-inventory.json",
+      "sha256": "64635e2d9bd322de6a6282daf7a83f7de1e69bfcc11f1c7c92265021557a8087"
+    },
+    "repository": "Xenoah/flightsim-claude",
+    "source_sha": "fe7373e96396131ef4a1c2a9af9cfabdb8aab82b",
+    "source_tree": "6dc4d8ed190ccc43733182d03e089f84f0eaaef6"
+  },
+  "status": "proposed_exact_asset_acceptance_for_independent_integration_review",
+  "user_variant_choice_recorded": false,
+  "whole_target_dependency_review_complete": false
+}

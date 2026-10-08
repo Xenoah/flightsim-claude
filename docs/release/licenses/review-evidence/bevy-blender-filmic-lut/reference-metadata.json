@@ -1,0 +1,58 @@
+{
+  "candidate": {
+    "blender_version_is_original_bevy_generation_version": false,
+    "config_blob": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+    "input_blobs": {
+      "filmic/filmic_desat65cube.spi3d": "66778b93e4ec6d311114396904de6d9e63849f40",
+      "filmic/filmic_to_0-70_1-03.spi1d": "24f2dffda57577b6898cfd5910e937c897a257c9",
+      "luts/srgb.spi1d": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+      "luts/srgb_inv.spi1d": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677"
+    },
+    "license_blob": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+    "license_path": "release/license/OpenColorIO.txt",
+    "license_route": "Blender configuration header references the relocated Sony BSD-3-Clause notice; independent exact-asset assessment remains required",
+    "repository": "blender/blender",
+    "source_commit": "ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a",
+    "tag_object": "96653d8c789f1c1373cde44c462d1ee3a7974622",
+    "version": "v3.4.1"
+  },
+  "existing_lut_modified": false,
+  "history": {
+    "all_configuration_versions_identical_proven": false,
+    "blender_filmic_introduction": "3cd27374ee53bc2ae3fd08b0b73c0a3118f81020",
+    "blender_filmic_introduction_date": "2017-05-07T14:41:38Z",
+    "filmic_1d_changes_through_v3_4_1": 1,
+    "filmic_3d_changes_through_v3_4_1": 2,
+    "filmic_3d_only_later_change": "f405934fe3d31e650cec9af48a4b6c69fd771b1f changes SPILUT to spilut in header only",
+    "license_relocation_commit": "0434efa09ddc451675ce8f8e8e7df61f5cc34e89"
+  },
+  "kind": "filmic_reproduction_candidate_not_asset_clearance",
+  "reference": {
+    "bytes": 308905,
+    "decoded_bytes": 2097152,
+    "decoded_format": "64x64x64 RGBA16F little-endian, all alpha=1",
+    "decoded_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+    "git_blob": "db07c847a1879aabe14cbcc1a4d00ec402bc9f1e",
+    "introduction_commit": "912fb5886908373db2b7c0140ae15961ccd92f72",
+    "introduction_date": "2023-02-19T20:38:13Z",
+    "path": "crates/bevy_core_pipeline/src/tonemapping/luts/Blender_-11_12.ktx2",
+    "recipe_blob": "e3b6b8a17f4296ab6ceb7d2338a1e93965f561ea",
+    "repository": "bevyengine/bevy",
+    "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
+    "version": "v0.18.1"
+  },
+  "release_authorized": false,
+  "review": {
+    "actual_final_runs": [
+      "run-5",
+      "run-6"
+    ],
+    "decoded_reproduction_performed": true,
+    "exact_decoded_bytes_equal": true,
+    "existing_lut_cleared": false,
+    "ktx2_key_value_metadata_bytes": 0,
+    "original_blender_version_found": false,
+    "pr_6677_comments_examined": 287,
+    "pr_7594_comments_examined": 216
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "all_grid_coordinates_verified": true,
+  "completed_at_utc": "2026-10-08T15:39:11.452497+00:00",
+  "config_selection_concern_resolved_by_hardened_driver": true,
+  "documented_bsd_notice_route_supported": true,
+  "evaluator_rerun_by_reviewer": false,
+  "exact_decoded_reproduction_verified": true,
+  "existing_lut_cleared": false,
+  "final_assessment_reviewed": {
+    "config_level_notice_scope_inference_explicit": true,
+    "sha256": "68e9041f4189ab6e93a34840a6dc6dde2c3bc7de0f378e8e49a909ab4fad0436",
+    "srgb_inverse_consumption_not_asserted": true
+  },
+  "final_runs": [
+    "run-5",
+    "run-6"
+  ],
+  "historical_bevy_blender_version_established": false,
+  "independent_zip_exr_decode_verified": true,
+  "kind": "independent_bounded_review_not_authorization",
+  "notice_scope_basis": "Inference from explicit configuration attribution/license cross-reference, associated referenced table distribution, and unchanged notice relocation; tables do not have individual licence headers.",
+  "packaged_bevy_recipe_exact": true,
+  "packaged_final_observations_and_invocations_match_reviewed_files": true,
+  "packaged_scripts_match_reviewed_scripts": true,
+  "packaged_upstream_notice_exact": true,
+  "per_file_runtime_read_trace_performed": false,
+  "portable_verifier": {
+    "default_runs": [
+      "run-5",
+      "run-6"
+    ],
+    "explicit_base_and_reference_arguments": true,
+    "output_uses_upstream_relative_reference_label": true,
+    "successful_rerun_after_portability_change": true
+  },
+  "reference_modified": false,
+  "release_authorized": false,
+  "review_artifacts": {
+    "review.md": {
+      "bytes": 10817,
+      "sha256": "4dd26392f6831d829035493546b1a44b0e437689acf8a422a9dd76ae22a7a3bf"
+    },
+    "source-evidence.json": {
+      "bytes": 15356,
+      "sha256": "b02ecfba830af8707c07897319adb270148cdb8fbbcf47fd4aad9c792d6a9684"
+    },
+    "verification-final.json": {
+      "bytes": 7937,
+      "sha256": "0b45705bcb5f320179e5ac6ecd5b1ebd8e46e191fd7544d6e3420d4fe04c9211"
+    },
+    "verify.py": {
+      "bytes": 10025,
+      "sha256": "188b935441cae939baf819f4d03f93c59c1cbac896dffb34dcb595cd3db172cd"
+    }
+  },
+  "reviewed_scripts": {
+    "reproduce.py": {
+      "bytes": 4870,
+      "git_blob": "42ff28c840a3d5356cff9fa814e2c002fb093bc8",
+      "sha256": "79a98984849c468495fd0bd4e99fd990757e9a79707c08d2c3ec5a14d953e602"
+    },
+    "run_pinned.py": {
+      "bytes": 2497,
+      "git_blob": "36d9feef859d65300ee25f1d1b250964b6bf4513",
+      "sha256": "1205cbf58a60680cf7d3f8b974ffad8fa3ba9a7aee7c8345ec3f1de4d18d7c16"
+    },
+    "stimulus.rs": {
+      "bytes": 780,
+      "git_blob": "abcd4945fcc05145993e5254c0cb735ca0afd545",
+      "sha256": "d12c2d58e14c92d54091eb4763eb522ea3a3c387a9a31b2c7ed7b5302b84d625"
+    },
+    "test_comparison.py": {
+      "bytes": 2177,
+      "git_blob": "48efcafd7470e71f425065b5f0e10655862d5b68",
+      "sha256": "82d915153b502e4552ecf4c93f794941a886f4081103370ed3c3dda9a1bbd22e"
+    },
+    "verify_reproduction.py": {
+      "bytes": 7150,
+      "git_blob": "d5422606d7b2763daf01fd9c5ce84d9c026ac20f",
+      "sha256": "1f505fd3d068e05e5a0fd11d175320fd3e2cc9a1c4276674c32bd81663e24aa0"
+    }
+  },
+  "rounding_independently_verified": true,
+  "source_blobs_verified_against_fresh_upstream_tag_tree": true,
+  "synthetic_comparison_tests": {
+    "actual_transform_evidence": false,
+    "passed": 6,
+    "run_count": 6
+  },
+  "whole_release_rights_review_complete": false
+}

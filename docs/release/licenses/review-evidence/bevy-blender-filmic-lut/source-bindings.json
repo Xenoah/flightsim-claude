@@ -1,0 +1,173 @@
+{
+  "actual_final_runs": [
+    "run-5",
+    "run-6"
+  ],
+  "assets": [
+    {
+      "bytes": 8234,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/config.ocio",
+      "git_blob": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+      "sha256": "87b8abe0f57f8b3cb3132f43f84b240666c7f19f4505cedd5abb81df3cda4bf9",
+      "upstream_path": "release/datafiles/colormanagement/config.ocio",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio"
+    },
+    {
+      "bytes": 9121032,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+      "git_blob": "66778b93e4ec6d311114396904de6d9e63849f40",
+      "sha256": "2c3dcccb5db817156737691924ade43d8daad16282cc6be3a9e242744002a0bb",
+      "upstream_path": "release/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/filmic/filmic_desat65cube.spi3d"
+    },
+    {
+      "bytes": 94270,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+      "git_blob": "24f2dffda57577b6898cfd5910e937c897a257c9",
+      "sha256": "ff0e4cd3745c3d6857c163ee33caa2c796d6c5bddd91859e4646518110bf5b13",
+      "upstream_path": "release/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/filmic/filmic_to_0-70_1-03.spi1d"
+    },
+    {
+      "bytes": 1460811,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/luts/srgb.spi1d",
+      "git_blob": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+      "sha256": "0928cc0b9f3c42b8101c67b701dcc4ba002c8a38060f0569522cac1eb7f0ce04",
+      "upstream_path": "release/datafiles/colormanagement/luts/srgb.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/luts/srgb.spi1d"
+    },
+    {
+      "bytes": 1728015,
+      "distribution_relative_path": "3.4/datafiles/colormanagement/luts/srgb_inv.spi1d",
+      "git_blob": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677",
+      "sha256": "82be644be7667c32ac656006c1c430b73e4f9765892f9a0bf6ead5961e179806",
+      "upstream_path": "release/datafiles/colormanagement/luts/srgb_inv.spi1d",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/luts/srgb_inv.spi1d"
+    },
+    {
+      "bytes": 1520,
+      "distribution_relative_path": "license/OpenColorIO.txt",
+      "git_blob": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+      "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc",
+      "upstream_path": "release/license/OpenColorIO.txt",
+      "upstream_url": "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt"
+    }
+  ],
+  "candidate": {
+    "blender_version_is_original_bevy_generation_version": false,
+    "config_blob": "8f7f2b9aaf48555b100aedbe226f3db2026d34d9",
+    "input_blobs": {
+      "filmic/filmic_desat65cube.spi3d": "66778b93e4ec6d311114396904de6d9e63849f40",
+      "filmic/filmic_to_0-70_1-03.spi1d": "24f2dffda57577b6898cfd5910e937c897a257c9",
+      "luts/srgb.spi1d": "9959867e472d725b9259e905f2fd4cefd883b4ec",
+      "luts/srgb_inv.spi1d": "2c1452fbb08d8b703e6c4c5c9bca698af95ce677"
+    },
+    "license_blob": "3dfcc78df9ef0cfa7b8f79f9e374beb549f5a15c",
+    "license_path": "release/license/OpenColorIO.txt",
+    "license_route": "Blender configuration header references the relocated Sony BSD-3-Clause notice; independent exact-asset assessment remains required",
+    "repository": "blender/blender",
+    "source_commit": "ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a",
+    "tag_object": "96653d8c789f1c1373cde44c462d1ee3a7974622",
+    "version": "v3.4.1"
+  },
+  "exact_distribution_assets_match_pinned_upstream_git_blobs": true,
+  "existing_lut_modified": false,
+  "existing_native_addendum": {
+    "modified": false,
+    "name": "FlightSim_Native_Rights_Fe7373e_Addendum.zip",
+    "sha256": "d19b10ffb58255493f055b2240edcff5892d3d7f7b0aeb2fa548265d030a98bb"
+  },
+  "existing_rights_checkpoint": {
+    "modified": false,
+    "name": "flightsim-analytical-license-review.zip",
+    "sha256": "df20e40727659f940a3e1b772dc92f2f6a5d2850299ceeb11f21b2c8333350e1",
+    "version": 6
+  },
+  "generation": {
+    "compile_command": [
+      "rustc",
+      "-O",
+      "stimulus.rs",
+      "-o",
+      "stimulus-generator"
+    ],
+    "generator_executable": {
+      "bytes": 3904688,
+      "sha256": "6d86ee1712a41ff21e594ab9fa2babac781a2b9c11a53f9ee25b31061847be31"
+    },
+    "recompiled_stimulus_identical": true,
+    "rustc_commit": "254b59607d4417e9dffbc307138ae5c86280fe4c",
+    "rustc_host": "x86_64-unknown-linux-gnu",
+    "rustc_version": "1.93.0",
+    "stimulus": {
+      "bytes": 4194304,
+      "sha256": "34259aa96f64dab1427ed9af0d6f4ae2842673147d0c18376c01dc828ea6bdb7"
+    }
+  },
+  "history": {
+    "all_configuration_versions_identical_proven": false,
+    "blender_filmic_introduction": "3cd27374ee53bc2ae3fd08b0b73c0a3118f81020",
+    "blender_filmic_introduction_date": "2017-05-07T14:41:38Z",
+    "filmic_1d_changes_through_v3_4_1": 1,
+    "filmic_3d_changes_through_v3_4_1": 2,
+    "filmic_3d_only_later_change": "f405934fe3d31e650cec9af48a4b6c69fd771b1f changes SPILUT to spilut in header only",
+    "license_relocation_commit": "0434efa09ddc451675ce8f8e8e7df61f5cc34e89"
+  },
+  "kind": "pinned_filmic_source_derivation_evidence_not_authorization",
+  "official_evaluator": {
+    "archive_bytes": 223772600,
+    "archive_sha256": "1497f83f93e9bbbde745422c795ed10fe15f92f5622b4421768f149fbe776981",
+    "archive_url": "https://download.blender.org/release/Blender3.4/blender-3.4.1-linux-x64.tar.xz",
+    "executable_sha256": "40999207b8b7f8a43a8902535cd6e3a35724b9590cb08715b161c39c5a0119f6",
+    "official_checksum_matches": true,
+    "official_checksum_url": "https://download.blender.org/release/Blender3.4/blender-3.4.1.sha256",
+    "official_index_url": "https://download.blender.org/release/Blender3.4/"
+  },
+  "reference": {
+    "bytes": 308905,
+    "decoded_bytes": 2097152,
+    "decoded_format": "64x64x64 RGBA16F little-endian, all alpha=1",
+    "decoded_sha256": "b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd",
+    "git_blob": "db07c847a1879aabe14cbcc1a4d00ec402bc9f1e",
+    "introduction_commit": "912fb5886908373db2b7c0140ae15961ccd92f72",
+    "introduction_date": "2023-02-19T20:38:13Z",
+    "path": "crates/bevy_core_pipeline/src/tonemapping/luts/Blender_-11_12.ktx2",
+    "recipe_blob": "e3b6b8a17f4296ab6ceb7d2338a1e93965f561ea",
+    "repository": "bevyengine/bevy",
+    "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
+    "version": "v0.18.1"
+  },
+  "related_source": {
+    "repository": "Xenoah/flightsim-claude",
+    "sha": "fe7373e96396131ef4a1c2a9af9cfabdb8aab82b",
+    "source_modified": false,
+    "tree": "6dc4d8ed190ccc43733182d03e089f84f0eaaef6"
+  },
+  "release_authorized": false,
+  "runtime_build_hash": "55485cb379f7",
+  "runtime_ocio_version": "2.1.1",
+  "runtime_version": "3.4.1",
+  "scripts": {
+    "reproduce.py": {
+      "bytes": 4870,
+      "sha256": "79a98984849c468495fd0bd4e99fd990757e9a79707c08d2c3ec5a14d953e602"
+    },
+    "run_pinned.py": {
+      "bytes": 2497,
+      "sha256": "1205cbf58a60680cf7d3f8b974ffad8fa3ba9a7aee7c8345ec3f1de4d18d7c16"
+    },
+    "stimulus.rs": {
+      "bytes": 780,
+      "sha256": "d12c2d58e14c92d54091eb4763eb522ea3a3c387a9a31b2c7ed7b5302b84d625"
+    },
+    "test_comparison.py": {
+      "bytes": 2177,
+      "sha256": "82d915153b502e4552ecf4c93f794941a886f4081103370ed3c3dda9a1bbd22e"
+    },
+    "verify_reproduction.py": {
+      "bytes": 7150,
+      "sha256": "1f505fd3d068e05e5a0fd11d175320fd3e2cc9a1c4276674c32bd81663e24aa0"
+    }
+  },
+  "whole_release_rights_review_complete": false
+}

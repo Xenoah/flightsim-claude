@@ -1626,7 +1626,7 @@ def run_candidate(repo, expected, work, evidence, *, diagnose_readback=False):
               "features": FEATURES, "default_features": True, "release_authorized": False,
               "status": "failed", "checks": {}, "limits": [
                   "Engineering acceptance only; rights, dependency review and release authorization remain independent",
-                  "Bundled AgX/Filmic LUTs remain enabled and retain unresolved review records",
+                  "Bundled AgX/Filmic LUTs remain enabled; Filmic has a scoped source-notice decision, while AgX rights and whole-target dependency review remain unresolved",
                   "Software D3D12 fallback is not physical GPU/controller/audio or Steam qualification",
                   LEGACY_LIMIT],
               "commands": candidate_commands(), "runtime_capture_rust_log": CAPTURE_TRACE}

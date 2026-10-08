@@ -116,6 +116,39 @@ class RuntimeFactsTests(unittest.TestCase):
         self.assertEqual(value['microsoft']['sdk_candidates'], [])
         self.assertIsNone(value['microsoft']['vswhere'])
 
+    def test_windows_uppercase_environment_discovers_and_replays_candidates(self):
+        # CPython os.environ supplies uppercase keys on Windows, unlike the
+        # mixed-case synthetic mapping used by the original discovery fixture.
+        supplied = {'PROGRAMFILES(X86)': str(self.program), 'RUSTUP_AUTO_INSTALL': '1'}
+        value = self.collect(env=supplied)
+        self.assertEqual(value['microsoft']['vswhere']['status'], 'observed')
+        self.assertEqual(len(value['microsoft']['visual_studio_candidates']), 1)
+        self.assertEqual(len(value['microsoft']['sdk_candidates']), 1)
+        manifest = json.loads((self.private / facts.PRIVATE_NAME).read_bytes())
+        self.assertEqual(manifest['discovery_roots'], {'program_files_x86': str(self.program)})
+        self.assertEqual(facts.project(self.private), value)
+        self.assertEqual(facts.project(self.private, recheck_installed=False), value)
+        self.assertNotIn(str(self.program), facts.canonical(value).decode())
+        self.assertEqual(supplied['RUSTUP_AUTO_INSTALL'], '1')
+        self.assertEqual(value['microsoft']['selected_sdk'], facts.UNKNOWN)
+        self.assertEqual(value['microsoft']['static_contributions'], facts.UNKNOWN)
+
+    def test_environment_case_aliases_are_canonical_and_ambiguity_fails_closed(self):
+        for key in ('PROGRAMFILES(X86)', 'ProgramFiles(x86)', 'programfiles(x86)'):
+            with self.subTest(key=key):
+                original = {key: str(self.program), 'rustup_auto_install': '1'}
+                collector = facts.Collector(self.root, original)
+                self.assertEqual(collector.env, {'PROGRAMFILES(X86)': str(self.program),
+                                                  'RUSTUP_AUTO_INSTALL': '0'})
+                self.assertEqual(original, {key: str(self.program), 'rustup_auto_install': '1'})
+        same = {'ProgramFiles(x86)': str(self.program), 'PROGRAMFILES(X86)': str(self.program)}
+        self.assertEqual(facts.Collector(self.root, same).env['PROGRAMFILES(X86)'], str(self.program))
+        for aliases in (same | {'PROGRAMFILES(X86)': str(self.root / 'foreign')},
+                        {'RUSTUP_AUTO_INSTALL': '0', 'rustup_auto_install': '1'}):
+            with self.subTest(aliases=aliases):
+                with self.assertRaisesRegex(ValueError, 'conflicting environment key aliases'):
+                    facts.Collector(self.root, aliases)
+
     def test_cfg_probe_separated_from_defaults_and_actual_build(self):
         self.outputs['rustc-recipe-cfg'] = self.cfg.replace('panic="unwind"', 'panic="abort"') + 'target_feature="crt-static"\n'
         value = self.collect()
@@ -354,6 +387,8 @@ class RuntimeFactsTests(unittest.TestCase):
         self.assertEqual(link['implicit_sdk_selection'], facts.UNKNOWN)
         self.assertEqual(link['actual_static_membership'], facts.UNKNOWN)
         self.assertNotIn(str(self.root), facts.canonical(value).decode())
+        self.assertEqual(link['trace_observation'], dict.fromkeys(facts.TRACE_COUNTERS, 1)
+                         | {'rejected_command_lines': 0})
         self.assertEqual(facts.project(self.private), value)
 
     def test_duplicate_final_link_is_unknown(self):
@@ -385,6 +420,135 @@ class RuntimeFactsTests(unittest.TestCase):
         trace.write_text(' INFO rustc_codegen_ssa::back::link "link.exe" "/OUT:C:\\\\foreign\\\\flightsim-app.exe"\n', encoding='utf-8')
         value = self.collect(linker_trace=trace, audited_executable=executable)
         self.assertEqual(value['final_link']['reason'], 'no_matching_command')
+
+    def test_trace_counts_expose_format_boundaries_without_private_text(self):
+        trace, executable = self.link_fixture()
+        prefix = ' INFO rustc_codegen_ssa::back::link'
+        trace.write_text('\n'.join([
+            'PRIVATE ERROR PATH',
+            '2026-10-08T00:00:00Z' + prefix + ' "PRIVATE unsupported prefix"',
+            prefix + ': preparing linker PRIVATE TEXT',
+            prefix + ' ENV="PRIVATE" "link.exe"',
+            prefix + ' "C:\\\\Private\\\\link.exe" "kernel32.lib"',
+            prefix + ' "C:\\\\Private\\\\link.exe" "/OUT:C:\\\\foreign\\\\flightsim-app.exe"',
+        ]) + '\n', encoding='utf-8')
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        link = value['final_link']
+        self.assertEqual(link['reason'], 'no_matching_command')
+        self.assertEqual(link['trace_observation'], {
+            'total_lines': 6, 'link_module_lines': 5, 'recognized_info_lines': 4,
+            'quoted_command_lines': 2, 'parsed_command_lines': 2, 'rejected_command_lines': 0,
+            'output_switch_commands': 1, 'matching_output_commands': 0})
+        self.assertFalse(link['constructed_final_command_observed'])
+        for private in ('PRIVATE', 'Private', 'foreign', str(self.root)):
+            self.assertNotIn(private, facts.canonical(value).decode())
+        self.assertEqual(facts.project(self.private), value)
+
+    def test_unparseable_debug_command_remains_unknown_with_bounded_counts(self):
+        trace, executable = self.link_fixture()
+        trace.write_text(' INFO rustc_codegen_ssa::back::link "link.exe" "\\q"\n', encoding='utf-8')
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        link = value['final_link']
+        self.assertEqual(link['reason'], 'unparseable_command')
+        self.assertEqual(link['trace_observation'], dict.fromkeys(facts.TRACE_COUNTERS, 0) | {
+            'total_lines': 1, 'link_module_lines': 1, 'recognized_info_lines': 1,
+            'quoted_command_lines': 1, 'rejected_command_lines': 1})
+        self.assertIsNone(link['linker'])
+
+    def test_no_trace_scan_does_not_project_zero_counts(self):
+        value = self.collect()
+        self.assertIsNone(value['final_link']['trace_observation'])
+
+    def test_trace_diagnostic_schema_is_closed_and_replay_bound(self):
+        trace, executable = self.link_fixture()
+        value = self.collect(linker_trace=trace, audited_executable=executable)
+        mutations = [
+            lambda row: row.update(raw_command='private'),
+            lambda row: row.update(total_lines=True),
+            lambda row: row.update(total_lines=-1),
+            lambda row: row.update(total_lines=facts.MAX_TRACE + 1),
+            lambda row: row.update(parsed_command_lines=2),
+            lambda row: row.update(matching_output_commands=0),
+        ]
+        for mutate in mutations:
+            changed = copy.deepcopy(value)
+            mutate(changed['final_link']['trace_observation'])
+            with self.subTest(mutation=mutate), self.assertRaises(ValueError):
+                facts.validate_projection(changed)
+        path = self.private / facts.PRIVATE_NAME
+        manifest = json.loads(path.read_bytes())
+        # A plausible count increase passes the scalar schema, but cannot be
+        # resealed into a different native observation of the same trace.
+        manifest['final_link']['trace_observation']['total_lines'] += 1
+        path.write_bytes(facts.canonical(manifest))
+        with self.assertRaisesRegex(ValueError, 'final link observations changed'):
+            facts.project(self.private)
+
+    def test_legacy_capture_without_trace_counters_still_replays(self):
+        trace, executable = self.link_fixture()
+        self.collect(linker_trace=trace, audited_executable=executable)
+        path = self.private / facts.PRIVATE_NAME
+        manifest = json.loads(path.read_bytes())
+        del manifest['final_link']['trace_observation']
+        path.write_bytes(facts.canonical(manifest))
+        value = facts.project(self.private)
+        self.assertNotIn('trace_observation', value['final_link'])
+        self.assertEqual(value['final_link']['status'], 'observed')
+        self.assertEqual(facts.project(self.private, recheck_installed=False), value)
+
+    def test_only_exact_output_argument_and_fingerprint_match(self):
+        trace, executable = self.link_fixture()
+        foreign = executable.parent / 'foreign/flightsim-app.exe'
+        wrong_deps = executable.parent / 'deps/flightsim_app-ffffffffffffffff.exe'
+        alternatives = [
+            ['/OUT:' + str(foreign)],
+            ['/OUT:' + str(wrong_deps)],
+            ['/OUT:flightsim-app.exe'],
+            ['/COMMENT:/OUT:' + str(executable)],
+            ['/LIBPATH:' + str(executable)],
+            ['literal "/OUT:' + str(executable) + '"'],
+        ]
+        collector = facts.Collector(self.root, {})
+        for args in alternatives:
+            trace.write_text(' INFO rustc_codegen_ssa::back::link ' +
+                             ' '.join(json.dumps(item) for item in [str(self.linker), *args]) + '\n',
+                             encoding='utf-8')
+            with self.subTest(args=args):
+                link = facts.final_link_facts(collector, trace, executable)
+                self.assertEqual(link['reason'], 'no_matching_command')
+                self.assertEqual(link['trace_observation']['matching_output_commands'], 0)
+                self.assertIsNone(link['linker'])
+
+    def test_multiple_output_arguments_cannot_select_first_matching_path(self):
+        trace, executable = self.link_fixture()
+        collector = facts.Collector(self.root, {})
+        for extra in (str(executable), str(executable.parent / 'foreign/flightsim-app.exe')):
+            args = [str(self.linker), '/OUT:' + str(executable), '/OUT:' + extra]
+            trace.write_text(' INFO rustc_codegen_ssa::back::link ' +
+                             ' '.join(json.dumps(item) for item in args) + '\n', encoding='utf-8')
+            with self.subTest(extra=extra):
+                link = facts.final_link_facts(collector, trace, executable)
+                self.assertEqual(link['reason'], 'unparseable_command')
+                self.assertEqual(link['trace_observation']['matching_output_commands'], 1)
+                self.assertIsNone(link['linker'])
+
+    def test_windows_command_debug_drive_paths_and_regular_argument_quoting(self):
+        # Source-shaped regular OsString Debug formatting, not Windows shell
+        # quoting. Rust 1.93.0 windows.rs Command::fmt and linker.rs /OUT:
+        # https://github.com/rust-lang/rust/blob/254b59607d4417e9dffbc307138ae5c86280fe4c/library/std/src/sys/process/windows.rs#L436-L447
+        # https://github.com/rust-lang/rust/blob/254b59607d4417e9dffbc307138ae5c86280fe4c/compiler/rustc_codegen_ssa/src/back/linker.rs#L1048-L1052
+        command = (r'"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\link.exe" '
+                   r'"/NOLOGO" "/OUT:D:\\work\\Private Project 日本語\\target\\x86_64-pc-windows-msvc\\release\\deps\\flightsim_app-0123456789abcdef.exe" '
+                   r'"/LIBPATH:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64" '
+                   r'"C:\\Users\\Private Person\\.rustup\\toolchains\\1.93.0-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib\\libstd-0123abcd.rlib" '
+                   r'"/COMMENT:embedded \"/OUT:D:\\foreign.exe\"" "kernel32.lib" ""')
+        self.assertEqual(facts.debug_command_tokens(command), [
+            r'C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\link.exe',
+            '/NOLOGO',
+            r'/OUT:D:\work\Private Project 日本語\target\x86_64-pc-windows-msvc\release\deps\flightsim_app-0123456789abcdef.exe',
+            r'/LIBPATH:C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64',
+            r'C:\Users\Private Person\.rustup\toolchains\1.93.0-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib\libstd-0123abcd.rlib',
+            r'/COMMENT:embedded "/OUT:D:\foreign.exe"', 'kernel32.lib', ''])
 
     def test_debug_parser_is_not_a_shell_and_rejects_hostile_inputs(self):
         self.assertEqual(facts.debug_command_tokens('"C:\\\\Program Files\\\\link.exe" "/OUT:C:\\\\x.exe"'),

@@ -234,13 +234,19 @@
       "feature": "tonemapping_luts",
       "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
       "bytes": 308905,
-      "review_state": "unresolved",
-      "license": "License record not yet resolved",
+      "review_state": "licensed_with_notices",
+      "license": "BSD-3-Clause",
       "sources": [
-        "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt"
+        "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt",
+        "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio",
+        "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt",
+        "docs/release/filmic-asset-source-decision.json"
       ],
-      "notice_files": [],
-      "reason": "Bevy recipe renders through Blender Filmic, but does not pin the Blender/Filmic version or its asset license; resolve source terms before clearance."
+      "notice_files": [
+        "docs/release/licenses/Blender-Filmic-OpenColorIO-LICENSE",
+        "docs/release/licenses/Blender-Filmic-NOTICE.txt"
+      ],
+      "reason": "Exact decoded LUT reproduced from pinned Blender 3.4.1 inputs under the configuration-level BSD-3-Clause notice route; associated tables have no individual headers. Preserve both listed notices. This asset-local source decision does not complete dependency/platform review or authorize publication."
     }
   ],
   "required_bundle_files": [

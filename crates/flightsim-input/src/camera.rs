@@ -112,6 +112,17 @@ impl CameraRig {
         self.smoothed
     }
 
+    /// Move an existing smoothed position into a new coordinate frame.
+    ///
+    /// The caller supplies the coordinate conversion so the rig does not need
+    /// to know about render origins. An uninitialised or explicitly reset rig
+    /// stays uninitialised and still snaps to its next target.
+    pub fn map_smoothed_position(&mut self, map: impl FnOnce(Vec3) -> Vec3) {
+        if self.initialised {
+            self.smoothed = map(self.smoothed);
+        }
+    }
+
     /// 視点を切り替えたときに追従を初期化する。
     ///
     /// これをしないと、コックピットからタワーへ切り替えた瞬間に
@@ -229,6 +240,24 @@ mod tests {
 
         let elsewhere = Vec3::new(5_000.0, 0.0, 0.0);
         assert_eq!(rig.follow(elsewhere, Seconds(1.0 / 60.0)), elsewhere);
+    }
+
+    #[test]
+    fn mapping_preserves_follow_history_but_does_not_initialise_a_reset_rig() {
+        let mut rig = CameraRig::default();
+        rig.map_smoothed_position(|_| panic!("there is no initial position to map"));
+        assert!(!rig.is_initialised());
+        rig.follow(Vec3::new(10.0, 20.0, 30.0), Seconds::ZERO);
+        rig.map_smoothed_position(|position| Vec3::new(position.z, position.x, position.y));
+        assert!(rig.is_initialised());
+        assert_eq!(
+            rig.follow(Vec3::ZERO, Seconds::ZERO),
+            Vec3::new(30.0, 10.0, 20.0)
+        );
+        rig.reset();
+        rig.map_smoothed_position(|_| panic!("an explicit reset must take precedence"));
+        assert!(!rig.is_initialised());
+        assert_eq!(rig.follow(Vec3::ONE, Seconds::ZERO), Vec3::ONE);
     }
 
     #[test]
