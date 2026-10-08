@@ -1,0 +1,117 @@
+--- a/src/device/global.rs
++++ b/src/device/global.rs
+@@ -2300,0 +2301 @@
++        let mut traced = false;
+@@ -2302 +2303,22 @@
+-            Ok(buffer) => buffer.map_async(offset, size, op),
++            Ok(buffer) => {
++                if buffer.label == "screenshot-transfer-buffer" {
++                    let (index, epoch) = buffer_id.unzip();
++                    traced = flightsim_readback_trace::select(
++                        Arc::as_ptr(&buffer) as usize,
++                        Arc::as_ptr(&buffer.device) as usize,
++                        u64::from(index), u64::from(epoch),
++                    );
++                }
++                let mut op = op;
++                if traced {
++                    flightsim_readback_trace::record(21, offset, size.unwrap_or(buffer.size), 0);
++                    if let Some(callback) = op.callback.take() {
++                        op.callback = Some(Box::new(move |status| {
++                            flightsim_readback_trace::record(24, u64::from(status.is_ok()), 0, 0);
++                            callback(status);
++                            flightsim_readback_trace::record(25, 0, 0, 0);
++                        }));
++                    }
++                }
++                buffer.map_async(offset, size, op)
++            }
+@@ -2307 +2329,4 @@
+-            Ok(submission_index) => Ok(submission_index),
++            Ok(submission_index) => {
++                if traced { flightsim_readback_trace::record(22, submission_index, 0, 0); }
++                Ok(submission_index)
++            }
+@@ -2308,0 +2334 @@
++                if traced { flightsim_readback_trace::record(23, 0, 0, 0); }
+--- a/src/device/life.rs
++++ b/src/device/life.rs
+@@ -230,0 +231,3 @@
++        if flightsim_readback_trace::is_buffer(Arc::as_ptr(buffer) as usize) {
++            flightsim_readback_trace::record(26, maybe_submission_index.unwrap_or(0), u64::from(maybe_submission_index.is_some()), 0);
++        }
+@@ -313,0 +317,5 @@
++            for buffer in &a.mapped {
++                if flightsim_readback_trace::is_buffer(Arc::as_ptr(buffer) as usize) {
++                    flightsim_readback_trace::record(27, a.index, last_done, 0);
++                }
++            }
+@@ -381,0 +390,2 @@
++            let traced = flightsim_readback_trace::is_buffer(Arc::as_ptr(&buffer) as usize);
++            if traced { flightsim_readback_trace::record(28, 0, 0, 0); }
+@@ -383,2 +393,8 @@
+-                Some(cb) => pending_callbacks.push(cb),
+-                None => continue,
++                Some(cb) => {
++                    if traced { flightsim_readback_trace::record(29, 1, u64::from(cb.1.is_ok()), 0); }
++                    pending_callbacks.push(cb)
++                }
++                None => {
++                    if traced { flightsim_readback_trace::record(29, 0, 0, 0); }
++                    continue;
++                }
+--- a/src/resource.rs
++++ b/src/resource.rs
+@@ -444,0 +445 @@
++        flightsim_readback_trace::release(core::ptr::from_ref(self) as usize);
+@@ -685,0 +687,2 @@
++        let traced = flightsim_readback_trace::is_buffer(core::ptr::from_ref(self) as usize);
++        if traced { flightsim_readback_trace::record(30, 0, 0, 0); }
+@@ -688 +691,4 @@
+-            BufferMapState::Waiting(pending_mapping) => pending_mapping,
++            BufferMapState::Waiting(pending_mapping) => {
++                if traced { flightsim_readback_trace::record(31, 0, 0, 0); }
++                pending_mapping
++            }
+@@ -690 +696,4 @@
+-            BufferMapState::Idle => return None,
++            BufferMapState::Idle => {
++                if traced { flightsim_readback_trace::record(32, 0, 0, 0); }
++                return None;
++            },
+@@ -693,0 +703 @@
++                if traced { flightsim_readback_trace::record(33, 0, 0, 0); }
+@@ -701,0 +712 @@
++            if traced { flightsim_readback_trace::record(34, pending_mapping.range.start, size, 0); }
+@@ -709,0 +721 @@
++                    if traced { flightsim_readback_trace::record(35, 1, 0, 0); }
+@@ -717 +729,4 @@
+-                Err(e) => Err(e),
++                Err(e) => {
++                    if traced { flightsim_readback_trace::record(35, 0, 0, 0); }
++                    Err(e)
++                },
+@@ -729,0 +745 @@
++        if traced { flightsim_readback_trace::record(36, u64::from(status.is_ok()), 0, 0); }
+--- a/src/device/resource.rs
++++ b/src/device/resource.rs
+@@ -768,0 +769,2 @@
++        let traced = flightsim_readback_trace::is_device(core::ptr::from_ref(self) as usize);
++        if traced { flightsim_readback_trace::record(40, 0, 0, 0); }
+@@ -771 +773,4 @@
+-            Ok(fence_value) => fence_value,
++            Ok(fence_value) => {
++                if traced { flightsim_readback_trace::record(37, 1, fence_value, self.last_successful_submission_index.load(Ordering::Acquire)); }
++                fence_value
++            },
+@@ -772,0 +778 @@
++                if traced { flightsim_readback_trace::record(37, 0, 0, self.last_successful_submission_index.load(Ordering::Acquire)); }
+@@ -850,0 +857 @@
++        if traced { flightsim_readback_trace::record(38, current_finished_submission, user_closures.mappings.len() as u64, u64::from(result.is_ok())); }
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -223,0 +224,4 @@
++
++[dependencies.flightsim-readback-trace]
++path = "../flightsim-readback-trace"
++version = "=0.0.0"

@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "capacity": 2048,
+  "events": {
+    "capture_prepare": {
+      "id": 1,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "copy_encode": {
+      "id": 2,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "width_pixels",
+        "c": "height_pixels"
+      }
+    },
+    "task_spawn": {
+      "id": 3,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "task_enter": {
+      "id": 4,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "map_register_enter": {
+      "id": 5,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "map_register_return": {
+      "id": 6,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "bevy_callback_enter": {
+      "id": 7,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "result_ok_1_or_error_0",
+        "c": "unused_zero"
+      }
+    },
+    "channel_send_enter": {
+      "id": 8,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "channel_send_return": {
+      "id": 9,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "receive_resumed": {
+      "id": 10,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "mapped_range_enter": {
+      "id": 11,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "mapped_range_return": {
+      "id": 12,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "byte_length",
+        "c": "unused_zero"
+      }
+    },
+    "cpu_copy_return": {
+      "id": 13,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "byte_length",
+        "c": "unused_zero"
+      }
+    },
+    "image_send_enter": {
+      "id": 14,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "byte_length",
+        "c": "unused_zero"
+      }
+    },
+    "image_send_return": {
+      "id": 15,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "send_ok_1_or_error_0",
+        "c": "unused_zero"
+      }
+    },
+    "main_receive": {
+      "id": 16,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "event_queued": {
+      "id": 17,
+      "fields": {
+        "a": "selected_bevy_entity_bits",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "buffer_selected": {
+      "id": 20,
+      "fields": {
+        "a": "actual_wgpu_buffer_id_index",
+        "b": "actual_wgpu_buffer_id_epoch",
+        "c": "unused_zero"
+      }
+    },
+    "core_map_enter": {
+      "id": 21,
+      "fields": {
+        "a": "offset_bytes",
+        "b": "requested_size_or_buffer_size_bytes",
+        "c": "unused_zero"
+      }
+    },
+    "core_map_return": {
+      "id": 22,
+      "fields": {
+        "a": "actual_returned_submission_dependency_0_means_no_wait",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "core_map_error": {
+      "id": 23,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "callback_invoke": {
+      "id": 24,
+      "fields": {
+        "a": "result_ok_1_or_error_0",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "callback_return": {
+      "id": 25,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "dependency_assigned": {
+      "id": 26,
+      "fields": {
+        "a": "actual_pending_submission_index_or_0",
+        "b": "has_pending_submission_1_or_ready_immediately_0",
+        "c": "unused_zero"
+      }
+    },
+    "pending_promoted": {
+      "id": 27,
+      "fields": {
+        "a": "pending_submission_index",
+        "b": "observed_completed_fence_value",
+        "c": "unused_zero"
+      }
+    },
+    "handle_map_enter": {
+      "id": 28,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "handle_map_return": {
+      "id": 29,
+      "fields": {
+        "a": "returned_closure_1_or_none_0",
+        "b": "closure_result_ok_1_or_error_or_none_0",
+        "c": "unused_zero"
+      }
+    },
+    "buffer_map_enter": {
+      "id": 30,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "map_state_waiting": {
+      "id": 31,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "map_state_idle": {
+      "id": 32,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "map_state_active": {
+      "id": 33,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "backend_map_enter": {
+      "id": 34,
+      "fields": {
+        "a": "start_offset_bytes",
+        "b": "range_size_bytes",
+        "c": "unused_zero"
+      }
+    },
+    "backend_map_return": {
+      "id": 35,
+      "fields": {
+        "a": "result_ok_1_or_error_0",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "buffer_map_return": {
+      "id": 36,
+      "fields": {
+        "a": "result_ok_1_or_error_0",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "fence_result": {
+      "id": 37,
+      "fields": {
+        "a": "fence_query_ok_1_or_error_0",
+        "b": "existing_fence_value_or_0_on_error",
+        "c": "last_successful_submission_index_snapshot"
+      }
+    },
+    "maintain_return": {
+      "id": 38,
+      "fields": {
+        "a": "existing_completed_fence_value",
+        "b": "device_wide_mapping_closure_count_NOT_selected_buffer_proof",
+        "c": "maintain_result_ok_1_or_error_0"
+      }
+    },
+    "buffer_drop": {
+      "id": 39,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    },
+    "fence_enter": {
+      "id": 40,
+      "fields": {
+        "a": "unused_zero",
+        "b": "unused_zero",
+        "c": "unused_zero"
+      }
+    }
+  },
+  "record_format": "FS_READBACK_TRACE schema=1 seq=<u64> us=<u64> event=<name> a=<u64> b=<u64> c=<u64>",
+  "status_format": "FS_READBACK_TRACE_STATUS schema=1 reserved=<usize> drained=<usize> dropped=<usize> io_errors=<usize> capacity=2048",
+  "ordering": "seq is atomic reservation order; us is monotonic-clock elapsed from first screenshot preparation. Concurrent recording can reorder timestamps relative to reservations. No total causality is implied. Drain publishes only contiguous fully written slots. Status is a non-atomic concurrent snapshot, not a process-final completeness attestation.",
+  "limits": [
+    "The sole screenshot entity and the existing screenshot-transfer-buffer label bind this one-capture recipe. This is not a general multi-screenshot recorder.",
+    "A callback may run before core_map_return; receive_resumed may precede channel_send_return. Only established program/channel ordering is causal.",
+    "callback_invoke wraps exactly the selected original callback, including synchronous errors; callback_return is absent on original panic. No original None callback is replaced.",
+    "maintain_return mapping count includes all mappings on the selected device. Use selected handle_map_return plus callback_invoke as per-buffer evidence.",
+    "main_receive and event_queued show receipt and queued Bevy command, not observer execution or PNG save. Ordinary log/PNG/process checks establish those.",
+    "Writes are best effort, statuses are concurrent snapshots, and a stalled main loop may leave an undrained tail. Drop/gap/I/O errors or missing final drain preclude proof of absence. First overflow is reported once; later dropped counts need not be emitted.",
+    "No pointer addresses, pixels, buffer bytes, or shader/model bytes are exported. BufferId index and epoch are engine object identifiers."
+  ]
+}

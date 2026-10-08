@@ -1,0 +1,82 @@
+name: Windows readback dependency trace
+
+on:
+  push:
+    branches: [diagnostic/windows-readback-afff4a7c]
+
+permissions:
+  contents: read
+
+env:
+  GIT_CONFIG_COUNT: '2'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.eol
+  GIT_CONFIG_VALUE_1: 'lf'
+
+concurrency:
+  group: windows-readback-trace-afff4a7c
+  cancel-in-progress: false
+
+jobs:
+  trace:
+    name: one nonqualifying Windows readback observation
+    if: github.ref == 'refs/heads/diagnostic/windows-readback-afff4a7c' && github.run_attempt == 1
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Verify the diagnostic harness
+        shell: pwsh
+        run: |
+          python -B -m unittest discover -s scripts/tests -p test_windows_readback_trace.py
+          if ($LASTEXITCODE -ne 0) { throw 'diagnostic harness tests failed' }
+          python -B -m unittest discover -s diagnostics/windows-readback -p test_prepare.py
+          if ($LASTEXITCODE -ne 0) { throw 'diagnostic preparation tests failed' }
+      - name: Install the ordinary pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'toolchain installation failed' }
+      # No cache, release, tags, binary upload or automatic second attempt.
+      - name: Build private instrumented dependencies and launch one scene
+        shell: pwsh
+        env:
+          EXPECTED_DIAGNOSTIC_SHA: ${{ github.sha }}
+        run: |
+          python -B scripts/run-windows-readback-trace.py `
+            --expected-source $env:EXPECTED_DIAGNOSTIC_SHA `
+            --work (Join-Path $env:RUNNER_TEMP 'windows-readback-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'windows-readback-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'diagnostic failed; preserve bounded partial evidence' }
+      - name: Validate text-only evidence even after failure
+        if: always()
+        id: evidence
+        shell: pwsh
+        run: |
+          python -B scripts/run-windows-readback-trace.py `
+            --validate-evidence (Join-Path $env:RUNNER_TEMP 'windows-readback-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'evidence validation failed; upload forbidden' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Upload only validated diagnostic text
+        if: always() && steps.evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-readback-text-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/windows-readback-evidence/diagnostic-report.json
+            ${{ runner.temp }}/windows-readback-evidence/source-inputs.json
+            ${{ runner.temp }}/windows-readback-evidence/dependency-inputs.json
+            ${{ runner.temp }}/windows-readback-evidence/package-inputs.json
+            ${{ runner.temp }}/windows-readback-evidence/trace-events.json
+            ${{ runner.temp }}/windows-readback-evidence/commands.log
+            ${{ runner.temp }}/windows-readback-evidence/runtime.log
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,50 @@
+--- a/src/view/window/screenshot.rs
++++ b/src/view/window/screenshot.rs
+@@ -201,0 +202 @@
++    flightsim_readback_trace::drain();
+@@ -203,0 +205 @@
++        flightsim_readback_trace::bevy(16, entity.to_bits(), 0, 0);
+@@ -206 +208,4 @@
+-    }
++        flightsim_readback_trace::bevy(17, entity.to_bits(), 0, 0);
++    }
++    drop(captured_screenshots);
++    flightsim_readback_trace::drain();
+@@ -376,0 +382 @@
++    flightsim_readback_trace::begin();
+@@ -591,0 +598 @@
++        flightsim_readback_trace::bevy(2, entity.to_bits(), u64::from(width), u64::from(height));
+@@ -642,0 +650 @@
++            flightsim_readback_trace::bevy(4, entity.to_bits(), 0, 0);
+@@ -645,0 +654 @@
++            flightsim_readback_trace::bevy(5, entity.to_bits(), 0, 0);
+@@ -646,0 +656 @@
++                flightsim_readback_trace::bevy(7, entity.to_bits(), u64::from(result.is_ok()), 0);
+@@ -649,0 +660 @@
++                flightsim_readback_trace::bevy(8, entity.to_bits(), 0, 0);
+@@ -650,0 +662 @@
++                flightsim_readback_trace::bevy(9, entity.to_bits(), 0, 0);
+@@ -651,0 +664 @@
++            flightsim_readback_trace::bevy(6, entity.to_bits(), 0, 0);
+@@ -652,0 +666,2 @@
++            flightsim_readback_trace::bevy(10, entity.to_bits(), 0, 0);
++            flightsim_readback_trace::bevy(11, entity.to_bits(), 0, 0);
+@@ -653,0 +669 @@
++            flightsim_readback_trace::bevy(12, entity.to_bits(), data.len() as u64, 0);
+@@ -656,0 +673 @@
++            flightsim_readback_trace::bevy(13, entity.to_bits(), result.len() as u64, 0);
+@@ -674,0 +692 @@
++            flightsim_readback_trace::bevy(14, entity.to_bits(), result.len() as u64, 0);
+@@ -689,0 +708,3 @@
++                flightsim_readback_trace::bevy(15, entity.to_bits(), 0, 0);
++            } else {
++                flightsim_readback_trace::bevy(15, entity.to_bits(), 1, 0);
+@@ -692,0 +714 @@
++        flightsim_readback_trace::bevy(3, entity.to_bits(), 0, 0);
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -296,0 +297,4 @@
++
++[dependencies.flightsim-readback-trace]
++path = "../flightsim-readback-trace"
++version = "=0.0.0"
