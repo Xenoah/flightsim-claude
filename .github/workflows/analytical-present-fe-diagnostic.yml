@@ -1,0 +1,159 @@
+name: Analytical Surface present cause for fe7373e
+
+# Diagnostic policy P observes unchanged canonical source S in a separate checkout.
+on:
+  push:
+    branches: ['diagnostic/analytical-present-fe7373e']
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: fe7373e96396131ef4a1c2a9af9cfabdb8aab82b
+  GIT_CONFIG_COUNT: '2'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.eol
+  GIT_CONFIG_VALUE_1: 'lf'
+  PYTHONUTF8: '1'
+
+concurrency:
+  group: analytical-present-cause-fe7373e-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  source-ci:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: policy
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Verify successful main CI for exact original source S
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+        run: python policy/scripts/check-analytical-source-ci.py --repository "$EXPECTED_REPOSITORY" --source-sha "$SOURCE_SHA" --output "$RUNNER_TEMP/source-ci.json"
+      - name: Preserve source CI observation
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-present-source-ci-fe7373e-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/source-ci.json
+          if-no-files-found: error
+          retention-days: 7
+
+  runtime-diagnostic:
+    needs: source-ci
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: policy
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: source
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Check bounded diagnostic helper boundaries
+        shell: pwsh
+        working-directory: policy
+        run: |
+          foreach ($test in @('test_analytical_runtime_failure.py', 'test_present_error_excerpt.py', 'test_analytical_present_observation.py', 'test_analytical_present_workflow.py')) {
+            python -m unittest discover -s scripts/tests -p $test -v
+            if ($LASTEXITCODE -ne 0) { throw 'diagnostic boundary tests failed' }
+          }
+      - name: Install unchanged exact official toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'exact toolchain installation failed' }
+      - name: Execute original source runtime qualification once
+        shell: pwsh
+        working-directory: source
+        run: |
+          python scripts/qualify-analytical-swift-windows.py --phase runtime --source-sha $env:SOURCE_SHA --private (Join-Path $env:RUNNER_TEMP 'qualification-private') --evidence (Join-Path $env:RUNNER_TEMP 'qualification-export')
+          if ($LASTEXITCODE -ne 0) { throw 'original runtime phase failed; diagnostic observation only' }
+      - name: Validate original S evidence once and bind P2 inputs
+        if: always()
+        id: source_evidence
+        shell: pwsh
+        working-directory: policy
+        env:
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          $sourceRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE 'source')).Path
+          python scripts/observe-present-failure.py --source-repo $sourceRoot --source-sha $env:SOURCE_SHA --source-private (Join-Path $env:RUNNER_TEMP 'qualification-private') --source-export (Join-Path $env:RUNNER_TEMP 'qualification-export') --policy-sha $env:POLICY_SHA --private (Join-Path $env:RUNNER_TEMP 'present-private') --validate-source
+          if ($LASTEXITCODE -ne 0) { throw 'original source validation failed' }
+      - name: Preserve unchanged permitted S evidence
+        id: original_upload
+        if: always() && steps.source_evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-present-original-fe7373e-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/qualification-export/qualification.json
+            ${{ runner.temp }}/qualification-export/native-review.json
+            ${{ runner.temp }}/qualification-export/runtime-facts.json
+            ${{ runner.temp }}/qualification-export/ui-capabilities.json
+            ${{ runner.temp }}/qualification-export/default-swift.png
+            ${{ runner.temp }}/qualification-export/day-cockpit.png
+            ${{ runner.temp }}/qualification-export/low-sun.png
+            ${{ runner.temp }}/qualification-export/night-cockpit.png
+            ${{ runner.temp }}/qualification-export/fog-cockpit.png
+            ${{ runner.temp }}/qualification-export/cloud-high.png
+            ${{ runner.temp }}/qualification-export/water-high.png
+            ${{ runner.temp }}/qualification-export/tower-day.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Observe only the bound native failure
+        if: always() && steps.source_evidence.outputs.native_failure == 'true' && steps.original_upload.outcome == 'success'
+        id: observe
+        shell: pwsh
+        working-directory: policy
+        env:
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          $sourceRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE 'source')).Path
+          python scripts/observe-present-failure.py --source-repo $sourceRoot --source-sha $env:SOURCE_SHA --source-private (Join-Path $env:RUNNER_TEMP 'qualification-private') --source-export (Join-Path $env:RUNNER_TEMP 'qualification-export') --policy-sha $env:POLICY_SHA --private (Join-Path $env:RUNNER_TEMP 'present-private') --evidence (Join-Path $env:RUNNER_TEMP 'present-export')
+          if ($LASTEXITCODE -ne 0) { throw 'bounded present failure observation failed' }
+      - name: Revalidate bound failure sidecars without another full build audit
+        if: always() && steps.observe.outcome == 'success'
+        id: diagnostic_evidence
+        shell: pwsh
+        working-directory: policy
+        env:
+          POLICY_SHA: ${{ github.sha }}
+        run: |
+          $sourceRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE 'source')).Path
+          python scripts/observe-present-failure.py --source-repo $sourceRoot --source-sha $env:SOURCE_SHA --source-private (Join-Path $env:RUNNER_TEMP 'qualification-private') --source-export (Join-Path $env:RUNNER_TEMP 'qualification-export') --policy-sha $env:POLICY_SHA --private (Join-Path $env:RUNNER_TEMP 'present-private') --validate-evidence (Join-Path $env:RUNNER_TEMP 'present-export')
+          if ($LASTEXITCODE -ne 0) { throw 'no validated present failure sidecars' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Preserve only validated diagnostic JSON sidecars
+        if: always() && steps.diagnostic_evidence.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: analytical-present-excerpt-fe7373e-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/present-export/present-origin.json
+            ${{ runner.temp }}/present-export/source-validation.json
+            ${{ runner.temp }}/present-export/runtime-failure.json
+            ${{ runner.temp }}/present-export/present-error.json
+          if-no-files-found: error
+          retention-days: 7
