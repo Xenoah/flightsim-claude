@@ -1,0 +1,53 @@
+name: Hosted source archive evidence
+
+on:
+  push:
+    branches: [agent/hosted-source-archive-check]
+  workflow_dispatch:
+
+# Independent read-only evidence, never a CI/Release workflow trigger or gate bypass.
+permissions:
+  contents: read
+
+jobs:
+  hosted_source_archives:
+    if: github.repository == 'Xenoah/flightsim-claude'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EVIDENCE_COMMIT: ${{ github.sha }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Validate the committed evidence files and reviewed source target
+        id: target
+        run: |
+          python3 .github/scripts/check-hosted-source-archives.py \
+            --evidence-commit "$EVIDENCE_COMMIT" --github-output "$GITHUB_OUTPUT"
+      - name: Read the exact target source without changing its branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.target.outputs.source_commit }}
+          path: source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Test archive and transport rejection boundaries offline
+        run: |
+          python3 -m unittest discover -s scripts -p test_source_archive.py -v
+          python3 -m unittest discover -s .github/scripts -p test_hosted_source_archives.py -v
+      - name: Download and validate actual hosted commit and optional tag archives
+        run: |
+          python3 .github/scripts/check-hosted-source-archives.py \
+            --repo source --evidence-commit "$EVIDENCE_COMMIT" \
+            --report "$RUNNER_TEMP/hosted-source-archives.json"
+      - name: Export only successful bounded text and hashes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hosted-source-archives-${{ steps.target.outputs.source_commit }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hosted-source-archives.json
+          if-no-files-found: error
+          retention-days: 30
