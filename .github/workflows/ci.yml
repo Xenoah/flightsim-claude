@@ -16,6 +16,21 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  pure_msrv:
+    name: pure core/world libraries (Rust 1.85)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: pure-msrv-1.85
+      # ADR-0007 retains 1.85 for these normal libraries. Criterion dev targets
+      # remain covered by the existing 1.93 test/bench jobs, not this MSRV check.
+      - name: Build pure libraries at the declared MSRV
+        run: cargo build --locked -j 2 -p flightsim-core -p flightsim-world --lib
+
   content_download_smoke:
     name: public synthetic download (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

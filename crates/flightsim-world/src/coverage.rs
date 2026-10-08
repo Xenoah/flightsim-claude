@@ -94,10 +94,10 @@ impl PrimaryCoverage {
                 let relative = format!("{prefix}{name}");
                 if depth < 2 && kind.is_dir() && canonical_integer(name).is_some() {
                     pending.push((entry.path(), format!("{relative}/"), depth + 1));
-                } else if depth == 2
-                    && kind.is_file()
-                    && let Some(id) = tile_id_from_relative_path(&relative)
-                {
+                } else if depth == 2 && kind.is_file() {
+                    let Some(id) = tile_id_from_relative_path(&relative) else {
+                        continue;
+                    };
                     if tiles.len() >= MAX_COVERAGE_TILES {
                         return Err(std::io::Error::other("primary coverage tile limit"));
                     }
