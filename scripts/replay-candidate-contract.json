@@ -1,6 +1,6 @@
 {
   "contract": "swift-candidate-replay-v3-v1",
-  "reviewed_source": "cdd3f9d23314ffb91037c7f6f1ece3df7233891d",
+  "reviewed_source": "b7efc0aa8d16945496e470734c52acb8ca7ee139",
   "schema_version": 1,
   "source_sha256": {
     "assets/aircraft/light_single.json": "8cf101b6785a7ceaa32772f10e9bf7bfdea68898c9f9ac9fa744ccadde7a1e25",
@@ -145,7 +145,7 @@
     "crates/flightsim-ui/src/world_map_layout.rs": "68836c31574b96153a2bf60253c11b140ab93d4dfb3f4b03783559db3725cbb2",
     "crates/flightsim-ui/src/world_map_layout_tests.rs": "eff3e875a25141a8672dcdfb332d7463fca3684a88da1ad271b482cbf752d244",
     "crates/flightsim-world/benches/terrain.rs": "61d03b1903f8ecee274524eb44c2636652e4b6698a208b44553ced3ec8548a2f",
-    "crates/flightsim-world/src/coverage.rs": "33d56ea807e070996ebe83ad444da13938360c098cbc12f5c83e7c1f4dcf2040",
+    "crates/flightsim-world/src/coverage.rs": "28bc00a875b200d536f03ba386c258572f321c563cea015fcf76dd870736bda1",
     "crates/flightsim-world/src/draw_distance.rs": "d195c2754bfdd4f69e78fb571e417f617d129797d82cc2d6913f033aeeb9d4c2",
     "crates/flightsim-world/src/draw_distance_tests.rs": "6dd5f517814550fc8ee24641c01fda1d4961c2761518a2b7979031fec854b456",
     "crates/flightsim-world/src/global.rs": "e456225a204677fce4514fda61430bf73be2715464658d09b99a03abdd908ab4",
