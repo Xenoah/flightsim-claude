@@ -288,6 +288,263 @@ CAPTURE_BACKPRESSURE_PATHS = {
     "crates/flightsim-app/src/capture_backpressure.rs",
 }
 REPLAY_CONTRACT_PATHS |= CAPTURE_BACKPRESSURE_PATHS
+# Batch preparation admission is a separate CPU Render-opportunity handshake.
+# Bind its complete engine hooks and pure generation state, including tests.
+CAPTURE_ADMISSION_PATHS = {
+    "crates/flightsim-app/src/capture_admission.rs",
+    "crates/flightsim-app/src/capture_admission_state.rs",
+}
+REPLAY_CONTRACT_PATHS |= CAPTURE_ADMISSION_PATHS
+# Reviewed local replacements lose registry-checksum authentication. Bind the
+# complete package, witness, provenance and export-policy files explicitly.
+# These paths grant neither licence clearance nor native/release qualification.
+VENDORED_PACKAGE_PATHS = {
+    'vendor/bevy_pbr/Cargo.lock',
+    'vendor/bevy_pbr/Cargo.toml',
+    'vendor/bevy_pbr/Cargo.toml.orig',
+    'vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt',
+    'vendor/bevy_pbr/FLIGHTSIM-PARALLAX-README.md',
+    'vendor/bevy_pbr/FLIGHTSIM-PATCHES.md',
+    'vendor/bevy_pbr/FLIGHTSIM-UPSTREAM-SOURCE.json',
+    'vendor/bevy_pbr/LICENSE-APACHE',
+    'vendor/bevy_pbr/LICENSE-FLIGHTSIM-APACHE',
+    'vendor/bevy_pbr/LICENSE-FLIGHTSIM-MIT',
+    'vendor/bevy_pbr/LICENSE-MIT',
+    'vendor/bevy_pbr/README.md',
+    'vendor/bevy_pbr/src/atmosphere/aerial_view_lut.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/bindings.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/bruneton_functions.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/environment.rs',
+    'vendor/bevy_pbr/src/atmosphere/environment.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/functions.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/mod.rs',
+    'vendor/bevy_pbr/src/atmosphere/multiscattering_lut.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/node.rs',
+    'vendor/bevy_pbr/src/atmosphere/render_sky.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/resources.rs',
+    'vendor/bevy_pbr/src/atmosphere/sky_view_lut.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/transmittance_lut.wgsl',
+    'vendor/bevy_pbr/src/atmosphere/types.wgsl',
+    'vendor/bevy_pbr/src/bluenoise/stbn.ktx2',
+    'vendor/bevy_pbr/src/cluster.rs',
+    'vendor/bevy_pbr/src/components.rs',
+    'vendor/bevy_pbr/src/decal/clustered.rs',
+    'vendor/bevy_pbr/src/decal/clustered.wgsl',
+    'vendor/bevy_pbr/src/decal/forward.rs',
+    'vendor/bevy_pbr/src/decal/forward_decal.wgsl',
+    'vendor/bevy_pbr/src/decal/mod.rs',
+    'vendor/bevy_pbr/src/deferred/deferred_lighting.wgsl',
+    'vendor/bevy_pbr/src/deferred/mod.rs',
+    'vendor/bevy_pbr/src/deferred/pbr_deferred_functions.wgsl',
+    'vendor/bevy_pbr/src/deferred/pbr_deferred_types.wgsl',
+    'vendor/bevy_pbr/src/diagnostic.rs',
+    'vendor/bevy_pbr/src/extended_material.rs',
+    'vendor/bevy_pbr/src/fog.rs',
+    'vendor/bevy_pbr/src/lib.rs',
+    'vendor/bevy_pbr/src/light_probe/copy.wgsl',
+    'vendor/bevy_pbr/src/light_probe/downsample.wgsl',
+    'vendor/bevy_pbr/src/light_probe/environment_filter.wgsl',
+    'vendor/bevy_pbr/src/light_probe/environment_map.rs',
+    'vendor/bevy_pbr/src/light_probe/environment_map.wgsl',
+    'vendor/bevy_pbr/src/light_probe/generate.rs',
+    'vendor/bevy_pbr/src/light_probe/irradiance_volume.rs',
+    'vendor/bevy_pbr/src/light_probe/irradiance_volume.wgsl',
+    'vendor/bevy_pbr/src/light_probe/light_probe.wgsl',
+    'vendor/bevy_pbr/src/light_probe/mod.rs',
+    'vendor/bevy_pbr/src/lightmap/lightmap.wgsl',
+    'vendor/bevy_pbr/src/lightmap/mod.rs',
+    'vendor/bevy_pbr/src/material.rs',
+    'vendor/bevy_pbr/src/material_bind_groups.rs',
+    'vendor/bevy_pbr/src/medium.rs',
+    'vendor/bevy_pbr/src/mesh_material.rs',
+    'vendor/bevy_pbr/src/meshlet/asset.rs',
+    'vendor/bevy_pbr/src/meshlet/clear_visibility_buffer.wgsl',
+    'vendor/bevy_pbr/src/meshlet/cull_bvh.wgsl',
+    'vendor/bevy_pbr/src/meshlet/cull_clusters.wgsl',
+    'vendor/bevy_pbr/src/meshlet/cull_instances.wgsl',
+    'vendor/bevy_pbr/src/meshlet/dummy_visibility_buffer_resolve.wgsl',
+    'vendor/bevy_pbr/src/meshlet/fill_counts.wgsl',
+    'vendor/bevy_pbr/src/meshlet/from_mesh.rs',
+    'vendor/bevy_pbr/src/meshlet/instance_manager.rs',
+    'vendor/bevy_pbr/src/meshlet/material_pipeline_prepare.rs',
+    'vendor/bevy_pbr/src/meshlet/material_shade_nodes.rs',
+    'vendor/bevy_pbr/src/meshlet/meshlet_bindings.wgsl',
+    'vendor/bevy_pbr/src/meshlet/meshlet_cull_shared.wgsl',
+    'vendor/bevy_pbr/src/meshlet/meshlet_mesh_manager.rs',
+    'vendor/bevy_pbr/src/meshlet/meshlet_mesh_material.wgsl',
+    'vendor/bevy_pbr/src/meshlet/mod.rs',
+    'vendor/bevy_pbr/src/meshlet/persistent_buffer.rs',
+    'vendor/bevy_pbr/src/meshlet/persistent_buffer_impls.rs',
+    'vendor/bevy_pbr/src/meshlet/pipelines.rs',
+    'vendor/bevy_pbr/src/meshlet/remap_1d_to_2d_dispatch.wgsl',
+    'vendor/bevy_pbr/src/meshlet/resolve_render_targets.wgsl',
+    'vendor/bevy_pbr/src/meshlet/resource_manager.rs',
+    'vendor/bevy_pbr/src/meshlet/visibility_buffer_hardware_raster.wgsl',
+    'vendor/bevy_pbr/src/meshlet/visibility_buffer_raster_node.rs',
+    'vendor/bevy_pbr/src/meshlet/visibility_buffer_resolve.wgsl',
+    'vendor/bevy_pbr/src/meshlet/visibility_buffer_software_raster.wgsl',
+    'vendor/bevy_pbr/src/parallax.rs',
+    'vendor/bevy_pbr/src/pbr_material.rs',
+    'vendor/bevy_pbr/src/prepass/mod.rs',
+    'vendor/bevy_pbr/src/prepass/prepass.wgsl',
+    'vendor/bevy_pbr/src/prepass/prepass_bindings.rs',
+    'vendor/bevy_pbr/src/prepass/prepass_bindings.wgsl',
+    'vendor/bevy_pbr/src/prepass/prepass_io.wgsl',
+    'vendor/bevy_pbr/src/prepass/prepass_utils.wgsl',
+    'vendor/bevy_pbr/src/render/build_indirect_params.wgsl',
+    'vendor/bevy_pbr/src/render/clustered_forward.wgsl',
+    'vendor/bevy_pbr/src/render/fog.rs',
+    'vendor/bevy_pbr/src/render/fog.wgsl',
+    'vendor/bevy_pbr/src/render/forward_io.wgsl',
+    'vendor/bevy_pbr/src/render/gpu_preprocess.rs',
+    'vendor/bevy_pbr/src/render/light.rs',
+    'vendor/bevy_pbr/src/render/mesh.rs',
+    'vendor/bevy_pbr/src/render/mesh.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_bindings.rs',
+    'vendor/bevy_pbr/src/render/mesh_bindings.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_functions.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_preprocess.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_types.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_view_bindings.rs',
+    'vendor/bevy_pbr/src/render/mesh_view_bindings.wgsl',
+    'vendor/bevy_pbr/src/render/mesh_view_types.wgsl',
+    'vendor/bevy_pbr/src/render/mod.rs',
+    'vendor/bevy_pbr/src/render/morph.rs',
+    'vendor/bevy_pbr/src/render/morph.wgsl',
+    'vendor/bevy_pbr/src/render/occlusion_culling.wgsl',
+    'vendor/bevy_pbr/src/render/parallax_mapping.wgsl',
+    'vendor/bevy_pbr/src/render/pbr.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_ambient.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_bindings.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_fragment.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_functions.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_lighting.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_prepass.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_prepass_functions.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_transmission.wgsl',
+    'vendor/bevy_pbr/src/render/pbr_types.wgsl',
+    'vendor/bevy_pbr/src/render/reset_indirect_batch_sets.wgsl',
+    'vendor/bevy_pbr/src/render/rgb9e5.wgsl',
+    'vendor/bevy_pbr/src/render/shadow_sampling.wgsl',
+    'vendor/bevy_pbr/src/render/shadows.wgsl',
+    'vendor/bevy_pbr/src/render/skin.rs',
+    'vendor/bevy_pbr/src/render/skinning.wgsl',
+    'vendor/bevy_pbr/src/render/utils.wgsl',
+    'vendor/bevy_pbr/src/render/view_transformations.wgsl',
+    'vendor/bevy_pbr/src/render/wireframe.wgsl',
+    'vendor/bevy_pbr/src/ssao/mod.rs',
+    'vendor/bevy_pbr/src/ssao/preprocess_depth.wgsl',
+    'vendor/bevy_pbr/src/ssao/spatial_denoise.wgsl',
+    'vendor/bevy_pbr/src/ssao/ssao.wgsl',
+    'vendor/bevy_pbr/src/ssao/ssao_utils.wgsl',
+    'vendor/bevy_pbr/src/ssr/mod.rs',
+    'vendor/bevy_pbr/src/ssr/raymarch.wgsl',
+    'vendor/bevy_pbr/src/ssr/ssr.wgsl',
+    'vendor/bevy_pbr/src/volumetric_fog/mod.rs',
+    'vendor/bevy_pbr/src/volumetric_fog/render.rs',
+    'vendor/bevy_pbr/src/volumetric_fog/volumetric_fog.wgsl',
+    'vendor/bevy_pbr/src/wireframe.rs',
+    'vendor/bevy_pbr/third-party-notices/EA-fastnoise-LICENSE.txt',
+    'vendor/bevy_pbr/third-party-notices/EA-fastnoise-NOTICE.txt',
+    'vendor/bevy_pbr/third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt',
+    'vendor/bevy_pbr/third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt',
+    'vendor/zune-jpeg/.gitignore',
+    'vendor/zune-jpeg/Benches.md',
+    'vendor/zune-jpeg/Cargo.lock',
+    'vendor/zune-jpeg/Cargo.toml',
+    'vendor/zune-jpeg/Cargo.toml.orig',
+    'vendor/zune-jpeg/Changelog.md',
+    'vendor/zune-jpeg/FLIGHTSIM-MODIFICATION-NOTICE.txt',
+    'vendor/zune-jpeg/FLIGHTSIM-PATCHES.md',
+    'vendor/zune-jpeg/FLIGHTSIM-TRANSPOSE-PROVENANCE.md',
+    'vendor/zune-jpeg/FLIGHTSIM-TRANSPOSE-README.md',
+    'vendor/zune-jpeg/FLIGHTSIM-UPSTREAM-SOURCE.json',
+    'vendor/zune-jpeg/LICENSE-APACHE',
+    'vendor/zune-jpeg/LICENSE-FLIGHTSIM-APACHE',
+    'vendor/zune-jpeg/LICENSE-FLIGHTSIM-MIT',
+    'vendor/zune-jpeg/LICENSE-MIT',
+    'vendor/zune-jpeg/LICENSE-ZLIB',
+    'vendor/zune-jpeg/README.md',
+    'vendor/zune-jpeg/src/bitstream.rs',
+    'vendor/zune-jpeg/src/color_convert.rs',
+    'vendor/zune-jpeg/src/color_convert/avx.rs',
+    'vendor/zune-jpeg/src/color_convert/neon64.rs',
+    'vendor/zune-jpeg/src/color_convert/scalar.rs',
+    'vendor/zune-jpeg/src/components.rs',
+    'vendor/zune-jpeg/src/decoder.rs',
+    'vendor/zune-jpeg/src/errors.rs',
+    'vendor/zune-jpeg/src/flightsim_array_transpose.rs',
+    'vendor/zune-jpeg/src/flightsim_transpose_tests.rs',
+    'vendor/zune-jpeg/src/flightsim_transpose_tests_body.rs',
+    'vendor/zune-jpeg/src/headers.rs',
+    'vendor/zune-jpeg/src/huffman.rs',
+    'vendor/zune-jpeg/src/idct.rs',
+    'vendor/zune-jpeg/src/idct/avx2.rs',
+    'vendor/zune-jpeg/src/idct/neon.rs',
+    'vendor/zune-jpeg/src/idct/scalar.rs',
+    'vendor/zune-jpeg/src/lib.rs',
+    'vendor/zune-jpeg/src/marker.rs',
+    'vendor/zune-jpeg/src/mcu.rs',
+    'vendor/zune-jpeg/src/mcu_prog.rs',
+    'vendor/zune-jpeg/src/misc.rs',
+    'vendor/zune-jpeg/src/unsafe_utils.rs',
+    'vendor/zune-jpeg/src/unsafe_utils_avx2.rs',
+    'vendor/zune-jpeg/src/unsafe_utils_neon.rs',
+    'vendor/zune-jpeg/src/upsampler.rs',
+    'vendor/zune-jpeg/src/upsampler/avx2.rs',
+    'vendor/zune-jpeg/src/upsampler/neon.rs',
+    'vendor/zune-jpeg/src/upsampler/portable_simd.rs',
+    'vendor/zune-jpeg/src/upsampler/scalar.rs',
+    'vendor/zune-jpeg/src/worker.rs',
+    'vendor/zune-jpeg/third-party-notices/STANFORD-NOTICE.txt',
+    'vendor/zune-jpeg/third-party-notices/libjpeg-turbo-LICENSE.ijg',
+    'vendor/zune-jpeg/third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt',
+    'vendor/zune-jpeg/third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt',
+    'vendor/zune-jpeg/third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt',
+    'vendor/zune-jpeg/third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt',
+    'vendor/zune-jpeg/third-party-notices/libultrahdr-copyright-headers.txt',
+    'vendor/zune-jpeg/third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt',
+    'vendor/zune-jpeg/third-party-notices/stb-MIT-NOTICE.txt',
+    'vendor/zune-jpeg/third-party-notices/stb-upstream-dual-license.txt',
+}
+
+REPLACEMENT_WITNESS_PATHS = {
+    'tools/validate-jpeg-replacement/Cargo.lock',
+    'tools/validate-jpeg-replacement/Cargo.toml',
+    'tools/validate-jpeg-replacement/README.md',
+    'tools/validate-jpeg-replacement/src/main.rs',
+    'tools/validate-parallax-math/Cargo.lock',
+    'tools/validate-parallax-math/Cargo.toml',
+    'tools/validate-parallax-math/README.md',
+    'tools/validate-parallax-math/shader/parallaxed_uv.wgsl',
+    'tools/validate-parallax-math/src/lib.rs',
+    'tools/validate-parallax-math/tests/wgsl_validation.rs',
+    'tools/validate-parallax-math/validate.sh',
+    'tools/validate-parallax-replacement/.gitignore',
+    'tools/validate-parallax-replacement/Cargo.lock',
+    'tools/validate-parallax-replacement/Cargo.toml',
+    'tools/validate-parallax-replacement/README.md',
+    'tools/validate-parallax-replacement/inputs.json',
+    'tools/validate-parallax-replacement/reference-inputs.json',
+    'tools/validate-parallax-replacement/shader/integration.wgsl',
+    'tools/validate-parallax-replacement/src/main.rs',
+    'tools/validate-parallax-replacement/validate.sh',
+}
+
+MODIFIED_SOURCE_POLICY_PATHS = {
+    '.gitattributes',
+    'docs/release/analytical-modified-source-provenance.json',
+    'docs/release/analytical-source-header-evidence.json',
+    'docs/release/modified-source-patches/bevy_pbr-added-vendor.patch',
+    'docs/release/modified-source-patches/zune-jpeg-added-vendor.patch',
+    'docs/release/original-routine-remediation.md',
+    'docs/release/source-archive-policy.md',
+    'scripts/check-source-archive.py',
+    'scripts/test_source_archive.py',
+}
+
+REPLAY_CONTRACT_PATHS |= VENDORED_PACKAGE_PATHS | REPLACEMENT_WITNESS_PATHS | MODIFIED_SOURCE_POLICY_PATHS
+
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {
@@ -463,6 +720,55 @@ def git(repo, *args):
     return subprocess.check_output(["git", *args], cwd=repo).decode("utf-8").strip()
 
 
+MODIFIED_SOURCE_BOUNDARIES = (
+    ("vendor/bevy_pbr/", VENDORED_PACKAGE_PATHS),
+    ("vendor/zune-jpeg/", VENDORED_PACKAGE_PATHS),
+    ("tools/validate-jpeg-replacement/", REPLACEMENT_WITNESS_PATHS),
+    ("tools/validate-parallax-math/", REPLACEMENT_WITNESS_PATHS),
+    ("tools/validate-parallax-replacement/", REPLACEMENT_WITNESS_PATHS),
+)
+
+
+def validate_modified_source_boundaries(paths):
+    # Prefixes reject unexpected members; they do not admit new files.
+    for prefix, declared in MODIFIED_SOURCE_BOUNDARIES:
+        expected = {path for path in declared if path.startswith(prefix)}
+        observed = {path for path in paths
+                    if path.casefold() == prefix[:-1].casefold()
+                    or path.casefold().startswith(prefix.casefold())}
+        require(observed == expected,
+                "modified source boundary changed: " + prefix)
+
+
+
+def validate_modified_source_checkout(repo):
+    # Git's clean status excludes ignored files. Cargo can discover a witness
+    # build.rs or local config among those files, so reject them here as well.
+    # This walk only rejects; acceptance still comes from the literal path sets.
+    for prefix, declared in MODIFIED_SOURCE_BOUNDARIES:
+        root = repo
+        for part in Path(prefix).parts:
+            root /= part
+            details = root.lstat()
+            require(root.is_dir() and not root.is_symlink()
+                    and not getattr(details, "st_file_attributes", 0) & 0x400,
+                    "non-regular/reparse modified source root: " + prefix)
+        expected = {path for path in declared if path.startswith(prefix)}
+        observed = set()
+        for member in root.rglob("*"):
+            relative = member.relative_to(repo).as_posix()
+            details = member.lstat()
+            require(not member.is_symlink()
+                    and not getattr(details, "st_file_attributes", 0) & 0x400,
+                    "modified source symlink/reparse input: " + relative)
+            if member.is_dir():
+                continue
+            require(member.is_file() and relative in expected,
+                    "unreviewed modified source checkout input: " + relative)
+            observed.add(relative)
+        require(observed == expected, "modified source checkout boundary changed: " + prefix)
+
+
 def validate_replay_contract(contract):
     require(isinstance(contract, dict) and contract.get("schema_version") == 1
             and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
@@ -502,6 +808,8 @@ def source_inputs(repo, expected):
                         "checkout_bytes": path.stat().st_size, "checkout_sha256": digest(path)})
     records.sort(key=lambda record: record["path"])
     by_path = {record["path"]: record for record in records}
+    validate_modified_source_boundaries(by_path)
+    validate_modified_source_checkout(repo)
     require(REPLAY_CONTRACT_PATH in by_path, "reviewed replay contract must be tracked")
     contract_record = by_path[REPLAY_CONTRACT_PATH]
     contract_blob = subprocess.check_output(
@@ -1216,6 +1524,7 @@ def validate_source_evidence(source, report):
                 and type(record.get("checkout_bytes")) is int and record["checkout_bytes"] >= 0
                 and hex_value(record.get("checkout_sha256"), 64), "invalid tracked source input")
         by_path[record["path"]] = record
+    validate_modified_source_boundaries(by_path)
     require(by_path.get(REPLAY_CONTRACT_PATH, {}).get("checkout_sha256") == contract_hash
             and by_path[REPLAY_CONTRACT_PATH]["checkout_bytes"] == len(contract_text.encode("utf-8")),
             "contract missing from tracked source inputs")

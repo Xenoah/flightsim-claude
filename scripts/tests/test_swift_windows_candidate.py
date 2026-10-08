@@ -111,6 +111,102 @@ def readback_v2_fixture(startup="complete", scene=True, late=True):
     return result
 
 
+# Literal independent source-semantic mutations for the reviewed local packages.
+# Altered sources are committed only in disposable fixtures and never compiled.
+MODIFIED_SOURCE_MUTATIONS = (
+    ('Cargo.toml', b'zune-jpeg = { path = "vendor/zune-jpeg" }', b'zune-jpeg = { path = "vendor/unreviewed-jpeg" }'),
+    ('Cargo.toml', b'bevy_pbr = { path = "vendor/bevy_pbr" }', b'# use registry bevy_pbr'),
+    ('Cargo.lock', b'name = "bevy_pbr"\nversion = "0.18.1"', b'name = "bevy_pbr"\nversion = "0.18.2"'),
+    ('Cargo.lock', b'name = "zune-jpeg"\nversion = "0.5.15"', b'name = "zune-jpeg"\nversion = "0.5.15"\nsource = "registry+https://github.com/rust-lang/crates.io-index"'),
+    ('vendor/zune-jpeg/Cargo.toml', b'build = false', b'build = true'),
+    ('vendor/zune-jpeg/Cargo.toml', b'path = "src/lib.rs"', b'path = "src/unreviewed.rs"'),
+    ('vendor/bevy_pbr/Cargo.toml', b'build = false', b'build = true'),
+    ('vendor/bevy_pbr/Cargo.toml', b'path = "src/lib.rs"', b'path = "src/unreviewed.rs"'),
+    ('vendor/zune-jpeg/Cargo.toml', b'    "x86",', b'    # x86 disabled,'),
+    ('vendor/zune-jpeg/src/unsafe_utils_avx2.rs', b'#[target_feature(enable = "avx2")]\n#[inline]\npub unsafe fn transpose', b'#[inline]\npub unsafe fn transpose'),
+    ('vendor/zune-jpeg/src/unsafe_utils_avx2.rs', b'let (a0, a1) = exchange_bit!(v0.mm256, v1.mm256, 0xb1, 0xaa);', b'let (a0, a1) = exchange_bit!(v0.mm256, v1.mm256, 0xb0, 0xaa);'),
+    ('vendor/zune-jpeg/src/unsafe_utils_avx2.rs', b'let (b0, b2) = exchange_bit!(a0, a2, 0x4e, 0xcc);', b'let (b0, b2) = exchange_bit!(a0, a2, 0x4e, 0xcd);'),
+    ('vendor/zune-jpeg/src/unsafe_utils_avx2.rs', b'v0.mm256 = _mm256_permute2x128_si256::<0x20>(b0, b4);', b'v0.mm256 = _mm256_permute2x128_si256::<0x31>(b0, b4);'),
+    ('vendor/zune-jpeg/src/unsafe_utils_avx2.rs', b'v7.mm256 = _mm256_permute2x128_si256::<0x31>(b3, b7);', b'v7.mm256 = _mm256_permute2x128_si256::<0x31>(b2, b6);'),
+    ('vendor/zune-jpeg/src/lib.rs', b'mod flightsim_transpose_tests;', b'// detached local transpose tests'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'return textureSampleLevel(', b'return textureSample('),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'let projection_z = max(incidence, 0.0001);', b'let projection_z = incidence;'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'let maximum_layers = floor(min(max_layer_count, 1024.0));', b'let maximum_layers = floor(max_layer_count);'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'step < min(max_steps, 24u)', b'step < max_steps'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'vec2<f32>(direction.x, -direction.y)', b'vec2<f32>(direction.x, direction.y)'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'let start_height = clamp(sample_depth_map(original_uv, material_bind_group_slot), 0.0, 1.0);', b'let start_height = clamp(sample_depth_map(original_uv, 0u), 0.0, 1.0);'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'if residual >= 0.0 {', b'if residual <= 0.0 {'),
+    ('vendor/bevy_pbr/src/render/parallax_mapping.wgsl', b'return original_uv + hit_depth * ray_uv;', b'return original_uv;'),
+    ('vendor/bevy_pbr/src/lib.rs', b'load_shader_library!(app, "render/parallax_mapping.wgsl");', b'// unregistered parallax module'),
+    ('vendor/bevy_pbr/src/render/pbr_fragment.wgsl', b'uv = parallaxed_uv(', b'uv = disabled_parallaxed_uv('),
+    ('vendor/bevy_pbr/src/lib.rs', b'include_bytes!("bluenoise/stbn.ktx2")', b'include_bytes!("bluenoise/unreviewed.ktx2")'),
+    ('.gitattributes', b'/assets/aircraft/light_single.glb export-ignore', b'# unresolved model no longer excluded'),
+    ('scripts/check-source-archive.py', b'if name in seen:', b'if False:'),
+    ('scripts/check-source-archive.py', b'if sha(payload) == DENIED_SHA256:', b'if False:'),
+    ('scripts/check-source-archive.py', b'if observed.keys() != expected.keys():', b'if False:'),
+    ('scripts/check-source-archive.py', b'if observed[name] != expected[name]:', b'if False:'),
+    ('scripts/check-source-archive.py', b"if not key.upper().startswith('GIT_')", b'if True'),
+    ('scripts/check-source-archive.py', b"[*git, '-C', str(bare), 'archive', '--format=' + fmt,", b"[*git, '-C', str(repo), 'archive', '--format=' + fmt,"),
+    ('scripts/check-source-archive.py', b"'publication_authorized': False", b"'publication_authorized': True"),
+    ('tools/validate-parallax-replacement/src/main.rs', b'assert!(matches!(level, naga::SampleLevel::Exact(_)));', b'assert!(true);'),
+    ('tools/validate-parallax-replacement/src/main.rs', b'assert_eq!(loops(&function.body), if relief { 2 } else { 1 });', b'assert_eq!(loops(&function.body), loops(&function.body));'),
+)
+
+
+CAPTURE_ADMISSION_MUTATIONS = (
+    ('crates/flightsim-app/src/capture_admission.rs', b'if startup.screenshot.is_none() || !startup.exit_after_screenshot {', b'if false {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'.add_systems(ExtractSchedule, extract_admission);', b'.add_systems(Render, extract_admission);'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'prepare_view_admission.before(renderer),', b'prepare_view_admission.after(renderer),'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'restore_views.after(renderer),', b'restore_views.before(renderer),'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'.in_set(RenderSystems::Render),', b'.in_set(RenderSystems::Prepare),'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'snapshot: admission.state.snapshot(),', b'snapshot: AdmissionState::default().snapshot(),'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'flight_camera: flight_camera.single().ok(),', b'flight_camera: None,'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'screenshot_in_flight: !screenshots.is_empty(),', b'screenshot_in_flight: false,'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'if !admission.snapshot.draw_views && !admission.screenshot_in_flight {', b'if !admission.snapshot.draw_views {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'frame.saved = Some(std::mem::take(&mut cameras.0));', b'cameras.0.clear();'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'let Some(epoch) = admission.snapshot.opportunity_epoch else {', b'let Some(epoch) = Some(1) else {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'let Some(entity) = admission.flight_camera else {', b'let Some(entity) = cameras.0.first().map(|camera| camera.entity) else {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'if !cameras.0.iter().any(|camera| camera.entity == entity) {', b'if false {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'views: Query<(&ExtractedCamera, &ViewTarget), With<Camera3d>>,', b'views: Query<(&ExtractedCamera, &ViewTarget)>, '),
+    ('crates/flightsim-app/src/capture_admission.rs', b'let Ok((camera, _target)) = views.get(entity) else {', b'let Ok((camera, _target)) = views.single() else {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'window.physical_width > 0 && window.physical_height > 0', b'true'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'if target_valid {', b'if true {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'frame.opportunity = Some((epoch, admission.rendered_epoch.clone()));', b'frame.opportunity = Some((1, admission.rendered_epoch.clone()));'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'cameras.0 = saved;', b'cameras.0.clear();'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'world.resource_mut::<SortedCameras>().0 = saved;', b'drop(saved);'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'admission.rendered_epoch.store(0, Ordering::Release);', b'admission.rendered_epoch.store(1, Ordering::Release);'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'std::panic::resume_unwind(failure);', b'drop(failure);'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'if let Some((epoch, rendered)) = frame.opportunity.take() {', b'if let Some((epoch, rendered)) = frame.opportunity.clone() {'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'rendered.store(epoch, Ordering::Release);', b'rendered.store(1, Ordering::Release);'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'if startup.screenshot.is_none() {\n        admission.finish();', b'if false {\n        admission.finish();'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'if !self.active || self.requested {', b'if false {'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'if scene_changed || (eligible && self.epoch == 0) {', b'if eligible && self.epoch == 0 {'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'self.epoch.checked_add(1)', b'Some(self.epoch.wrapping_add(1))'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'self.opened |= eligible;', b'self.opened = eligible;'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'Ok(eligible && self.epoch != 0 && rendered_epoch == self.epoch)', b'Ok(eligible)'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'draw_views: !self.active || self.opened || self.requested,', b'draw_views: self.eligible,'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'opportunity_epoch: (self.active && self.eligible && !self.requested)', b'opportunity_epoch: (self.active)'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'self.requested = true;', b'self.requested = false;'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'self.active = false;', b'self.active = true;'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'let eligible = state.elapsed >= startup.screenshot_delay && state.frames >= 30 && stable;', b'let eligible = true;'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'if !admission.observe(state.scene_changed, eligible) {', b'if false && !admission.observe(state.scene_changed, eligible) {'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'self.scene_changed = !stable && (ready.is_some() || self.previous_ready.is_some());', b'self.scene_changed = false;'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'admission.requested();', b'admission.finish();'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'if let Some(mut admission) = admission {\n        admission.finish();', b'if let Some(mut admission) = admission {\n        let _ = admission;'),
+    ('crates/flightsim-app/src/capture_backpressure.rs', b'crate::capture_admission::with_restored_views(world, |world| {\n            world.run_schedule(Render);\n        });', b'world.run_schedule(Render);'),
+    ('crates/flightsim-app/src/capture_backpressure.rs', b'crate::capture_admission::acknowledge_render(world);', b'// omit acknowledgement'),
+    ('crates/flightsim-app/src/main.rs', b'#[cfg(not(target_family = "wasm"))]\nmod capture_admission;', b'mod capture_admission;'),
+    ('crates/flightsim-app/src/screen_capture.rs', b'crate::capture_admission::configure(app);', b'let _ = app;'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'.physical_viewport_size\n        .is_none_or(|size| size.min_element() == 0)', b'.physical_viewport_size\n        .is_none_or(|_| false)'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'.physical_target_size\n            .is_none_or(|size| size.min_element() == 0)', b'.physical_target_size\n            .is_none_or(|_| false)'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'frame.opportunity = None;\n            frame.saved.take()', b'frame.saved.take()'),
+    ('crates/flightsim-app/src/capture_admission.rs', b'self.state.finish();\n        self.rendered_epoch.store(0, Ordering::Release);', b'self.rendered_epoch.store(0, Ordering::Release);'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'self.finish();\n                return Err("screenshot admission generation exhausted");', b'return Ok(true);'),
+    ('crates/flightsim-app/src/capture_admission_state.rs', b'opened: false,', b'opened: true,'),
+    ('crates/flightsim-app/src/capture_backpressure.rs', b'world.run_schedule(Render);\n        });\n        crate::capture_admission::acknowledge_render(world);', b'crate::capture_admission::acknowledge_render(world);\n            world.run_schedule(Render);\n        });'),
+)
+
+
 class CandidateAcceptanceTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -225,11 +321,12 @@ class CandidateAcceptanceTests(unittest.TestCase):
     def test_windows_native_checkout_failure_then_explicit_lf_preserves_raw_notices(self):
         repo, notice = self.source_fixture()
         notice_bytes = notice.read_bytes()
-        # Keep the contract LF in this fixture so the independent implementation
-        # byte check is reached; another test covers a CRLF contract itself.
-        with (repo / ".gitattributes").open("a", encoding="utf-8") as attributes:
-            attributes.write("\nscripts/replay-candidate-contract.json text eol=lf\n")
-        expected = self.commit_source_fixture(repo)
+        # Keep the contract LF so the independent implementation byte check is
+        # reached. Root .gitattributes is now pinned for archive policy; the
+        # disposable local override leaves its canonical bytes unchanged.
+        with (repo / ".git/info/attributes").open("w", encoding="utf-8") as attributes:
+            attributes.write("scripts/replay-candidate-contract.json text eol=lf\n")
+        expected = candidate.git(repo, "rev-parse", "HEAD")
         self.checkout_source_fixture(repo, "crlf")
         aircraft = repo / "crates/flightsim-fdm/src/aircraft.rs"
         self.assertEqual(aircraft.read_bytes().count(b"\r\n"), 799)
@@ -1647,6 +1744,423 @@ class CandidateAcceptanceTests(unittest.TestCase):
                 self.seal_report(evidence, changed_report)
                 with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
                     candidate.validate_evidence(evidence)
+
+    def test_capture_admission_has_complete_scope_and_prior_render_witnesses(self):
+        paths = candidate.CAPTURE_ADMISSION_PATHS
+        self.assertEqual(paths, {
+            'crates/flightsim-app/src/capture_admission.rs',
+            'crates/flightsim-app/src/capture_admission_state.rs',
+        })
+        self.assertTrue(paths <= candidate.REPLAY_CONTRACT_PATHS)
+        for relative, old, _new in CAPTURE_ADMISSION_MUTATIONS:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            self.assertEqual((ROOT / relative).read_bytes().count(old), 1, (relative, old))
+        helper = (ROOT / 'crates/flightsim-app/src/capture_admission.rs').read_text()
+        production = helper.rsplit('\n#[cfg(test)]\nmod tests {', 1)[0]
+        self.assertIn('#[path = "capture_admission_state.rs"]\nmod state;', production)
+        self.assertIn('configure_frame_hooks(render_app, render_system.into_system_set().intern());', production)
+        self.assertIn('views: Query<(&ExtractedCamera, &ViewTarget), With<Camera3d>>', production)
+        self.assertIn('rendered_epoch: admission.rendered_epoch.clone(),', production)
+        self.assertIn('frame.opportunity = Some((epoch, admission.rendered_epoch.clone()));', production)
+        for forbidden in ('.set_extract(', '.submit(', '.run_if(', '.update_schedule =',
+                          'is_active =', 'MAX_IN_FLIGHT_FRAMES', 'on_submitted_work_done'):
+            self.assertNotIn(forbidden, production)
+        configure = production.split('pub(super) fn configure', 1)[1].split('fn configure_frame_hooks', 1)[0]
+        self.assertLess(configure.index('startup.screenshot.is_none() || !startup.exit_after_screenshot'),
+                        configure.index('app.get_sub_app_mut(RenderApp)'))
+        self.assertIn('.add_systems(Last, cancel_removed_request);', configure)
+        restoration = production.split('fn restore_views(', 1)[1].split('pub(super) fn with_restored_views', 1)[0]
+        self.assertIn('if let Some(saved) = frame.saved.take()', restoration)
+        self.assertNotIn('snapshot.', restoration)
+        self.assertNotIn('active()', restoration)
+        wrapper = (ROOT / 'crates/flightsim-app/src/capture_backpressure.rs').read_text().split('fn render_capture_frame', 1)[1].split('#[cfg(test)]', 1)[0]
+        order = [wrapper.index(anchor) for anchor in (
+            '.wait_for_credit(&session, || {',
+            'crate::capture_admission::with_restored_views(world, |world| {',
+            'world.run_schedule(Render);',
+            'crate::capture_admission::acknowledge_render(world);',
+            'if session.active() {',
+            'let complete = credits.submitted();',
+            '.on_submitted_work_done(move || complete.store(true, Ordering::Release));',
+        )]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(wrapper.count('world.run_schedule(Render);'), 1)
+        capture = (ROOT / 'crates/flightsim-app/src/screen_capture.rs').read_text().split('\n#[cfg(test)]', 1)[0]
+        self.assertIn('let stable = ready.is_some() && self.previous_ready == ready;', capture)
+        self.assertIn('state.elapsed < startup.screenshot_delay || state.frames < 30 || !stable', capture)
+        self.assertLess(capture.index('if !admission.observe(state.scene_changed, eligible)'),
+                        capture.index('state.done = true;'))
+        self.assertLess(capture.index('admission.requested();'), capture.index('let screenshot = target.map_or_else'))
+        saver = capture.split('fn save_capture(', 1)[1].split('fn save_capture_image', 1)[0]
+        self.assertLess(saver.index('admission.finish();'), saver.index('let Some(path)'))
+        for witness in (
+            'loading_keeps_preparation_and_cleanup_and_restores_the_exact_view_list',
+            'an_extracted_screenshot_never_loses_its_view_draws',
+            'restoration_does_not_depend_on_a_later_snapshot_or_empty_saved_list',
+            'admission_with_no_valid_flight_view_does_not_acknowledge_a_render',
+            'acknowledgement_uses_the_admitted_frame_token_not_later_main_state',
+            'a_failed_render_restores_views_invalidates_ack_and_still_fails',
+            'batch_configuration_extracts_a_deferred_snapshot_and_render_entity_mapping',
+            'ordinary_and_non_batch_launches_install_no_admission_systems',
+        ):
+            self.assertEqual(helper.count('fn ' + witness + '('), 1, witness)
+
+    def test_capture_admission_rejects_scope_epoch_lifecycle_and_restore_mutations(self):
+        repo, _ = self.source_fixture()
+        candidate.source_inputs(repo, candidate.git(repo, 'rev-parse', 'HEAD'))
+        self.assertEqual(len(CAPTURE_ADMISSION_MUTATIONS), 50)
+        for relative, old, new in CAPTURE_ADMISSION_MUTATIONS:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, (relative, old))
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(
+                    ValueError, 'canonical baseline changed') as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_capture_admission_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        paths = candidate.CAPTURE_ADMISSION_PATHS | {
+            'crates/flightsim-app/src/main.rs',
+            'crates/flightsim-app/src/screen_capture.rs',
+            'crates/flightsim-app/src/capture_backpressure.rs',
+        }
+        self.assertEqual(len(paths), 5)
+        for relative in sorted(paths):
+            for mutation in ('missing file', 'missing reviewed record', 'changed canonical digest',
+                             'changed checkout digests', 'removed contract row'):
+                changed = json.loads(json.dumps(source))
+                if mutation == 'missing file':
+                    changed['files'] = [row for row in changed['files'] if row['path'] != relative]
+                elif mutation == 'missing reviewed record':
+                    del changed['reviewed_replay_source_evidence'][relative]
+                elif mutation == 'changed canonical digest':
+                    changed['reviewed_replay_source_evidence'][relative]['canonical_sha256'] = '0' * 64
+                elif mutation == 'changed checkout digests':
+                    changed['reviewed_replay_source_evidence'][relative]['canonical_sha256'] = '0' * 64
+                    changed['reviewed_replay_source_evidence'][relative]['checkout_sha256'] = '0' * 64
+                    for row in changed['files']:
+                        if row['path'] == relative:
+                            row['checkout_sha256'] = '0' * 64
+                else:
+                    del changed['replay_contract']['source_sha256'][relative]
+                    changed['replay_contract_text'] = json.dumps(changed['replay_contract'])
+                    changed['replay_contract_sha256'] = candidate.hashlib.sha256(changed['replay_contract_text'].encode()).hexdigest()
+                    for row in changed['files']:
+                        if row['path'] == candidate.REPLAY_CONTRACT_PATH:
+                            row['checkout_sha256'] = changed['replay_contract_sha256']
+                            row['checkout_bytes'] = len(changed['replay_contract_text'].encode())
+                candidate.write_json(evidence / 'source-inputs.json', changed)
+                self.seal_report(evidence, {**report,
+                    'source_inputs_sha256': candidate.digest(evidence / 'source-inputs.json'),
+                    'replay_contract_sha256': changed['replay_contract_sha256']})
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
+    def test_local_package_closure_provenance_and_semantic_anchors_are_complete(self):
+        import hashlib
+        import tomllib
+        self.assertEqual(len(candidate.VENDORED_PACKAGE_PATHS), 207)
+        self.assertEqual(len(candidate.REPLACEMENT_WITNESS_PATHS), 20)
+        self.assertEqual(len(candidate.MODIFIED_SOURCE_POLICY_PATHS), 9)
+        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 402)
+        for prefix, paths in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            actual = {path.relative_to(ROOT).as_posix() for path in (ROOT / prefix).rglob('*') if path.is_file()}
+            self.assertEqual(actual, {p for p in paths if p.startswith(prefix)}, prefix)
+        cargo = tomllib.loads((ROOT / 'Cargo.toml').read_text())
+        self.assertEqual(cargo['patch']['crates-io'], {
+            'zune-jpeg': {'path': 'vendor/zune-jpeg'},
+            'bevy_pbr': {'path': 'vendor/bevy_pbr'},
+        })
+        self.assertEqual(len(cargo['workspace']['members']), 13)
+        self.assertEqual(cargo['workspace']['exclude'], ['vendor/osmpbf', 'vendor/zune-jpeg', 'vendor/bevy_pbr'])
+        lock = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']
+        for name, version, directory in (
+            ('zune-jpeg', '0.5.15', 'vendor/zune-jpeg'),
+            ('bevy_pbr', '0.18.1', 'vendor/bevy_pbr'),
+        ):
+            packages = [entry for entry in lock if entry['name'] == name]
+            self.assertEqual(len(packages), 1, name)
+            self.assertEqual(packages[0]['version'], version)
+            self.assertNotIn('source', packages[0])
+            self.assertNotIn('checksum', packages[0])
+            manifest = tomllib.loads((ROOT / directory / 'Cargo.toml').read_text())
+            self.assertEqual(manifest['package']['name'], name)
+            self.assertEqual(manifest['package']['version'], version)
+            self.assertEqual(manifest['package']['license'], 'MIT OR Apache-2.0')
+            self.assertIs(manifest['package']['build'], False)
+            self.assertEqual(manifest['lib']['path'], 'src/lib.rs')
+        zune = tomllib.loads((ROOT / 'vendor/zune-jpeg/Cargo.toml').read_text())
+        self.assertEqual(zune['features']['default'], ['x86', 'neon', 'std'])
+        provenance = json.loads((ROOT / 'docs/release/analytical-modified-source-provenance.json').read_text())
+        rows = {}
+        for package in provenance['packages']:
+            self.assertIn(package['source_root'], ('vendor/zune-jpeg', 'vendor/bevy_pbr'))
+            for record in package['files']:
+                path = package['source_root'] + '/' + record['path']
+                self.assertNotIn(path, rows)
+                rows[path] = record
+                data = (ROOT / path).read_bytes()
+                self.assertEqual(len(data), record['bytes'], path)
+                self.assertEqual(hashlib.sha256(data).hexdigest(), record['sha256'], path)
+        self.assertEqual(set(rows), candidate.VENDORED_PACKAGE_PATHS)
+        headers = json.loads((ROOT / 'docs/release/analytical-source-header-evidence.json').read_text())['records']
+        self.assertEqual(len(headers), 510)
+        roots = {'zune-jpeg@0.5.15': 'vendor/zune-jpeg', 'bevy_pbr@0.18.1': 'vendor/bevy_pbr'}
+        for record in headers:
+            if record['package_id'] not in roots:
+                continue
+            path = roots[record['package_id']] + '/' + record['source_relative_path']
+            self.assertIn(path, candidate.VENDORED_PACKAGE_PATHS)
+            data = (ROOT / path).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), record['source_sha256'], path)
+            start, length = record['start_byte'], record['byte_length']
+            self.assertGreaterEqual(start, 0)
+            self.assertGreater(length, 0)
+            self.assertLessEqual(start + length, len(data))
+            self.assertEqual(hashlib.sha256(data[start:start + length]).hexdigest(), record['excerpt_sha256'])
+        # Whole-file pins remain authoritative; these literal source semantics
+        # independently prevent a no-op/feature-removal migration being called equivalent.
+        for relative, old, _new in MODIFIED_SOURCE_MUTATIONS:
+            self.assertEqual((ROOT / relative).read_bytes().count(old), 1, relative)
+        self.assertFalse((ROOT / 'vendor/bevy_pbr/src/meshlet/meshlet_preview.png').exists())
+        for root in roots.values():
+            self.assertFalse((ROOT / root / '.cargo_vcs_info.json').exists())
+
+    def test_modified_source_exact_sets_reject_missing_extra_and_case_aliases(self):
+        paths = set(candidate.REPLAY_CONTRACT_PATHS)
+        candidate.validate_modified_source_boundaries(paths)
+        candidate.validate_modified_source_boundaries(paths | {'docs/unrelated-source-note.md'})
+        for prefix, declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            original = sorted(path for path in declared if path.startswith(prefix))[0]
+            alias = prefix.upper() + original[len(prefix):]
+            for changed in (paths - {original}, paths | {prefix + 'unreviewed.rs'},
+                            (paths - {original}) | {alias}, paths | {alias}):
+                with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, 'modified source boundary changed'):
+                    candidate.validate_modified_source_boundaries(changed)
+
+    def test_ignored_vendor_and_witness_inputs_cannot_escape_the_live_boundary(self):
+        repo, _ = self.source_fixture()
+        candidate.validate_modified_source_checkout(repo)
+        excludes = repo / '.git/info/exclude'
+        excludes.write_text('build.rs\n.cargo/\n', encoding='utf-8')
+        for prefix, _declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            for suffix in ('build.rs', '.cargo/config.toml'):
+                path = repo / prefix / suffix
+                self.assertFalse(path.exists())
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('unreviewed ignored fixture\n', encoding='utf-8')
+                self.assertEqual(candidate.git(repo, 'status', '--porcelain', '--untracked-files=all'), '')
+                with self.subTest(prefix=prefix, suffix=suffix), self.assertRaisesRegex(
+                        ValueError, 'unreviewed modified source checkout input'):
+                    candidate.validate_modified_source_checkout(repo)
+                path.unlink()
+        candidate.validate_modified_source_checkout(repo)
+        # Exercise every ancestor/member guard without requiring Windows
+        # symlink-creation privileges in the ordinary source-only CI suite.
+        for prefix, declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            relative = sorted(path for path in declared if path.startswith(prefix))[0]
+            for alias in (repo / Path(prefix).parts[0], repo / prefix, repo / relative):
+                with self.subTest(alias=alias), patch.object(
+                        Path, 'is_symlink', autospec=True, side_effect=lambda path: path == alias):
+                    with self.assertRaisesRegex(ValueError, 'modified source (root|symlink)'):
+                        candidate.validate_modified_source_checkout(repo)
+
+    def test_windows_reparse_inputs_cannot_escape_vendor_or_witness_roots(self):
+        from types import SimpleNamespace
+        repo, _ = self.source_fixture()
+        candidate.validate_modified_source_checkout(repo)
+        original_lstat = Path.lstat
+        for prefix, _declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            for reparse in (repo / Path(prefix).parts[0], repo / prefix,
+                            repo / prefix / 'src', repo / prefix / 'Cargo.toml'):
+                self.assertTrue(reparse.exists())
+                def reparse_details(path, *args, **kwargs):
+                    details = original_lstat(path, *args, **kwargs)
+                    if path == reparse:
+                        return SimpleNamespace(st_mode=details.st_mode, st_file_attributes=0x400)
+                    return details
+                with self.subTest(reparse=reparse), patch.object(
+                        Path, 'lstat', autospec=True, side_effect=reparse_details):
+                    with self.assertRaisesRegex(ValueError, 'reparse'):
+                        candidate.validate_modified_source_checkout(repo)
+                candidate.validate_modified_source_checkout(repo)
+
+    def test_local_package_semantic_mutations_reject_before_build(self):
+        repo, _ = self.source_fixture()
+        candidate.source_inputs(repo, candidate.git(repo, 'rev-parse', 'HEAD'))
+        for relative, old, new in MODIFIED_SOURCE_MUTATIONS:
+            self.assertIn(relative, candidate.REPLAY_CONTRACT_PATHS)
+            path = repo / relative
+            original = path.read_bytes()
+            self.assertEqual(original.count(old), 1, relative)
+            path.write_bytes(original.replace(old, new))
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative, mutation=old), self.assertRaisesRegex(ValueError, 'canonical baseline changed') as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_local_package_provenance_notice_and_asset_mutations_reject(self):
+        repo, _ = self.source_fixture()
+        paths = (
+            'vendor/bevy_pbr/src/bluenoise/stbn.ktx2',
+            'vendor/bevy_pbr/third-party-notices/EA-fastnoise-LICENSE.txt',
+            'docs/release/analytical-modified-source-provenance.json',
+            'docs/release/analytical-source-header-evidence.json',
+        )
+        for relative in paths:
+            path = repo / relative
+            original = path.read_bytes()
+            if relative.endswith('.ktx2'):
+                changed = bytes([original[0] ^ 1]) + original[1:]
+            elif relative.endswith('LICENSE.txt'):
+                changed = original + b'\n'
+            elif relative.endswith('analytical-modified-source-provenance.json'):
+                value = json.loads(original)
+                package = next(entry for entry in value['packages'] if entry['id'] == 'bevy_pbr@0.18.1')
+                old_count = len(package['files'])
+                package['files'] = [entry for entry in package['files'] if entry['path'] != 'src/render/parallax_mapping.wgsl']
+                self.assertEqual(len(package['files']), old_count - 1)
+                changed = json.dumps(value).encode()
+            else:
+                value = json.loads(original)
+                entry = next(entry for entry in value['records'] if entry['package_id'] == 'zune-jpeg@0.5.15')
+                entry['source_sha256'] = '0' * 64
+                changed = json.dumps(value).encode()
+            self.assertNotEqual(changed, original)
+            path.write_bytes(changed)
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, 'canonical baseline changed') as failure:
+                candidate.source_inputs(repo, expected)
+            self.assertIn(relative, str(failure.exception))
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_committed_vendor_and_witness_members_cannot_expand_or_shrink(self):
+        repo, _ = self.source_fixture()
+        candidate.source_inputs(repo, candidate.git(repo, 'rev-parse', 'HEAD'))
+        for prefix, declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            extra = repo / (prefix + 'unreviewed.rs')
+            self.assertFalse(extra.exists())
+            extra.write_bytes(b'unreviewed source fixture\n')
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(prefix=prefix, operation='addition'), self.assertRaisesRegex(ValueError, 'modified source boundary changed'):
+                candidate.source_inputs(repo, expected)
+            extra.unlink()
+            self.commit_source_fixture(repo)
+            relative = sorted(path for path in declared if path.startswith(prefix))[0]
+            path = repo / relative
+            original = path.read_bytes()
+            path.unlink()
+            expected = self.commit_source_fixture(repo)
+            with self.subTest(prefix=prefix, operation='omission'), self.assertRaisesRegex(ValueError, 'modified source boundary changed'):
+                candidate.source_inputs(repo, expected)
+            path.write_bytes(original)
+            self.commit_source_fixture(repo)
+
+    def test_exported_modified_sources_cannot_be_omitted_or_rehashed(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        paths = (candidate.VENDORED_PACKAGE_PATHS | candidate.REPLACEMENT_WITNESS_PATHS
+                 | candidate.MODIFIED_SOURCE_POLICY_PATHS)
+        self.assertEqual(len(paths), 236)
+        for relative in sorted(paths):
+            for mutation in ('missing file', 'missing reviewed record', 'changed canonical digest',
+                             'changed checkout digests', 'removed contract row'):
+                changed = json.loads(json.dumps(source))
+                if mutation == 'missing file':
+                    changed['files'] = [row for row in changed['files'] if row['path'] != relative]
+                elif mutation == 'missing reviewed record':
+                    del changed['reviewed_replay_source_evidence'][relative]
+                elif mutation == 'changed canonical digest':
+                    changed['reviewed_replay_source_evidence'][relative]['canonical_sha256'] = '0' * 64
+                elif mutation == 'changed checkout digests':
+                    changed['reviewed_replay_source_evidence'][relative]['canonical_sha256'] = '0' * 64
+                    changed['reviewed_replay_source_evidence'][relative]['checkout_sha256'] = '0' * 64
+                    for row in changed['files']:
+                        if row['path'] == relative:
+                            row['checkout_sha256'] = '0' * 64
+                else:
+                    del changed['replay_contract']['source_sha256'][relative]
+                    changed['replay_contract_text'] = json.dumps(changed['replay_contract'])
+                    changed['replay_contract_sha256'] = candidate.hashlib.sha256(changed['replay_contract_text'].encode()).hexdigest()
+                    for row in changed['files']:
+                        if row['path'] == candidate.REPLAY_CONTRACT_PATH:
+                            row['checkout_sha256'] = changed['replay_contract_sha256']
+                            row['checkout_bytes'] = len(changed['replay_contract_text'].encode())
+                candidate.write_json(evidence / 'source-inputs.json', changed)
+                self.seal_report(evidence, {**report,
+                    'source_inputs_sha256': candidate.digest(evidence / 'source-inputs.json'),
+                    'replay_contract_sha256': changed['replay_contract_sha256']})
+                with self.subTest(relative=relative, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
+    def test_exported_vendor_and_witness_sets_reject_extra_rows_and_aliases(self):
+        evidence, source, report = self.successful_evidence_fixture()
+        candidate.validate_evidence(evidence)
+        for prefix, declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
+            original = sorted(path for path in declared if path.startswith(prefix))[0]
+            for mutation in ('extra member', 'case alias', 'resealed additional contract member'):
+                changed = json.loads(json.dumps(source))
+                if mutation == 'case alias':
+                    for row in changed['files']:
+                        if row['path'] == original:
+                            row['path'] = prefix.upper() + original[len(prefix):]
+                else:
+                    relative = prefix + 'unreviewed.rs'
+                    record = {'path': relative, 'canonical_git_blob': candidate.hashlib.new(
+                        changed['canonical_git_object_format'], b'blob 0\0').hexdigest(),
+                        'git_mode': '100644', 'checkout_bytes': 0,
+                        'checkout_sha256': candidate.hashlib.sha256(b'').hexdigest()}
+                    changed['files'].append(record)
+                    if mutation == 'resealed additional contract member':
+                        changed['replay_contract']['source_sha256'][relative] = record['checkout_sha256']
+                        changed['reviewed_replay_source_evidence'][relative] = {
+                            'canonical_sha256': record['checkout_sha256'], 'canonical_bytes': 0,
+                            'canonical_git_blob': record['canonical_git_blob'],
+                            'checkout_sha256': record['checkout_sha256'], 'checkout_bytes': 0}
+                        changed['replay_contract_text'] = json.dumps(changed['replay_contract'])
+                        changed['replay_contract_sha256'] = candidate.hashlib.sha256(changed['replay_contract_text'].encode()).hexdigest()
+                        for row in changed['files']:
+                            if row['path'] == candidate.REPLAY_CONTRACT_PATH:
+                                row['checkout_sha256'] = changed['replay_contract_sha256']
+                                row['checkout_bytes'] = len(changed['replay_contract_text'].encode())
+                candidate.write_json(evidence / 'source-inputs.json', changed)
+                self.seal_report(evidence, {**report,
+                    'source_inputs_sha256': candidate.digest(evidence / 'source-inputs.json'),
+                    'replay_contract_sha256': changed['replay_contract_sha256']})
+                with self.subTest(prefix=prefix, mutation=mutation), self.assertRaises(ValueError):
+                    candidate.validate_evidence(evidence)
+
+    def test_all_protected_sources_and_notices_survive_committed_archives(self):
+        spec = importlib.util.spec_from_file_location(
+            'reviewed_local_package_archive', ROOT / 'scripts/check-source-archive.py')
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+        protected = candidate.REPLAY_CONTRACT_PATHS | set(candidate.INDEPENDENT_REPLAY_HASHES)
+        for fmt in ('zip', 'tar'):
+            commit, payload = policy.committed_archive(ROOT, 'HEAD', fmt)
+            self.assertEqual(commit, candidate.git(ROOT, 'rev-parse', 'HEAD'))
+            members = policy.normalized_members(payload)
+            self.assertNotIn(policy.DENIED_PATH, members)
+            self.assertTrue(protected <= set(members), sorted(protected - set(members)))
+            for relative in protected:
+                self.assertEqual(members[relative], (ROOT / relative).read_bytes(), relative)
+
+    def test_reviewed_source_archive_policy_suite_runs_in_source_ci(self):
+        result = subprocess.run([candidate.sys.executable, str(ROOT / 'scripts/test_source_archive.py')],
+                                cwd=ROOT, text=True, capture_output=True, timeout=60, check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Ran 15 tests', result.stderr)
+        self.assertIn('\nOK\n', result.stderr)
 
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):
         repo, _ = self.source_fixture()
