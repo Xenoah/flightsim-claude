@@ -1,0 +1,565 @@
+{
+  "actual_native_log_claim": false,
+  "crates": [
+    {
+      "name": "wgpu-hal",
+      "registry_archive_sha256": "5b21cb61c57ee198bc4aff71aeadff4cbb80b927beb912506af9c780d64313ce",
+      "version": "27.0.4"
+    },
+    {
+      "name": "wgpu-core",
+      "registry_archive_sha256": "27a75de515543b1897b26119f93731b385a19aea165a1ec5f0e3acecc229cae7",
+      "version": "27.0.3"
+    },
+    {
+      "name": "bevy_log",
+      "registry_archive_sha256": "c2aac1187f83a1ab2eae887564f7fb14b4abb3fbe8b2267a6426663463923120",
+      "version": "0.18.1"
+    },
+    {
+      "name": "tracing-subscriber",
+      "registry_archive_sha256": "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319",
+      "version": "0.3.23"
+    },
+    {
+      "name": "windows",
+      "registry_archive_sha256": "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6",
+      "version": "0.58.0"
+    },
+    {
+      "name": "windows-result",
+      "registry_archive_sha256": "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e",
+      "version": "0.2.0"
+    },
+    {
+      "name": "bevy_ecs",
+      "registry_archive_sha256": "c9cf7a3ee41342dd7b5a5d82e200d0e8efb933169247fce853b4ad633d51e87d",
+      "version": "0.18.1"
+    }
+  ],
+  "files": [
+    {
+      "path": "wgpu-hal-27.0.4/src/auxil/dxgi/result.rs",
+      "sha256": "e7a9dfb48d8ef8cbe58b28b1ace5caf7818ee50505ba3220bb0509e66ae469b7"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/auxil/dxgi/exception.rs",
+      "sha256": "7138831914a59dc7cbb71512068e9134144b9bc8f43312682edccb0b3ee24a48"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/auxil/dxgi/factory.rs",
+      "sha256": "81e479e550a09127384d8080e43d5f5bae8e8dda6082fe41a87bea8f872eb0f1"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/auxil/dxgi/name.rs",
+      "sha256": "ff942da0da1a497ee4d2be21604f7ba9fae963588105b3d1f63aae1a0c536e82"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/mod.rs",
+      "sha256": "592a110924259e8754a919bfbc3efda1292f7416a447d585fe56fe910e6225d0"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/device.rs",
+      "sha256": "15c075fe5fed3869e8d0c3bac01bb8cc4d8a0b91f6a420ce723d337653dc3d30"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/command.rs",
+      "sha256": "4298abac32fbcb2c253650fc4546e5eb75c2ab9e4de0a5654ea9a043a4869a55"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/descriptor.rs",
+      "sha256": "ccd4feb6bd3e0a0ffc26142f8a81fca26180d0f50146b6eb2f670cbc89ea7064"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs",
+      "sha256": "014e9ec4a94519b877ad3adc2ea5d182aa6cdf502248009d28dc5833a9edb93c"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/sampler.rs",
+      "sha256": "d18d243efe4fa667dbab5b75b5b91d47de94d441976d9f44a46a2b49ba38473d"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/adapter.rs",
+      "sha256": "9249a60f13cd252244268425d38116ec1b86d2ad6e4bde88de35aafa66317a1b"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/shader_compilation.rs",
+      "sha256": "c901a797c69e08c8c0ec93ea37c5f31084eb21c26c7d703d7031f987f2243509"
+    },
+    {
+      "path": "wgpu-core-27.0.3/src/device/resource.rs",
+      "sha256": "2d381aaf9ee0bff01bab69f12923bbedba2bb0bc7110f6648d6a641efae93001"
+    },
+    {
+      "path": "wgpu-core-27.0.3/src/resource.rs",
+      "sha256": "729534761eccf965758ed82a21c7ffd357d7378c9216b25d0649185ce714b8b2"
+    },
+    {
+      "path": "bevy_log-0.18.1/src/lib.rs",
+      "sha256": "bd7044c294db7cf16f874c8cf92f01a368cf6ca8affcd04a3f0fac7cd4e0a4d4"
+    },
+    {
+      "path": "tracing-subscriber-0.3.23/src/fmt/format/mod.rs",
+      "sha256": "8933844e059b8f56788fdeb289074da0d4051de1b3b125a7d11c8d5a36cbf986"
+    },
+    {
+      "path": "windows-result-0.2.0/src/error.rs",
+      "sha256": "6c3d05bb2177791bff427eeaea204462202bb3ed2dc8727babdfefc4f1b3e84f"
+    },
+    {
+      "path": "windows-result-0.2.0/src/hresult.rs",
+      "sha256": "2a0f9f532e5e715d316735f626c1cf9e895ca1cc0aa65fedeeb01953028c4573"
+    },
+    {
+      "path": "windows-0.58.0/src/Windows/Win32/Foundation/mod.rs",
+      "sha256": "dbc6fb432dee05bcb0a2850047c288cef35feeed4625351fdd1008c1dbcc54b0"
+    },
+    {
+      "path": "windows-0.58.0/src/Windows/Win32/Graphics/Direct3D12/mod.rs",
+      "sha256": "51e89d4651f19edecce84fa2a3b5721719be309771203b90b7c5f6e97c565f97"
+    },
+    {
+      "path": "bevy_ecs-0.18.1/src/schedule/executor/single_threaded.rs",
+      "sha256": "60cffd66c1c998e101ad95a17c10c1b21f2059f9d82ebc7b95b0e55ee1ebe31e"
+    },
+    {
+      "path": "bevy_ecs-0.18.1/src/schedule/executor/multi_threaded.rs",
+      "sha256": "22b68289de0d34714ae3432430b620df7c78242487da34797f8cfc6aadf853b6"
+    }
+  ],
+  "kind": "source_backed_synthetic_fixture_provenance",
+  "message_ids": {
+    "COMMAND_ALLOCATOR_CANNOT_RESET": 543,
+    "COMMAND_ALLOCATOR_CONTENTION": 540,
+    "COMMAND_ALLOCATOR_RESET": 541,
+    "COMMAND_ALLOCATOR_RESET_BUNDLE": 542,
+    "COMMAND_ALLOCATOR_SYNC": 552,
+    "COMMAND_LIST_CLOSED": 547,
+    "COMMAND_LIST_MULTIPLE_SWAPCHAIN_BUFFER_REFERENCES": 904,
+    "COMMAND_LIST_OPEN": 544,
+    "COMMAND_LIST_OUTOFMEMORY": 903,
+    "COMMAND_LIST_SYNC": 553,
+    "COMMAND_LIST_TOO_MANY_SWAPCHAIN_REFERENCES": 905,
+    "DEVICE_REMOVAL_PROCESS_AT_FAULT": 232,
+    "DEVICE_REMOVAL_PROCESS_NOT_AT_FAULT": 234,
+    "DEVICE_REMOVAL_PROCESS_POSSIBLY_AT_FAULT": 233
+  },
+  "result_operations": [
+    {
+      "call_sites": [
+        {
+          "line": 1590,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "Present",
+      "operation": "present"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1560,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "Signal fence",
+      "operation": "signal_fence"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 67,
+          "path": "wgpu-hal-27.0.4/src/auxil/dxgi/factory.rs"
+        }
+      ],
+      "description": "QueryVideoMemoryInfo",
+      "operation": "query_video_memory_info"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 437,
+          "path": "wgpu-hal-27.0.4/src/dx12/command.rs"
+        }
+      ],
+      "description": "GraphicsCommandList::close",
+      "operation": "graphics_command_list_close"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 416,
+          "path": "wgpu-hal-27.0.4/src/dx12/command.rs"
+        }
+      ],
+      "description": "Create command list",
+      "operation": "create_command_list"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 22,
+          "path": "wgpu-hal-27.0.4/src/auxil/dxgi/name.rs"
+        }
+      ],
+      "description": "SetName",
+      "operation": "set_name"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 57,
+          "path": "wgpu-hal-27.0.4/src/dx12/descriptor.rs"
+        },
+        {
+          "line": 138,
+          "path": "wgpu-hal-27.0.4/src/dx12/descriptor.rs"
+        }
+      ],
+      "description": "Descriptor heap creation",
+      "operation": "descriptor_heap_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 272,
+          "path": "wgpu-hal-27.0.4/src/dx12/descriptor.rs"
+        }
+      ],
+      "description": "CPU descriptor heap creation",
+      "operation": "cpu_descriptor_heap_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 68,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Idle fence creation",
+      "operation": "idle_fence_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 109,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Zero buffer creation",
+      "operation": "zero_buffer_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 252,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Command signature creation",
+      "operation": "command_signature_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 269,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Signal",
+      "operation": "signal"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 271,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        },
+        {
+          "line": 2274,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Set event",
+      "operation": "set_event"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 520,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Map buffer",
+      "operation": "map_buffer"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1722,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Map",
+      "operation": "map"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 784,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Command allocator creation",
+      "operation": "command_allocator_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1350,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Root signature creation",
+      "operation": "root_signature_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 2221,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Query heap creation",
+      "operation": "query_heap_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 2241,
+          "path": "wgpu-hal-27.0.4/src/dx12/device.rs"
+        }
+      ],
+      "description": "Fence creation",
+      "operation": "fence_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 756,
+          "path": "wgpu-hal-27.0.4/src/dx12/adapter.rs"
+        }
+      ],
+      "description": "Queue creation",
+      "operation": "queue_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 190,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "Device creation",
+      "operation": "device_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 334,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Placed buffer creation",
+      "operation": "placed_buffer_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 373,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Placed texture creation",
+      "operation": "placed_texture_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 412,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Placed acceleration structure creation",
+      "operation": "placed_acceleration_structure_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 468,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Committed buffer creation",
+      "operation": "committed_buffer_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 508,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Committed texture creation",
+      "operation": "committed_texture_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 551,
+          "path": "wgpu-hal-27.0.4/src/dx12/suballocation.rs"
+        }
+      ],
+      "description": "Committed acceleration structure creation",
+      "operation": "committed_acceleration_structure_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 124,
+          "path": "wgpu-hal-27.0.4/src/dx12/sampler.rs"
+        }
+      ],
+      "description": "Failed to create global GPU-Visible Sampler Descriptor Heap",
+      "operation": "sampler_descriptor_heap_creation"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 321,
+          "path": "wgpu-hal-27.0.4/src/dx12/shader_compilation.rs"
+        }
+      ],
+      "description": "DxcCreateInstance",
+      "operation": "dxc_create_instance"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 349,
+          "path": "wgpu-hal-27.0.4/src/dx12/shader_compilation.rs"
+        }
+      ],
+      "description": "GetOutput",
+      "operation": "get_output"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 416,
+          "path": "wgpu-hal-27.0.4/src/dx12/shader_compilation.rs"
+        }
+      ],
+      "description": "Compile",
+      "operation": "compile"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 229,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "Root signature serialization",
+      "operation": "root_signature_serialization"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 263,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "GetDebugInterface",
+      "operation": "get_debug_interface"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 301,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "debug_interface1",
+      "operation": "debug_interface1"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 328,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "create_factory4",
+      "operation": "create_factory4"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 348,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "create_factory_media",
+      "operation": "create_factory_media"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 657,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "CreateEventA",
+      "operation": "create_event"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1439,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "MakeWindowAssociation",
+      "operation": "make_window_association"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1448,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "SetMaximumFrameLatency",
+      "operation": "set_maximum_frame_latency"
+    },
+    {
+      "call_sites": [
+        {
+          "line": 1461,
+          "path": "wgpu-hal-27.0.4/src/dx12/mod.rs"
+        }
+      ],
+      "description": "Failed to get swapchain buffer",
+      "operation": "get_swapchain_buffer"
+    }
+  ],
+  "schema_version": 1,
+  "source_grammar": {
+    "exception": "wgpu-hal strips D3D12 and severity prefix, emits message via log; only whole metadata-only messages are eligible. Driver prose plus metadata is explicitly unknown because object names have no trusted delimiter.",
+    "hresult": "windows-result Display: code alone or message plus space and parenthesized code; code is uppercase eight hex digits with 0x prefix",
+    "logger": "bevy_log default stderr tracing_subscriber Full; timestamp, level, target, message; dynamic spans explicitly rejected",
+    "wait": "windows WAIT_EVENT Debug is WAIT_EVENT(value), not a bare HRESULT"
+  },
+  "source_sha": "fe7373e96396131ef4a1c2a9af9cfabdb8aab82b"
+}
