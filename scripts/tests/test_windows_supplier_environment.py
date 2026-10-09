@@ -85,6 +85,44 @@ class SupplierEnvironmentTests(unittest.TestCase):
         self.assertEqual(probe.image_identity({'IMAGEOS': 'win25', 'IMAGEVERSION': '20261001.1.0'}),
                          {'image_os': 'win25', 'image_version': '20261001.1.0'})
 
+    def test_exact_official_vs2026_image_token_is_admitted(self):
+        # Official source for the failed run's exact image release:
+        # actions/runner-images, win25-vs2026/20260925.250,
+        # helpers/GenerateResourcesAndImage.ps1, Get-PackerTemplate.
+        with patch.dict(probe.os.environ, {'ImageOS': 'win25-vs2026', 'ImageVersion': '20260925.250.1'}):
+            receipt, _ = self.export()
+            self.assertEqual(receipt['runner_image'],
+                             {'image_os': 'win25-vs2026', 'image_version': '20260925.250.1'})
+            probe.validate_export(self.private, self.evidence, self.sha)
+        for value in ('win25-vs2027', 'win25-secret', 'win25-vs2026/secret',
+                      'win25-vs2026\\secret', 'win25-vs2026?token=secret', 'win25-vs2026 PRIVATE'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                probe.image_identity({'ImageOS': value})
+
+    def test_image_metadata_failure_is_preflight_and_source_label_only(self):
+        with patch.dict(probe.os.environ, {'ImageOS': 'PRIVATE PATH'}):
+            with patch.object(probe.facts, 'collect_runtime_facts') as collect:
+                with patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                    code = probe.main(['--private', str(self.private), '--evidence', str(self.evidence),
+                                       '--source-sha', self.sha])
+        collect.assert_not_called()
+        self.assertEqual(code, 1)
+        self.assertIn('[image_identity:invalid_identity]', stderr.getvalue())
+        self.assertNotIn('PRIVATE PATH', stderr.getvalue())
+
+    def test_error_codes_never_echo_untrusted_text(self):
+        cases = [(ValueError('unsafe identity'), 'invalid_identity'),
+                 (ValueError('aggregate file budget exceeded'), 'aggregate_file_budget'),
+                 (ValueError('unsafe identity PRIVATE'), 'invalid_value'),
+                 (OSError('PRIVATE PATH'), 'io_error'), (KeyError('PRIVATE'), 'missing_field'),
+                 (TypeError('PRIVATE'), 'invalid_type'),
+                 (UnicodeError('PRIVATE'), 'encoding_error'),
+                 (probe.subprocess.SubprocessError('PRIVATE'), 'subprocess_error')]
+        for error, expected in cases:
+            with self.subTest(kind=type(error).__name__):
+                self.assertEqual(probe.error_code(error), expected)
+                self.assertNotIn('PRIVATE', probe.error_code(error))
+
     def test_public_schema_and_no_build_claims_are_closed(self):
         _, original = self.export()
         mutations = [
@@ -191,6 +229,7 @@ class SupplierEnvironmentTests(unittest.TestCase):
                                    '--source-sha', self.sha])
         self.assertEqual(code, 1)
         self.assertNotIn('PRIVATE PATH', stderr.getvalue())
+        self.assertIn('[runtime_collection:invalid_value]', stderr.getvalue())
         self.assertFalse(self.evidence.exists())
 
     def test_real_collection_refuses_non_windows(self):
@@ -204,7 +243,9 @@ class SupplierWorkflowTests(unittest.TestCase):
     def test_workflow_has_only_dedicated_push_and_uploads_only_validated_json(self):
         raw = (SCRIPTS.parent / '.github/workflows/windows-supplier-environment.yml').read_text()
         self.assertIn('on:\n  push:\n    branches: [qualification/windows-supplier-probe]\n\n', raw)
-        self.assertIn('fetch-depth: 2', raw)
+        self.assertIn('fetch-depth: 3', raw)
+        self.assertIn('git rev-parse HEAD^^', raw)
+        self.assertIn('e60d5944c7e201b4b3b760f55616e890cb241d17', raw)
         self.assertIn('git rev-parse HEAD^', raw)
         self.assertIn(probe.BASE_SHA, raw)
         self.assertIn('runs-on: windows-latest', raw)

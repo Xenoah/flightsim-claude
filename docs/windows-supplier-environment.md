@@ -29,7 +29,8 @@ Only these two validated JSON files are uploaded, with seven-day retention:
 
 `source_sha` and `probe_source_sha` identify the checked-out probe scripts, not
 an application build. The workflow verifies that the probe commit has the
-already-public `55094fa928fbb8f907a2103740ee6824171c26e7` as its immediate parent;
+already-public `e60d5944c7e201b4b3b760f55616e890cb241d17` as its immediate
+predecessor and `55094fa928fbb8f907a2103740ee6824171c26e7` as its first-parent grandparent;
 `probe_base_sha` records that baseline. Environment facts may inform later
 prospective supplier review, but do not qualify any later application source. There is no linker trace, build fingerprint, executable,
 selected SDK, linked static-membership proof, rights approval or same-build
@@ -41,6 +42,11 @@ The raw discovery receipts and notice snapshots remain private on the ephemeral
 runner. Before upload, the wrapper replays the installed-file discovery,
 rechecks byte bindings and requires exact public-directory membership and
 canonical bytes. Any collection or validation failure prevents the upload.
+Failures print only fixed source-defined stage/error labels, never exception
+text, paths or raw query output. The admitted `win25-vs2026` image token is
+verified against the [official image source](https://github.com/actions/runner-images/blob/win25-vs2026/20260925.250/helpers/GenerateResourcesAndImage.ps1).
+The first native probe failed with an opaque exception; this token mismatch is
+a confirmed compatibility defect, not proof that it was the only failure.
 
 ## Local checks
 

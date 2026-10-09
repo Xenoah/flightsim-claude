@@ -39,7 +39,9 @@ def image_identity(env):
             selected[key] = value
     image_os, image_version = selected.get('IMAGEOS'), selected.get('IMAGEVERSION')
     if image_os is not None:
-        facts.safe_token(image_os, 32, r'win[0-9]{2,4}')
+        # Official image token in the 20260925.250 Windows VS2026 image.
+        # Admit this one literal suffix, never arbitrary image metadata.
+        facts.safe_token(image_os, 32, r'(?:win[0-9]{2,4}|win25-vs2026)')
     if image_version is not None:
         facts.version(image_version)
     return {'image_os': image_os, 'image_version': image_version}
@@ -109,6 +111,31 @@ def validate_export(private, evidence, source_sha):
     return expected
 
 
+
+def error_code(error):
+    """Fixed source-defined labels only; never echo exception text or paths."""
+    if isinstance(error, UnicodeError):
+        return 'encoding_error'
+    if isinstance(error, ValueError):
+        return {
+            'unsafe identity': 'invalid_identity',
+            'file budget or type rejected': 'file_budget_or_type',
+            'aggregate file budget exceeded': 'aggregate_file_budget',
+            'linked or reparse path rejected': 'linked_path',
+            'directory entry budget exceeded': 'directory_budget',
+            'installed version budget exceeded': 'version_budget',
+            'query output budget exceeded': 'query_budget',
+            'native Windows is required': 'native_windows_required',
+        }.get(str(error), 'invalid_value')
+    if isinstance(error, OSError):
+        return 'io_error'
+    if isinstance(error, KeyError):
+        return 'missing_field'
+    if isinstance(error, TypeError):
+        return 'invalid_type'
+    return 'subprocess_error'
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--private', type=Path, required=True)
@@ -116,19 +143,26 @@ def main(argv=None):
     parser.add_argument('--source-sha', required=True)
     parser.add_argument('--validate', action='store_true')
     args = parser.parse_args(argv)
+    stage = 'directories'
     try:
         private, evidence = separate_directories(args.private, args.evidence)
+        stage = 'image_identity'
+        image_identity(os.environ)
         if args.validate:
+            stage = 'export_validation'
             validate_export(private, evidence, args.source_sha)
         else:
+            stage = 'runtime_collection'
             facts.require(not evidence.exists(), 'fresh public directory required')
             facts.collect_runtime_facts(private, source_sha=args.source_sha, recipe_cfg_args=['-D', 'warnings'])
+            stage = 'public_export'
             export(private, evidence, args.source_sha)
         print('Environment-only supplier facts validated; no application build or release approval.')
         return 0
-    except (ValueError, OSError, KeyError, TypeError, UnicodeError, subprocess.SubprocessError):
+    except (ValueError, OSError, KeyError, TypeError, UnicodeError, subprocess.SubprocessError) as error:
         # Exceptions can include a private path or untrusted tool output.
-        print('Environment probe failed; no public upload is allowed.', file=sys.stderr)
+        print('Environment probe failed [' + stage + ':' + error_code(error)
+              + ']; no public upload is allowed.', file=sys.stderr)
         return 1
 
 
