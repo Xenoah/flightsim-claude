@@ -1,7 +1,7 @@
 {
   "identity": "analytical-swift-msvc-build-capture-v1",
   "inherited_contracts": {
-    "scripts/analytical-swift-source-contract.json": "cb1b34ee4811be5316ed7c5e35c9fa8123d0a1ccf272a5d42292e6814c8e63d0",
+    "scripts/analytical-swift-source-contract.json": "2629651790223c7d0a6c9f5676f2d7b1e36e468da494131c974f67e724dea0a1",
     "scripts/replay-candidate-contract.json": "81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19"
   },
   "reviewed_runtime_tree": "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e",
@@ -12,7 +12,7 @@
   "source_sha256": {
     ".github/workflows/analytical-swift-msvc-build.yml": "d23c764b900f7d66f0b2ed0df77feb984323bdd038cc7451805b56a456b70976",
     "docs/release/analytical-swift-msvc-capture.md": "a81f848e85ffe6210c7c4c3b30cd4e2f35f2f5a5b3e3e569a304ef4959f7993e",
-    "scripts/capture-analytical-swift-msvc.py": "e27d3cf67f005f4115ee5c3fdae71622351b846360964bfe8c5a03d0d715d215",
+    "scripts/capture-analytical-swift-msvc.py": "2d84d1564812b24e256046e52d4fb508bdca8a623f2b34c1363c93aca4d810d8",
     "scripts/tests/test_analytical_swift_capture.py": "f5b68be1a16ee515b1fce5e3f7e410c86caa1c2034318e24f0b1877dec3e0277"
   }
 }

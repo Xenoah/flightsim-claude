@@ -190,7 +190,9 @@ jobs:
   analytic-tonemapping:
     name: analytical tonemapping (Linux source/build)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Budget for cold QA plus two fresh, isolated app builds and their audits.
+    # The final builds intentionally cannot reuse QA artifacts or each other.
+    timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: "2"
       CARGO_INCREMENTAL: "0"
