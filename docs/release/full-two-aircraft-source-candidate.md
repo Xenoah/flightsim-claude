@@ -1,5 +1,13 @@
 # Full two-aircraft source candidate
 
+> Historical preparation record: this document and `full-two-aircraft-source-inputs.json`
+> describe frozen composition `37a818d4548bf7f10e2ad16612d857f00fea81bd`.
+> `check-full-two-aircraft-source.py` intentionally remains bound to that preparation
+> and rejects later source. Current source admission is separately defined in
+> [full-two-aircraft-source-admission.md](full-two-aircraft-source-admission.md).
+> This history is neither a current admission nor a release receipt.
+
+
 Status: local source preparation; final source/recipe admission is pending.
 Base: `d918943a70d01644b5a6bebb8a903a5bbc89139f`.
 No main branch, hosted repository, terms acceptance or publication authorization

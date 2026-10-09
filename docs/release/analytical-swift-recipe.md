@@ -162,3 +162,14 @@ validated text/Swift PNG only; executable/archive/targets/notices/raw metadata/
 replay stay private. This preparation grants no broader export route. Existing
 ordinary candidate/release/readiness/authorization commands and accepted source
 remain authoritative within their unchanged scopes.
+
+## Current source admission
+
+The build variant identity and feature commands above are preserved. Current
+source admission is separately versioned as `analytical-swift-two-lut-source-admission-v1`
+and requires explicit `bevy-0.18.1-tony-filmic-source-v1` capture metadata. Audit
+requires `--upstream-archive` with the exact original Bevy crate outside the source
+tree. The ordinary control must contain Tony and Filmic, with AgX absent; the
+analytical regression must omit all three. Old three-LUT controls retain their
+upstream recipe and historical source contracts. See
+[full source admission](full-two-aircraft-source-admission.md).

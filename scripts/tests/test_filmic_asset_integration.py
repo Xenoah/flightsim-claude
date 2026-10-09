@@ -14,8 +14,14 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 DECISION = Path('docs/release/filmic-asset-source-decision.json')
 MANIFEST = Path('docs/release/asset-rights-manifest.json')
+HISTORICAL = Path('docs/release/history/mesh-and-lut-boundary-d918943.json')
 PROOF = Path('docs/release/licenses/review-evidence/bevy-blender-filmic-lut')
 IDENTITY = 'bevy-blender-filmic-lut'
+AGX_IDENTITY = 'bevy-agx-lut'
+TONY_IDENTITY = 'bevy-tony-mc-mapface'
+LIGHT_PATH = 'assets/aircraft/light_single.glb'
+ORIGINAL_LIGHT_HASH = 'b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc'
+HISTORICAL_LIGHT_HASH = '8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9'
 LUT_HASH = 'a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7'
 PRIOR_HASH = '64635e2d9bd322de6a6282daf7a83f7de1e69bfcc11f1c7c92265021557a8087'
 PACKET_MANIFEST_HASH = 'f79bcb6bf7fcc86ce5eefb0bb15b66c3237e65b921dd9e2ce8178ee342f71d57'
@@ -59,6 +65,8 @@ def verify_candidate(root):
         if decision[key] is not False:
             raise ValueError('scope or authority expanded')
     assets = {item['id']: item for item in manifest['dependency_assets']}
+    if set(assets) != {'bevy-fira-mono', TONY_IDENTITY, IDENTITY} or len(manifest['dependency_assets']) != 3:
+        raise ValueError('current embedded-asset boundary changed')
     asset = assets[IDENTITY]
     expected = {'id': IDENTITY, 'package': 'bevy_core_pipeline', 'version': '0.18.1',
                 'source_path': 'src/tonemapping/luts/Blender_-11_12.ktx2',
@@ -87,14 +95,31 @@ def verify_candidate(root):
     if sha(prior_path) != PRIOR_HASH:
         raise ValueError('historical native inventory changed')
     prior = read(prior_path)
+    historical = read(root / HISTORICAL)
+    historical_assets = manifest['historical_excluded_dependency_assets']
+    if historical_assets != [historical['agx_dependency_asset']]:
+        raise ValueError('historical AgX decision changed')
     for item in prior['embedded_assets']:
         if item['id'] != IDENTITY:
             original = {k: v for k, v in item.items() if k not in ('observed_sha256', 'notices')}
-            if assets[item['id']] != original:
+            record = historical_assets[0] if item['id'] == AGX_IDENTITY else assets[item['id']]
+            if record != original:
                 raise ValueError('another embedded-asset decision changed')
-    legacy = next(a for a in manifest['assets'] if a['path'] == 'assets/aircraft/light_single.glb')
-    if legacy['review_state'] != 'unresolved':
-        raise ValueError('Light Single decision changed')
+    legacy = manifest['historical_excluded_assets']
+    if (legacy != [historical['light_single_asset']] or legacy[0]['review_state'] != 'unresolved'
+            or legacy[0]['sha256'] != HISTORICAL_LIGHT_HASH):
+        raise ValueError('historical Light Single decision changed')
+    current = [a for a in manifest['assets'] if a['path'] == LIGHT_PATH]
+    if (len(current) != 1 or current[0]['review_state'] != 'original_source_recorded'
+            or current[0]['sha256'] != ORIGINAL_LIGHT_HASH or current[0]['bytes'] != 140840
+            or current[0]['license'] != 'MIT OR Apache-2.0'):
+        raise ValueError('current original Light Single decision changed')
+    checked_record(root, current[0])
+    for identity in (TONY_IDENTITY, IDENTITY):
+        item = assets[identity]
+        checked_record(root, {**item, 'path': 'vendor/bevy_core_pipeline/' + item['source_path']})
+    if (root / 'vendor/bevy_core_pipeline' / historical_assets[0]['source_path']).exists():
+        raise ValueError('historical AgX payload restored')
     if (root / 'docs/release/dependency-review.json').exists():
         raise ValueError('unexpected whole-target review')
 
@@ -116,10 +141,19 @@ class ActualCandidateEvidence(unittest.TestCase):
         verify_candidate(REPO)
 
     def test_mutated_notice_proof_identity_or_scope_rejected(self):
-        for mutation in ('license', 'comparison', 'inventory', 'authority', 'identity', 'notice-list', 'agx'):
+        for mutation in ('license', 'comparison', 'inventory', 'authority', 'identity', 'notice-list',
+                         'historical-agx', 'historical-meshy', 'current-light', 'current-tony', 'active-agx'):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 shutil.copytree(REPO / 'docs/release', root / 'docs/release')
+                current_manifest = read(REPO / MANIFEST)
+                current_files = [LIGHT_PATH] + [
+                    'vendor/bevy_core_pipeline/' + a['source_path']
+                    for a in current_manifest['dependency_assets'] if a['id'] in (TONY_IDENTITY, IDENTITY)]
+                for relative in current_files:
+                    target = root / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(REPO / relative, target)
                 if mutation == 'license':
                     (root / next(n for n in NOTICES if n.endswith('LICENSE'))).write_text('Truncated notice')
                 elif mutation == 'comparison':
@@ -133,7 +167,11 @@ class ActualCandidateEvidence(unittest.TestCase):
                     a = next(a for a in m['dependency_assets'] if a['id'] == IDENTITY)
                     if mutation == 'identity': a['sha256'] = '0' * 64
                     if mutation == 'notice-list': a['notice_files'].pop()
-                    if mutation == 'agx': next(a for a in m['dependency_assets'] if a['id'] == 'bevy-agx-lut')['review_state'] = 'licensed_with_notices'
+                    if mutation == 'historical-agx': m['historical_excluded_dependency_assets'][0]['review_state'] = 'licensed_with_notices'
+                    if mutation == 'historical-meshy': m['historical_excluded_assets'][0]['review_state'] = 'original_source_recorded'
+                    if mutation == 'current-light': next(a for a in m['assets'] if a['path'] == LIGHT_PATH)['sha256'] = HISTORICAL_LIGHT_HASH
+                    if mutation == 'current-tony': next(a for a in m['dependency_assets'] if a['id'] == TONY_IDENTITY)['sha256'] = '0' * 64
+                    if mutation == 'active-agx': m['dependency_assets'].append(m['historical_excluded_dependency_assets'][0])
                     write(root / MANIFEST, m)
                 with self.assertRaises(ValueError):
                     verify_candidate(root)
@@ -150,7 +188,7 @@ class ActualCandidateEvidence(unittest.TestCase):
             self.assertTrue(any(identity in message for message in unresolved))
 
 
-class SyntheticCollectorIntegration(unittest.TestCase):
+class SyntheticHistoricalAgxCollectorIntegration(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name); self.repo = self.root / 'fixture-repo'; self.repo.mkdir()
@@ -158,7 +196,10 @@ class SyntheticCollectorIntegration(unittest.TestCase):
         for name in ('LICENSE-MIT', 'LICENSE-APACHE'):
             (self.repo / name).write_text('Synthetic package notice; no real review\n')
         actual = read(REPO / MANIFEST)
-        assets = [copy.deepcopy(a) for a in actual['dependency_assets'] if a['id'] in (IDENTITY, 'bevy-agx-lut')]
+        # Recreate the historical Filmic-cleared/AgX-unresolved boundary explicitly;
+        # the current source recipe no longer embeds the historical AgX payload.
+        assets = [copy.deepcopy(next(a for a in actual['dependency_assets'] if a['id'] == IDENTITY)),
+                  copy.deepcopy(read(REPO / HISTORICAL)['agx_dependency_asset'])]
         source = self.repo / 'synthetic-engine'; source.mkdir()
         (source / 'Cargo.toml').write_text('Synthetic metadata fixture')
         (source / 'LICENSE').write_text('Synthetic engine notice')

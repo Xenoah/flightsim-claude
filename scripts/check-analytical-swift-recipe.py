@@ -35,6 +35,8 @@ IDENTITY = tone.ANALYTICAL_SWIFT_RECIPE
 TARGET, TOOLCHAIN = candidate.TARGET, candidate.TOOLCHAIN
 FEATURES = ['analytic-tonemapping', 'commercial-staging']
 CONTRACT = 'scripts/analytical-swift-source-contract.json'
+SOURCE_ADMISSION = 'analytical-swift-two-lut-source-admission-v1'
+SOURCE_RECIPE = tone.TWO_LUT_SOURCE
 SOURCE_PATHS = {
     'Cargo.toml', 'Cargo.lock', 'crates/flightsim-app/Cargo.toml',
     'crates/flightsim-render/Cargo.toml', 'crates/flightsim-app/src/main.rs',
@@ -52,6 +54,15 @@ SOURCE_PATHS = {
     'scripts/tests/test_analytical_swift_recipe.py', 'scripts/tests/test_tonemapping_build.py',
     'docs/release/asset-rights-manifest.json', 'docs/release/dependency-notice-supplements.json',
     'docs/release/analytical-swift-recipe.md',
+    'scripts/tonemapping-two-lut-source.json', 'docs/two-lut-build-audit.md',
+    'scripts/ci-tonemapping.py', 'scripts/tests/test_ci_tonemapping.py',
+    'scripts/tests/test_full_source_admission.py',
+    'scripts/tests/test_swift_windows_candidate.py',
+    'scripts/tests/test_filmic_asset_integration.py',
+    'scripts/tests/test_release_authorization.py',
+    'scripts/tests/test_historical_release_copy_plan.py',
+    '.github/workflows/ci.yml',
+    'docs/release/full-two-aircraft-source-admission.md',
 }
 GATES = {
     'combined_feature_regressions': 'Combined release/MSVC app/render tests and Clippy; real render tonemapping_modes; ordinary controls and mixed/neither rejection',
@@ -80,8 +91,8 @@ def commands(mode):
     }
 
 
-def recipe():
-    return {'schema_version': 1, 'recipe': IDENTITY, 'status': 'prepared_unexecuted',
+def recipe(source_recipe=SOURCE_RECIPE):
+    return {'schema_version': 1, 'recipe': IDENTITY, 'source_recipe': source_recipe, 'status': 'prepared_unexecuted',
             'target': TARGET, 'toolchain': TOOLCHAIN, 'default_features': False,
             'features': FEATURES, 'region_downloads': False, 'release_authorized': False,
             'commands': {mode: commands(mode) for mode in ('analytic', 'ordinary')},
@@ -98,15 +109,24 @@ def validate_header(value, source_sha):
             'wrong analytical Swift capture identity')
     require(re.fullmatch('[0-9a-f]{40}', source_sha) is not None and value.get('source_sha') == source_sha,
             'capture source differs from exact source')
+    require(value.get('source_recipe') in (tone.UPSTREAM_THREE_LUT_SOURCE, SOURCE_RECIPE),
+            'explicit source recipe is required')
     require(set(value.get('modes', {})) == {'analytic', 'ordinary'}, 'both isolated build captures are required')
 
 
 def source_evidence(repo, expected):
-    # This preserves all 404 reviewed source pins and 102 independent anchors.
+    # Versioned source admission retains the historical 404 pins and all 102 independent anchors.
     source = candidate.source_inputs(repo, expected)
     contract = json.loads((repo / CONTRACT).read_text())
-    require(contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY
-            and re.fullmatch('[0-9a-f]{40}', contract.get('reviewed_source', '')) is not None,
+    require(set(contract) == {'schema_version', 'recipe', 'source_admission', 'source_recipe',
+            'reviewed_source', 'reviewed_runtime_tree', 'release_authorized', 'source_sha256'}
+            and type(contract.get('schema_version')) is int
+            and contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY
+            and contract.get('reviewed_source') == candidate.REVIEWED_RUNTIME_SOURCE
+            and contract.get('reviewed_runtime_tree') == candidate.REVIEWED_RUNTIME_TREE
+            and contract.get('source_admission') == SOURCE_ADMISSION
+            and contract.get('source_recipe') == SOURCE_RECIPE
+            and contract.get('release_authorized') is False,
             'invalid analytical source contract')
     pins = contract.get('source_sha256')
     require(isinstance(pins, dict) and set(pins) == SOURCE_PATHS, 'analytical source boundary changed')
@@ -123,7 +143,7 @@ def source_evidence(repo, expected):
                 'analytical checkout differs from Git: ' + relative)
         if relative != CONTRACT:
             require(pins[relative] == entry['checkout_sha256'], 'analytical source pin changed: ' + relative)
-    return {**source, 'analytical_contract': contract, 'analytical_contract_sha256': digest(repo / CONTRACT)}
+    return {**source, 'source_recipe': SOURCE_RECIPE, 'analytical_contract': contract, 'analytical_contract_sha256': digest(repo / CONTRACT)}
 
 
 def graph_identity(name, value):
@@ -169,7 +189,8 @@ def reconcile(metadata, graph, repo, mode):
             'scope': 'Raw metadata retained unchanged; conservative extras retained in inventory; exact graph is separate compiled-scope evidence'}
 
 
-def validate_inventory(metadata_path, inventory_path, graph, repo, mode):
+def validate_inventory(metadata_path, inventory_path, graph, repo, mode, *, source_recipe=tone.UPSTREAM_THREE_LUT_SOURCE):
+    require(source_recipe in (tone.UPSTREAM_THREE_LUT_SOURCE, SOURCE_RECIPE), "unknown inventory source recipe")
     metadata = json.loads(metadata_path.read_text())
     difference = reconcile(metadata, graph, repo, mode)
     inventory = json.loads(inventory_path.read_text())
@@ -181,7 +202,9 @@ def validate_inventory(metadata_path, inventory_path, graph, repo, mode):
     require(inventory.get('review_status') == 'not_reviewed', 'collection is not review approval')
     expected_assets = {'bevy-fira-mono'}
     if mode == 'ordinary':
-        expected_assets |= {'bevy-tony-mc-mapface', 'bevy-agx-lut', 'bevy-blender-filmic-lut'}
+        expected_assets |= {'bevy-tony-mc-mapface', 'bevy-blender-filmic-lut'}
+        if source_recipe == tone.UPSTREAM_THREE_LUT_SOURCE:
+            expected_assets.add('bevy-agx-lut')
     require({a['id'] for a in inventory['embedded_assets']} == expected_assets,
             'embedded asset applicability differs from exact mode')
     identities = {p['id'] for p in inventory['packages']}
@@ -257,7 +280,10 @@ def validate_capture(record, directory, repo, mode, source):
                     for m in messages), 'build contains rejected compiler diagnostics')
     artifacts = [m for m in messages if m.get('reason') == 'compiler-artifact']
     require(len([m for m in artifacts if m.get('executable')]) == 1, 'unexpected executable roots')
-    root, libraries = tone.select_artifacts(messages, graph, 'app')
+    source_recipe = source['source_recipe']
+    modern = source_recipe == SOURCE_RECIPE
+    root, libraries = tone.select_artifacts(messages, graph, 'app', source_recipe=source_recipe,
+                                             source_root=repo if modern else None)
     render = [a for a in artifacts if a['target']['name'] == 'flightsim_render' and a['target']['kind'] == ['lib']]
     require(len(render) == 1 and set(render[0]['features']) == graph['flightsim-render']['features'],
             'missing or mismatched compiled render routing')
@@ -281,7 +307,10 @@ def validate_capture(record, directory, repo, mode, source):
         require(any(t['name'] == artifact['target']['name'] and t['kind'] == artifact['target']['kind']
                     and t['src_path'] == artifact['target']['src_path'] for t in packages[package_id]['targets']),
                 'compiled source target differs from metadata')
-    result = tone.audit(graph_path, messages_path, mode, 'app', recipe=selected_recipe)
+    result = tone.audit(graph_path, messages_path, mode, 'app', recipe=selected_recipe,
+                        source_recipe=source_recipe, source_root=repo if modern else None,
+                        upstream_archive=source.get('upstream_archive') if modern else None,
+                        target=TARGET if modern else None)
     paths = [executable, Path(result['core_pipeline_depinfo']['path'])]
     for item in result['compiled']:
         paths.extend([Path(item['rlib']), Path(item['fingerprint'])])
@@ -302,22 +331,37 @@ def validate_capture(record, directory, repo, mode, source):
         paths.append(fingerprint)
     observed = {str(path): file_record(path) for path in paths}
     require(record.get('frozen_artifacts') == observed, 'frozen artifact hashes/bytes changed or incomplete')
-    inventory = validate_inventory(directory / 'metadata.json', directory / 'notices/dependency-inventory.json', graph, repo, mode)
+    inventory = validate_inventory(directory / 'metadata.json', directory / 'notices/dependency-inventory.json',
+                                   graph, repo, mode, source_recipe=source_recipe)
     require(record.get('inventory') == file_record(directory / 'notices/dependency-inventory.json'), 'inventory capture changed')
     return {'artifact': result, **inventory}
 
 
-def audit(repo, expected, capture):
+def audit(repo, expected, capture, *, upstream_archive=None):
     repo, capture = repo.resolve(), capture.resolve()
     original_capture = (capture / 'capture.json').read_bytes()
     value = json.loads(original_capture)
     validate_header(value, expected)
     source = source_evidence(repo, expected)
     require(value.get('source_tree') == source['source_tree'], 'capture source tree changed')
+    require(value['source_recipe'] == source['source_recipe'], 'capture source recipe differs from admitted source')
+    capture_source = dict(source)
+    if source['source_recipe'] == SOURCE_RECIPE:
+        require(upstream_archive is not None, 'two-LUT audit requires private upstream archive')
+        upstream_archive = Path(upstream_archive)
+        require(upstream_archive.is_absolute() and upstream_archive.resolve() == upstream_archive,
+                'private upstream reference must be absolute and unaliased')
+        file_record(upstream_archive)
+        tone.validate_source(repo, upstream_archive)
+        require(value.get('upstream_archive') == file_record(upstream_archive), 'private upstream reference changed')
+        capture_source['upstream_archive'] = upstream_archive
+    else:
+        require(upstream_archive is None and 'upstream_archive' not in value,
+                'historical source recipe cannot accept a two-LUT reference')
     directories = [Path(value['modes'][mode]['target_dir']).resolve() for mode in ('analytic', 'ordinary')]
     require(not directories[0].is_relative_to(directories[1]) and not directories[1].is_relative_to(directories[0]),
             'ordinary control requires a disjoint target directory')
-    results = {mode: validate_capture(value['modes'][mode], capture / mode, repo, mode, source)
+    results = {mode: validate_capture(value['modes'][mode], capture / mode, repo, mode, capture_source)
                for mode in ('analytic', 'ordinary')}
     analytic, ordinary = (results[mode]['artifact'] for mode in ('analytic', 'ordinary'))
     require(analytic['executable_sha256'] != ordinary['executable_sha256'], 'ordinary control was substituted')
@@ -339,11 +383,14 @@ def audit(repo, expected, capture):
         require(final_readiness == results[mode]['readiness'], 'notice integrity/readiness changed during audit')
         for path, frozen in value['modes'][mode]['frozen_artifacts'].items():
             require(file_record(Path(path)) == frozen, 'artifact changed during audit')
-    return {**recipe(), 'status': 'build_evidence_checked_native_and_distribution_unqualified',
+    if upstream_archive is not None:
+        require(file_record(upstream_archive) == value['upstream_archive'], 'private upstream reference changed during audit')
+    return {**recipe(source['source_recipe']), 'status': 'build_evidence_checked_native_and_distribution_unqualified',
             'source_sha': expected, 'source_tree': source['source_tree'],
             'analytical_contract_sha256': source['analytical_contract_sha256'],
             'replay_contract_sha256': source['replay_contract_sha256'],
             'capture_sha256': digest(capture / 'capture.json'), 'builds': results,
+            **({'upstream_archive': value['upstream_archive']} if upstream_archive is not None else {}),
             'tone_attestation': 'Exact pinned source/command/graph/compiled features/fingerprints/dep-info/executable payloads; distribution-info has no tone field'}
 
 
@@ -353,6 +400,7 @@ def main():
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--source-sha')
     parser.add_argument('--capture', type=Path)
+    parser.add_argument('--upstream-archive', type=Path)
     args = parser.parse_args()
     try:
         if args.describe:
@@ -360,7 +408,7 @@ def main():
             result = recipe()
         else:
             require(args.source_sha is not None and args.capture is not None, 'audit requires source SHA and complete capture')
-            result = audit(args.repo, args.source_sha, args.capture)
+            result = audit(args.repo, args.source_sha, args.capture, upstream_archive=args.upstream_archive)
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print('analytical Swift build-evidence audit failed: ' + str(error), file=sys.stderr)
         return 1

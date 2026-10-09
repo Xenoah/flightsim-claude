@@ -151,7 +151,10 @@ def inspect(root):
         asset = assets.get(relative)
         if not relative.startswith("assets/") or not asset or asset["review_state"] not in REVIEWED_STATES:
             block("INVALID_RELEASE_ASSET_ALLOWLIST", f"Release allowlist entry lacks reviewed source record: {relative}")
-    unresolved_hashes = {a["sha256"] for a in assets.values() if a["review_state"] not in REVIEWED_STATES}
+    unresolved_hashes = {a["sha256"] for a in [*assets.values(),
+                         *manifest.get("historical_excluded_assets", []),
+                         *manifest.get("historical_excluded_dependency_assets", [])]
+                         if a["review_state"] not in REVIEWED_STATES}
     for relative, asset in assets.items():
         if asset.get("delivery") == "embedded" and asset["review_state"] not in REVIEWED_STATES:
             block("UNRESOLVED_EMBEDDED_ASSET", f"Embedded source asset lacks reviewed rights: {relative}")

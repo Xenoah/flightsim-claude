@@ -30,16 +30,16 @@ SPEC.loader.exec_module(check)
 require = check.require
 IDENTITY = 'analytical-swift-msvc-build-capture-v1'
 CONTRACT = 'scripts/analytical-swift-capture-contract.json'
+SOURCE_ADMISSION = 'analytical-swift-two-lut-capture-source-admission-v1'
+REFERENCE = 'reference/bevy_core_pipeline-0.18.1.crate'
 BOUND_FILES = {
     'scripts/capture-analytical-swift-msvc.py',
     'scripts/tests/test_analytical_swift_capture.py',
     '.github/workflows/analytical-swift-msvc-build.yml',
     'docs/release/analytical-swift-msvc-capture.md',
 }
-INHERITED_CONTRACTS = {
-    'scripts/analytical-swift-source-contract.json': '00e8d5a493fcd3402077b6ab8d5f57d63a729395c2ee26d2b49834ab65260a4a',
-    'scripts/replay-candidate-contract.json': '2290d90e367b6a48432741b9570e80102a213d387e55d39140859075b6cf3cf4',
-}
+INHERITED_CONTRACTS = {'scripts/analytical-swift-source-contract.json': 'cb1b34ee4811be5316ed7c5e35c9fa8123d0a1ccf272a5d42292e6814c8e63d0', 'scripts/replay-candidate-contract.json': '81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19'}
+
 MODES = ('analytic', 'ordinary')
 OUTPUTS = {'rustc': 'rustc.txt', 'graph': 'graph.txt', 'build': 'messages.jsonl', 'metadata': 'metadata.json'}
 COMMAND_IDS = ('fetch', *(f'{mode}-{name}' for mode in MODES for name in (*OUTPUTS, 'notices')), 'audit')
@@ -109,10 +109,13 @@ def source_evidence(repo, expected):
     source = check.source_evidence(repo, expected)
     verify_canonical_sources(repo, source)
     contract = json.loads((repo / CONTRACT).read_text(encoding='utf-8'))
-    require(set(contract) == {'schema_version', 'identity', 'reviewed_source', 'inherited_contracts', 'source_sha256'}
+    require(set(contract) == {'schema_version', 'identity', 'reviewed_source', 'reviewed_runtime_tree', 'source_admission', 'source_recipe', 'inherited_contracts', 'source_sha256'}
             and type(contract['schema_version']) is int and contract['schema_version'] == 1
             and contract['identity'] == IDENTITY
-            and contract['reviewed_source'] == '75753f5e1dfe8d56d321775cb800b29bf058b3e3',
+            and contract['reviewed_source'] == check.candidate.REVIEWED_RUNTIME_SOURCE
+            and contract['reviewed_runtime_tree'] == check.candidate.REVIEWED_RUNTIME_TREE
+            and contract['source_admission'] == SOURCE_ADMISSION
+            and contract['source_recipe'] == check.SOURCE_RECIPE,
             'invalid additive capture source contract')
     require(contract['inherited_contracts'] == INHERITED_CONTRACTS, 'inherited contracts changed')
     require(set(contract['source_sha256']) == BOUND_FILES, 'capture boundary changed')
@@ -194,12 +197,15 @@ def execute(command, *, cwd, env, stdout, stderr, journal, timeout):
     return record
 
 
-def frozen_artifacts(directory, target, mode):
+def frozen_artifacts(directory, target, mode, *, repo=None, upstream_archive=None):
     graph = check.tone.parse_graph((directory / 'graph.txt').read_text(encoding='utf-8'))
     messages = [json.loads(line) for line in (directory / 'messages.jsonl').read_text(encoding='utf-8').splitlines()]
     result = check.tone.audit(directory / 'graph.txt', directory / 'messages.jsonl', mode, 'app',
-                              recipe=check.IDENTITY if mode == 'analytic' else None)
-    root, libraries = check.tone.select_artifacts(messages, graph, 'app')
+                              recipe=check.IDENTITY if mode == 'analytic' else None,
+                              source_recipe=check.SOURCE_RECIPE, source_root=repo,
+                              upstream_archive=upstream_archive, target=check.TARGET)
+    root, libraries = check.tone.select_artifacts(messages, graph, 'app',
+                                                  source_recipe=check.SOURCE_RECIPE, source_root=repo)
     render = [item for item in messages if item.get('reason') == 'compiler-artifact'
               and item['target']['name'] == 'flightsim_render' and item['target']['kind'] == ['lib']]
     require(len(render) == 1, 'expected one render artifact')
@@ -243,10 +249,19 @@ def read_private_json(path):
 def projected_builds(receipt, report):
     require(report['status'] == PASS and report['release_authorized'] is False
             and report['required_unexecuted_gates'] == check.GATES, 'wrong private audit status')
+    source_recipe = receipt.get('source_recipe', check.tone.UPSTREAM_THREE_LUT_SOURCE)
+    require(report.get('source_recipe', check.tone.UPSTREAM_THREE_LUT_SOURCE) == source_recipe,
+            'audit and capture source recipes differ')
+    if source_recipe == check.SOURCE_RECIPE:
+        require(valid_record(receipt.get('upstream_archive'))
+                and report.get('upstream_archive') == receipt['upstream_archive'],
+                'audit and capture private reference bindings differ')
     builds = {}
     for mode in MODES:
         artifact = report['builds'][mode]['artifact']
         record = receipt['modes'][mode]
+        require(artifact.get('source_recipe', check.tone.UPSTREAM_THREE_LUT_SOURCE) == source_recipe,
+                'compiled source recipe differs')
         executable = record['frozen_artifacts'][artifact['executable']]
         require(file_record(Path(artifact['executable'])) == executable
                 and artifact['executable_sha256'] == executable['sha256']
@@ -267,6 +282,8 @@ def verify_command_journals(value, repo, private):
             command = (['cargo', '+' + check.TOOLCHAIN, 'fetch', '--locked', '--target', check.TARGET] if name == 'fetch'
                        else [sys.executable, str(repo / 'scripts/check-analytical-swift-recipe.py'), '--repo', str(repo),
                              '--source-sha', value['source_sha'], '--capture', str(private / 'capture')])
+            if name == 'audit' and value.get('source_recipe') == check.SOURCE_RECIPE:
+                command += ['--upstream-archive', str(private / REFERENCE)]
         else:
             mode, operation = name.split('-')
             directory = private / 'capture' / mode
@@ -284,10 +301,15 @@ def verify_command_journals(value, repo, private):
 
 
 def validate_summary(value):
-    require(isinstance(value, dict) and set(value) == {
+    require(isinstance(value, dict), 'export must be an object')
+    modern = value.get('source_recipe') == check.SOURCE_RECIPE
+    extra_fields = {'source_recipe'} if 'source_recipe' in value else set()
+    require(value.get('source_recipe', check.tone.UPSTREAM_THREE_LUT_SOURCE)
+            in (check.tone.UPSTREAM_THREE_LUT_SOURCE, check.SOURCE_RECIPE), 'unknown export source recipe')
+    require(set(value) == {
         'schema_version', 'identity', 'recipe', 'status', 'stage', 'source_sha', 'source_tree',
         'release_authorized', 'native_runtime_qualified', 'distribution_qualified',
-        'required_unexecuted_gates', 'commands', 'bindings', 'builds'}, 'unexpected export fields')
+        'required_unexecuted_gates', 'commands', 'bindings', 'builds'} | extra_fields, 'unexpected export fields')
     require(type(value['schema_version']) is int and value['schema_version'] == 1
             and value['identity'] == IDENTITY and value['recipe'] == check.IDENTITY, 'wrong export identity')
     require(value['status'] in ('failed', PASS) and value['stage'] in STAGES, 'wrong export status')
@@ -310,7 +332,8 @@ def validate_summary(value):
         require(valid_record(item['stdout']) and valid_record(item['stderr']), 'invalid stream binding')
         require(index == len(value['commands']) - 1 or item['outcome'] == 'succeeded', 'execution continued after failure')
     require(isinstance(value['bindings'], dict) and set(value['bindings']) <= {
-        'source', 'capture_contract', 'analytical_contract', 'replay_contract', 'lock', 'capture', 'audit', 'frozen_trees'},
+        'source', 'capture_contract', 'analytical_contract', 'replay_contract', 'lock', 'capture', 'audit', 'frozen_trees'}
+            | ({'upstream_archive'} if modern else set()),
         'unexpected bindings')
     require(all(valid_record(record) for record in value['bindings'].values()), 'invalid binding')
     require(isinstance(value['builds'], dict) and set(value['builds']) <= set(MODES), 'unexpected builds')
@@ -319,7 +342,7 @@ def validate_summary(value):
                 'unexpected build fields')
         require(all(valid_record(build[name]) for name in ('executable', 'inventory', 'metadata')), 'invalid build binding')
         require(type(build['frozen_artifact_count']) is int and build['frozen_artifact_count'] == 17
-                and type(build['lut_payloads_found']) is int and build['lut_payloads_found'] == (3 if mode == 'ordinary' else 0),
+                and type(build['lut_payloads_found']) is int and build['lut_payloads_found'] == ((2 if modern else 3) if mode == 'ordinary' else 0),
                 'wrong build proof counts')
     if value['status'] == PASS:
         require(value['stage'] == 'complete' and hex_string(value['source_tree'], 40)
@@ -327,7 +350,7 @@ def validate_summary(value):
                 and all(item['outcome'] == 'succeeded' for item in value['commands'])
                 and set(value['builds']) == set(MODES)
                 and set(value['bindings']) == {'source', 'capture_contract', 'analytical_contract', 'replay_contract',
-                                              'lock', 'capture', 'audit', 'frozen_trees'}, 'incomplete passing export')
+                                              'lock', 'capture', 'audit', 'frozen_trees'} | ({'upstream_archive'} if modern else set()), 'incomplete passing export')
     else:
         require(value['stage'] != 'complete' and not value['builds'], 'failure cannot claim audited builds')
 
@@ -354,6 +377,8 @@ def validate_export(directory, *, repo=None, expected=None, private=None):
         verify_command_journals(value, repo.resolve(), private.resolve())
         if value['status'] == PASS:
             source = source_evidence(repo.resolve(), expected)
+            require(value.get('source_recipe', check.tone.UPSTREAM_THREE_LUT_SOURCE) == source['source_recipe'],
+                    'export source recipe differs from admitted source')
             require(value['source_tree'] == source['source_tree']
                     and read_private_json(private / 'source.json') == source,
                     'export source differs from captured source')
@@ -361,6 +386,9 @@ def validate_export(directory, *, repo=None, expected=None, private=None):
                      'analytical_contract': repo / check.CONTRACT, 'replay_contract': repo / check.candidate.REPLAY_CONTRACT_PATH,
                      'lock': repo / 'Cargo.lock', 'capture': private / 'capture/capture.json',
                      'audit': private / 'audit.json', 'frozen_trees': private / 'frozen-trees.json'}
+            if value.get('source_recipe') == check.SOURCE_RECIPE:
+                paths['upstream_archive'] = private / REFERENCE
+                check.tone.validate_source(repo.resolve(), paths['upstream_archive'])
             require(all(file_record(path) == value['bindings'][key] for key, path in paths.items()), 'export bindings changed')
             frozen = read_private_json(private / 'frozen-trees.json')
             require(snapshot_tree(private / 'capture') == frozen['capture'], 'frozen capture changed before export')
@@ -368,6 +396,9 @@ def validate_export(directory, *, repo=None, expected=None, private=None):
                 require(snapshot_tree(private / ('target-' + mode)) == frozen[mode], 'frozen target changed before export')
             receipt = read_private_json(private / 'capture/capture.json')
             report = read_private_json(private / 'audit.json')
+            if value.get('source_recipe') == check.SOURCE_RECIPE:
+                require(receipt.get('upstream_archive') == value['bindings']['upstream_archive'],
+                        'export private reference binding differs from capture')
             require(value['builds'] == projected_builds(receipt, report), 'export build projection differs')
     return value
 
@@ -387,7 +418,7 @@ def private_console(directory):
             os.close(saved[0]); os.close(saved[1])
 
 
-def capture(repo, expected, private, evidence):
+def capture(repo, expected, private, evidence, *, upstream_archive=None):
     require(hex_string(expected, 40), 'source must be a full lowercase commit SHA')
     for path in (repo, private, evidence):
         require(path.is_absolute(), 'absolute paths required')
@@ -396,7 +427,8 @@ def capture(repo, expected, private, evidence):
     disjoint(repo, private, evidence)
     require(not private.exists() and not evidence.exists(), 'capture/export roots must be fresh')
     private.mkdir(parents=True)
-    summary = {'schema_version': 1, 'identity': IDENTITY, 'recipe': check.IDENTITY, 'status': 'failed',
+    summary = {'schema_version': 1, 'identity': IDENTITY, 'recipe': check.IDENTITY,
+               'source_recipe': check.SOURCE_RECIPE, 'status': 'failed',
                'stage': 'preflight', 'source_sha': expected, 'source_tree': None,
                'release_authorized': False, 'native_runtime_qualified': False, 'distribution_qualified': False,
                'required_unexecuted_gates': list(check.GATES), 'commands': [], 'bindings': {}, 'builds': {}}
@@ -406,19 +438,30 @@ def capture(repo, expected, private, evidence):
             require(shutil.disk_usage(private).free >= MIN_START_FREE, 'insufficient private build disk')
             reject_configuration(repo, os.environ)
             source = source_evidence(repo, expected)
+            require(upstream_archive is not None, 'two-LUT capture requires private upstream archive')
+            upstream_archive = Path(upstream_archive)
+            no_links(upstream_archive)
+            require(upstream_archive.is_absolute() and upstream_archive.resolve() == upstream_archive,
+                    'private upstream reference must be absolute and unaliased')
+            check.tone.validate_source(repo, upstream_archive)
+            reference = private / REFERENCE
+            reference.parent.mkdir()
+            shutil.copyfile(upstream_archive, reference)
+            check.tone.validate_source(repo, reference)
             summary['source_tree'] = source['source_tree']
             write_json(private / 'source.json', source)
             summary['bindings'] = {'source': file_record(private / 'source.json'),
                                    'capture_contract': file_record(repo / CONTRACT),
                                    'analytical_contract': file_record(repo / check.CONTRACT),
                                    'replay_contract': file_record(repo / check.candidate.REPLAY_CONTRACT_PATH),
-                                   'lock': file_record(repo / 'Cargo.lock')}
+                                   'lock': file_record(repo / 'Cargo.lock'), 'upstream_archive': file_record(reference)}
             cargo_home = private / 'cargo-home'; cargo_home.mkdir()
             env = {**os.environ, 'CARGO_HOME': str(cargo_home), 'CARGO_TERM_COLOR': 'never',
                    'RUSTFLAGS': '-D warnings', 'CARGO_INCREMENTAL': '0', 'PYTHONUTF8': '1'}
             capture_root = private / 'capture'; capture_root.mkdir()
             receipt = {key: check.recipe()[key] for key in ('schema_version', 'recipe', 'target', 'toolchain',
-                       'features', 'default_features', 'region_downloads', 'release_authorized')}
+                       'features', 'default_features', 'region_downloads', 'release_authorized', 'source_recipe')}
+            receipt['upstream_archive'] = file_record(reference)
             receipt.update(source_sha=expected, source_tree=source['source_tree'], modes={})
 
             def run(name, command, directory, stdout, timeout, run_env=env):
@@ -460,7 +503,7 @@ def capture(repo, expected, private, evidence):
                     directory, 'notices.stdout', 300, mode_env)
                 record['inventory'] = file_record(directory / 'notices/dependency-inventory.json')
                 summary['stage'] = 'freeze'
-                record['frozen_artifacts'] = frozen_artifacts(directory, target, mode)
+                record['frozen_artifacts'] = frozen_artifacts(directory, target, mode, repo=repo, upstream_archive=reference)
                 frozen[mode] = snapshot_tree(target)
                 write_json(capture_root / 'capture.json', receipt)
                 # No further build/test commands ever target this frozen tree.
@@ -469,11 +512,14 @@ def capture(repo, expected, private, evidence):
             summary['bindings']['capture'] = file_record(capture_root / 'capture.json')
             summary['bindings']['frozen_trees'] = file_record(private / 'frozen-trees.json')
             run('audit', [sys.executable, str(repo / 'scripts/check-analytical-swift-recipe.py'),
-                '--repo', str(repo), '--source-sha', expected, '--capture', str(capture_root)], private, 'audit.json', 1800)
+                '--repo', str(repo), '--source-sha', expected, '--capture', str(capture_root),
+                '--upstream-archive', str(reference)], private, 'audit.json', 1800)
             report = json.loads((private / 'audit.json').read_text(encoding='utf-8'))
             require(report['status'] == PASS and report['release_authorized'] is False
                     and report['required_unexecuted_gates'] == check.GATES
-                    and report['source_sha'] == expected and report['source_tree'] == source['source_tree'],
+                    and report['source_sha'] == expected and report['source_tree'] == source['source_tree']
+                    and report['source_recipe'] == check.SOURCE_RECIPE
+                    and report['upstream_archive'] == file_record(reference),
                     'auditor did not retain unqualified status and gates')
             summary['stage'] = 'source-recheck'
             require(source_evidence(repo, expected) == source, 'source changed during capture')
@@ -500,6 +546,7 @@ def main(argv=None):
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--source-sha')
     parser.add_argument('--private', type=Path)
+    parser.add_argument('--upstream-archive', type=Path)
     parser.add_argument('--evidence', type=Path)
     parser.add_argument('--validate-evidence', type=Path)
     args = parser.parse_args(argv)
@@ -511,7 +558,7 @@ def main(argv=None):
             print('Bounded text-only build evidence validated.')
             return 0
         require(args.source_sha is not None and args.private is not None and args.evidence is not None, 'capture arguments required')
-        result = capture(args.repo, args.source_sha, args.private, args.evidence)
+        result = capture(args.repo, args.source_sha, args.private, args.evidence, upstream_archive=args.upstream_archive)
         print('Analytical MSVC build capture: ' + result['status'] + '; remaining gates unexecuted; release_authorized=false.')
         return 0 if result['status'] == PASS else 1
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError):

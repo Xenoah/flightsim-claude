@@ -2,8 +2,9 @@
 
 This additive runner executes only the build/artifact portion of the existing
 [strict prepared recipe](analytical-swift-recipe.md). That earlier preparation
-document and its source pins are unchanged. This document describes the new
-runner; it does not reinterpret a prior preparation result as execution.
+runtime feature recipe is retained. Its current source binding is separately
+versioned as described in [source admission](full-two-aircraft-source-admission.md).
+Historical captures are never reinterpreted as new execution.
 
 The manual `Analytical Swift MSVC build evidence` workflow also runs on a push to
 `main` that changes exactly one or more of these trigger paths:
@@ -16,8 +17,10 @@ Other changes do not trigger this workflow. There is no pull-request,
 `workflow_run`, ordinary candidate, release, or general CI integration. Every
 invocation checks out its exact `github.sha`. The additive capture source
 contract requires independent review; no tool refreshes any contract pins.
-Both inherited source contracts, including all 130 reviewed replay pins and
-102 independent anchors, remain byte-for-byte unchanged.
+The prior source contracts remain byte-exact under `scripts/history/`. Current
+contracts explicitly select the new runtime source and two-LUT source recipe;
+all 102 independent anchors, 496 same-path runtime/physical files, and the
+historically relocated old source contract remain exact.
 
 ## What actually runs
 
@@ -40,12 +43,26 @@ to private journals. A timeout terminates the subprocess tree and records the
 actual resulting status; a launch failure has no invented exit code. Failures
 stop subsequent commands. Failed output is never rewritten as a success receipt.
 The unchanged notice collector runs on each complete raw metadata capture.
-The unchanged auditor then runs on this same machine/source/target/Cargo home.
+The source-versioned auditor then runs on this same machine/source/target/Cargo home.
 It independently recaptures locked/offline metadata and graph evidence and
 validates profile/features, selected artifacts, fingerprints, dep-info, payload
 absence/presence, inventory, notice integrity, and preserved readiness blockers.
 Entire target trees are hashed at freeze and compared after audit. Nothing
 compiles into a frozen tree. Exact source is rechecked before completion.
+
+## Private upstream reference
+
+Current invocations require `--upstream-archive` naming the exact official
+`bevy_core_pipeline-0.18.1.crate` outside the source tree. The source auditor checks
+its package checksum and all original archive members before use. Capture copies
+it to `reference/bevy_core_pipeline-0.18.1.crate` beneath the private root and binds
+its bytes/hash in the capture, audit and export. It is never an upload member.
+
+The explicit `source_recipe` is `bevy-0.18.1-tony-filmic-source-v1`. Current ordinary
+proof counts require two retained payloads; analytical requires zero. Both audit
+all three known payloads, including excluded AgX from that private reference.
+Historical exports without this field continue to require three ordinary payloads
+and cannot be rebound to the current source.
 
 ## Export and remaining gates
 

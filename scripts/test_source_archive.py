@@ -26,6 +26,23 @@ def zipped(entries):
     return stream.getvalue()
 
 class ArchivePolicyTests(unittest.TestCase):
+    def test_current_commit_requires_explicit_original_highwing_policy(self):
+        repo = Path(__file__).resolve().parents[1]
+        for fmt in ('zip', 'tar'):
+            with self.subTest(format=fmt):
+                result = policy.verify(repo, 'HEAD', fmt=fmt, policy=policy.ORIGINAL_HIGHWING_POLICY)
+                self.assertEqual(result['archive_policy'], 'original-highwing-v1')
+                self.assertEqual(result['status'], 'source_archive_contents_verified')
+                self.assertTrue(result['original_highwing_included'])
+                self.assertIsNone(result['excluded_path'])
+                self.assertEqual(result['forbidden_historical_model_sha256'],
+                                 '8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9')
+                self.assertFalse(result['identical_model_bytes_found'])
+                self.assertFalse(result['publication_authorized'])
+                self.assertFalse(result['hosted_origin_attested'])
+                with self.assertRaisesRegex(ValueError, 'legacy commit export policy still includes excluded model path'):
+                    policy.verify(repo, 'HEAD', fmt=fmt)
+
     def test_zip_root_is_normalized(self):
         self.assertEqual(policy.normalized_members(zipped([('any-root/LICENSE', b'x')])), {'LICENSE': b'x'})
 
@@ -164,6 +181,9 @@ class ArchivePolicyTests(unittest.TestCase):
             git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture')
             for fmt in ('zip', 'tar'):
                 result = policy.verify(repo, 'HEAD', fmt=fmt)
+                self.assertEqual(result['archive_policy'], 'legacy-meshy-excluded-v1')
+                self.assertEqual(result['excluded_path'], policy.DENIED_PATH)
+                self.assertFalse(result['original_highwing_included'])
                 self.assertFalse(result['publication_authorized'])
                 self.assertFalse(result['hosted_origin_attested'])
                 supplied = git('archive', '--format=' + fmt, '--prefix=hosted-name/', 'HEAD')

@@ -17,6 +17,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 import zlib
 
@@ -39,7 +40,14 @@ LEGACY_SOURCE_HASHES = {
     "crates/flightsim-app/src/aircraft_profile.rs": "59c6deb0db1822178b30a0ba4e2fcbcac9e2177e1f0f0851f54c74510f3c6da0",
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
-REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
+HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-reviewed-source-v1"
+REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
+REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
+SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
+HISTORICAL_CONTRACT_HASHES = {'scripts/history/d918943-replay-candidate-contract.json': '2290d90e367b6a48432741b9570e80102a213d387e55d39140859075b6cf3cf4', 'scripts/history/d918943-analytical-swift-source-contract.json': '00e8d5a493fcd3402077b6ab8d5f57d63a729395c2ee26d2b49834ab65260a4a', 'scripts/history/d918943-analytical-swift-capture-contract.json': '2cbb6c46002f8a414ac8cee1ba75f3362024f7b16b80b89c2bb1cacb84264fc5'}
+PRESERVED_RUNTIME_PATH = "scripts/full-two-aircraft-runtime-pins.json"
+PRESERVED_RUNTIME_SHA256 = "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667"
 # The reviewed additive jet/turboprop exports change this file, but no legacy FDM
 # body. Keep a literal full-file guard; the historical lib hash above never moves.
 REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "2328631f895921e4152de6f8107c4d6f07ba764b6f6225189a4b826c6f9f013c"
@@ -549,6 +557,543 @@ MODIFIED_SOURCE_POLICY_PATHS = {
 
 REPLAY_CONTRACT_PATHS |= VENDORED_PACKAGE_PATHS | REPLACEMENT_WITNESS_PATHS | MODIFIED_SOURCE_POLICY_PATHS
 
+# This is a new source admission, not a new runtime/aircraft acceptance.
+# Keep the previous 404-file boundary inspectable and version it explicitly.
+HISTORICAL_REPLAY_CONTRACT_PATHS = frozenset(REPLAY_CONTRACT_PATHS)
+CORE_PIPELINE_SOURCE_PATHS = {
+    'vendor/bevy_core_pipeline/Cargo.lock',
+    'vendor/bevy_core_pipeline/Cargo.toml',
+    'vendor/bevy_core_pipeline/Cargo.toml.orig',
+    'vendor/bevy_core_pipeline/FLIGHTSIM-MODIFICATION-NOTICE.txt',
+    'vendor/bevy_core_pipeline/FLIGHTSIM-PATCHES.md',
+    'vendor/bevy_core_pipeline/FLIGHTSIM-UPSTREAM-SOURCE.json',
+    'vendor/bevy_core_pipeline/LICENSE-APACHE',
+    'vendor/bevy_core_pipeline/LICENSE-FLIGHTSIM-APACHE',
+    'vendor/bevy_core_pipeline/LICENSE-FLIGHTSIM-MIT',
+    'vendor/bevy_core_pipeline/LICENSE-MIT',
+    'vendor/bevy_core_pipeline/README.md',
+    'vendor/bevy_core_pipeline/src/blit/blit.wgsl',
+    'vendor/bevy_core_pipeline/src/blit/mod.rs',
+    'vendor/bevy_core_pipeline/src/core_2d/main_opaque_pass_2d_node.rs',
+    'vendor/bevy_core_pipeline/src/core_2d/main_transparent_pass_2d_node.rs',
+    'vendor/bevy_core_pipeline/src/core_2d/mod.rs',
+    'vendor/bevy_core_pipeline/src/core_3d/main_opaque_pass_3d_node.rs',
+    'vendor/bevy_core_pipeline/src/core_3d/main_transmissive_pass_3d_node.rs',
+    'vendor/bevy_core_pipeline/src/core_3d/main_transparent_pass_3d_node.rs',
+    'vendor/bevy_core_pipeline/src/core_3d/mod.rs',
+    'vendor/bevy_core_pipeline/src/deferred/copy_deferred_lighting_id.wgsl',
+    'vendor/bevy_core_pipeline/src/deferred/copy_lighting_id.rs',
+    'vendor/bevy_core_pipeline/src/deferred/mod.rs',
+    'vendor/bevy_core_pipeline/src/deferred/node.rs',
+    'vendor/bevy_core_pipeline/src/experimental/mip_generation/downsample_depth.wgsl',
+    'vendor/bevy_core_pipeline/src/experimental/mip_generation/mod.rs',
+    'vendor/bevy_core_pipeline/src/experimental/mod.rs',
+    'vendor/bevy_core_pipeline/src/fullscreen_material.rs',
+    'vendor/bevy_core_pipeline/src/fullscreen_vertex_shader/fullscreen.wgsl',
+    'vendor/bevy_core_pipeline/src/fullscreen_vertex_shader/mod.rs',
+    'vendor/bevy_core_pipeline/src/lib.rs',
+    'vendor/bevy_core_pipeline/src/oit/mod.rs',
+    'vendor/bevy_core_pipeline/src/oit/oit_draw.wgsl',
+    'vendor/bevy_core_pipeline/src/oit/resolve/mod.rs',
+    'vendor/bevy_core_pipeline/src/oit/resolve/node.rs',
+    'vendor/bevy_core_pipeline/src/oit/resolve/oit_resolve.wgsl',
+    'vendor/bevy_core_pipeline/src/prepass/mod.rs',
+    'vendor/bevy_core_pipeline/src/prepass/node.rs',
+    'vendor/bevy_core_pipeline/src/skybox/mod.rs',
+    'vendor/bevy_core_pipeline/src/skybox/prepass.rs',
+    'vendor/bevy_core_pipeline/src/skybox/skybox.wgsl',
+    'vendor/bevy_core_pipeline/src/skybox/skybox_prepass.wgsl',
+    'vendor/bevy_core_pipeline/src/tonemapping/lut_bindings.wgsl',
+    'vendor/bevy_core_pipeline/src/tonemapping/luts/Blender_-11_12.ktx2',
+    'vendor/bevy_core_pipeline/src/tonemapping/luts/info.txt',
+    'vendor/bevy_core_pipeline/src/tonemapping/luts/tony_mc_mapface.ktx2',
+    'vendor/bevy_core_pipeline/src/tonemapping/mod.rs',
+    'vendor/bevy_core_pipeline/src/tonemapping/node.rs',
+    'vendor/bevy_core_pipeline/src/tonemapping/tonemapping.wgsl',
+    'vendor/bevy_core_pipeline/src/tonemapping/tonemapping_shared.wgsl',
+    'vendor/bevy_core_pipeline/src/upscaling/mod.rs',
+    'vendor/bevy_core_pipeline/src/upscaling/node.rs',
+    'vendor/bevy_core_pipeline/third-party-notices/Blender-Filmic-NOTICE.txt',
+    'vendor/bevy_core_pipeline/third-party-notices/Blender-Filmic-OpenColorIO-LICENSE',
+    'vendor/bevy_core_pipeline/third-party-notices/TonyMcMapface-LICENSE-MIT',
+}
+ORIGINAL_HIGHWING_SOURCE_PATHS = {
+    'tools/original-highwing/CHECKSUMS.sha256',
+    'tools/original-highwing/README.md',
+    'tools/original-highwing/adapt_original_highwing.py',
+    'tools/original-highwing/assets/aircraft/light_single.glb',
+    'tools/original-highwing/assets/aircraft/light_single.json',
+    'tools/original-highwing/check_rejection_cases.py',
+    'tools/original-highwing/evidence/adapter-output.json',
+    'tools/original-highwing/evidence/author-visual-review.json',
+    'tools/original-highwing/evidence/blender-import-and-render.json',
+    'tools/original-highwing/evidence/blender-import.log',
+    'tools/original-highwing/evidence/blender-render.log',
+    'tools/original-highwing/evidence/geometry-validation.json',
+    'tools/original-highwing/evidence/independent-review.json',
+    'tools/original-highwing/evidence/independent-review.md',
+    'tools/original-highwing/evidence/original-validation-rerun.json',
+    'tools/original-highwing/evidence/preservation-check.json',
+    'tools/original-highwing/evidence/rebuilt-output.json',
+    'tools/original-highwing/evidence/rebuilt.glb',
+    'tools/original-highwing/evidence/rejection-cases.json',
+    'tools/original-highwing/evidence/source-manifest.json',
+    'tools/original-highwing/previews/candidate-front.jpg',
+    'tools/original-highwing/previews/candidate-starboard.jpg',
+    'tools/original-highwing/previews/candidate-three-quarter.jpg',
+    'tools/original-highwing/render_candidate.py',
+    'tools/original-highwing/source/LICENSE-APACHE',
+    'tools/original-highwing/source/LICENSE-MIT',
+    'tools/original-highwing/source/build_meadow_trainer.py',
+    'tools/original-highwing/source/light_single.json',
+    'tools/original-highwing/source/meadow_trainer.blend',
+    'tools/original-highwing/source/meadow_trainer.glb',
+    'tools/original-highwing/source/meadow_trainer.json',
+    'tools/original-highwing/source/validate_meadow_trainer.py',
+    'tools/original-highwing/validate_candidate.py',
+}
+FULL_SOURCE_PROVENANCE_PATHS = {
+    'docs/release/filmic-asset-source-decision.json',
+    'docs/release/filmic-asset-source-decision.md',
+    'docs/release/licenses/Blender-Filmic-NOTICE.txt',
+    'docs/release/licenses/Blender-Filmic-OpenColorIO-LICENSE',
+    'docs/release/licenses/TonyMcMapface-LICENSE-MIT',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/ASSESSMENT.md',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/MANIFEST.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/REPRODUCE.md',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/bevy-recipe-exact.txt',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/blender-3.4.1-provenance.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/blender-3.4.1.sha256',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/comparison-test-results.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/final-comparison.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/review-result.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/review.md',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/source-evidence.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/verification-final.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/independent-review/verify.py',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/notices/Bevy-LICENSE-MIT.txt',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/notices/Blender-3.4.1-config.ocio',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/notices/Blender-OpenColorIO-BSD-3-Clause.txt',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/prior-native-inventory.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/recipe-source-bindings.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/reference-metadata.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/reproduce.py',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/run-5/invocation.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/run-5/observation.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/run-6/invocation.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/run-6/observation.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/run_pinned.py',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/source-bindings.json',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/stimulus.rs',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/test_comparison.py',
+    'docs/release/licenses/review-evidence/bevy-blender-filmic-lut/verify_reproduction.py',
+    '.gitattributes',
+    'ATTRIBUTION.md',
+    'Cargo.lock',
+    'Cargo.toml',
+    'assets/aircraft/light_single.glb',
+    'docs/qa/licensed-tonemap-source-candidate-2026-10-08.md',
+    'docs/release/asset-rights-manifest.json',
+    'docs/release/full-two-aircraft-source-candidate.md',
+    'docs/release/full-two-aircraft-source-inputs.json',
+    'docs/release/history/mesh-and-lut-boundary-d918943.json',
+    'docs/release/history/source-archive-policy-d918943.md',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/.cargo_vcs_info.json',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/.github/workflows/rust.yml',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/.gitignore',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/Cargo.toml.orig',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/README.md',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/comptime.rs',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/lib.rs',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/package/src/runtime.rs',
+    'docs/release/licenses/review-evidence/constgebra-0.1.4/source-record.json',
+    'docs/release/licenses/review-evidence/standard-license-texts/Apache-2.0.txt',
+    'docs/release/licenses/review-evidence/standard-license-texts/CC0-1.0.txt',
+    'docs/release/licenses/review-evidence/standard-license-texts/README.txt',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/REVIEW.md',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/VERIFICATION.md',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/acceptance.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/assessed-input.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/candidate-verification.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/fresh-per-file-histories.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/fresh-primary-records.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/original-verification.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/reviewed-assessment-snapshot.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/verify_candidate.py',
+    'docs/release/licenses/review-evidence/two-package-ordinary/independent-review/verify_original.py',
+    'docs/release/licenses/review-evidence/two-package-ordinary/native-inventory.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/prior-package-assessment.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/reconciliation.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/windows-candidate-archive-receipt.json',
+    'docs/release/licenses/review-evidence/two-package-ordinary/windows-candidate-validation.json',
+    'docs/release/native-link-output-association.md',
+    'docs/release/ordinary-two-package-assessment.json',
+    'docs/release/ordinary-two-package-assessment.md',
+    'docs/release/source-archive-policy.md',
+    'scripts/check-commercial-readiness.py',
+    'scripts/check-full-two-aircraft-source.py',
+    'scripts/check-source-archive.py',
+    'scripts/tests/test_commercial_readiness.py',
+    'scripts/tests/test_full_two_aircraft_source.py',
+    'tools/blender/validate_cedar_turboprop.py',
+    'tools/blender/validate_kestrel_jet_trainer.py',
+    'tools/blender/validate_meadow_trainer.py',
+    'tools/validate-tonemap-subset.py',
+}
+PRESERVED_RUNTIME_EXTRA_PATHS = {
+    'assets/aircraft/swift_sport.blend',
+    'crates/flightsim-app/src/aircraft_profile/schema_contract.rs',
+    'crates/flightsim-app/src/airport_drape_runtime.rs',
+    'crates/flightsim-app/src/distance_runtime.rs',
+    'crates/flightsim-app/src/graphics_runtime.rs',
+    'crates/flightsim-app/src/region_downloads.rs',
+    'crates/flightsim-app/src/region_downloads_tests.rs',
+    'crates/flightsim-app/src/render_metrics.rs',
+    'crates/flightsim-app/src/scenery_map_tests.rs',
+    'crates/flightsim-app/src/scenery_runtime.rs',
+    'crates/flightsim-app/src/scenery_runtime_tests.rs',
+    'crates/flightsim-app/src/scenery_terrain_policy_tests.rs',
+    'crates/flightsim-app/src/water_runtime.rs',
+    'crates/flightsim-app/src/windows_readback_diagnostic.rs',
+    'crates/flightsim-app/tests/aircraft_scene_hierarchy.rs',
+    'crates/flightsim-app/tests/fixtures/README.md',
+    'crates/flightsim-app/tests/fixtures/region-synthetic.zip',
+    'crates/flightsim-assetgen/Cargo.toml',
+    'crates/flightsim-assetgen/src/env_file.rs',
+    'crates/flightsim-assetgen/src/main.rs',
+    'crates/flightsim-assetgen/src/meshy.rs',
+    'crates/flightsim-audio/Cargo.toml',
+    'crates/flightsim-audio/examples/render_engine.rs',
+    'crates/flightsim-audio/src/airframe.rs',
+    'crates/flightsim-audio/src/dsp.rs',
+    'crates/flightsim-audio/src/engine.rs',
+    'crates/flightsim-audio/src/mixer.rs',
+    'crates/flightsim-audio/src/source.rs',
+    'crates/flightsim-audio/src/turbine.rs',
+    'crates/flightsim-content/examples/download_region.rs',
+    'crates/flightsim-content/examples/validate_aircraft_package.rs',
+    'crates/flightsim-content/examples/validate_region_package.rs',
+    'crates/flightsim-content/src/download/http.rs',
+    'crates/flightsim-content/src/download/mod.rs',
+    'crates/flightsim-content/src/download/source.rs',
+    'crates/flightsim-content/src/download/tests.rs',
+    'crates/flightsim-content/tests/data/download-fixture.zip',
+    'crates/flightsim-content/tests/data/make_download_fixture.py',
+    'crates/flightsim-core/Cargo.toml',
+    'crates/flightsim-core/benches/origin.rs',
+    'crates/flightsim-core/src/fixed_step.rs',
+    'crates/flightsim-core/src/frames.rs',
+    'crates/flightsim-core/src/lib.rs',
+    'crates/flightsim-core/src/origin.rs',
+    'crates/flightsim-core/src/render_frame.rs',
+    'crates/flightsim-core/src/units.rs',
+    'crates/flightsim-fdm/benches/step.rs',
+    'crates/flightsim-fdm/benches/turboprop_step.rs',
+    'crates/flightsim-fdm/examples/aero_trace.rs',
+    'crates/flightsim-fdm/examples/longitudinal_trace.rs',
+    'crates/flightsim-fdm/tests/bundled_definitions.rs',
+    'crates/flightsim-fdm/tests/fixtures/cedar-law1-calm-braking-boundary.json',
+    'crates/flightsim-fdm/tests/fixtures/cedar-law1-component-bits.json',
+    'crates/flightsim-fdm/tests/fixtures/cedar-law1-components.json',
+    'crates/flightsim-fdm/tests/fixtures/jet-contact-dynamics.json',
+    'crates/flightsim-fdm/tests/fixtures/subsonic-identity-v1.json',
+    'crates/flightsim-fdm/tests/fixtures/turboprop-numerical.json',
+    'crates/flightsim-fdm/tests/invariants.rs',
+    'crates/flightsim-fdm/tests/jet_contact_regression.rs',
+    'crates/flightsim-fdm/tests/jet_runtime.rs',
+    'crates/flightsim-fdm/tests/longitudinal.rs',
+    'crates/flightsim-fdm/tests/longitudinal_support/mod.rs',
+    'crates/flightsim-fdm/tests/slope_contact.rs',
+    'crates/flightsim-fdm/tests/stall_peak.rs',
+    'crates/flightsim-fdm/tests/subsonic_tables.rs',
+    'crates/flightsim-fdm/tests/turbulence.rs',
+    'crates/flightsim-fdm/tests/turbulence_global.rs',
+    'crates/flightsim-input/Cargo.toml',
+    'crates/flightsim-input/src/configuration.rs',
+    'crates/flightsim-input/src/controllers.rs',
+    'crates/flightsim-input/src/gamepad.rs',
+    'crates/flightsim-input/src/keyboard_regression.rs',
+    'crates/flightsim-input/src/native.rs',
+    'crates/flightsim-net/Cargo.toml',
+    'crates/flightsim-net/src/lib.rs',
+    'crates/flightsim-net/src/protocol.rs',
+    'crates/flightsim-net/src/session.rs',
+    'crates/flightsim-net/src/traffic.rs',
+    'crates/flightsim-net/tests/local_sessions.rs',
+    'crates/flightsim-net/tests/protocol_traffic.rs',
+    'crates/flightsim-render/Cargo.toml',
+    'crates/flightsim-render/benches/scenery_mesh.rs',
+    'crates/flightsim-render/benches/terrain_polar_normals.rs',
+    'crates/flightsim-render/examples/sun_clock.rs',
+    'crates/flightsim-render/src/aircraft.rs',
+    'crates/flightsim-render/src/apron.rs',
+    'crates/flightsim-render/src/biome.rs',
+    'crates/flightsim-render/src/cloud_field.rs',
+    'crates/flightsim-render/src/cloud_field.wgsl',
+    'crates/flightsim-render/src/cloud_volume.rs',
+    'crates/flightsim-render/src/cloud_volume.wgsl',
+    'crates/flightsim-render/src/cockpit.rs',
+    'crates/flightsim-render/src/daylight.rs',
+    'crates/flightsim-render/src/graphics_quality.rs',
+    'crates/flightsim-render/src/graphics_quality_metrics.rs',
+    'crates/flightsim-render/src/graphics_quality_pipelines.rs',
+    'crates/flightsim-render/src/holding_position.rs',
+    'crates/flightsim-render/src/lib.rs',
+    'crates/flightsim-render/src/modeled_weather.rs',
+    'crates/flightsim-render/src/precipitation.rs',
+    'crates/flightsim-render/src/runway.rs',
+    'crates/flightsim-render/src/runway_lights.rs',
+    'crates/flightsim-render/src/scenery.rs',
+    'crates/flightsim-render/src/scenery_canopy_tests.rs',
+    'crates/flightsim-render/src/scenery_exclusions.rs',
+    'crates/flightsim-render/src/sun.rs',
+    'crates/flightsim-render/src/taxiway.rs',
+    'crates/flightsim-render/src/taxiway_lights.rs',
+    'crates/flightsim-render/src/taxiway_sign.rs',
+    'crates/flightsim-render/src/terrain.rs',
+    'crates/flightsim-render/src/terrain_detail.rs',
+    'crates/flightsim-render/src/terrain_detail.wgsl',
+    'crates/flightsim-render/src/terrain_drape.rs',
+    'crates/flightsim-render/src/terrain_overlays.rs',
+    'crates/flightsim-render/src/terrain_polar_normals.rs',
+    'crates/flightsim-render/src/terrain_stitching.rs',
+    'crates/flightsim-render/src/tonemapping.rs',
+    'crates/flightsim-render/src/water.rs',
+    'crates/flightsim-render/src/water.wgsl',
+    'crates/flightsim-render/src/water_mask.rs',
+    'crates/flightsim-render/src/water_pipelines.rs',
+    'crates/flightsim-render/src/weather.rs',
+    'crates/flightsim-render/tests/daylight_systems.rs',
+    'crates/flightsim-render/tests/modeled_weather_systems.rs',
+    'crates/flightsim-render/tests/scenery_bounds.rs',
+    'crates/flightsim-render/tests/scenery_forest_lattice.rs',
+    'crates/flightsim-render/tests/solar_cross_check.rs',
+    'crates/flightsim-render/tests/sun_shadow_cascades.rs',
+    'crates/flightsim-render/tests/support/scenery_fixtures.rs',
+    'crates/flightsim-render/tests/terrain_overlay_lifecycle.rs',
+    'crates/flightsim-render/tests/terrain_overlay_transactions.rs',
+    'crates/flightsim-render/tests/terrain_parent_fallback.rs',
+    'crates/flightsim-render/tests/terrain_stitching_systems.rs',
+    'crates/flightsim-render/tests/terrain_streaming_systems.rs',
+    'crates/flightsim-render/tests/tonemapping_modes.rs',
+    'crates/flightsim-render/tests/twilight.rs',
+    'crates/flightsim-render/tests/weather_systems.rs',
+    'crates/flightsim-sim/examples/peregrine_qualification.rs',
+    'crates/flightsim-sim/examples/record_visual_flight.rs',
+    'crates/flightsim-sim/examples/support/turbulence_scenarios.rs',
+    'crates/flightsim-sim/examples/turbulence_diagnostics.rs',
+    'crates/flightsim-sim/examples/turbulence_validation.rs',
+    'crates/flightsim-sim/src/bin/jet-headless.rs',
+    'crates/flightsim-sim/src/crash.rs',
+    'crates/flightsim-sim/src/director.rs',
+    'crates/flightsim-sim/src/flight.rs',
+    'crates/flightsim-sim/src/ground.rs',
+    'crates/flightsim-sim/src/jet_scenarios.rs',
+    'crates/flightsim-sim/src/main.rs',
+    'crates/flightsim-sim/src/model_simulation.rs',
+    'crates/flightsim-sim/src/model_simulation/parked.rs',
+    'crates/flightsim-sim/src/model_simulation/presentation.rs',
+    'crates/flightsim-sim/src/simulation.rs',
+    'crates/flightsim-sim/tests/acceptance.rs',
+    'crates/flightsim-sim/tests/aircraft_profile_v2.rs',
+    'crates/flightsim-sim/tests/aircraft_profile_v3.rs',
+    'crates/flightsim-sim/tests/airport_circuit.rs',
+    'crates/flightsim-sim/tests/approach.rs',
+    'crates/flightsim-sim/tests/climate_integration.rs',
+    'crates/flightsim-sim/tests/crash_flight.rs',
+    'crates/flightsim-sim/tests/fixed_step_controls.rs',
+    'crates/flightsim-sim/tests/fixtures/cedar-law1-profile.json',
+    'crates/flightsim-sim/tests/fixtures/cedar-law2-negative-rows.json',
+    'crates/flightsim-sim/tests/fixtures/jet-identity-v2.json',
+    'crates/flightsim-sim/tests/fixtures/legacy_v1.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/legacy_v2_disabled.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/legacy_v2_world.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/near-static-cedar-negative-rows.json',
+    'crates/flightsim-sim/tests/fixtures/near-static-turboprop-identity-v4.json',
+    'crates/flightsim-sim/tests/fixtures/turboprop-identity-v3.json',
+    'crates/flightsim-sim/tests/fixtures/v3_clear.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_cloud.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_custom_both.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_fog.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_legacy_weather.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_rain.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_snow.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v3_storm.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_clear.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_cloud.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_custom_both.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_fog.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_rain.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_snow.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_storm.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_terminal_no_query.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_terminal_zero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v4_zero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_clear.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_cloud.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_custom_both.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_fog.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_rain.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_snow.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_storm.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_successful_121.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_aero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_altitude.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_budget.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_disk_below.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_disk_derived.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_disk_nonpositive.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_envelope.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_power_map.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_propeller_map.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_raw.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_tip.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_terminal_wind.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v5_zero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_clear.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_cloud.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_custom_both.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_fog.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_rain.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_snow.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_storm.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_successful_121.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_adverse.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_aero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_altitude.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_both_inflows.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_budget.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_disk_below.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_disk_derived.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_disk_nonpositive.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_envelope.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_negative_aero.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_negative_budget.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_negative_component.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_negative_derivative.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_negative_ground.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_power_map.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_propeller_map.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_raw.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_scale_load.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_scale_underflow.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_static_derived.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_static_floor.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_static_power.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_static_thrust.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_tip.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_transverse.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_terminal_wind.fsreplay',
+    'crates/flightsim-sim/tests/fixtures/v6_zero.fsreplay',
+    'crates/flightsim-sim/tests/flight_log.rs',
+    'crates/flightsim-sim/tests/global_climate_duration.rs',
+    'crates/flightsim-sim/tests/global_climate_flight.rs',
+    'crates/flightsim-sim/tests/hands_off.rs',
+    'crates/flightsim-sim/tests/jet_headless_cli.rs',
+    'crates/flightsim-sim/tests/jet_model_identity.rs',
+    'crates/flightsim-sim/tests/jet_numerical_flight.rs',
+    'crates/flightsim-sim/tests/jet_presentation.rs',
+    'crates/flightsim-sim/tests/jet_replay_v4.rs',
+    'crates/flightsim-sim/tests/modeled_weather.rs',
+    'crates/flightsim-sim/tests/parked_slope.rs',
+    'crates/flightsim-sim/tests/render_rehearsal.rs',
+    'crates/flightsim-sim/tests/replay_fidelity.rs',
+    'crates/flightsim-sim/tests/replay_file_boundaries.rs',
+    'crates/flightsim-sim/tests/replay_hostile.rs',
+    'crates/flightsim-sim/tests/replay_model_identity.rs',
+    'crates/flightsim-sim/tests/replay_world_climate.rs',
+    'crates/flightsim-sim/tests/restart.rs',
+    'crates/flightsim-sim/tests/slope_spawn.rs',
+    'crates/flightsim-sim/tests/stall_margin.rs',
+    'crates/flightsim-sim/tests/stress.rs',
+    'crates/flightsim-sim/tests/touchdown.rs',
+    'crates/flightsim-sim/tests/turboprop_codec_v5.rs',
+    'crates/flightsim-sim/tests/turboprop_common/mod.rs',
+    'crates/flightsim-sim/tests/turboprop_model_identity.rs',
+    'crates/flightsim-sim/tests/turboprop_replay_v5.rs',
+    'crates/flightsim-sim/tests/turbulence_envelopes.rs',
+    'crates/flightsim-sim/tests/turbulence_flight.rs',
+    'crates/flightsim-sim/tests/turbulence_integration.rs',
+    'crates/flightsim-sim/tests/wind.rs',
+    'crates/flightsim-tilegen/Cargo.toml',
+    'crates/flightsim-tilegen/examples/check_geoid.rs',
+    'crates/flightsim-tilegen/examples/synthetic_dem.rs',
+    'crates/flightsim-tilegen/src/airport.rs',
+    'crates/flightsim-tilegen/src/bin/flightsim-airportgen.rs',
+    'crates/flightsim-tilegen/src/bin/flightsim-globalgen.rs',
+    'crates/flightsim-tilegen/src/bin/flightsim-scenerygen.rs',
+    'crates/flightsim-tilegen/src/generate.rs',
+    'crates/flightsim-tilegen/src/geoid.rs',
+    'crates/flightsim-tilegen/src/geotiff.rs',
+    'crates/flightsim-tilegen/src/global.rs',
+    'crates/flightsim-tilegen/src/lib.rs',
+    'crates/flightsim-tilegen/src/main.rs',
+    'crates/flightsim-tilegen/src/region.rs',
+    'crates/flightsim-tilegen/src/scenery.rs',
+    'crates/flightsim-tilegen/src/testing.rs',
+    'crates/flightsim-tilegen/src/vertical_datum.rs',
+    'crates/flightsim-tilegen/tests/dateline_coverage.rs',
+    'crates/flightsim-tilegen/tests/fixtures/airport-valid.fsairports',
+    'crates/flightsim-tilegen/tests/generation_limits.rs',
+    'crates/flightsim-tilegen/tests/geoid_cli.rs',
+    'crates/flightsim-tilegen/tests/geoid_normalization.rs',
+    'crates/flightsim-tilegen/tests/geotiff_metadata.rs',
+    'crates/flightsim-tilegen/tests/output_safety.rs',
+    'crates/flightsim-tilegen/tests/pbf_hostile_probe.rs',
+    'crates/flightsim-tilegen/tests/pipeline.rs',
+    'crates/flightsim-tilegen/tests/scenery_pipeline.rs',
+    'crates/flightsim-tilegen/tests/support/pbf.rs',
+    'crates/flightsim-tilegen/tests/vertical_datum_gate.rs',
+    'crates/flightsim-tilegen/tests/vertical_datum_read.rs',
+    'crates/flightsim-ui/Cargo.toml',
+    'crates/flightsim-ui/examples/attitude_clip_repro.rs',
+    'crates/flightsim-ui/examples/attitude_matrix.rs',
+    'crates/flightsim-ui/examples/check_attitude_pixels.py',
+    'crates/flightsim-ui/src/attitude.rs',
+    'crates/flightsim-ui/src/attitude.wgsl',
+    'crates/flightsim-ui/src/crash.rs',
+    'crates/flightsim-ui/src/input_diagnostics.rs',
+    'crates/flightsim-ui/src/landing.rs',
+    'crates/flightsim-ui/src/traffic.rs',
+    'crates/flightsim-world/Cargo.toml',
+    'crates/flightsim-world/benches/scenery.rs',
+    'crates/flightsim-world/benches/terrain_seam_planning.rs',
+    'crates/flightsim-world/data/global-terrain.fsgt',
+    'crates/flightsim-world/data/global-terrain.provenance.json',
+    'crates/flightsim-world/data/ncep-ncar-1991-2020.fsclim',
+    'crates/flightsim-world/data/ncep-ncar-1991-2020.json',
+    'crates/flightsim-world/src/airport.rs',
+    'crates/flightsim-world/src/airport/io.rs',
+    'crates/flightsim-world/src/airport/io/v3.rs',
+    'crates/flightsim-world/src/climate.rs',
+    'crates/flightsim-world/src/climate_metadata.rs',
+    'crates/flightsim-world/src/dem.rs',
+    'crates/flightsim-world/src/dem/io.rs',
+    'crates/flightsim-world/src/global_metadata.rs',
+    'crates/flightsim-world/src/mesh.rs',
+    'crates/flightsim-world/src/scenery.rs',
+    'crates/flightsim-world/src/scenery/io.rs',
+    'crates/flightsim-world/src/seams.rs',
+    'crates/flightsim-world/src/seams/planner.rs',
+    'crates/flightsim-world/src/streaming.rs',
+    'crates/flightsim-world/tests/airport_mesh_clearance.rs',
+    'crates/flightsim-world/tests/dateline_dem_mesh.rs',
+    'crates/flightsim-world/tests/scenery_database.rs',
+    'crates/flightsim-world/tests/terrain_seam_geometry.rs',
+    'crates/flightsim-world/tests/v3_fuzz_review.rs',
+}
+HISTORICAL_SOURCE_PATHS = {
+    'scripts/full-two-aircraft-runtime-pins.json',
+    'scripts/history/d918943-analytical-swift-capture-contract.json',
+    'scripts/history/d918943-analytical-swift-source-contract.json',
+    'scripts/history/d918943-replay-candidate-contract.json',
+}
+
+REPLAY_CONTRACT_PATHS |= (CORE_PIPELINE_SOURCE_PATHS | ORIGINAL_HIGHWING_SOURCE_PATHS
+                          | FULL_SOURCE_PROVENANCE_PATHS | PRESERVED_RUNTIME_EXTRA_PATHS
+                          | HISTORICAL_SOURCE_PATHS)
+
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
 INDEPENDENT_REPLAY_HASHES = {
@@ -724,7 +1269,14 @@ def git(repo, *args):
     return subprocess.check_output(["git", *args], cwd=repo).decode("utf-8").strip()
 
 
+# Cargo auto-discovers build scripts, binary/example/benchmark targets. These
+# are exactly the preserved crate paths, never an on-disk glob admission.
+PRESERVED_CRATE_SOURCE_PATHS = frozenset(path for path in REPLAY_CONTRACT_PATHS
+                                       if path.startswith("crates/"))
 MODIFIED_SOURCE_BOUNDARIES = (
+    ("crates/", PRESERVED_CRATE_SOURCE_PATHS),
+    ("vendor/bevy_core_pipeline/", CORE_PIPELINE_SOURCE_PATHS),
+    ("tools/original-highwing/", ORIGINAL_HIGHWING_SOURCE_PATHS),
     ("vendor/bevy_pbr/", VENDORED_PACKAGE_PATHS),
     ("vendor/zune-jpeg/", VENDORED_PACKAGE_PATHS),
     ("tools/validate-jpeg-replacement/", REPLACEMENT_WITNESS_PATHS),
@@ -752,6 +1304,9 @@ def validate_modified_source_checkout(repo):
     for prefix, declared in MODIFIED_SOURCE_BOUNDARIES:
         root = repo
         for part in Path(prefix).parts:
+            matches = [entry for entry in root.iterdir() if entry.name.casefold() == part.casefold()]
+            require(len(matches) == 1 and matches[0].name == part,
+                    "modified source root case alias: " + prefix)
             root /= part
             details = root.lstat()
             require(root.is_dir() and not root.is_symlink()
@@ -774,8 +1329,14 @@ def validate_modified_source_checkout(repo):
 
 
 def validate_replay_contract(contract):
-    require(isinstance(contract, dict) and contract.get("schema_version") == 1
+    require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
+            "reviewed_source", "reviewed_runtime_tree", "scope", "release_authorized", "source_sha256"}
+            and type(contract.get("schema_version")) is int and contract.get("schema_version") == 1
             and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
+    require(contract.get("reviewed_source") == REVIEWED_RUNTIME_SOURCE
+            and contract.get("reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
+            and contract.get("scope") == SOURCE_ADMISSION_SCOPE
+            and contract.get("release_authorized") is False, "source admission identity or scope changed")
     require(isinstance(contract.get("reviewed_source"), str)
             and re.fullmatch(r"[0-9a-f]{40}", contract["reviewed_source"]), "missing reviewed replay source")
     pins = contract.get("source_sha256")
@@ -789,6 +1350,15 @@ def validate_replay_contract(contract):
         require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
     require(pins["crates/flightsim-fdm/src/lib.rs"] == REVIEWED_ADDITIVE_FDM_LIB_SHA256,
             "frozen reviewed FDM module input changed")
+    for path, expected in HISTORICAL_CONTRACT_HASHES.items():
+        require(pins[path] == expected, "historical contract changed: " + path)
+    require(pins[PRESERVED_RUNTIME_PATH] == PRESERVED_RUNTIME_SHA256,
+            "preserved runtime contract changed")
+    frozen_file = Path(__file__).with_name("full-two-aircraft-runtime-pins.json")
+    require(digest(frozen_file) == PRESERVED_RUNTIME_SHA256, "preserved runtime contract changed")
+    preserved = json.loads(frozen_file.read_text(encoding="utf-8"))["source_sha256"]
+    require(len(preserved) == 497 and all(pins.get(path) == value for path, value in preserved.items()),
+            "preserved runtime source pins changed")
     return contract
 
 
@@ -796,15 +1366,64 @@ def load_replay_contract(repo):
     return validate_replay_contract(json.loads((repo / REPLAY_CONTRACT_PATH).read_text(encoding="utf-8")))
 
 
+MAX_CANONICAL_BLOB_BYTES = 32 * 1024 * 1024
+MAX_CANONICAL_BATCH_BYTES = 128 * 1024 * 1024
+MAX_CANONICAL_BATCH_OBJECTS = 4096
+
+
+def canonical_blobs(repo, sizes):
+    """Read the requested immutable objects once, without a cross-call cache.
+
+    Sizes come from this invocation's canonical ls-tree, not checkout lengths.
+    A fixed expected frame length bounds the accepted response. Every object ID,
+    blob type, decimal size, binary byte, separator and end-of-response is checked.
+    """
+    require(isinstance(sizes, dict) and 0 < len(sizes) <= MAX_CANONICAL_BATCH_OBJECTS,
+            "invalid canonical batch object count")
+    require(all(isinstance(oid, str) and re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid)
+                and type(size) is int and 0 <= size <= MAX_CANONICAL_BLOB_BYTES
+                for oid, size in sizes.items()), "invalid canonical batch object identity or size")
+    frames = [(oid, size, f"{oid} blob {size}\n".encode("ascii")) for oid, size in sizes.items()]
+    expected_bytes = sum(len(header) + size + 1 for _, size, header in frames)
+    require(expected_bytes <= MAX_CANONICAL_BATCH_BYTES, "canonical batch exceeds byte bound")
+    # Spool subprocess output before loading it, so malformed/trailing output
+    # cannot amplify the in-memory read beyond the declared 128 MiB boundary.
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        subprocess.run(["git", "cat-file", "--batch"], cwd=repo,
+                       input=("\n".join(sizes) + "\n").encode("ascii"),
+                       stdout=output, stderr=errors, timeout=60, check=True)
+        require(output.tell() == expected_bytes, "canonical batch truncated or has extra bytes")
+        output.seek(0)
+        raw = output.read(expected_bytes + 1)
+    require(len(raw) == expected_bytes, "canonical batch truncated or has extra bytes")
+    blobs, offset = {}, 0
+    for oid, size, header in frames:
+        require(raw[offset:offset + len(header)] == header,
+                "canonical batch object ID, type, size or framing changed")
+        offset += len(header)
+        blobs[oid] = raw[offset:offset + size]
+        offset += size
+        require(raw[offset:offset + 1] == b"\n", "canonical batch separator changed")
+        offset += 1
+    require(offset == len(raw), "canonical batch trailing bytes")
+    return blobs
+
+
 def source_inputs(repo, expected):
     require(re.fullmatch(r"[0-9a-f]{40}", expected), "expected source must be a full lowercase SHA")
     require(git(repo, "rev-parse", "HEAD") == expected, "checkout is not the expected source")
     require(not git(repo, "status", "--porcelain", "--untracked-files=all"), "source checkout must be clean")
-    tree = subprocess.check_output(["git", "ls-tree", "-r", "-z", "HEAD"], cwd=repo).decode("utf-8")
+    tree = subprocess.check_output(["git", "ls-tree", "-r", "-l", "-z", "HEAD"], cwd=repo).decode("utf-8")
     records = []
+    object_sizes = {}
     for entry in sorted(p for p in tree.split("\0") if p):
         metadata, relative = entry.split("\t", 1)
-        mode, kind, object_id = metadata.split()
+        mode, kind, object_id, size_text = metadata.split()
+        require(size_text.isascii() and size_text.isdecimal(), "invalid canonical blob size")
+        size = int(size_text)
+        require(object_id not in object_sizes or object_sizes[object_id] == size,
+                "inconsistent canonical object size")
+        object_sizes[object_id] = size
         require(kind == "blob" and mode in ("100644", "100755"), f"non-regular canonical input: {relative}")
         path = repo / relative
         require(path.is_file() and not path.is_symlink(), f"non-regular source input: {relative}")
@@ -821,11 +1440,17 @@ def source_inputs(repo, expected):
     require(hashlib.sha256(contract_blob).hexdigest() == contract_record["checkout_sha256"],
             "reviewed replay contract checkout differs from canonical Git blob")
     contract = load_replay_contract(repo)
+    pins = {**contract["source_sha256"], **INDEPENDENT_REPLAY_HASHES}
+    for relative in pins:
+        require(relative in by_path, "missing reviewed replay source: " + relative)
+    objects = {by_path[path]["canonical_git_blob"]: object_sizes[by_path[path]["canonical_git_blob"]]
+               for path in pins}
+    blobs = canonical_blobs(repo, objects)
     reviewed_sources = {}
-    for relative, expected_hash in {**contract["source_sha256"], **INDEPENDENT_REPLAY_HASHES}.items():
+    for relative, expected_hash in pins.items():
         require(relative in by_path, "missing reviewed replay source: " + relative)
         record = by_path[relative]
-        blob = subprocess.check_output(["git", "cat-file", "blob", record["canonical_git_blob"]], cwd=repo)
+        blob = blobs[record["canonical_git_blob"]]
         canonical_hash = hashlib.sha256(blob).hexdigest()
         diagnostic = (f"{relative}; expected_sha256={expected_hash}; canonical_sha256={canonical_hash}; "
                       f"checkout_sha256={record['checkout_sha256']}")

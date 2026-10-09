@@ -504,14 +504,46 @@ class RepositoryAssetPolicyTests(unittest.TestCase):
         self.assertEqual(manifest["commercial_external_assets"], commercial)
         self.assertEqual([p for p in gate.staging.SOURCE_FILES if p.startswith("assets/")], commercial)
         self.assertEqual(set(manifest["release_external_assets"]), set(commercial) | {
-            "assets/aircraft/light_single.json", "assets/aircraft/swift_sport.blend"})
+            "assets/aircraft/light_single.glb", "assets/aircraft/light_single.json",
+            "assets/aircraft/swift_sport.blend"})
         assets = {a["path"]: a for a in manifest["assets"]}
         for relative in manifest["release_external_assets"]:
             self.assertIn(assets[relative]["review_state"], gate.REVIEWED_STATES)
             self.assertEqual(gate.readiness.digest(root / relative), assets[relative]["sha256"])
-        legacy = "assets/aircraft/light_single.glb"
-        self.assertIn(legacy, gate.SOURCE_FILES)
-        self.assertEqual(assets[legacy]["review_state"], "unresolved")
+            self.assertEqual((root / relative).stat().st_size, assets[relative]["bytes"])
+        current = assets["assets/aircraft/light_single.glb"]
+        self.assertIn(current["path"], gate.SOURCE_FILES)
+        self.assertEqual(current["review_state"], "original_source_recorded")
+        self.assertEqual(current["license"], "MIT OR Apache-2.0")
+        self.assertEqual(current["sha256"], "b41f29ade89701d31759e6bc8164d5cdb3aa8734f512628af63823ad7eaaa3cc")
+        self.assertEqual(current["bytes"], 140840)
+
+    def test_current_tony_filmic_records_preserve_historical_agx_and_meshy_denial(self):
+        root = SCRIPT.parents[1]
+        manifest = json.loads((root / gate.ASSET_MANIFEST).read_text())
+        historical = json.loads((root / "docs/release/history/mesh-and-lut-boundary-d918943.json").read_text())
+        self.assertEqual(manifest["historical_excluded_assets"], [historical["light_single_asset"]])
+        self.assertEqual(manifest["historical_excluded_dependency_assets"], [historical["agx_dependency_asset"]])
+        for record, digest in (
+            (historical["light_single_asset"], "8fc91894ea3f54d4226c3a30545de1947fa8a9fb0e013bb4bfec0b5e298effd9"),
+            (historical["agx_dependency_asset"], "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf"),
+        ):
+            self.assertEqual(record["review_state"], "unresolved")
+            self.assertEqual(record["sha256"], digest)
+        assets = {a["id"]: a for a in manifest["dependency_assets"]}
+        self.assertEqual(set(assets), {"bevy-fira-mono", "bevy-tony-mc-mapface", "bevy-blender-filmic-lut"})
+        self.assertEqual(len(manifest["dependency_assets"]), 3)
+        for identity, digest in (
+            ("bevy-tony-mc-mapface", "053e5adc519b1d733c819a625199e61cf138549db1358e533811d45df3227f84"),
+            ("bevy-blender-filmic-lut", "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7"),
+        ):
+            record = assets[identity]
+            self.assertEqual(record["review_state"], "licensed_with_notices")
+            self.assertEqual(record["sha256"], digest)
+            source = root / "vendor/bevy_core_pipeline" / record["source_path"]
+            self.assertEqual(gate.readiness.digest(source), digest)
+            self.assertEqual(source.stat().st_size, record["bytes"])
+        self.assertFalse((root / "vendor/bevy_core_pipeline" / historical["agx_dependency_asset"]["source_path"]).exists())
 
 
 if __name__ == "__main__":

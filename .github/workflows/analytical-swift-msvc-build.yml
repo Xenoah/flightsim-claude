@@ -49,6 +49,21 @@ jobs:
         run: |
           python -m unittest discover -s scripts/tests -p test_analytical_swift_capture.py -v
           if ($LASTEXITCODE -ne 0) { throw 'capture/export boundary tests failed' }
+      - name: Fetch exact private upstream LUT reference
+        shell: pwsh
+        run: |
+          $referenceDir = Join-Path $env:RUNNER_TEMP 'analytical-lut-reference'
+          New-Item -ItemType Directory -Path $referenceDir -ErrorAction Stop | Out-Null
+          $reference = Join-Path $referenceDir 'bevy_core_pipeline-0.18.1.crate'
+          curl.exe --fail --location --silent --show-error --proto '=https' `
+            --max-time 120 --retry 2 --max-filesize 4194304 `
+            --output $reference `
+            https://static.crates.io/crates/bevy_core_pipeline/bevy_core_pipeline-0.18.1.crate
+          if ($LASTEXITCODE -ne 0) { throw 'private upstream reference download failed' }
+          if ((Get-FileHash -Algorithm SHA256 $reference).Hash.ToLowerInvariant() -ne `
+              '4d0810e85c2436e50c67448d48a83bf0bb1b5849899619ae2c7ea817221e9172') {
+            throw 'private upstream reference checksum mismatch'
+          }
       # No cache: executables, raw metadata, notices, targets and replay stay local.
       - name: Capture actual build-only evidence and run same-machine audit
         shell: pwsh
@@ -58,7 +73,8 @@ jobs:
           python scripts/capture-analytical-swift-msvc.py `
             --source-sha $env:EXPECTED_SOURCE_SHA `
             --private (Join-Path $env:RUNNER_TEMP 'analytical-swift-private') `
-            --evidence (Join-Path $env:RUNNER_TEMP 'analytical-swift-text')
+            --evidence (Join-Path $env:RUNNER_TEMP 'analytical-swift-text') `
+            --upstream-archive (Join-Path $env:RUNNER_TEMP 'analytical-lut-reference/bevy_core_pipeline-0.18.1.crate')
           if ($LASTEXITCODE -ne 0) { throw 'analytical build evidence failed; all qualification gates remain open' }
       - name: Independently validate the exact text export after success or failure
         if: always()

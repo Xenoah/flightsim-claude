@@ -208,10 +208,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.0
         with:
           components: clippy
+      - name: Fetch checksum-bound private upstream LUT reference
+        run: |
+          # The excluded AgX reference is audit input only, outside evidence and
+          # upload roots. The source-recipe checker independently verifies it.
+          mkdir -p "$RUNNER_TEMP/tonemapping-private"
+          curl --fail --location --silent --show-error --proto '=https' \
+            --max-time 120 --retry 2 --max-filesize 4194304 \
+            --output "$RUNNER_TEMP/tonemapping-private/bevy_core_pipeline-0.18.1.crate" \
+            https://static.crates.io/crates/bevy_core_pipeline/bevy_core_pipeline-0.18.1.crate
+          echo "4d0810e85c2436e50c67448d48a83bf0bb1b5849899619ae2c7ea817221e9172  $RUNNER_TEMP/tonemapping-private/bevy_core_pipeline-0.18.1.crate" | sha256sum --check --status
       - name: Check analytical tests, guards, and exact app artifacts
         run: |
           python3 scripts/ci-tonemapping.py \
-            "$RUNNER_TEMP/tonemapping-evidence" "$RUNNER_TEMP/tonemapping-build"
+            "$RUNNER_TEMP/tonemapping-evidence" "$RUNNER_TEMP/tonemapping-build" \
+            --upstream-archive "$RUNNER_TEMP/tonemapping-private/bevy_core_pipeline-0.18.1.crate"
       - name: Retain source/build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

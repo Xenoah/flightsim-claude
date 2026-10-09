@@ -140,7 +140,7 @@ MODIFIED_SOURCE_MUTATIONS = (
     ('vendor/bevy_pbr/src/lib.rs', b'load_shader_library!(app, "render/parallax_mapping.wgsl");', b'// unregistered parallax module'),
     ('vendor/bevy_pbr/src/render/pbr_fragment.wgsl', b'uv = parallaxed_uv(', b'uv = disabled_parallaxed_uv('),
     ('vendor/bevy_pbr/src/lib.rs', b'include_bytes!("bluenoise/stbn.ktx2")', b'include_bytes!("bluenoise/unreviewed.ktx2")'),
-    ('.gitattributes', b'/assets/aircraft/light_single.glb export-ignore', b'# unresolved model no longer excluded'),
+    ('.gitattributes', b'/assets/aircraft/light_single.glb binary', b'/assets/aircraft/light_single.glb export-ignore'),
     ('scripts/check-source-archive.py', b'if name in seen:', b'if False:'),
     ('scripts/check-source-archive.py', b'if sha(payload) == DENIED_SHA256:', b'if False:'),
     ('scripts/check-source-archive.py', b'if observed.keys() != expected.keys():', b'if False:'),
@@ -284,6 +284,8 @@ class CandidateAcceptanceTests(unittest.TestCase):
         notice.parent.mkdir(parents=True)
         notice.write_bytes(b"Verbatim upstream fixture\r\nKeep these CRLF bytes.\r\n")
         self.commit_source_fixture(repo)
+        # Every mutation test starts from an admitted clean positive fixture.
+        candidate.source_inputs(repo, candidate.git(repo, "rev-parse", "HEAD"))
         return repo, notice
 
     def commit_source_fixture(self, repo):
@@ -1893,7 +1895,9 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(candidate.VENDORED_PACKAGE_PATHS), 207)
         self.assertEqual(len(candidate.REPLACEMENT_WITNESS_PATHS), 20)
         self.assertEqual(len(candidate.MODIFIED_SOURCE_POLICY_PATHS), 9)
-        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 404)
+        self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
+        self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
+        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 918)
         for prefix, paths in candidate.MODIFIED_SOURCE_BOUNDARIES:
             actual = {path.relative_to(ROOT).as_posix() for path in (ROOT / prefix).rglob('*') if path.is_file()}
             self.assertEqual(actual, {p for p in paths if p.startswith(prefix)}, prefix)
@@ -1901,9 +1905,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(cargo['patch']['crates-io'], {
             'zune-jpeg': {'path': 'vendor/zune-jpeg'},
             'bevy_pbr': {'path': 'vendor/bevy_pbr'},
+            'bevy_core_pipeline': {'path': 'vendor/bevy_core_pipeline'},
         })
         self.assertEqual(len(cargo['workspace']['members']), 13)
-        self.assertEqual(cargo['workspace']['exclude'], ['vendor/osmpbf', 'vendor/zune-jpeg', 'vendor/bevy_pbr'])
+        self.assertEqual(cargo['workspace']['exclude'], ['vendor/osmpbf', 'vendor/zune-jpeg', 'vendor/bevy_pbr', 'vendor/bevy_core_pipeline'])
         lock = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']
         for name, version, directory in (
             ('zune-jpeg', '0.5.15', 'vendor/zune-jpeg'),
@@ -2003,7 +2008,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
         original_lstat = Path.lstat
         for prefix, _declared in candidate.MODIFIED_SOURCE_BOUNDARIES:
             for reparse in (repo / Path(prefix).parts[0], repo / prefix,
-                            repo / prefix / 'src', repo / prefix / 'Cargo.toml'):
+                            repo / sorted(path for path in _declared if path.startswith(prefix))[0]):
                 self.assertTrue(reparse.exists())
                 def reparse_details(path, *args, **kwargs):
                     details = original_lstat(path, *args, **kwargs)
@@ -2174,16 +2179,18 @@ class CandidateAcceptanceTests(unittest.TestCase):
             commit, payload = policy.committed_archive(ROOT, 'HEAD', fmt)
             self.assertEqual(commit, candidate.git(ROOT, 'rev-parse', 'HEAD'))
             members = policy.normalized_members(payload)
-            self.assertNotIn(policy.DENIED_PATH, members)
+            self.assertIn(policy.DENIED_PATH, set(members))
+            self.assertEqual(candidate.hashlib.sha256(members[policy.DENIED_PATH]).hexdigest(), policy.ORIGINAL_HIGHWING_SHA256)
+            policy.verify(ROOT, 'HEAD', payload, fmt, policy=policy.ORIGINAL_HIGHWING_POLICY)
             self.assertTrue(protected <= set(members), sorted(protected - set(members)))
             for relative in protected:
-                self.assertEqual(members[relative], (ROOT / relative).read_bytes(), relative)
+                self.assertEqual(candidate.hashlib.sha256(members[relative]).hexdigest(), candidate.digest(ROOT / relative), relative)
 
     def test_reviewed_source_archive_policy_suite_runs_in_source_ci(self):
         result = subprocess.run([candidate.sys.executable, str(ROOT / 'scripts/test_source_archive.py')],
                                 cwd=ROOT, text=True, capture_output=True, timeout=60, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Ran 15 tests', result.stderr)
+        self.assertIn('Ran 16 tests', result.stderr)
         self.assertIn('\nOK\n', result.stderr)
 
     def test_contract_checkout_bytes_are_bound_even_when_git_reports_clean(self):

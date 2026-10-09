@@ -29,7 +29,7 @@ def fixture(root):
     (repo / 'LICENSE-MIT').write_text('fixture license')
     (repo / 'LICENSE-APACHE').write_text('fixture license')
     source = {'source_sha': 'a' * 40, 'source_tree': 'b' * 40, 'analytical_contract_sha256': 'c' * 64,
-              'replay_contract_sha256': 'd' * 64}
+              'replay_contract_sha256': 'd' * 64, 'source_recipe': check.tone.UPSTREAM_THREE_LUT_SOURCE}
     versions = {name: '0.18.1' for name in check.tone.KEY_CRATES}
     versions.update({'ktx2': '0.4.0', 'ruzstd': '0.8.2', 'flightsim-app': '0.6.0-alpha.21',
                      'flightsim-render': '0.6.0-alpha.21', 'bevy_text': '0.18.1',
@@ -67,7 +67,7 @@ def fixture(root):
     write(repo / 'docs/release/asset-rights-manifest.json', {'schema_version': 1, 'assets': [], 'dependency_assets': assets})
     write(repo / 'docs/release/dependency-notice-supplements.json', {'entries': []})
     receipt = {key: check.recipe()[key] for key in ('schema_version', 'recipe', 'target', 'toolchain', 'features', 'default_features', 'region_downloads', 'release_authorized')}
-    receipt.update(source_sha=source['source_sha'], source_tree=source['source_tree'], modes={})
+    receipt.update(source_recipe=check.tone.UPSTREAM_THREE_LUT_SOURCE, source_sha=source['source_sha'], source_tree=source['source_tree'], modes={})
     for mode in ('analytic', 'ordinary'):
         directory = capture / mode; directory.mkdir()
         target = root / ('target-' + mode); profile = target / check.TARGET / 'release'; profile.mkdir(parents=True)
@@ -153,6 +153,42 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
              mock.patch.object(check, 'source_evidence', return_value=source), mock.patch.object(check.tone, 'LUTS', luts), \
              mock.patch.object(check, 'recapture', side_effect=lambda repo, target, mode: authoritative[mode]):
             return check.audit(repo, source['source_sha'], capture)
+
+    def test_inventory_asset_applicability_is_versioned_by_source_recipe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo, captured, receipt, source, luts = fixture(Path(temporary))
+            directory = captured / 'ordinary'
+            graph = check.tone.parse_graph((directory / 'graph.txt').read_text())
+            historical_inventory = directory / 'notices/dependency-inventory.json'
+            check.validate_inventory(directory / 'metadata.json', historical_inventory, graph, repo, 'ordinary',
+                                     source_recipe=check.tone.UPSTREAM_THREE_LUT_SOURCE)
+            with self.assertRaisesRegex(ValueError, 'embedded asset applicability'):
+                check.validate_inventory(directory / 'metadata.json', historical_inventory, graph, repo, 'ordinary',
+                                         source_recipe=check.SOURCE_RECIPE)
+            manifest_path = repo / 'docs/release/asset-rights-manifest.json'
+            manifest = json.loads(manifest_path.read_text())
+            manifest['dependency_assets'] = [a for a in manifest['dependency_assets'] if a['id'] != 'bevy-agx-lut']
+            write(manifest_path, manifest)
+            current_notices = Path(temporary) / 'current-notices'
+            check.collector.collect(directory / 'metadata.json', repo, current_notices, check.TARGET, 'flightsim-app')
+            current_inventory = current_notices / 'dependency-inventory.json'
+            check.validate_inventory(directory / 'metadata.json', current_inventory, graph, repo, 'ordinary',
+                                     source_recipe=check.SOURCE_RECIPE)
+            with self.assertRaisesRegex(ValueError, 'embedded asset applicability'):
+                check.validate_inventory(directory / 'metadata.json', current_inventory, graph, repo, 'ordinary',
+                                         source_recipe=check.tone.UPSTREAM_THREE_LUT_SOURCE)
+
+    def test_historical_fixture_requires_its_explicit_source_recipe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = self.audit_fixture(Path(temporary))
+            self.assertEqual(result['source_recipe'], check.tone.UPSTREAM_THREE_LUT_SOURCE)
+        for changed in (None, check.tone.TWO_LUT_SOURCE, 'unknown-source'):
+            def mutate(repo, capture, receipt):
+                if changed is None: receipt.pop('source_recipe')
+                else: receipt['source_recipe'] = changed
+            with self.subTest(source_recipe=changed), tempfile.TemporaryDirectory() as temporary:
+                with self.assertRaisesRegex(ValueError, 'source recipe'):
+                    self.audit_fixture(Path(temporary), mutate)
 
     def test_late_notice_mutation_cannot_retain_inventory_integrity(self):
         with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(ValueError, 'integrity blocker'):
@@ -358,8 +394,8 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
                  b"require(sys.platform == 'win32', 'native Windows is required')",
                  b"require(True, 'native Windows is required')"),
                 ('scripts/tests/test_analytical_runtime_facts.py',
-                 b'def test_only_exact_output_argument_and_fingerprint_match(self):',
-                 b'def disabled_exact_output_argument_and_fingerprint_match(self):'),
+                 b'def test_new_association_retains_unique_fingerprint_requirement(self):',
+                 b'def disabled_new_association_retains_unique_fingerprint_requirement(self):'),
             )
             for relative, old, new in mutations:
                 self.assertIn(relative, check.SOURCE_PATHS)
@@ -383,8 +419,9 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
             for mode, kind, recipe in [('ordinary', 'app', check.IDENTITY), ('analytic', 'sun-clock', check.IDENTITY), ('analytic', 'app', 'unknown')]:
                 with self.assertRaises(ValueError): check.tone.validate_graph(graph, mode, kind, recipe=recipe)
         self.assertEqual(check.candidate.FEATURES, ['commercial-staging'])
-        self.assertEqual(len(check.candidate.load_replay_contract(Path(__file__).parents[2])['source_sha256']), 404)
-        self.assertEqual(len(check.SOURCE_PATHS), 24)
+        self.assertEqual(len(check.candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
+        self.assertEqual(len(check.SOURCE_PATHS), 35)
+        self.assertEqual(check.recipe()['source_recipe'], check.tone.TWO_LUT_SOURCE)
         self.assertEqual(len(check.candidate.INDEPENDENT_REPLAY_HASHES), 102)
 
 

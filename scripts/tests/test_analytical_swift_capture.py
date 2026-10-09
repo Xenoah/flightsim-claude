@@ -188,9 +188,12 @@ class BoundaryTests(unittest.TestCase):
             self.assertEqual(value['commands'], [])
             self.assertNotIn(str(root).encode(), result.stdout + result.stderr)
 
-    def test_contract_has_only_additive_files_and_unchanged_inherited_contracts(self):
+    def test_current_contract_binds_versioned_source_and_historical_contracts(self):
         contract = json.loads((REPO / capture.CONTRACT).read_text())
         self.assertEqual(set(contract['source_sha256']), capture.BOUND_FILES)
+        self.assertEqual(contract['source_admission'], capture.SOURCE_ADMISSION)
+        self.assertEqual(contract['source_recipe'], capture.check.SOURCE_RECIPE)
+        self.assertEqual(contract['reviewed_source'], capture.check.candidate.REVIEWED_RUNTIME_SOURCE)
         for path, expected in {**contract['source_sha256'], **capture.INHERITED_CONTRACTS}.items():
             with self.subTest(path=path): self.assertEqual(capture.check.digest(REPO / path), expected)
         old = json.loads((REPO / capture.check.CONTRACT).read_text())
@@ -199,6 +202,30 @@ class BoundaryTests(unittest.TestCase):
 
 
 class ExportTests(unittest.TestCase):
+    def test_current_two_lut_and_historical_three_lut_exports_cannot_be_relabelled(self):
+        historical = summary_fixture(passed=True)
+        capture.validate_summary(historical)
+        explicit_historical = json.loads(json.dumps(historical))
+        explicit_historical['source_recipe'] = capture.check.tone.UPSTREAM_THREE_LUT_SOURCE
+        capture.validate_summary(explicit_historical)
+        current = json.loads(json.dumps(historical))
+        current['source_recipe'] = capture.check.SOURCE_RECIPE
+        current['bindings']['upstream_archive'] = stream_record(b'private original reference')
+        current['builds']['ordinary']['lut_payloads_found'] = 2
+        capture.validate_summary(current)
+        for positive in (historical, current):
+            wrong = json.loads(json.dumps(positive))
+            wrong['source_recipe'] = (capture.check.SOURCE_RECIPE if positive is historical
+                                      else capture.check.tone.UPSTREAM_THREE_LUT_SOURCE)
+            with self.assertRaises(ValueError):
+                capture.validate_summary(wrong)
+        for name in ('source_recipe',):
+            wrong = json.loads(json.dumps(current)); del wrong[name]
+            with self.assertRaises(ValueError): capture.validate_summary(wrong)
+        wrong = json.loads(json.dumps(current)); del wrong['bindings']['upstream_archive']
+        with self.assertRaisesRegex(ValueError, 'incomplete passing export'):
+            capture.validate_summary(wrong)
+
     def test_json_writer_emits_ascii_lf_even_with_windows_text_translation(self):
         # Reproduce run 37299384923 on every host using real text I/O newline
         # conversion, without pretending that a native Windows build succeeded.
