@@ -7,7 +7,7 @@
   "source_admission": "analytical-swift-two-lut-source-admission-v1",
   "source_recipe": "bevy-0.18.1-tony-filmic-source-v1",
   "source_sha256": {
-    ".github/workflows/ci.yml": "7c7a1013979ad6f33fa1787829e2a67f4c6bd210e7cadebd8d64e4cadf20b42c",
+    ".github/workflows/ci.yml": "037ffd6b565a2631ef915f8e36d51385ddf222a3e3f1b921b1f422034e8e794b",
     "Cargo.lock": "198064f4ec49650db29b76de5834880de1e3fd9bc8e9860890eb3987703599b2",
     "Cargo.toml": "d02e563c40d92d180cfa8ca321cf69b029285cd6c0da553e5209cf66ebb03300",
     "crates/flightsim-app/Cargo.toml": "de135b9cf1e61b8ff6bd8c7c87b008ffad197f9d4be01fdc446444b6b663f630",

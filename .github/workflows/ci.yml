@@ -64,7 +64,9 @@ jobs:
   world_source_tools:
     name: world source-tool boundaries
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Allow the full canonical-source mutation sweep and all schema/reference
+    # checks to finish despite hosted-runner variability.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Test offline world-data output safety
