@@ -3,9 +3,9 @@
   "kind": "cargo-dependency-notices",
   "target": "x86_64-pc-windows-msvc",
   "root_package": "flightsim-app",
-  "cargo_lock_sha256": "9ef5a7ccfa27755027201438dd15b973ff2a834565e62c25b41086f85b612c06",
-  "metadata_sha256": "b8e41f8d54b0c7df37a1489a619e3c0b46c376d8c65a72162f0fdecaf18c356a",
-  "asset_manifest_sha256": "bd6c47141551072924154207fc125053f5c4fc63779225344a13951a9f55dcf8",
+  "cargo_lock_sha256": "198064f4ec49650db29b76de5834880de1e3fd9bc8e9860890eb3987703599b2",
+  "metadata_sha256": "c716b6a3b3f3a6ac1b9316c12948726554005403a4510c06b5f9247b75db0023",
+  "asset_manifest_sha256": "ac06195d27c82f48f1d7219b54dd5b28e11aecb89a0e976f3ddc7f6b9bd4bd3c",
   "supplement_manifest_sha256": "2f9ea61d636ba36059b24d5a3923c4ac03048410024a06e5239100b507255332",
   "scope": "Conservative normal/build dependency closure of target-filtered Cargo metadata; excludes dev-only edges, not proof of final linkage or exhaustive nested-source licensing",
   "review_status": "not_reviewed",
@@ -1048,10 +1048,10 @@
       "id": "bevy_core_pipeline@0.18.1",
       "name": "bevy_core_pipeline",
       "version": "0.18.1",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "source_checksum": "4d0810e85c2436e50c67448d48a83bf0bb1b5849899619ae2c7ea817221e9172",
-      "source_revision": "f667c282dad2c1419afb5836ded22a3ec263970e",
-      "source_path_in_repository": "crates/bevy_core_pipeline",
+      "source": "workspace",
+      "source_checksum": null,
+      "source_revision": null,
+      "source_path_in_repository": null,
       "repository": "https://github.com/bevyengine/bevy",
       "license_expression": "MIT OR Apache-2.0",
       "features": [
@@ -1059,16 +1059,52 @@
       ],
       "notices": [
         {
+          "path": "licenses/bevy_core_pipeline-0.18.1/FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "upstream_path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "sha256": "b96e408e7c16c86dc291da19b169c1f4b1b8e3bf52298eecebb3eaee5f25b10c",
+          "bytes": 1016
+        },
+        {
           "path": "licenses/bevy_core_pipeline-0.18.1/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
           "bytes": 10173
         },
         {
+          "path": "licenses/bevy_core_pipeline-0.18.1/LICENSE-FLIGHTSIM-APACHE",
+          "upstream_path": "LICENSE-FLIGHTSIM-APACHE",
+          "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+          "bytes": 11359
+        },
+        {
+          "path": "licenses/bevy_core_pipeline-0.18.1/LICENSE-FLIGHTSIM-MIT",
+          "upstream_path": "LICENSE-FLIGHTSIM-MIT",
+          "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+          "bytes": 1086
+        },
+        {
           "path": "licenses/bevy_core_pipeline-0.18.1/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
           "bytes": 1036
+        },
+        {
+          "path": "licenses/bevy_core_pipeline-0.18.1/third-party-notices/Blender-Filmic-NOTICE.txt",
+          "upstream_path": "third-party-notices/Blender-Filmic-NOTICE.txt",
+          "sha256": "f3e625d50741f33f0ef700f5732fe8f06fccf466110f64ca3d38f0bb2844dcce",
+          "bytes": 2054
+        },
+        {
+          "path": "licenses/bevy_core_pipeline-0.18.1/third-party-notices/Blender-Filmic-OpenColorIO-LICENSE",
+          "upstream_path": "third-party-notices/Blender-Filmic-OpenColorIO-LICENSE",
+          "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc",
+          "bytes": 1520
+        },
+        {
+          "path": "licenses/bevy_core_pipeline-0.18.1/third-party-notices/TonyMcMapface-LICENSE-MIT",
+          "upstream_path": "third-party-notices/TonyMcMapface-LICENSE-MIT",
+          "sha256": "b00743beb398b2dac3fbc451e780b9f4cb0e9bdc04a27ff448e919b3bf1dc32a",
+          "bytes": 1061
         }
       ],
       "unresolved": []
@@ -1712,14 +1748,20 @@
       "id": "bevy_pbr@0.18.1",
       "name": "bevy_pbr",
       "version": "0.18.1",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "source_checksum": "a5ab6944ffc6fd71604c0fbca68cc3e2a3654edfcdbfd232f9d8b88e3d20fdc0",
-      "source_revision": "f667c282dad2c1419afb5836ded22a3ec263970e",
-      "source_path_in_repository": "crates/bevy_pbr",
+      "source": "workspace",
+      "source_checksum": null,
+      "source_revision": null,
+      "source_path_in_repository": null,
       "repository": "https://github.com/bevyengine/bevy",
       "license_expression": "MIT OR Apache-2.0",
       "features": [],
       "notices": [
+        {
+          "path": "licenses/bevy_pbr-0.18.1/FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "upstream_path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287",
+          "bytes": 714
+        },
         {
           "path": "licenses/bevy_pbr-0.18.1/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
@@ -1727,10 +1769,46 @@
           "bytes": 10173
         },
         {
+          "path": "licenses/bevy_pbr-0.18.1/LICENSE-FLIGHTSIM-APACHE",
+          "upstream_path": "LICENSE-FLIGHTSIM-APACHE",
+          "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+          "bytes": 11359
+        },
+        {
+          "path": "licenses/bevy_pbr-0.18.1/LICENSE-FLIGHTSIM-MIT",
+          "upstream_path": "LICENSE-FLIGHTSIM-MIT",
+          "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+          "bytes": 1086
+        },
+        {
           "path": "licenses/bevy_pbr-0.18.1/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
           "bytes": 1036
+        },
+        {
+          "path": "licenses/bevy_pbr-0.18.1/third-party-notices/EA-fastnoise-LICENSE.txt",
+          "upstream_path": "third-party-notices/EA-fastnoise-LICENSE.txt",
+          "sha256": "1b8fc6a4ca2b4d0c2e4621ccc9d08ff701d4526cd02b29239834a606266183e9",
+          "bytes": 1504
+        },
+        {
+          "path": "licenses/bevy_pbr-0.18.1/third-party-notices/EA-fastnoise-NOTICE.txt",
+          "upstream_path": "third-party-notices/EA-fastnoise-NOTICE.txt",
+          "sha256": "250745b263f7248381c7884eb67a667c54d8a0ede6696bb7595788506f75c32d",
+          "bytes": 1151
+        },
+        {
+          "path": "licenses/bevy_pbr-0.18.1/third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt",
+          "upstream_path": "third-party-notices/src__atmosphere__bruneton_functions.wgsl.notice-0.txt",
+          "sha256": "4081495a79a7ab5a3aeeba5e37843b81f9f7504638450171608b6f1aa4b11ca1",
+          "bytes": 3174
+        },
+        {
+          "path": "licenses/bevy_pbr-0.18.1/third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt",
+          "upstream_path": "third-party-notices/src__ssr__raymarch.wgsl.notice-0.txt",
+          "sha256": "35441edfb6cdb0271e943462598271bb51116856a89e5bd0adfafd7a9940523c",
+          "bytes": 568
         }
       ],
       "unresolved": []
@@ -3194,18 +3272,6 @@
       ],
       "notices": [
         {
-          "path": "licenses/cosmic-text-0.16.0/LICENSE-APACHE",
-          "upstream_path": "LICENSE-APACHE",
-          "sha256": "000b4962e6b27176a0ff89cce4be555b16472cafb5671eb2804a8fdac6854793",
-          "bytes": 11357
-        },
-        {
-          "path": "licenses/cosmic-text-0.16.0/LICENSE-MIT",
-          "upstream_path": "LICENSE-MIT",
-          "sha256": "95557bafe728379e206f3b6d4aceeaa054d271c71d722411a6222e2dec01138c",
-          "bytes": 1075
-        },
-        {
           "path": "licenses/cosmic-text-0.16.0/fonts/FiraMono-LICENSE",
           "upstream_path": "fonts/FiraMono-LICENSE",
           "sha256": "587dd9548304fd421cd254f7550bd101c1250ffc95417f2f7f92d55b44ecbe53",
@@ -3222,6 +3288,18 @@
           "upstream_path": "fonts/NotoSans-LICENSE",
           "sha256": "5ec4347054089def6904da61d04f0360968f9ef36634b1fe007a5b6ec2f7aa96",
           "bytes": 4351
+        },
+        {
+          "path": "licenses/cosmic-text-0.16.0/LICENSE-APACHE",
+          "upstream_path": "LICENSE-APACHE",
+          "sha256": "000b4962e6b27176a0ff89cce4be555b16472cafb5671eb2804a8fdac6854793",
+          "bytes": 11357
+        },
+        {
+          "path": "licenses/cosmic-text-0.16.0/LICENSE-MIT",
+          "upstream_path": "LICENSE-MIT",
+          "sha256": "95557bafe728379e206f3b6d4aceeaa054d271c71d722411a6222e2dec01138c",
+          "bytes": 1075
         }
       ],
       "unresolved": []
@@ -4427,7 +4505,9 @@
       "source_path_in_repository": null,
       "repository": null,
       "license_expression": "MIT OR Apache-2.0",
-      "features": [],
+      "features": [
+        "default"
+      ],
       "notices": [
         {
           "path": "licenses/flightsim-render-0.6.0-alpha.21/LICENSE-MIT",
@@ -10767,12 +10847,12 @@
       "id": "zune-jpeg@0.5.15",
       "name": "zune-jpeg",
       "version": "0.5.15",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "source_checksum": "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296",
-      "source_revision": "31d81fed7551c8ccea456d9d8e2b1fd8bebb6995",
-      "source_path_in_repository": "crates/zune-jpeg",
+      "source": "workspace",
+      "source_checksum": null,
+      "source_revision": null,
+      "source_path_in_repository": null,
       "repository": "https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg",
-      "license_expression": "MIT OR Apache-2.0 OR Zlib",
+      "license_expression": "MIT OR Apache-2.0",
       "features": [
         "default",
         "neon",
@@ -10781,10 +10861,28 @@
       ],
       "notices": [
         {
+          "path": "licenses/zune-jpeg-0.5.15/FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "upstream_path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
+          "sha256": "8a0daaadb8528c948e20008d4dca83d2a5c627a0164967d5539edafe69ad18f8",
+          "bytes": 603
+        },
+        {
           "path": "licenses/zune-jpeg-0.5.15/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
           "bytes": 11357
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/LICENSE-FLIGHTSIM-APACHE",
+          "upstream_path": "LICENSE-FLIGHTSIM-APACHE",
+          "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+          "bytes": 11359
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/LICENSE-FLIGHTSIM-MIT",
+          "upstream_path": "LICENSE-FLIGHTSIM-MIT",
+          "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+          "bytes": 1086
         },
         {
           "path": "licenses/zune-jpeg-0.5.15/LICENSE-MIT",
@@ -10797,6 +10895,66 @@
           "upstream_path": "LICENSE-ZLIB",
           "sha256": "d201d14804d3bcd3b944147173175e4abfbd838b7c8069b6bd3452496bf13e6c",
           "bytes": 859
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
+          "upstream_path": "third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
+          "sha256": "d903a69ab39425283b44e2ea355cbfaf79bcd738b69c2b1c3c700ce80f2d89f9",
+          "bytes": 74
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt",
+          "upstream_path": "third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt",
+          "sha256": "0a98d2f90f69c08b46c65cfeeb2946160cd8884a8470e6607fff6fdfd66c3dc6",
+          "bytes": 545
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt",
+          "upstream_path": "third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt",
+          "sha256": "2e469db250a81fde70a0e62f2e265a13b1d929be5a0e84b4fccdb6418dc0243e",
+          "bytes": 346
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-LICENSE.ijg",
+          "upstream_path": "third-party-notices/libjpeg-turbo-LICENSE.ijg",
+          "sha256": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb",
+          "bytes": 12732
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
+          "upstream_path": "third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libultrahdr-copyright-headers.txt",
+          "upstream_path": "third-party-notices/libultrahdr-copyright-headers.txt",
+          "sha256": "2352361eb536bdd8650043df3d51e30c99f336e75cd28098db30d332bf3976e9",
+          "bytes": 1233
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
+          "upstream_path": "third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
+          "sha256": "746d8c9c414b335bb7c9615918a15a6489a4dcc1c5c3aac2bda410d1072c332a",
+          "bytes": 66
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/STANFORD-NOTICE.txt",
+          "upstream_path": "third-party-notices/STANFORD-NOTICE.txt",
+          "sha256": "44cbe28eee934caf9f3ffd119df0bc1813343c3928d7456e362b9964a26e299b",
+          "bytes": 528
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/stb-MIT-NOTICE.txt",
+          "upstream_path": "third-party-notices/stb-MIT-NOTICE.txt",
+          "sha256": "c5d1e0e499700d8ae2fc2c342210184d603d5bd7640c82a734efa9c2f914c659",
+          "bytes": 1066
+        },
+        {
+          "path": "licenses/zune-jpeg-0.5.15/third-party-notices/stb-upstream-dual-license.txt",
+          "upstream_path": "third-party-notices/stb-upstream-dual-license.txt",
+          "sha256": "bebfe904b14301657e4e5d655c811d51fd31b97c455b9cc2d8600d6bac6cff63",
+          "bytes": 2510
         }
       ],
       "unresolved": []
@@ -10857,24 +11015,6 @@
       ]
     },
     {
-      "id": "bevy-agx-lut",
-      "package": "bevy_core_pipeline",
-      "version": "0.18.1",
-      "source_path": "src/tonemapping/luts/AgX-default_contrast.ktx2",
-      "feature": "tonemapping_luts",
-      "sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
-      "bytes": 17842,
-      "review_state": "unresolved",
-      "license": "License record not yet resolved",
-      "sources": [
-        "https://github.com/MrLixm/AgXc/tree/898198e0490b0551ed81412a0c22e0b72fffb7cd"
-      ],
-      "notice_files": [],
-      "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance.",
-      "observed_sha256": "90fcdff22741698dbed7b3b2fd3133006847c63185d5dc42fbab6084f50e69cf",
-      "notices": []
-    },
-    {
       "id": "bevy-blender-filmic-lut",
       "package": "bevy_core_pipeline",
       "version": "0.18.1",
@@ -10882,15 +11022,32 @@
       "feature": "tonemapping_luts",
       "sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
       "bytes": 308905,
-      "review_state": "unresolved",
-      "license": "License record not yet resolved",
+      "review_state": "licensed_with_notices",
+      "license": "BSD-3-Clause",
       "sources": [
-        "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt"
+        "https://github.com/bevyengine/bevy/blob/v0.18.1/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt",
+        "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio",
+        "https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt",
+        "docs/release/filmic-asset-source-decision.json"
       ],
-      "notice_files": [],
-      "reason": "Bevy recipe renders through Blender Filmic, but does not pin the Blender/Filmic version or its asset license; resolve source terms before clearance.",
+      "notice_files": [
+        "docs/release/licenses/Blender-Filmic-OpenColorIO-LICENSE",
+        "docs/release/licenses/Blender-Filmic-NOTICE.txt"
+      ],
+      "reason": "Exact decoded LUT reproduced from pinned Blender 3.4.1 inputs under the configuration-level BSD-3-Clause notice route; associated tables have no individual headers. Preserve both listed notices. This asset-local source decision does not complete dependency/platform review or authorize publication.",
       "observed_sha256": "a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7",
-      "notices": []
+      "notices": [
+        {
+          "path": "licenses/supplemental/Blender-Filmic-OpenColorIO-LICENSE",
+          "sha256": "e39e97c2149a821e3e3b3c07839f8cadf6a98fb0a816b8ed69f16dd8817066fc",
+          "bytes": 1520
+        },
+        {
+          "path": "licenses/supplemental/Blender-Filmic-NOTICE.txt",
+          "sha256": "f3e625d50741f33f0ef700f5732fe8f06fccf466110f64ca3d38f0bb2844dcce",
+          "bytes": 2054
+        }
+      ]
     }
   ],
   "unresolved": [
@@ -10901,14 +11058,6 @@
     {
       "id": "hexf-parse@0.2.1",
       "reason": "No root/declared primary license text found in exact packaged source or pinned supplements; nested third-party notices do not substitute for the crate's own grant"
-    },
-    {
-      "id": "bevy-agx-lut",
-      "reason": "Exact upstream AgX LUT license record beyond Bevy crate SPDX remains unverified; preserve a specific grant/notice or replace this embedding before clearance."
-    },
-    {
-      "id": "bevy-blender-filmic-lut",
-      "reason": "Bevy recipe renders through Blender Filmic, but does not pin the Blender/Filmic version or its asset license; resolve source terms before clearance."
     }
   ]
 }

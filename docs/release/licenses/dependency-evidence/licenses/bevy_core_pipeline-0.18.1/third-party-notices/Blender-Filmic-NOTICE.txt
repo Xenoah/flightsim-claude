@@ -1,0 +1,36 @@
+Blender Filmic lookup-table source and attribution
+
+Applies to Bevy 0.18.1 bevy_core_pipeline
+src/tonemapping/luts/Blender_-11_12.ktx2
+SHA-256: a81a2462182bc8499d1a222345a72e7c4f1fabc2cb23d9c543caa567ccba7ad7
+
+Filmic Dynamic Range LUT configuration crafted by Troy James Sobotka with
+special thanks and feedback from Guillermo, Claudio Rocha, Bassam Kurdali,
+Eugenio Pignataro, Henri Hebeisen, Jason Clarke, Haarm-Peter Duiker, Thomas
+Mansencal, and Timothy Lottes.
+
+Source: Blender 3.4.1 color-management configuration and associated tables,
+pinned to source tag commit ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a.
+The exact numerical LUT content is reproducible using the unchanged Bevy
+recipe and the officially distributed Blender 3.4.1 CPU evaluator. All
+2,097,152 decoded RGBA16F bytes match, SHA-256:
+b8e2f0a26ee58edda1cf54e591175e8688ae21550e4d16af4c409cfdf5d919dd
+This identifies a reproducible derivation; Bevy's historical Blender version
+is not asserted. The existing LUT bytes have not been replaced.
+
+The configuration expressly refers to the OpenColorIO license notice,
+renamed unchanged from ocio-license.txt to release/license/OpenColorIO.txt.
+The source-rights determination applies that configuration-level BSD notice
+route to the associated tables, which have no individual license headers.
+Preserve the accompanying complete Blender-Filmic-OpenColorIO-LICENSE,
+including its copyright, conditions, disclaimer and non-endorsement term.
+No contributor or upstream project endorsement is implied.
+
+Pinned configuration:
+https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/datafiles/colormanagement/config.ocio
+Pinned license:
+https://github.com/blender/blender/blob/ef9ca44dee7fe3e25089dbfc49c69e9eff83ba5a/release/license/OpenColorIO.txt
+Unchanged license relocation:
+https://github.com/blender/blender/commit/0434efa09ddc451675ce8f8e8e7df61f5cc34e89
+Bevy recipe:
+https://github.com/bevyengine/bevy/blob/912fb5886908373db2b7c0140ae15961ccd92f72/crates/bevy_core_pipeline/src/tonemapping/luts/info.txt

@@ -1,0 +1,9 @@
+/// fast 0..255 * 0..255 => 0..255 rounded multiplication
+///
+/// Borrowed from stb
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#[inline]
+fn blinn_8x8(in_val: u8, y: u8) -> u8 {
+    let t = i32::from(in_val) * i32::from(y) + 128;
+    return ((t + (t >> 8)) >> 8) as u8;
+}

@@ -75,6 +75,7 @@ mod aircraft_profile_schema_contract;
 mod aircraft_scene;
 mod airport_drape_runtime;
 mod cloud_runtime;
+mod component_terms;
 mod distance_runtime;
 mod distribution;
 mod flight_session;
@@ -536,6 +537,24 @@ struct PendingModelFit(ModelFit);
 
 fn main() -> bevy::app::AppExit {
     let arguments: Vec<_> = std::env::args().skip(1).collect();
+    // The explicit review command always reopens the complete terms and exits,
+    // even with an existing receipt or other informational arguments.
+    if arguments.iter().any(|value| value == "--component-terms") {
+        return match component_terms::enforce(true) {
+            Ok(_) => bevy::app::AppExit::Success,
+            Err(error) => {
+                eprintln!("{error}");
+                bevy::app::AppExit::error()
+            }
+        };
+    }
+    let smoke_arguments = match component_terms::smoke_arguments(&arguments) {
+        Ok(arguments) => arguments,
+        Err(error) => {
+            eprintln!("{error}");
+            return bevy::app::AppExit::error();
+        }
+    };
     if arguments.len() == 1 && arguments[0] == "--distribution-info" {
         println!("{}", distribution::info());
         return bevy::app::AppExit::Success;
@@ -551,6 +570,24 @@ fn main() -> bevy::app::AppExit {
         println!("{}", distribution::aircraft_listing());
         return bevy::app::AppExit::Success;
     }
+    let internal_release_smoke = smoke_arguments.is_some();
+    if internal_release_smoke {
+        // This closed, input-disabled diagnostic path has no receipt access.
+        if let Err(error) = component_terms::arm_smoke_watchdog() {
+            eprintln!("{error}");
+            return bevy::app::AppExit::error();
+        }
+        eprintln!("{}", component_terms::SMOKE_MARKER);
+    } else {
+        match component_terms::enforce(false) {
+            Ok(component_terms::Admission::Continue) => {}
+            Ok(component_terms::Admission::Exit) => return bevy::app::AppExit::Success,
+            Err(error) => {
+                eprintln!("{error}");
+                return bevy::app::AppExit::error();
+            }
+        }
+    }
     if let Some(result) = aircraft_package_cli::run_cli(&arguments) {
         return match result {
             Ok(()) => bevy::app::AppExit::Success,
@@ -560,7 +597,7 @@ fn main() -> bevy::app::AppExit {
             }
         };
     }
-    let (mut startup, mut diagnostics) = parse_arguments();
+    let (mut startup, mut diagnostics) = parse_arguments_from(smoke_arguments.unwrap_or(arguments));
     if let Some(error) = startup.weather.error.as_ref() {
         eprintln!("invalid weather options: {error}");
         return bevy::app::AppExit::error();
@@ -847,7 +884,7 @@ fn main() -> bevy::app::AppExit {
     }
     // Offscreen capture has no interactive gamepad input. Do not require a
     // hardware hot-plug monitor in a container merely to render a scene.
-    if native_controllers || headless {
+    if native_controllers || headless || internal_release_smoke {
         plugins = plugins.disable::<bevy::gilrs::GilrsPlugin>();
     }
     let tutorial_state = if startup.approach.is_some() {
@@ -974,6 +1011,9 @@ fn main() -> bevy::app::AppExit {
             ),
         );
 
+    if internal_release_smoke {
+        configure_internal_release_smoke(&mut app);
+    }
     if let Some(atlas) = water_atlas {
         app.insert_resource(atlas);
     }
@@ -1016,11 +1056,47 @@ fn main() -> bevy::app::AppExit {
     app.run()
 }
 
+/// Isolated release diagnostics preserve ordinary scene setup and rendering,
+/// but cannot be turned into an interactive flight or extend their fixed budget.
+fn configure_internal_release_smoke(app: &mut App) {
+    app.add_systems(
+        PreUpdate,
+        suppress_internal_release_smoke_input
+            .after(bevy::input::InputSystems)
+            .before(bevy::ui::UiSystems::Focus),
+    )
+    .add_systems(Last, bound_internal_release_smoke);
+}
+
+fn suppress_internal_release_smoke_input(world: &mut World) {
+    use bevy::input::keyboard::{Key, KeyboardInput};
+    use bevy::input::mouse::{
+        AccumulatedMouseMotion, AccumulatedMouseScroll, MouseMotion, MouseWheel,
+    };
+    world.resource_mut::<ButtonInput<KeyCode>>().reset_all();
+    world.resource_mut::<ButtonInput<Key>>().reset_all();
+    world.resource_mut::<ButtonInput<MouseButton>>().reset_all();
+    world.resource_mut::<Messages<KeyboardInput>>().clear();
+    world.resource_mut::<Messages<MouseMotion>>().clear();
+    world.resource_mut::<Messages<MouseWheel>>().clear();
+    *world.resource_mut::<AccumulatedMouseMotion>() = default();
+    *world.resource_mut::<AccumulatedMouseScroll>() = default();
+    *world.resource_mut::<Touches>() = default();
+}
+
+fn bound_internal_release_smoke(mut budget: Local<component_terms::SmokeBudget>) {
+    if !budget.advance() {
+        eprintln!("internal release smoke exceeded its fixed Main-update bound");
+        std::process::exit(2);
+    }
+}
+
 fn application_help() -> &'static str {
     "flightsim-claude (experimental flight simulator)\n\n\
 --aircraft light-single|swift-sport|PROFILE.json  Select dynamics/model/controls\n\
 --list-aircraft                                 List bundled aircraft\n\
 --distribution-info                             Print build profile JSON and exit\n\
+--component-terms                               Review component terms and exit (required before redistribution)\n\
 --view cockpit|chase|free|tower                  Initial camera\n\
 --difficulty beginner|normal|realistic          Environment/help preset\n\
 --approach [NM] | --drop METRES                  Approach or drop scenario\n\
@@ -1269,16 +1345,6 @@ fn create_replay_file(directory: &std::path::Path) -> std::io::Result<(PathBuf, 
     ))
 }
 
-/// `--tiles <DIR>`、`--airports <FILE>`、`--start <LAT,LON>` を読む。
-///
-/// clap を入れるほどの規模ではない。増えたら入れる。
-///
-/// **指摘は `warn!` せず溜めて返す。** この関数は `LogPlugin` より前に走るので、
-/// ここで出しても購読者が居らず何も表示されない（[`StartupDiagnostics`]）。
-fn parse_arguments() -> (Startup, StartupDiagnostics) {
-    parse_arguments_from(std::env::args().skip(1))
-}
-
 /// 次のトークンが別の long option でなければ、値として取り出す。
 ///
 /// 値の無い option が後続 option を飲み込むと、後続側が警告なしで消える。
@@ -1293,6 +1359,13 @@ where
         .then(|| arguments.next().expect("peeked argument must exist"))
 }
 
+/// `--tiles <DIR>`、`--airports <FILE>`、`--start <LAT,LON>` を読む。
+///
+/// clap を入れるほどの規模ではない。増えたら入れる。
+///
+/// **指摘は `warn!` せず溜めて返す。** この関数は `LogPlugin` より前に走るので、
+/// ここで出しても購読者が居らず何も表示されない（[`StartupDiagnostics`]）。
+///
 /// 引数列を解釈する。テストから実プロセスの引数を差し替えられる入口。
 fn parse_arguments_from(
     arguments: impl IntoIterator<Item = String>,
@@ -4961,6 +5034,80 @@ mod tests {
         let (startup, diagnostics) =
             parse_arguments_from(args.iter().map(|argument| (*argument).to_owned()));
         (startup, diagnostics.0)
+    }
+
+    #[test]
+    fn internal_smoke_translates_only_to_the_fixed_capture_setup() {
+        for (scene, aircraft, view) in [
+            ("light-single-cockpit", "light-single", ViewMode::Cockpit),
+            ("swift-sport-chase", "swift-sport", ViewMode::Chase),
+            ("light-single-exterior", "light-single", ViewMode::Chase),
+        ] {
+            let arguments = ["--internal-release-smoke", scene, "proof.png"].map(str::to_owned);
+            let fixed = component_terms::smoke_arguments(&arguments)
+                .unwrap()
+                .unwrap();
+            let (startup, diagnostics) = parse_arguments_from(fixed);
+            assert!(diagnostics.0.is_empty());
+            assert_eq!(startup.aircraft.id(), aircraft);
+            assert_eq!(startup.view, view);
+            assert_eq!(startup.screenshot, Some(PathBuf::from("proof.png")));
+            assert_eq!(startup.screenshot_delay.to_bits(), 5.0_f64.to_bits());
+            assert!(startup.exit_after_screenshot && startup.traffic.synthetic);
+            assert!(!startup.headless_screenshot);
+            assert!(!startup.native_controllers);
+        }
+    }
+
+    #[test]
+    fn internal_smoke_removes_input_before_update_but_ordinary_setup_keeps_it() {
+        use bevy::input::keyboard::Key;
+        use bevy::input::mouse::{AccumulatedMouseMotion, MouseMotion};
+        for diagnostic in [false, true] {
+            let mut app = App::new();
+            app.add_plugins(bevy::input::InputPlugin);
+            if diagnostic {
+                configure_internal_release_smoke(&mut app);
+            }
+            for _ in 0..2 {
+                app.world_mut()
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(KeyCode::KeyW);
+                app.world_mut()
+                    .resource_mut::<ButtonInput<Key>>()
+                    .press(Key::F12);
+                app.world_mut()
+                    .resource_mut::<ButtonInput<MouseButton>>()
+                    .press(MouseButton::Left);
+                app.world_mut()
+                    .write_message(MouseMotion { delta: Vec2::ONE });
+                app.update();
+                let world = app.world();
+                assert_eq!(
+                    world
+                        .resource::<ButtonInput<KeyCode>>()
+                        .pressed(KeyCode::KeyW),
+                    !diagnostic
+                );
+                assert_eq!(
+                    world.resource::<ButtonInput<Key>>().pressed(Key::F12),
+                    !diagnostic
+                );
+                assert_eq!(
+                    world
+                        .resource::<ButtonInput<MouseButton>>()
+                        .pressed(MouseButton::Left),
+                    !diagnostic
+                );
+                assert_eq!(
+                    world.resource::<AccumulatedMouseMotion>().delta == Vec2::ZERO,
+                    diagnostic
+                );
+                if diagnostic {
+                    assert!(world.resource::<Messages<MouseMotion>>().is_empty());
+                }
+            }
+        }
     }
 
     #[test]

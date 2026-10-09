@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/release.yml"
+PREPARATION = ROOT / 'scripts/prepare-ordinary-full-release.py'
 
 
 def jobs():
@@ -47,39 +48,59 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn("ref: ${{ github.event.workflow_run.head_sha }}", jobs()[name])
             self.assertIn("persist-credentials: false", jobs()[name])
         build = jobs()["build_windows"]
-        self.assertLess(build.index("scripts/check-release-authorization.py"), build.index("cargo build"))
+        self.assertLess(build.index("scripts/check-release-authorization.py"), build.index("scripts/capture-analytical-swift-msvc.py"))
+        self.assertNotIn('cargo build', build)
         self.assertNotIn("--allow-blocked", build)
         for field in ("release_inventory_sha256", "source_inventory_sha256", "authorization_sha256"):
             self.assertIn("$gate." + field + " -ne $env:EXPECTED_", build)
 
     def test_copy_plan_is_the_only_source_of_package_files(self):
-        build = jobs()["build_windows"]
-        self.assertIn("foreach ($file in $inventory.files)", build)
+        build, preparation = jobs()["build_windows"], PREPARATION.read_text()
+        self.assertIn("for item in plan['files']:", preparation)
         self.assertNotIn("-Recurse", build)
-        self.assertIn("--bundle $staging --executable $executable", build)
-        self.assertIn("--bundle $packageRoot --executable $builtExecutable", build)
+        self.assertIn('release.verify_bundle(staged, plan, executable)', preparation)
+        self.assertIn('release.verify_bundle(extracted, plan, executable)', preparation)
+        self.assertIn("build_private / 'target-ordinary' / release.TARGET / 'release/flightsim-app.exe'", preparation)
 
     def test_offline_identity_runs_only_on_trusted_build_before_packaging(self):
         build = jobs()["build_windows"]
-        handshake = "--verify-built-executable target/x86_64-pc-windows-msvc/release/flightsim-app.exe"
-        self.assertLess(build.index("cargo build"), build.index(handshake))
-        self.assertLess(build.index(handshake), build.index("Assemble and verify the release bundle"))
-        self.assertIn("if ($LASTEXITCODE -ne 0) { throw 'built executable does not match the offline release recipe' }", build)
+        preparation = PREPARATION.read_text().split('def prepare(', 1)[1]
+        self.assertLess(build.index('scripts/capture-analytical-swift-msvc.py'), build.index('scripts/prepare-ordinary-full-release.py'))
+        self.assertLess(preparation.index('capture.validate_export('), preparation.index('release.verify_distribution_info('))
+        self.assertLess(preparation.index('release.verify_distribution_info('), preparation.index('shutil.copyfile(executable,'))
         self.assertNotIn("--verify-built-executable", jobs()["authorize"])
         self.assertNotIn("--verify-built-executable", jobs()["publish"])
-        self.assertNotIn("--features", build.split("- name: Build the Windows application", 1)[1].split("- name:", 1)[0])
+        self.assertNotIn('--features', build)
+        self.assertIn('--validate-only', build)
 
     def test_artifact_paths_are_explicit_and_exclude_raw_qa(self):
         build = jobs()["build_windows"]
         paths = re.findall(r"^          path: \|\n((?:            .+\n)+)", build, re.MULTILINE)
-        self.assertEqual(len(paths), 2)
+        self.assertEqual(len(paths), 3)
         for block in paths:
             self.assertNotIn("*", block)
             for forbidden in (".fsreplay", "qa/", ".csv", "target/", "assets/", "workspace"):
                 self.assertNotIn(forbidden, block)
-        self.assertIn("flightsim-windows-smoke.stdout.log", paths[0])
-        self.assertIn("flightsim-windows-smoke-swift.stderr.log", paths[0])
-        self.assertIn("release-artifact/${{ steps.version.outputs.bundle }}", paths[1])
+        self.assertIn('ordinary-failed-native-facts.json', paths[0])
+        self.assertIn('ordinary-native-review.json', paths[1])
+        self.assertIn('ordinary-release-evidence.json', paths[1])
+        self.assertNotIn('.log', ''.join(paths))
+        self.assertIn("ordinary-release-artifact/${{ steps.version.outputs.bundle }}", paths[2])
+        self.assertIn('ordinary-release-evidence.json', paths[2])
+
+    def test_failure_fact_export_revalidates_and_never_enters_publication_artifact(self):
+        build = jobs()['build_windows']
+        self.assertIn("if: failure() && steps.native_capture.outcome == 'success' && steps.version.outcome == 'success'", build)
+        self.assertIn("if: failure() && steps.failure_native_facts.outcome == 'success'", build)
+        block = build.split('- name: Revalidate bounded native facts after a failed final check', 1)[1]
+        block = block.split('- name: Retain successful bounded ordinary native evidence', 1)[0]
+        self.assertIn('scripts/project-ordinary-native-evidence.py', block)
+        for arg in ('--expected-sha', '--build-private', '--build-text', '--bundle', '--runtime-facts-private'):
+            self.assertIn(arg, block)
+        self.assertIn('if ($LASTEXITCODE -ne 0)', block)
+        self.assertNotIn('continue-on-error', block)
+        self.assertNotIn('ordinary-release-artifact/', block)
+        self.assertNotIn('ordinary-failed-native', jobs()['publish'])
 
     def test_publisher_only_runs_inline_verification_of_current_run_artifact(self):
         publish = jobs()["publish"]
@@ -90,6 +111,45 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn(f"jq -er '.{field}'", publish)
         self.assertIn("contents: write", publish)
         self.assertNotIn("contents: write", jobs()["build_windows"])
+
+    def test_final_evidence_digest_rechecked_by_nonexecuting_publisher(self):
+        publish = jobs()['publish']
+        for binding in ('.evidence_sha256', '.bindings.archive.sha256', '.applicability.conditions_matched',
+                        'ordinary_final_same_build_evidence_not_authority'):
+            self.assertIn(binding, publish)
+        self.assertIn('light-single-cockpit', publish)
+        self.assertIn('swift-sport-chase', publish)
+        self.assertLess(publish.index('evidence=release-artifact/ordinary-release-evidence.json'),
+                        publish.index('Create the tag if absent'))
+
+    def test_component_disclosure_is_bound_and_published_before_recipient_choice(self):
+        build, publish = jobs()['build_windows'], jobs()['publish']
+        self.assertIn('ordinary-release-artifact/release-notes.md', build)
+        for field in ('.notes_sha256', '.bindings.publication_notes.sha256',
+                      '.component_terms.recipient_assent_collected == false',
+                      '.component_terms.dialog_tested_by_smoke == false'):
+            self.assertIn(field, publish)
+        self.assertIn("! grep -q '@SOURCE_SHA@'", publish)
+        self.assertEqual(publish.count('--notes-file "$notes"'), 2)
+        self.assertIn('"$swift_screenshot" "$evidence" --repo', publish)
+        self.assertNotIn('--generate-notes', publish)
+        self.assertNotIn('actions/checkout', publish)
+
+    def test_windows_dialog_contract_is_separate_from_scene_smoke(self):
+        test = './scripts/tests/test-component-terms-dialog.ps1'
+        build = jobs()['build_windows']
+        self.assertIn(test, build)
+        self.assertLess(build.index('scripts/check-release-authorization.py'), build.index(test))
+        self.assertLess(build.index(test), build.index('scripts/capture-analytical-swift-msvc.py'))
+        ci = (ROOT / '.github/workflows/ci.yml').read_text()
+        self.assertIn("if: runner.os == 'Windows'\n        shell: pwsh\n        run: " + test, ci)
+
+    def test_native_capture_checkout_is_canonical_lf_on_windows(self):
+        workflow = WORKFLOW.read_text()
+        for expected in ("GIT_CONFIG_COUNT: '2'", 'GIT_CONFIG_KEY_0: core.autocrlf',
+                         "GIT_CONFIG_VALUE_0: 'false'", 'GIT_CONFIG_KEY_1: core.eol',
+                         "GIT_CONFIG_VALUE_1: 'lf'"):
+            self.assertIn(expected, workflow.split('jobs:', 1)[0])
 
 
 if __name__ == "__main__":

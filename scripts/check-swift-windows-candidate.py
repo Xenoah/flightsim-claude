@@ -41,13 +41,31 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
-REPLAY_CONTRACT_ID = "full-two-aircraft-reviewed-source-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-component-terms-source-v1"
 REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
 REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
 SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
 HISTORICAL_CONTRACT_HASHES = {'scripts/history/d918943-replay-candidate-contract.json': '2290d90e367b6a48432741b9570e80102a213d387e55d39140859075b6cf3cf4', 'scripts/history/d918943-analytical-swift-source-contract.json': '00e8d5a493fcd3402077b6ab8d5f57d63a729395c2ee26d2b49834ab65260a4a', 'scripts/history/d918943-analytical-swift-capture-contract.json': '2cbb6c46002f8a414ac8cee1ba75f3362024f7b16b80b89c2bb1cacb84264fc5'}
 PRESERVED_RUNTIME_PATH = "scripts/full-two-aircraft-runtime-pins.json"
 PRESERVED_RUNTIME_SHA256 = "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667"
+# The old reviewed tree is base provenance only. This exact migration owns the
+# changed startup gate; historical runtime hashes never become current evidence.
+COMPONENT_TERMS_MIGRATION_PATH = "scripts/component-terms-source-migration.json"
+COMPONENT_TERMS_MIGRATION_SHA256 = "f742f4678d6af0197408acc16619e7220c8b1c9433c1c7347254fa1d8e88195e"
+COMPONENT_TERMS_MAIN_PATH = "crates/flightsim-app/src/main.rs"
+COMPONENT_TERMS_HISTORY_PATH = "scripts/history/4d40f9a-flightsim-app-main.rs"
+COMPONENT_TERMS_RUNTIME_PATHS = frozenset({
+    "crates/flightsim-app/src/component_terms.rs",
+    "crates/flightsim-app/src/component_terms_dialog.ps1",
+})
+COMPONENT_TERMS_DOCUMENT_PATHS = frozenset({
+    "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt",
+    "docs/release/components/MICROSOFT-COMPONENT-TERMS.ja.txt",
+    "docs/release/components/MICROSOFT-COMPONENT-NOTICE.txt",
+})
+COMPONENT_TERMS_LICENSE_PATHS = frozenset({"LICENSE-MIT", "LICENSE-APACHE"})
+COMPONENT_TERMS_SOURCE_PATHS = (COMPONENT_TERMS_RUNTIME_PATHS | COMPONENT_TERMS_DOCUMENT_PATHS
+                               | COMPONENT_TERMS_LICENSE_PATHS)
 # The reviewed additive jet/turboprop exports change this file, but no legacy FDM
 # body. Keep a literal full-file guard; the historical lib hash above never moves.
 REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "2328631f895921e4152de6f8107c4d6f07ba764b6f6225189a4b826c6f9f013c"
@@ -1093,6 +1111,9 @@ HISTORICAL_SOURCE_PATHS = {
 REPLAY_CONTRACT_PATHS |= (CORE_PIPELINE_SOURCE_PATHS | ORIGINAL_HIGHWING_SOURCE_PATHS
                           | FULL_SOURCE_PROVENANCE_PATHS | PRESERVED_RUNTIME_EXTRA_PATHS
                           | HISTORICAL_SOURCE_PATHS)
+# Add exact members after freezing the original 404-path history above.
+REPLAY_CONTRACT_PATHS |= (COMPONENT_TERMS_SOURCE_PATHS
+                          | {COMPONENT_TERMS_MIGRATION_PATH, COMPONENT_TERMS_HISTORY_PATH})
 
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -1270,11 +1291,15 @@ def git(repo, *args):
 
 
 # Cargo auto-discovers build scripts, binary/example/benchmark targets. These
-# are exactly the preserved crate paths, never an on-disk glob admission.
+# retain the 492 preserved members plus the two literal component-terms inputs.
+# No on-disk glob can admit additional build, binary, example or benchmark files.
 PRESERVED_CRATE_SOURCE_PATHS = frozenset(path for path in REPLAY_CONTRACT_PATHS
-                                       if path.startswith("crates/"))
+                                       if path.startswith("crates/")
+                                       and path not in COMPONENT_TERMS_RUNTIME_PATHS)
+CURRENT_CRATE_SOURCE_PATHS = PRESERVED_CRATE_SOURCE_PATHS | COMPONENT_TERMS_RUNTIME_PATHS
 MODIFIED_SOURCE_BOUNDARIES = (
-    ("crates/", PRESERVED_CRATE_SOURCE_PATHS),
+    ("crates/", CURRENT_CRATE_SOURCE_PATHS),
+    ("docs/release/components/", COMPONENT_TERMS_DOCUMENT_PATHS),
     ("vendor/bevy_core_pipeline/", CORE_PIPELINE_SOURCE_PATHS),
     ("tools/original-highwing/", ORIGINAL_HIGHWING_SOURCE_PATHS),
     ("vendor/bevy_pbr/", VENDORED_PACKAGE_PATHS),
@@ -1330,15 +1355,17 @@ def validate_modified_source_checkout(repo):
 
 def validate_replay_contract(contract):
     require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
-            "reviewed_source", "reviewed_runtime_tree", "scope", "release_authorized", "source_sha256"}
+            "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
+            "scope", "release_authorized", "source_sha256"}
             and type(contract.get("schema_version")) is int and contract.get("schema_version") == 1
             and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
-    require(contract.get("reviewed_source") == REVIEWED_RUNTIME_SOURCE
-            and contract.get("reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
+    require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
+            and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
+            and contract.get("source_migration_sha256") == COMPONENT_TERMS_MIGRATION_SHA256
             and contract.get("scope") == SOURCE_ADMISSION_SCOPE
             and contract.get("release_authorized") is False, "source admission identity or scope changed")
-    require(isinstance(contract.get("reviewed_source"), str)
-            and re.fullmatch(r"[0-9a-f]{40}", contract["reviewed_source"]), "missing reviewed replay source")
+    require(isinstance(contract.get("base_reviewed_source"), str)
+            and re.fullmatch(r"[0-9a-f]{40}", contract["base_reviewed_source"]), "missing reviewed replay source")
     pins = contract.get("source_sha256")
     require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
             "reviewed replay source boundary changed")
@@ -1357,7 +1384,38 @@ def validate_replay_contract(contract):
     frozen_file = Path(__file__).with_name("full-two-aircraft-runtime-pins.json")
     require(digest(frozen_file) == PRESERVED_RUNTIME_SHA256, "preserved runtime contract changed")
     preserved = json.loads(frozen_file.read_text(encoding="utf-8"))["source_sha256"]
-    require(len(preserved) == 497 and all(pins.get(path) == value for path, value in preserved.items()),
+    migration_file = Path(__file__).with_name("component-terms-source-migration.json")
+    require(digest(migration_file) == COMPONENT_TERMS_MIGRATION_SHA256
+            and pins[COMPONENT_TERMS_MIGRATION_PATH] == COMPONENT_TERMS_MIGRATION_SHA256,
+            "component terms migration changed")
+    migration = json.loads(migration_file.read_text(encoding="utf-8"))
+    require(set(migration) == {"schema_version", "identity", "base_source", "base_runtime_source",
+            "base_runtime_tree", "base_replay_contract_sha256", "preserved_runtime_sha256",
+            "historical_relocations", "replaced_source_sha256", "added_source_sha256"}
+            and type(migration["schema_version"]) is int and migration["schema_version"] == 1
+            and migration["identity"] == "full-two-aircraft-component-terms-source-migration-v1"
+            and migration["base_source"] == "4d40f9abbfa90be38c91f2a1379d8355530dc2f5"
+            and migration["base_runtime_source"] == REVIEWED_RUNTIME_SOURCE
+            and migration["base_runtime_tree"] == REVIEWED_RUNTIME_TREE
+            and migration["base_replay_contract_sha256"] == "81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19"
+            and migration["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256,
+            "invalid component terms migration identity")
+    relocations = migration["historical_relocations"]
+    require(relocations == {COMPONENT_TERMS_MAIN_PATH: COMPONENT_TERMS_HISTORY_PATH},
+            "component terms historical relocation changed")
+    replaced = migration["replaced_source_sha256"]
+    require(set(replaced) == {COMPONENT_TERMS_MAIN_PATH}
+            and set(replaced[COMPONENT_TERMS_MAIN_PATH]) == {"previous_sha256", "sha256"}
+            and replaced[COMPONENT_TERMS_MAIN_PATH]["previous_sha256"] == preserved[COMPONENT_TERMS_MAIN_PATH]
+            and replaced[COMPONENT_TERMS_MAIN_PATH]["sha256"] != preserved[COMPONENT_TERMS_MAIN_PATH]
+            and pins[COMPONENT_TERMS_MAIN_PATH] == replaced[COMPONENT_TERMS_MAIN_PATH]["sha256"],
+            "component terms replacement changed")
+    added = migration["added_source_sha256"]
+    require(set(added) == COMPONENT_TERMS_SOURCE_PATHS
+            and all(pins.get(path) == value for path, value in added.items()),
+            "component terms source pins changed")
+    require(len(preserved) == 497
+            and all(pins.get(relocations.get(path, path)) == value for path, value in preserved.items()),
             "preserved runtime source pins changed")
     return contract
 

@@ -8,6 +8,9 @@
 この README は alpha.21 のソースと同梱機能の説明です。配布物の公開状態と対象版は
 [Releases](https://github.com/Xenoah/flightsim-claude/releases) で確認してください。Windows 版は
 対象 commit の CI、展開 zip からの 2 機種の撮影・正常終了、checksum 検査の後にだけ公開されます。
+Windows 版のダウンロード・再配布前に、下記の
+[Microsoft ランタイムの補足規約と同意方法](#microsoft-ランタイムの補足規約と同意方法)
+を確認してください。
 2026-10-01 の実測・修正・未検証事項は
 [検証記録](docs/qa/overnight-status-2026-10-01.md)、設計上の範囲は
 [ARCHITECTURE.md §7](ARCHITECTURE.md#7-現状のスコープ) を参照してください。
@@ -246,6 +249,38 @@ F10 は入力診断、F11 は診断ページ、F12 は参加中の LAN セッシ
 `flightsim-app.exe` と同じフォルダに置いたまま実行してください。これは開発途中の
 prerelease です。
 
+#### Microsoft ランタイムの補足規約と同意方法
+
+この Windows 版に実際に組み込まれる Microsoft の実行時処理・起動処理コードだけに、
+[補足規約（英語正文、2026-10-09-2）](docs/release/components/MICROSOFT-COMPONENT-TERMS.txt)
+が適用されます。[日本語参考訳](docs/release/components/MICROSOFT-COMPONENT-TERMS.ja.txt) と
+[コンポーネント表示](docs/release/components/MICROSOFT-COMPONENT-NOTICE.txt) も ZIP に同梱します。
+対象コードの保護、Microsoft と供給者の免責・損害賠償責任、再配布時の義務を含みます。
+FlightSim のソース等の MIT／Apache-2.0 と各部品の既存ライセンス、通常の FlightSim の
+ベンチマークは変わりません。既存の著作権表示も保持します。
+
+初回起動時は、シミュレーターに入る前に規約全文と日本語参考訳、既存の著作権表示を
+表示します。「同意して続行 / Agree and continue」を明示的に選んだ場合だけ続行し、
+「同意せず終了 / Decline and exit」は同意を保存せず終了します。同意は初期選択しません。
+規約画面から同梱のコンポーネント表示も確認できます。
+規約画面は Windows 標準の Windows PowerShell 5.1 と .NET Windows Forms を使用します。
+画面を開けない環境では同意を推測せず終了し、システムの実行制限を変更しません。
+
+**再配布者は、再配布前に `flightsim-app.exe --component-terms` を実行し、同じ規約を
+確認して明示的に同意してください。** この専用操作はシミュレーターを起動せず、
+同意・不同意の選択後に終了します。あとから規約を再表示するときも同じ操作を使えます。
+ZIP の規約・表示を残し、その先の再配布者と外部エンドユーザーにも、補足規約に従って
+対象コードを保護する条件への同意を求めてください。表示やダウンロードだけを同意とは扱いません。
+
+保存するのは、利用者自身の明示的な選択による、正確な規約の版・ハッシュに対応する
+端末内の同意記録だけです。内容が変われば再度選択を求めます。アカウント、テレメトリー、
+個人情報や同意記録のサーバー送信は追加しません。Visual Studio の購入・アカウント作成は不要です。
+
+Windows、UCRT、グラフィックスドライバー、x64 Visual C++ v14 ランタイムは外部の前提です。
+必要なランタイムは [Microsoft の公式案内](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+からサポート中の x64 v14 パッケージを入手してください。Microsoft の DLL やインストーラーを
+この ZIP に別途同梱したり、非公式サイトから個別 DLL を取得したりする手順ではありません。
+
 alpha.20 は source `f3d32d816cc625d10e4309f3506c150280e749a5` の CI、展開した zip の
 Windows WARP 起動・モデル読込・完全な PNG・終了コード 0 を確認済みです。
 公開アーカイブの SHA-256 と実 PNG の確認記録は [統合 QA](docs/qa/overnight-status-2026-10-01.md#verified-alpha20-release)
@@ -341,6 +376,10 @@ OpenStreetMap と ESA WorldCover は帰属表示が**法的に必須**です。
 ## ライセンス
 
 [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE)
+
+Windows 実行ファイルに組み込まれる Microsoft コードには、上記の
+[コンポーネント補足規約](docs/release/components/MICROSOFT-COMPONENT-TERMS.txt) が別途適用されます。
+FlightSim のソースと別ライセンスの部品について、既存ライセンスが認める権利は変わりません。
 
 ## Offline global map and climate (development branch)
 

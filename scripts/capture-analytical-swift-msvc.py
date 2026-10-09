@@ -30,7 +30,7 @@ SPEC.loader.exec_module(check)
 require = check.require
 IDENTITY = 'analytical-swift-msvc-build-capture-v1'
 CONTRACT = 'scripts/analytical-swift-capture-contract.json'
-SOURCE_ADMISSION = 'analytical-swift-two-lut-capture-source-admission-v1'
+SOURCE_ADMISSION = 'analytical-swift-component-terms-capture-source-admission-v1'
 REFERENCE = 'reference/bevy_core_pipeline-0.18.1.crate'
 BOUND_FILES = {
     'scripts/capture-analytical-swift-msvc.py',
@@ -38,7 +38,7 @@ BOUND_FILES = {
     '.github/workflows/analytical-swift-msvc-build.yml',
     'docs/release/analytical-swift-msvc-capture.md',
 }
-INHERITED_CONTRACTS = {'scripts/analytical-swift-source-contract.json': '112d3b623fadeb7f0cd7f15a3eda13d020d287b622ee3a55c679b139ffe9b2a3', 'scripts/replay-candidate-contract.json': '81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19'}
+INHERITED_CONTRACTS = {'scripts/analytical-swift-source-contract.json': '79a78d2ed432fc6ba38e4a5ee3d35eb0fcedc0f273354ef3225d8ddd2782126a', 'scripts/replay-candidate-contract.json': '6a66967636c162b7b381fc162723faebb10bef3d14d09b1f663de6b2cfc30875'}
 
 MODES = ('analytic', 'ordinary')
 OUTPUTS = {'rustc': 'rustc.txt', 'graph': 'graph.txt', 'build': 'messages.jsonl', 'metadata': 'metadata.json'}
@@ -109,11 +109,12 @@ def source_evidence(repo, expected):
     source = check.source_evidence(repo, expected)
     verify_canonical_sources(repo, source)
     contract = json.loads((repo / CONTRACT).read_text(encoding='utf-8'))
-    require(set(contract) == {'schema_version', 'identity', 'reviewed_source', 'reviewed_runtime_tree', 'source_admission', 'source_recipe', 'inherited_contracts', 'source_sha256'}
+    require(set(contract) == {'schema_version', 'identity', 'base_reviewed_source', 'base_reviewed_runtime_tree', 'source_migration_sha256', 'source_admission', 'source_recipe', 'inherited_contracts', 'source_sha256'}
             and type(contract['schema_version']) is int and contract['schema_version'] == 1
             and contract['identity'] == IDENTITY
-            and contract['reviewed_source'] == check.candidate.REVIEWED_RUNTIME_SOURCE
-            and contract['reviewed_runtime_tree'] == check.candidate.REVIEWED_RUNTIME_TREE
+            and contract['base_reviewed_source'] == check.candidate.REVIEWED_RUNTIME_SOURCE
+            and contract['base_reviewed_runtime_tree'] == check.candidate.REVIEWED_RUNTIME_TREE
+            and contract['source_migration_sha256'] == check.candidate.COMPONENT_TERMS_MIGRATION_SHA256
             and contract['source_admission'] == SOURCE_ADMISSION
             and contract['source_recipe'] == check.SOURCE_RECIPE,
             'invalid additive capture source contract')

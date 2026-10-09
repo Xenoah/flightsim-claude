@@ -1,0 +1,17 @@
+{
+  "authorized_at": "2026-10-09T06:47:12Z",
+  "authorized_by": "Xenoah (repository owner; recorded by authorized development assistant)",
+  "evidence": [
+    "The repository owner authorized the next GitHub Windows prerelease and direct main-branch updates; the confirmation is retained privately.",
+    "The repository owner approved the exact bundled Microsoft CRT component terms and assent presentation on 2026-10-09T06:47:12Z; the approved document is retained privately.",
+    "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt",
+    "docs/release/windows-component-release-notes.md"
+  ],
+  "release_inventory_sha256": "38a92ded80c31dc95ecc95b11435f337b0b12b52cd477e526871fb82144be608",
+  "schema_version": 1,
+  "scope": "github-windows-prerelease",
+  "source_inventory_sha256": "f78f81604c9c7bfd221a6273964d38a24be22ab184888a6279339be7b86ad97f",
+  "status": "authorized",
+  "target": "x86_64-pc-windows-msvc",
+  "version": "0.6.0-alpha.21"
+}

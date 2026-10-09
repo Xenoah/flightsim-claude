@@ -1,0 +1,3 @@
+// Inspired by David Tolnay's serde-rs
+// https://github.com/serde-rs/json/blob/master/src/raw.rs
+// Licensed under either of Apache License, Version 2.0 or MIT license at your option.

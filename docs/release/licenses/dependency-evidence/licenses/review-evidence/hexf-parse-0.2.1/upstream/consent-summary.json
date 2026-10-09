@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "kind": "generated_factual_provenance_and_consent_summary",
+  "status": "evidence_collected_review_pending",
+  "prepared_at": "2026-10-08",
+  "description": "Generated factual summary of the upstream issue and four relevant consent comments. Not a raw API snapshot, verbatim transcript, legal opinion, or independent certification of contributor authority. No discussion text is quoted. Full fetched discussion is excluded from the public dossier.",
+  "issue": {
+    "repository": "lifthrasiir/hexf",
+    "number": 26,
+    "source": "https://github.com/lifthrasiir/hexf/issues/26",
+    "author_login": "decathorpe",
+    "created_at": "2023-11-24T19:40:52Z",
+    "updated_at": "2023-12-06T22:10:54Z",
+    "closed_at": "2023-12-06T14:45:35Z",
+    "state": "closed",
+    "summary": "An upstream contributor requested a different software license. The maintainer requested contributor consent, contributors responded, and the maintainer later committed the 0BSD relicensing change. This is a paraphrase."
+  },
+  "relevant_consents": [
+    {
+      "author_login": "lifthrasiir",
+      "comment_id": 1829549155,
+      "author_association": "OWNER",
+      "created_at": "2023-11-28T10:38:41Z",
+      "updated_at": "2023-11-28T10:38:41Z",
+      "source": "https://github.com/lifthrasiir/hexf/issues/26#issuecomment-1829549155",
+      "license_referenced": "0BSD",
+      "license_reference_url": "https://opensource.org/license/0bsd/",
+      "consent_observed": true,
+      "summary": "The author gave affirmative consent to 0BSD relicensing of their contributions. This is a paraphrase, not a quotation."
+    },
+    {
+      "author_login": "pchickey",
+      "comment_id": 1830149852,
+      "author_association": "CONTRIBUTOR",
+      "created_at": "2023-11-28T15:58:57Z",
+      "updated_at": "2023-11-28T15:58:57Z",
+      "source": "https://github.com/lifthrasiir/hexf/issues/26#issuecomment-1830149852",
+      "license_referenced": "0BSD",
+      "license_reference_url": "https://opensource.org/license/0bsd/",
+      "consent_observed": true,
+      "summary": "The author gave affirmative consent to 0BSD relicensing of their contributions. This is a paraphrase, not a quotation."
+    },
+    {
+      "author_login": "sunfishcode",
+      "comment_id": 1830227783,
+      "author_association": "CONTRIBUTOR",
+      "created_at": "2023-11-28T16:22:09Z",
+      "updated_at": "2023-11-28T16:22:09Z",
+      "source": "https://github.com/lifthrasiir/hexf/issues/26#issuecomment-1830227783",
+      "license_referenced": "0BSD",
+      "license_reference_url": "https://opensource.org/license/0bsd/",
+      "consent_observed": true,
+      "summary": "The author gave affirmative consent to 0BSD relicensing of their contributions. This is a paraphrase, not a quotation."
+    },
+    {
+      "author_login": "youknowone",
+      "comment_id": 1829687101,
+      "author_association": "COLLABORATOR",
+      "created_at": "2023-11-28T11:52:03Z",
+      "updated_at": "2023-11-28T11:52:06Z",
+      "source": "https://github.com/lifthrasiir/hexf/issues/26#issuecomment-1829687101",
+      "license_referenced": "0BSD",
+      "license_reference_url": "https://opensource.org/license/0bsd/",
+      "consent_observed": true,
+      "summary": "The author gave affirmative consent to 0BSD relicensing of their contributions. This is a paraphrase, not a quotation."
+    }
+  ],
+  "source_snapshot_fingerprints": [
+    {
+      "source": "https://api.github.com/repos/lifthrasiir/hexf/issues/26",
+      "bytes": 6296,
+      "sha256": "a621bb20c5b8aa833976d1d9dad30c1f2ff62ac8a316d077b7d24f8cf85cb720",
+      "representation": "UTF-8 GitHub API JSON content string as returned by the connected GitHub tool; retained only in local validation evidence, not distributed."
+    },
+    {
+      "source": "https://api.github.com/repos/lifthrasiir/hexf/issues/26/comments?per_page=100",
+      "bytes": 21340,
+      "sha256": "348c4f26e8f6bffdf37e0764d2843f62db8e41f5b2c503407c55fa3a2ba9ccc0",
+      "representation": "UTF-8 GitHub API JSON content string as returned by the connected GitHub tool; retained only in local validation evidence, not distributed."
+    }
+  ]
+}

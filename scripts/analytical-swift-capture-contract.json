@@ -1,18 +1,19 @@
 {
+  "base_reviewed_runtime_tree": "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e",
+  "base_reviewed_source": "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef",
   "identity": "analytical-swift-msvc-build-capture-v1",
   "inherited_contracts": {
-    "scripts/analytical-swift-source-contract.json": "112d3b623fadeb7f0cd7f15a3eda13d020d287b622ee3a55c679b139ffe9b2a3",
-    "scripts/replay-candidate-contract.json": "81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19"
+    "scripts/analytical-swift-source-contract.json": "79a78d2ed432fc6ba38e4a5ee3d35eb0fcedc0f273354ef3225d8ddd2782126a",
+    "scripts/replay-candidate-contract.json": "6a66967636c162b7b381fc162723faebb10bef3d14d09b1f663de6b2cfc30875"
   },
-  "reviewed_runtime_tree": "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e",
-  "reviewed_source": "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef",
   "schema_version": 1,
-  "source_admission": "analytical-swift-two-lut-capture-source-admission-v1",
+  "source_admission": "analytical-swift-component-terms-capture-source-admission-v1",
+  "source_migration_sha256": "f742f4678d6af0197408acc16619e7220c8b1c9433c1c7347254fa1d8e88195e",
   "source_recipe": "bevy-0.18.1-tony-filmic-source-v1",
   "source_sha256": {
     ".github/workflows/analytical-swift-msvc-build.yml": "d23c764b900f7d66f0b2ed0df77feb984323bdd038cc7451805b56a456b70976",
     "docs/release/analytical-swift-msvc-capture.md": "a81f848e85ffe6210c7c4c3b30cd4e2f35f2f5a5b3e3e569a304ef4959f7993e",
-    "scripts/capture-analytical-swift-msvc.py": "908c93f90aff89e6c44629f6a75f899c19724e0696fc5800a5fd5eca8755273d",
-    "scripts/tests/test_analytical_swift_capture.py": "f5b68be1a16ee515b1fce5e3f7e410c86caa1c2034318e24f0b1877dec3e0277"
+    "scripts/capture-analytical-swift-msvc.py": "25a6fde7701897f325af4c95a44df27cfdb211611841eba5cc1daa24a4a489b8",
+    "scripts/tests/test_analytical_swift_capture.py": "746b02bc0440baf4676eac519481a9ecc5a4bf10887f760fb32e089d518d2629"
   }
 }

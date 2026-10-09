@@ -193,7 +193,7 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(set(contract['source_sha256']), capture.BOUND_FILES)
         self.assertEqual(contract['source_admission'], capture.SOURCE_ADMISSION)
         self.assertEqual(contract['source_recipe'], capture.check.SOURCE_RECIPE)
-        self.assertEqual(contract['reviewed_source'], capture.check.candidate.REVIEWED_RUNTIME_SOURCE)
+        self.assertEqual(contract['base_reviewed_source'], capture.check.candidate.REVIEWED_RUNTIME_SOURCE)
         for path, expected in {**contract['source_sha256'], **capture.INHERITED_CONTRACTS}.items():
             with self.subTest(path=path): self.assertEqual(capture.check.digest(REPO / path), expected)
         old = json.loads((REPO / capture.check.CONTRACT).read_text())

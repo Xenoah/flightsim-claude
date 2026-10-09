@@ -1,0 +1,27 @@
+{
+  "added_source_sha256": {
+    "LICENSE-APACHE": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
+    "LICENSE-MIT": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
+    "crates/flightsim-app/src/component_terms.rs": "20d2d9ecc046ef619a0d4102dc19eb06fff2084979c46bfbe378c8a0874f2553",
+    "crates/flightsim-app/src/component_terms_dialog.ps1": "47ebe9c2b79a168f21ecae8b50b1f4b6a50168f15856a135f85920e20f031b35",
+    "docs/release/components/MICROSOFT-COMPONENT-NOTICE.txt": "140023bab16a1c65bf55554a4db7a760bda222afe46fdcc401930f87a2ac0006",
+    "docs/release/components/MICROSOFT-COMPONENT-TERMS.ja.txt": "639a4b64da625b37afffd42b9563f0550c3725aeca5940f8a819334cba5e1fde",
+    "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt": "052656e63c7f2df77a7cfffb7d78fcbb64d8525f9d0ca69d39e5475e5bce9d20"
+  },
+  "base_replay_contract_sha256": "81878db06cc1620627447317bce4d412c7e1195939ef3ef02abed13cb8db3a19",
+  "base_runtime_source": "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef",
+  "base_runtime_tree": "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e",
+  "base_source": "4d40f9abbfa90be38c91f2a1379d8355530dc2f5",
+  "historical_relocations": {
+    "crates/flightsim-app/src/main.rs": "scripts/history/4d40f9a-flightsim-app-main.rs"
+  },
+  "identity": "full-two-aircraft-component-terms-source-migration-v1",
+  "preserved_runtime_sha256": "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667",
+  "replaced_source_sha256": {
+    "crates/flightsim-app/src/main.rs": {
+      "previous_sha256": "160cc900acbb0029452c4175fee9ba24bc26611ce41faaa57a97a8426b97811a",
+      "sha256": "fe78b9415040a27cd11397c6aebebd9f2e59669fb8dbd8cd88be79c303a3f9a0"
+    }
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,62 @@
+FlightSim: incorporated Microsoft runtime component notice
+
+Project copyright: Copyright (c) 2026 flightsim-claude contributors
+Project source license: MIT OR Apache-2.0, subject to separate component terms
+
+Component scope
+
+Only proprietary Microsoft native CRT startup and runtime support actually
+incorporated in the Windows executable under the applicable Visual Studio
+Distributable Code route is within the component supplement. Standard startup
+incorporation is supported by the ordinary Rust main, controlled MSVC release
+recipe and documented compiler/linker behavior. This is a source/recipe
+applicability assessment, not a measured static object-member inventory.
+Installed tools, candidate toolset folders, SDK libraries and external DLL
+imports alone do not establish that their code is incorporated or distributed.
+This notice does not assert a selected toolset or exact static membership.
+
+Exact-build evidence schedule
+
+This notice is not an executable fingerprint. The separate exact-build release
+evidence schedule must bind the source revision/tree, executable SHA-256,
+release inventory, these component documents and the reviewed incorporated-code
+scope to the actual published build. A corrected or rebuilt executable requires
+that schedule and its applicability assessment to be rebound; evidence from an
+earlier executable is not evidence of the new executable's exact contents.
+Unknown static members and toolset selection must remain explicitly unknown
+unless the new build evidence establishes them. No historical executable or
+installed-toolset observation is represented here as a fact about every build.
+
+Retain applicable original supplier notices. This explanatory notice does not
+replace or invent their text. Separately licensed Rust, LLVM, Cargo and other
+components remain covered by their accompanying original licenses and notices.
+
+External prerequisites
+
+The release copy plan does not include separate Microsoft DLLs, LIBs or
+redistributable installers. The actual payload must be checked against that
+exact plan. Windows system libraries, UCRT, graphics drivers and the x64 Visual
+C++ v14 runtime remain external prerequisites. Obtain the runtime from Microsoft:
+https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
+Use the current supported x64 v14 package; do not copy individual DLLs from
+unverified download sites. No installation or agreement acceptance is performed
+by this notice.
+
+Authoritative references
+
+Visual Studio Enterprise/Professional 2022 agreement, section 5:
+https://visualstudio.microsoft.com/license-terms/vs2022-ga-proenterprise/
+
+Native startup and runtime catalog:
+https://learn.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features?view=msvc-170
+
+Static deployment:
+https://learn.microsoft.com/en-us/cpp/windows/deployment-in-visual-cpp?view=msvc-170
+
+The complete component supplement is MICROSOFT-COMPONENT-TERMS.txt, version
+2026-10-09-2. MICROSOFT-COMPONENT-TERMS.ja.txt is its Japanese reference
+translation. The first-launch screen requests an explicit choice. Before onward
+distribution, redistributors must review and agree using --component-terms,
+which shows the same terms without entering the simulator. Only the recipient's
+explicit choice records local acceptance for the exact terms version/hash.
+This notice, a build check or merely opening the terms records no assent.

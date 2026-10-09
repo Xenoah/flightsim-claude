@@ -1,0 +1,23 @@
+//! This file exposes a single struct that can decode a huffman encoded
+//! Bitstream in a JPEG file
+//!
+//! This code is optimized for speed.
+//! It's meant to be super duper super fast, because everyone else depends on this being fast.
+//! It's (annoyingly) serial hence we cant use parallel bitstreams(it's variable length coding.)
+//!
+//! Furthermore, on the case of refills, we have to do bytewise processing because the standard decided
+//! that we want to support markers in the middle of streams(seriously few people use RST markers).
+//!
+//! So we pull in all optimization steps:
+//! - use `inline[always]`? ✅ ,
+//! - pre-execute most common cases ✅,
+//! - add random comments ✅
+//! -  fast paths ✅.
+//!
+//! Speed-wise: It is probably the fastest JPEG BitStream decoder to ever sail the seven seas because of
+//! a couple of optimization tricks.
+//! 1. Fast refills from libjpeg-turbo
+//! 2. As few as possible branches in decoder fast paths.
+//! 3. Accelerated AC table decoding borrowed from stb_image.h written by Fabian Gissen (@ rygorous),
+//! improved by me to handle more cases.
+//! 4. Safe and extensible routines(e.g. cool ways to eliminate bounds check)

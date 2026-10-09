@@ -1,27 +1,35 @@
-# Full two-aircraft source admission, version 1
+# Full two-aircraft component-terms source admission, version 1
 
-This source-only identity is `full-two-aircraft-reviewed-source-v1`. It binds the
-canonical GitHub runtime commit `960c3126e6a4bc22b8d4acc6e6737f8f2b473bef`, tree
-`b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e`. The locally reviewed `9a722291ea81b057eabf56e1c9b080ff04c43750`
-has the same tree. Admission implementation and fixture migration require their
-own review after all pins are sealed. The runtime composition review is not a
-review of this subsequent tooling change.
+This source-only identity is `full-two-aircraft-component-terms-source-v1`.
+The `base_reviewed_source` and `base_reviewed_runtime_tree` fields identify the
+previous runtime composition `960c3126e6a4bc22b8d4acc6e6737f8f2b473bef`, tree
+`b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e`, as historical base provenance only.
+They do not identify the changed component-terms runtime. The separately pinned
+`scripts/component-terms-source-migration.json` binds the exact startup change,
+two new runtime inputs, three component documents and two unchanged embedded
+project-license texts. Every execution still requires its actual final clean commit, complete tree and canonical input bytes.
+Prior `55094fa` builds, graphs and native observations remain reference evidence;
+none are qualified evidence for the changed runtime.
 
-The current replay source contract names 918 exact files. Its literal path sets
+The current replay source contract names 927 exact files. Its literal path sets
 include the previous 404-file boundary, every one of the 55 local core-pipeline
-files, complete original-highwing inputs and provenance, and 496 unchanged same-path
-runtime/physical files plus the old replay contract bytes at its explicit historical
-path. This preserves all 497 byte identities without claiming the new contract is
-unchanged. The relocation is declared in `full-two-aircraft-runtime-pins.json`.
-The frozen hashes were independently compared to
-both base `d918943a70d01644b5a6bebb8a903a5bbc89139f` and the canonical runtime Git
+files, complete original-highwing inputs and provenance, and 495 unchanged
+same-path runtime/physical identities plus the old replay contract and old main
+bytes at their explicit historical paths. The frozen 497-identity map is unchanged. Its sole changed
+same-path member, app `main.rs`, is retained byte-for-byte as
+`scripts/history/4d40f9a-flightsim-app-main.rs`; the new migration declares and
+checks this single relocation and the exact old/new hashes. All other 496
+identities retain their prior paths. No old digest is overwritten or relabeled.
+Before this migration, the frozen hashes were independently compared to both base `d918943a70d01644b5a6bebb8a903a5bbc89139f` and the canonical runtime Git
 blobs. All 102 independent replay anchors retain their previous hashes. No
-runtime/profile byte is refreshed to satisfy a test. Clean Git state, regular
-files, canonical blob hashes, checkout hashes, case-sensitive exact path sets,
+unrelated runtime/profile byte is refreshed to satisfy a test. Clean Git state,
+regular files, canonical blob hashes, checkout hashes, case-sensitive exact path sets,
 and rejection of ignored local vendor/witness inputs remain required. The 492
-preserved crate paths also form a closed member set: committed, ignored or
-untracked Cargo-discovered build scripts, binaries, examples and benchmarks
-cannot expand it. Root-case aliases and reparse/symlink paths remain rejected.
+preserved crate paths plus only the two literal component-terms inputs form a
+closed 494-member set: committed, ignored or untracked Cargo-discovered build
+scripts, binaries, examples and benchmarks cannot expand it. The three component
+documents also form an exact closed directory boundary. Root-case aliases and
+reparse/symlink paths remain rejected.
 
 `scripts/history/d918943-*.json` stores byte-exact prior replay, analytical and
 capture source contracts. Their historical identities, reviewed sources and
@@ -48,6 +56,9 @@ Current source archives select `original-highwing-v1`; historical default archiv
 fixtures retain their previous policy. The preparation map
 `docs/release/full-two-aircraft-source-inputs.json` remains historical preparation
 data, with no source-admission authority.
+
+See [the bounded component-terms migration](../qa/component-terms-source-bindings-2026-10-09.md)
+for the exact preservation and mutation-test boundary.
 
 A source pass establishes neither native execution, appearance, whole-target
 rights, source-hosting verification nor publication authority. The final full

@@ -35,7 +35,7 @@ IDENTITY = tone.ANALYTICAL_SWIFT_RECIPE
 TARGET, TOOLCHAIN = candidate.TARGET, candidate.TOOLCHAIN
 FEATURES = ['analytic-tonemapping', 'commercial-staging']
 CONTRACT = 'scripts/analytical-swift-source-contract.json'
-SOURCE_ADMISSION = 'analytical-swift-two-lut-source-admission-v1'
+SOURCE_ADMISSION = 'analytical-swift-component-terms-source-admission-v1'
 SOURCE_RECIPE = tone.TWO_LUT_SOURCE
 SOURCE_PATHS = {
     'Cargo.toml', 'Cargo.lock', 'crates/flightsim-app/Cargo.toml',
@@ -63,7 +63,10 @@ SOURCE_PATHS = {
     'scripts/tests/test_historical_release_copy_plan.py',
     '.github/workflows/ci.yml',
     'docs/release/full-two-aircraft-source-admission.md',
-}
+    'scripts/tests/test_component_terms_source_admission.py',
+    'scripts/tests/test-component-terms-dialog.ps1',
+    'docs/qa/component-terms-source-bindings-2026-10-09.md',
+} | candidate.COMPONENT_TERMS_SOURCE_PATHS
 GATES = {
     'combined_feature_regressions': 'Combined release/MSVC app/render tests and Clippy; real render tonemapping_modes; ordinary controls and mixed/neither rejection',
     'exact_identity_and_legacy_tests': 'Existing fingerprint and three exact legacy tests, one executed passing test each under combined release/MSVC features',
@@ -119,11 +122,13 @@ def source_evidence(repo, expected):
     source = candidate.source_inputs(repo, expected)
     contract = json.loads((repo / CONTRACT).read_text())
     require(set(contract) == {'schema_version', 'recipe', 'source_admission', 'source_recipe',
-            'reviewed_source', 'reviewed_runtime_tree', 'release_authorized', 'source_sha256'}
+            'base_reviewed_source', 'base_reviewed_runtime_tree', 'source_migration_sha256',
+            'release_authorized', 'source_sha256'}
             and type(contract.get('schema_version')) is int
             and contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY
-            and contract.get('reviewed_source') == candidate.REVIEWED_RUNTIME_SOURCE
-            and contract.get('reviewed_runtime_tree') == candidate.REVIEWED_RUNTIME_TREE
+            and contract.get('base_reviewed_source') == candidate.REVIEWED_RUNTIME_SOURCE
+            and contract.get('base_reviewed_runtime_tree') == candidate.REVIEWED_RUNTIME_TREE
+            and contract.get('source_migration_sha256') == candidate.COMPONENT_TERMS_MIGRATION_SHA256
             and contract.get('source_admission') == SOURCE_ADMISSION
             and contract.get('source_recipe') == SOURCE_RECIPE
             and contract.get('release_authorized') is False,

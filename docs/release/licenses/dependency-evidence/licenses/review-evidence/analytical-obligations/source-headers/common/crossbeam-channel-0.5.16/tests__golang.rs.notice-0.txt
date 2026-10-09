@@ -1,0 +1,10 @@
+//! Tests copied from Go and manually rewritten in Rust.
+//!
+//! Source:
+//!   - https://github.com/golang/go
+//!
+//! Copyright & License:
+//!   - Copyright (c) 2009 The Go Authors
+//!   - https://golang.org/AUTHORS
+//!   - https://golang.org/LICENSE
+//!   - https://golang.org/PATENTS

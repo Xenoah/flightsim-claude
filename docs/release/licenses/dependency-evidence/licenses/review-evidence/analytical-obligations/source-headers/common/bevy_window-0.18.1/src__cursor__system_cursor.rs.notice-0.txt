@@ -1,0 +1,10 @@
+// This file contains a portion of the CSS Basic User Interface Module Level 3
+// specification. In particular, the names for the cursor from the #cursor
+// section and documentation for some of the variants were taken.
+//
+// The original document is https://www.w3.org/TR/css-ui-3/#cursor.
+// Copyright © 2018 W3C® (MIT, ERCIM, Keio, Beihang)
+//
+// These documents were used under the terms of the following license. This W3C
+// license as well as the W3C short notice apply to the `CursorIcon` enum's
+// variants and documentation attached to them.

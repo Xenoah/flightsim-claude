@@ -1,0 +1,10 @@
+Electronic Arts fastnoise texture provenance
+
+The bundled src/bluenoise/stbn.ktx2 consists of 32 RGB layers whose decoded bytes match the Electronic Arts fastnoise vector3_uniform_box3x3_exp0101_product_0.png through _31.png, in numeric order and without a vertical flip. This is a format conversion of the supplied EA textures; it is not attributed to NVIDIA STBN.
+
+Upstream: https://github.com/electronicarts/fastnoise/tree/a63c6b6594aaf63f8c88c918a1df3915d6417ee5
+Texture archive: noise.zip, upstream LFS SHA-256 35fe2ce496a837186931acc5afedcdf53ef22d1aaf6d01ad1dcd416c5ff68cea
+Subdirectory: vector3/temporal/exp
+Bevy supplier provenance: https://github.com/bevyengine/bevy/pull/19076#issuecomment-3095317127
+
+The accompanying exact EA-fastnoise-LICENSE.txt preserves Electronic Arts' 2023 copyright, BSD-3-Clause conditions and disclaimer. Retain it with source and binary distribution documentation. No endorsement or separate rights beyond that grant are claimed. The analytical project feature graph does not enable bluenoise_texture; retaining the asset supports the upstream optional feature without changing this project's enabled features.

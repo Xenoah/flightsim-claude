@@ -1,0 +1,1072 @@
+Rust 1.93.0 compiler-builtins and embedded libm source notices
+
+Conservative source notice superset. Presence here does not establish that a file
+was compiled for Windows or that code survived linking. Original comment text follows
+unchanged, including comment delimiters, with source locations added as separators.
+
+
+========================================================================
+library/compiler-builtins/compiler-builtins/src/probestack.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/compiler-builtins/src/probestack.rs
+Source SHA-256: 704acd6e582b0db871d5cd793cea2d9101bf57ad4166672c1fd4a6f2dd2a8c18
+
+Lines 1-9
+// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
+// file at the top-level directory of this distribution and at
+// http://rust-lang.org/COPYRIGHT.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+========================================================================
+library/compiler-builtins/libm/src/math/acos.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/acos.rs
+Source SHA-256: efd83a6138061209867f06421c6a756b8ca3aab5c6c0a85c4aba31bedb299da5
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/acosf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/acosf.rs
+Source SHA-256: c5c9c74d267725bbe5f9319e6f4a396af6ce46c890b601d3f963a5d74d12e4c3
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/asin.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/asin.rs
+Source SHA-256: 9693a7cb61674ec6fe22be9db8fe20276729c48b1562fd86d5421e372a0a12e4
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/asinf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/asinf.rs
+Source SHA-256: 25f6b7bbf46fc5aac4ebdd9e00118239747dcd28a79b90b858ddc4633d773d65
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/atan.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/atan.rs
+Source SHA-256: 54181dbddf4f77b90b32b9f6819ac989da570dc02b791f3685d20a23d51324be
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/atan2.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/atan2.rs
+Source SHA-256: 7d028d4d397f7484b8feed7b228eda65b84acac94d27729d236d5df95e38d8f0
+
+Lines 2-12
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ *
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/atan2f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/atan2f.rs
+Source SHA-256: b9497b5adb75e2788c404fd121aa64dcfa0e9357b67af3b3e7e6d4624dae1ca1
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/atanf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/atanf.rs
+Source SHA-256: 197762f16ed5951236e17d0869c529e857acc329cc287df019ff69e5401f3b4d
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/cbrt.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/cbrt.rs
+Source SHA-256: 1ed98a0943c46ca48e32af54b6baeb80b6e8da5dda550005711fcb26bfcf12c2
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+Lines 2-5
+/* origin: core-math/src/binary64/cbrt/cbrt.c
+ * Copyright (c) 2021-2022 Alexei Sibidanov.
+ * Ported to Rust in 2025 by Trevor Gross.
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/cbrtf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/cbrtf.rs
+Source SHA-256: 7a2b4f190e8618c52cb23b47c040a4b4eacca739c68393cf14fb3f5d73988127
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/cos.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/cos.rs
+Source SHA-256: 6e81752899c471bd42d04bdf08e0b22bc10a29f92fa2a343281b995fd342f035
+
+Lines 1-10
+// origin: FreeBSD /usr/src/lib/msun/src/s_cos.c */
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunPro, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/cosf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/cosf.rs
+Source SHA-256: f48aa954f199fe4f54fd73b4e7886a75f2c08afba7fc31c6a36db5b5f90ced69
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/erf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/erf.rs
+Source SHA-256: 5a69f440d5ca88a5c4a45119837c45b14238836a036675230e10fec41d293a3b
+
+Lines 3-12
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/erff.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/erff.rs
+Source SHA-256: 62c30876390e532d7dc9ac1f1f1c1f654065fba2b2e534e531964d79e1766196
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/exp.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/exp.rs
+Source SHA-256: 63b610d99d8753cc3db1e22a4341f753809e3df07c61fd6828a27a0ef25695a3
+
+Lines 2-10
+/*
+ * ====================================================
+ * Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/exp2.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/exp2.rs
+Source SHA-256: 95960af68c3db512f94421912cf1d14335c269dbd207f3244f5b44947a23b695
+
+Lines 1-25
+// origin: FreeBSD /usr/src/lib/msun/src/s_exp2.c */
+//-
+// Copyright (c) 2005 David Schultz <das@FreeBSD.ORG>
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
+
+========================================================================
+library/compiler-builtins/libm/src/math/exp2f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/exp2f.rs
+Source SHA-256: 9f7b2c4c9c30fd4ccb82dc4ecf945a818f3fb4e1bd15d6965f3c270f74eba2f4
+
+Lines 1-25
+// origin: FreeBSD /usr/src/lib/msun/src/s_exp2f.c
+//-
+// Copyright (c) 2005 David Schultz <das@FreeBSD.ORG>
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
+
+========================================================================
+library/compiler-builtins/libm/src/math/expf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/expf.rs
+Source SHA-256: 98873958e03372a4e0e3bda9a9d1e2c93d64e10ad33b93ada1309a1042c926fe
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/expm1.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/expm1.rs
+Source SHA-256: 6cc612ca7cf1384dc15f541b301a1f176efbc79536aff1293408b3121cc30ad3
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/expm1f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/expm1f.rs
+Source SHA-256: 28ac11d85bc89dc3147b947bc68141e254d89bcab48149e39485ea2dd1879772
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/fma.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/fma.rs
+Source SHA-256: 16e72470f5c4407c44183cf06f5868f216c92e0532f3fb387b57dbccf815e2a7
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/ceil.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/ceil.rs
+Source SHA-256: 66b3def2b00ed9dd6a4f59c73765a050853dfe06c828fdf731987ac99e7c2a88
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/floor.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/floor.rs
+Source SHA-256: 7d4f15369abefa27645d6deda51d30febbe60ee9dca76e72a9364d574d0711c0
+
+Lines 1-2
+/* SPDX-License-Identifier: MIT
+ * origin: musl src/math/floor.c */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fma.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fma.rs
+Source SHA-256: ba44930a56d7c1953ab0c96c7c767911c9dc6967083700c8ef02f43672c8482f
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fmax.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fmax.rs
+Source SHA-256: 68d923950c3f1eab68baeab24679ab50918b663904839bc349ef666d9467518f
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fmaximum.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fmaximum.rs
+Source SHA-256: c4b8b7080821a2dc65d0a50baf717ccd9ee20b813ce6d6d3f9f01b5700b674fa
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fmaximum_num.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fmaximum_num.rs
+Source SHA-256: 2f2d41e1f0160eb73469fa63db27d881b5b8eabc6d62fae7ca1b4b03eb35c5d5
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fmin.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fmin.rs
+Source SHA-256: 9bbdece9606e5eac57f3a91a5db7aab814c8e2b28b6df1813723c6b5715efc55
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fminimum.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fminimum.rs
+Source SHA-256: a6a33085356610eced23957ca86456b7dbe95e0f9d916298d59ce8bd90076b02
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fminimum_num.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fminimum_num.rs
+Source SHA-256: f5db65654e690adea16da83839d62a707cc814c998fd4a77e63caaaea1472256
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/fmod.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/fmod.rs
+Source SHA-256: 15a29db87c3b2d3f11b36d188e8e45b8303d109474a99b55a604a5acb8c21c85
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/rint.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/rint.rs
+Source SHA-256: deec183fd0da6c0a47ab272a256990cea4f9231db7faff314697886457d6841a
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/sqrt.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/sqrt.rs
+Source SHA-256: c58e48ec07404d618109ad45332efe46c5246f42a2ddefdf5b25ba19e4ca9a0f
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT */
+
+========================================================================
+library/compiler-builtins/libm/src/math/generic/trunc.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/generic/trunc.rs
+Source SHA-256: 46dd2cc35f6da25099ea2202264d8da3330b5ff1a962a8afb671b54b6ef6002d
+
+Lines 1-2
+/* SPDX-License-Identifier: MIT
+ * origin: musl src/math/trunc.c */
+
+========================================================================
+library/compiler-builtins/libm/src/math/j0.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/j0.rs
+Source SHA-256: 1cb991f0151a626744ad1832d4aedfaca681bcfcecc797de5ac5e9baf2342006
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/j0f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/j0f.rs
+Source SHA-256: de97374b6a0019fd8b3d1f553be1708018546491d3b4a5fc650ee2dcdfc9620e
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/j1.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/j1.rs
+Source SHA-256: e0a10746fd11a458d55ee61e758d9f016ff0f2203a07eb9907b5aca709a40469
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/j1f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/j1f.rs
+Source SHA-256: 27b586c94d510aa653923b6b83cfec174e1f5da326d9120b0a0135b1190e32dc
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/jn.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/jn.rs
+Source SHA-256: ba36d25d4bbada83aadb3b2986879b7d88b91adb7b502061d21bf96ff3942194
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/jnf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/jnf.rs
+Source SHA-256: b3861e19644ae669fe17db81d91aeaee9c9f9051b59957ab674017684c98fe32
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_cos.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_cos.rs
+Source SHA-256: d4867527877c846aa8e2a0b43cf06f03e2d94c321a548acaf8d5171c09ff4057
+
+Lines 1-10
+// origin: FreeBSD /usr/src/lib/msun/src/k_cos.c
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunSoft, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_cosf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_cosf.rs
+Source SHA-256: 8f76089d014e217b96c9eca520271e64d467dc0d6542bf313dd70eb96c040f7f
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_sin.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_sin.rs
+Source SHA-256: dfe6524cb2d530ec51eb1a2ab233aeb65b3f12177c1fb2f50f044ea41170f5d8
+
+Lines 1-10
+// origin: FreeBSD /usr/src/lib/msun/src/k_sin.c
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunSoft, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_sinf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_sinf.rs
+Source SHA-256: cf0e8bbe8d73a6704b7f1f710f5b9d31f190f1c633e894d4f69c4e3bc359eba3
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_tan.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_tan.rs
+Source SHA-256: dc3f8ece9187bbd65792a7d1068e676092e9c2a0886f28c80579f9bd94d744b7
+
+Lines 1-9
+// origin: FreeBSD /usr/src/lib/msun/src/k_tan.c */
+//
+// ====================================================
+// Copyright 2004 Sun Microsystems, Inc.  All Rights Reserved.
+//
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/k_tanf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/k_tanf.rs
+Source SHA-256: 3381d2d4865bfc98e87aadb96bd8986f7691a389569a58fb1cb8db74fb5d9c20
+
+Lines 2-10
+/*
+ * ====================================================
+ * Copyright 2004 Sun Microsystems, Inc.  All Rights Reserved.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/lgamma_r.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/lgamma_r.rs
+Source SHA-256: 5d56169c077b5b9f88902e2d243a7a4b4d06b89295aa84283d6fa15d9c244032
+
+Lines 2-12
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ *
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/lgammaf_r.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/lgammaf_r.rs
+Source SHA-256: 0bc2b5e0eec7666973adaca536f4d5fe978c8793bb340484fff9e5e7abb425f0
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log.rs
+Source SHA-256: df5f4d1325e89621bfcd9cf7788d0d7e20a6ef7f429110fe35b370b3c9362615
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log10.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log10.rs
+Source SHA-256: 4a96dd2b6a2a505497f2bb7ea956a50491d068dab1b6055a573aec1724a52e40
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log10f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log10f.rs
+Source SHA-256: 784a576dd4a4071f4f67c670eb9b221cb03014818c4b2d71afbcbd2211431caf
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log1p.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log1p.rs
+Source SHA-256: bb8ce741e54d8f001d9c12450a14a663bd413014da2ade9ba1f5fbc9ff0c9a88
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log1pf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log1pf.rs
+Source SHA-256: 8736222a9b9004b061f1339bb819c63c6b54414d4a01ef79d5f5a5f0a70677b5
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log2.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log2.rs
+Source SHA-256: 1ec0cdd94bf4435ff0402d209089b1bdbcb1ba9a4cd5f77807f9c84cf534f980
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/log2f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/log2f.rs
+Source SHA-256: 7b3b17ba08df6b5a57dacf6f945bfe1a3c088bee0eb11e201ac5affc7f65925a
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/logf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/logf.rs
+Source SHA-256: c7dfa5e89fcca0411624fdc594f64c62d5dfa3b91f061fcb7ac3aea18414f238
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/pow.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/pow.rs
+Source SHA-256: c5566d0f48682d107e8803b0ed204ff3521503348f18a4f26cbe3f47fef15192
+
+Lines 2-10
+/*
+ * ====================================================
+ * Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/powf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/powf.rs
+Source SHA-256: 819971cb8e927d80113aded3cfe90dcd501c031e0eb1c562b58842fddd1751be
+
+Lines 5-14
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/rem_pio2.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/rem_pio2.rs
+Source SHA-256: 5a040ab09dc356bca6d57712327151ed43003e2bac156553e3eb87d1cdefd2d1
+
+Lines 1-12
+// origin: FreeBSD /usr/src/lib/msun/src/e_rem_pio2.c
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunPro, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+//
+// Optimized by Bruce D. Evans. */
+
+========================================================================
+library/compiler-builtins/libm/src/math/rem_pio2_large.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/rem_pio2_large.rs
+Source SHA-256: 986b5b9ad2c8fba828aee47bf198eab97fab243359ab03eb09783d98ca5847b5
+
+Lines 3-12
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/rem_pio2f.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/rem_pio2f.rs
+Source SHA-256: fb34bab63f8d143dfefa4ef2e31e8166bf21f3c67f1519bfc3ca4fb8eb28cafe
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/sin.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/sin.rs
+Source SHA-256: b48cebd120fc2ac93a6563059cabda28a72c8680304eb8335b92b412235cc232
+
+Lines 1-10
+// origin: FreeBSD /usr/src/lib/msun/src/s_sin.c */
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunPro, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/sincos.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/sincos.rs
+Source SHA-256: a9c414e828c2e78b6bce4d5e4237b1baa93e81d78421aed5cedeab43df64067f
+
+Lines 2-11
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/sincosf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/sincosf.rs
+Source SHA-256: c39b6e3b52be83ccf4015ff105dab55e693577ebfc43745881750e73eebc6fa6
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/sinf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/sinf.rs
+Source SHA-256: b17db34d5da39a0f336d831abcb700fab69402c915321823870f1845e66c03d2
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+========================================================================
+library/compiler-builtins/libm/src/math/support/int_traits/narrowing_div.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/support/int_traits/narrowing_div.rs
+Source SHA-256: af1d009ecff106fef81c46c71f2f19db9839e17a1deba005a17f7483917a5b8f
+
+Lines 1-1
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+
+========================================================================
+library/compiler-builtins/libm/src/math/tan.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/tan.rs
+Source SHA-256: 2ea87ca18526753db6d149635ed6c895c8fbafd1e0fa7a9c04f7dc44b4eae986
+
+Lines 1-10
+// origin: FreeBSD /usr/src/lib/msun/src/s_tan.c */
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunPro, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
+========================================================================
+library/compiler-builtins/libm/src/math/tanf.rs
+https://raw.githubusercontent.com/rust-lang/rust/254b59607d4417e9dffbc307138ae5c86280fe4c/library/compiler-builtins/libm/src/math/tanf.rs
+Source SHA-256: f7140c4193a57709acde5d290c8f83435562da42924c54cab0aa3a4f26095190
+
+Lines 6-15
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */

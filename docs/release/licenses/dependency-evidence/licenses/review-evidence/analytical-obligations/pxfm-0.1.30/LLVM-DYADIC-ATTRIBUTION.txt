@@ -1,0 +1,16 @@
+LLVM libc dyadic floating-point implementation adapted in pxfm 0.1.30
+
+pxfm src/dyadic_float.rs contains a Rust, fixed-128-bit adaptation of LLVM libc dyadic_float.h, including fast_as_f64 corresponding to fast_as<T>. The Rust adaptation changes language, types, helper calls and exception-handling details. This acknowledgement describes the observed adaptation; it does not assert a particular historical import commit.
+
+Source: https://github.com/llvm/llvm-project/blob/87f0227cb60147a26a1eeb4fb06e3b505e9c7261/libc/src/__support/FPUtil/dyadic_float.h
+Verified grant snapshot: LLVM 20.1.8 (87f0227cb60147a26a1eeb4fb06e3b505e9c7261)
+
+//===-- A class to store high precision floating point numbers --*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+The accompanying LLVM-LICENSE.txt reproduces the actual libc license file, including its LLVM exceptions and legacy explanatory material. The selected grant for this file is Apache-2.0 WITH LLVM-exception; no legacy NCSA alternative is asserted.

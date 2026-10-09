@@ -1,0 +1,28 @@
+/*
+ * // Copyright 2024 (c) the Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Use of this source code is governed by a BSD-style
+ * // license that can be found in the LICENSE file.
+ */
+
+//! # Luv
+/// Struct representing a color in CIE LUV, a.k.a. L\*u\*v\*, color space
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Default, PartialOrd)]
+pub struct Luv {
+    /// The L\* value (achromatic luminance) of the colour in 0–100 range.
+    pub l: f32,
+    /// The u\* value of the colour.
+    ///
+    /// Together with v\* value, it defines chromaticity of the colour.  The u\*
+    /// coordinate represents colour’s position on red-green axis with negative
+    /// values indicating more red and positive more green colour.  Typical
+    /// values are in -134–220 range (but exact range for ‘valid’ colours
+    /// depends on luminance and v\* value).
+    pub u: f32,
+    /// The u\* value of the colour.
+    ///
+    /// Together with u\* value, it defines chromaticity of the colour.  The v\*
+    /// coordinate represents colour’s position on blue-yellow axis with
+    /// negative values indicating more blue and positive more yellow colour.
+    /// Typical values are in -140–122 range (but exact range for ‘valid’

@@ -1,0 +1,7 @@
+// Adapted from https://github.com/rust-lang-nursery/stdsimd/pull/479.
+macro_rules! _MM_SHUFFLE {
+    ($z:expr, $y:expr, $x:expr, $w:expr) => {
+        ($z << 6) | ($y << 4) | ($x << 2) | $w
+    };
+}
+

@@ -1,0 +1,86 @@
+FlightSim: incorporated Microsoft runtime components
+Version 2026-10-09-2
+
+1. Limited scope
+
+These terms apply only to the proprietary Microsoft native runtime and startup
+code actually incorporated in this Windows FlightSim executable and identified
+in its accompanying Microsoft component notice (Covered Code). They do not
+apply to tools installed on the build computer, external Windows or driver
+files, or separately installed runtime packages.
+
+FlightSim source, assets, and separately licensed components retain their
+existing licenses. These terms do not reduce rights granted for those parts by
+MIT, Apache 2.0, or another applicable license. If a particular covered portion
+has a separate license, that license governs that portion. Nothing limits
+rights or remedies that applicable law does not permit to be limited, including
+consumer rights and legally protected interoperability or reverse engineering.
+
+2. Use with FlightSim
+
+You may install and use Covered Code as incorporated in FlightSim. You may
+copy and redistribute this application with the Covered Code subject to these
+terms. This does not grant a license to Microsoft's development tools or a
+right to extract, sell, license or redistribute Covered Code on its own.
+
+3. Protection of Covered Code
+
+Except where applicable law or a separate governing license permits otherwise,
+do not remove, minimize, block or alter its proprietary notices, defeat its technical limits,
+reverse engineer, decompile or disassemble it, or derive its source code.
+Do not rent, lease, lend, publish or sublicense Covered Code as a separate
+product. These restrictions concern Covered Code, not the separately licensed
+FlightSim source or other open-source components.
+
+Do not use Microsoft trademarks in the application's name or suggest Microsoft
+created or endorses it. Preserve applicable supplier notices. Comply with
+export restrictions applicable to Covered Code. Do not impose a source-code
+disclosure or modification-license condition on proprietary Covered Code that
+its governing license does not authorize.
+
+4. Redistribution
+
+When distributing this FlightSim binary, keep Covered Code incorporated in the
+application and retain its notices and this supplement. Require distributors
+and external end users to agree to terms protecting Covered Code at least as
+much as this supplement and its applicable Microsoft distribution terms.
+
+These terms do not authorize bundling additional Microsoft DLLs, installers,
+tools, SDK code, debug, preview, pre-release or beta components. A distributor
+who changes the binary must assess the terms for its own incorporated code.
+FlightSim's separately licensed source may still be modified and distributed
+under its existing licenses. No restriction on benchmarking FlightSim is added.
+
+5. Microsoft and supplier protection
+
+Microsoft does not supply or support FlightSim merely because this runtime
+code is incorporated. To the maximum extent permitted by applicable law,
+Microsoft and its suppliers provide Covered Code without warranties,
+guarantees or conditions, including merchantability, fitness for a particular
+purpose and non-infringement.
+
+To the maximum extent permitted by applicable law, Microsoft and its suppliers
+are not liable for damages or other remedies arising from Covered Code,
+including direct, indirect, incidental, special or consequential loss or lost
+profits, whether a claim is based on contract, warranty, negligence or another
+theory, even if such loss was foreseeable or advised.
+
+If applicable law allows you to recover damages from Microsoft or its suppliers
+despite these exclusions, then, to the maximum extent that law permits, recovery
+for Covered Code is limited to the amount you paid for Covered Code, or US$50
+if you acquired Covered Code at no charge. This does not exclude liability
+that law forbids excluding, or reduce rights or remedies expressly provided
+by another independently applicable agreement with Microsoft.
+
+These protections concern Microsoft and its suppliers. They do not remove the
+application distributor's own legal duties or impose a distributor's indemnity
+to Microsoft on an end user merely for installing or using FlightSim.
+
+6. Agreement boundary
+
+Agreement is requested only for this component supplement. It does not create
+a Visual Studio or Windows SDK account or license, change FlightSim's project
+licenses, or impose a new application-wide liability cap, dispute forum,
+arbitration clause, account requirement or telemetry consent.
+
+END OF COMPONENT TERMS

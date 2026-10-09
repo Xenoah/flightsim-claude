@@ -153,6 +153,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test Windows component dialog without recording recipient assent
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/tests/test-component-terms-dialog.ps1
+
       # winit の x11 バックエンドが要求するもの。
       # libasound2-dev は音（bevy_audio → alsa-sys）が要求する。
       # ADR-0009 で音を入れるまでは feature ごと切ってあり不要だった。

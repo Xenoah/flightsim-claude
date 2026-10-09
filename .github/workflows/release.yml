@@ -14,9 +14,12 @@ permissions:
 # Release input hashes must have identical bytes on Linux and Windows checkouts.
 # Process-local Git configuration; no runner/account settings are persisted.
 env:
-  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_COUNT: '2'
   GIT_CONFIG_KEY_0: core.autocrlf
   GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.eol
+  GIT_CONFIG_VALUE_1: 'lf'
+  PYTHONUTF8: '1'
 
 concurrency:
   # 異なる main commit が近接して完了しても、同じ version/tag を並行操作しない。
@@ -56,7 +59,7 @@ jobs:
     needs: authorize
     if: needs.authorize.outputs.authorized == 'true'
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 360
     outputs:
       bundle: ${{ steps.version.outputs.bundle }}
       tag: ${{ steps.version.outputs.tag }}
@@ -93,6 +96,10 @@ jobs:
               $gate.authorization_sha256 -ne $env:EXPECTED_AUTHORIZATION) {
             throw 'authorization or actual release input bytes changed between jobs'
           }
+
+      - name: Test component dialog separately from diagnostic scene capture
+        shell: pwsh
+        run: ./scripts/tests/test-component-terms-dialog.ps1
 
       - name: Install the tested Rust toolchain
         shell: pwsh
@@ -133,250 +140,111 @@ jobs:
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "bundle=$bundle" >> $env:GITHUB_OUTPUT
 
-      - name: Build the Windows application
-        shell: pwsh
-        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p flightsim-app
-
-      - name: Verify the trusted freshly built offline application identity
+      # One fresh dual audit; the ordinary executable is packaged without rebuilding.
+      - name: Fetch the exact private upstream source reference
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          python scripts/check-release-authorization.py `
-            --verify-built-executable target/x86_64-pc-windows-msvc/release/flightsim-app.exe
-          if ($LASTEXITCODE -ne 0) { throw 'built executable does not match the offline release recipe' }
+          $directory = Join-Path $env:RUNNER_TEMP 'ordinary-upstream-reference'
+          New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+          $reference = Join-Path $directory 'bevy_core_pipeline-0.18.1.crate'
+          curl.exe --fail --location --silent --show-error --proto '=https' `
+            --max-time 120 --retry 2 --max-filesize 4194304 --output $reference `
+            https://static.crates.io/crates/bevy_core_pipeline/bevy_core_pipeline-0.18.1.crate
+          if ($LASTEXITCODE -ne 0) { throw 'private upstream reference download failed' }
+          if ((Get-FileHash -Algorithm SHA256 $reference).Hash.ToLowerInvariant() -ne
+              '4d0810e85c2436e50c67448d48a83bf0bb1b5849899619ae2c7ea817221e9172') {
+            throw 'private reference differs from reviewed source'
+          }
 
-      - name: Assemble and verify the release bundle
+      - name: Capture and audit the final source once
+        id: native_capture
         shell: pwsh
         env:
-          BUNDLE: ${{ steps.version.outputs.bundle }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-          INVENTORY_SHA256: ${{ needs.authorize.outputs.release_inventory_sha256 }}
-          AUTHORIZATION_SHA256: ${{ needs.authorize.outputs.authorization_sha256 }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $staging = Join-Path $env:RUNNER_TEMP "flightsim-claude-$env:TAG-windows-x86_64"
-          $artifact = Join-Path $env:GITHUB_WORKSPACE 'release-artifact'
-          New-Item -ItemType Directory -Force -Path $staging, $artifact | Out-Null
+          python -B scripts/capture-analytical-swift-msvc.py `
+            --repo $env:GITHUB_WORKSPACE --source-sha $env:SOURCE_SHA `
+            --private (Join-Path $env:RUNNER_TEMP 'ordinary-build-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'ordinary-build-text') `
+            --upstream-archive (Join-Path $env:RUNNER_TEMP 'ordinary-upstream-reference/bevy_core_pipeline-0.18.1.crate')
+          if ($LASTEXITCODE -ne 0) { throw 'same-build native capture failed' }
 
-          $executable = Join-Path $env:GITHUB_WORKSPACE 'target/x86_64-pc-windows-msvc/release/flightsim-app.exe'
-          $inventory = Get-Content -Raw -LiteralPath (Join-Path $env:RUNNER_TEMP 'release-inventory.json') | ConvertFrom-Json
-          # The gate and copy operation consume one exact inventory. Never copy
-          # assets/, a workspace, logs or QA recordings recursively.
-          Copy-Item -LiteralPath $executable -Destination $staging
-          foreach ($file in $inventory.files) {
-            $destination = Join-Path $staging $file.path
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
-            Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $file.source) -Destination $destination
-          }
-          python scripts/check-release-authorization.py --bundle $staging --executable $executable
-          if ($LASTEXITCODE -ne 0) { throw 'staged bundle differs from the authorized inventory' }
-
-          $zip = Join-Path $artifact $env:BUNDLE
-          Compress-Archive -LiteralPath $staging -DestinationPath $zip -CompressionLevel Optimal
-          if (-not (Test-Path -LiteralPath $zip -PathType Leaf) -or (Get-Item $zip).Length -eq 0) {
-            throw "release archive was not created"
-          }
-
-          $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
-          $checksumPath = Join-Path $artifact "$($env:BUNDLE).sha256"
-          "$sha256  $env:BUNDLE" | Set-Content -Encoding ascii -NoNewline `
-            $checksumPath
-          @{
-            bundle = $env:BUNDLE
-            sha256 = $sha256
-            source_sha = $env:SOURCE_SHA
-            tag = $env:TAG
-            version = $env:VERSION
-            release_inventory_sha256 = $env:INVENTORY_SHA256
-            authorization_sha256 = $env:AUTHORIZATION_SHA256
-          } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifact 'release-metadata.json')
-
-      # Run the archive users will download, from a fresh extraction directory.
-      # D3D12's fallback adapter (WARP) is a software startup check, not evidence
-      # for a physical GPU, vendor driver, or frame-rate target.
-      - name: Start the extracted Windows bundle with software D3D12
+      - name: Assemble and verify the same-build ordinary release
         shell: pwsh
         env:
-          BUNDLE: ${{ steps.version.outputs.bundle }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $archive = Join-Path $env:GITHUB_WORKSPACE "release-artifact/$env:BUNDLE"
-          $smokeRoot = Join-Path $env:RUNNER_TEMP 'flightsim-windows-extracted'
+          python -B scripts/prepare-ordinary-full-release.py `
+            --repo $env:GITHUB_WORKSPACE --expected-sha $env:SOURCE_SHA `
+            --build-private (Join-Path $env:RUNNER_TEMP 'ordinary-build-private') `
+            --build-text (Join-Path $env:RUNNER_TEMP 'ordinary-build-text') `
+            --private (Join-Path $env:RUNNER_TEMP 'ordinary-final-private') `
+            --output (Join-Path $env:RUNNER_TEMP 'ordinary-release-artifact')
+          if ($LASTEXITCODE -ne 0) { throw 'ordinary review applicability or final extracted smoke failed' }
 
-          New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
-          Expand-Archive -LiteralPath $archive -DestinationPath $smokeRoot
-          $packageDirectories = @(Get-ChildItem -LiteralPath $smokeRoot -Directory)
-          if ($packageDirectories.Count -ne 1) {
-            throw 'release archive must contain exactly one top-level directory'
-          }
+      - name: Revalidate every final original immediately before upload
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python -B scripts/prepare-ordinary-full-release.py --validate-only `
+            --repo $env:GITHUB_WORKSPACE --expected-sha $env:SOURCE_SHA `
+            --build-private (Join-Path $env:RUNNER_TEMP 'ordinary-build-private') `
+            --build-text (Join-Path $env:RUNNER_TEMP 'ordinary-build-text') `
+            --private (Join-Path $env:RUNNER_TEMP 'ordinary-final-private') `
+            --output (Join-Path $env:RUNNER_TEMP 'ordinary-release-artifact')
+          if ($LASTEXITCODE -ne 0) { throw 'original final evidence changed before upload' }
 
-          $packageRoot = $packageDirectories[0].FullName
-          $executable = Join-Path $packageRoot 'flightsim-app.exe'
-          $builtExecutable = Join-Path $env:GITHUB_WORKSPACE 'target/x86_64-pc-windows-msvc/release/flightsim-app.exe'
-          python scripts/check-release-authorization.py --bundle $packageRoot --executable $builtExecutable
-          if ($LASTEXITCODE -ne 0) { throw 'extracted bundle differs from the authorized inventory' }
+      - name: Revalidate bounded native facts after a failed final check
+        id: failure_native_facts
+        if: failure() && steps.native_capture.outcome == 'success' && steps.version.outcome == 'success'
+        shell: pwsh
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $facts = Join-Path $env:RUNNER_TEMP 'ordinary-failed-native-facts.json'
+          $top = 'flightsim-claude-v' + $env:RELEASE_VERSION + '-windows-x86_64'
+          python -B scripts/project-ordinary-native-evidence.py `
+            --repo $env:GITHUB_WORKSPACE --expected-sha $env:SOURCE_SHA `
+            --build-private (Join-Path $env:RUNNER_TEMP 'ordinary-build-private') `
+            --build-text (Join-Path $env:RUNNER_TEMP 'ordinary-build-text') `
+            --bundle (Join-Path $env:RUNNER_TEMP ('ordinary-final-private/staged/' + $top)) `
+            --runtime-facts-private (Join-Path $env:RUNNER_TEMP 'ordinary-final-private/runtime-facts') > $facts
+          if ($LASTEXITCODE -ne 0) { throw 'failed-run native facts could not be independently revalidated' }
 
-          function Test-CompletePng([string] $Path) {
-            try {
-              if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-                return $false
-              }
-              $bytes = [System.IO.File]::ReadAllBytes($Path)
-              $signature = [byte[]](137, 80, 78, 71, 13, 10, 26, 10)
-              $ending = [byte[]](0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130)
-              if ($bytes.Length -le 24) {
-                return $false
-              }
-              for ($index = 0; $index -lt $signature.Length; $index++) {
-                if ($bytes[$index] -ne $signature[$index]) {
-                  return $false
-                }
-              }
-              $offset = $bytes.Length - $ending.Length
-              for ($index = 0; $index -lt $ending.Length; $index++) {
-                if ($bytes[$offset + $index] -ne $ending[$index]) {
-                  return $false
-                }
-              }
-              return $true
-            } catch {
-              return $false
-            }
-          }
-
-          function Read-SmokeLogs {
-            $parts = @()
-            foreach ($path in @($stdout, $stderr)) {
-              if (Test-Path -LiteralPath $path -PathType Leaf) {
-                try {
-                  $parts += [System.IO.File]::ReadAllText($path)
-                } catch {
-                  # The process can briefly hold the redirected file while writing.
-                }
-              }
-            }
-            return [string]::Join([Environment]::NewLine, $parts)
-          }
-
-          $env:WGPU_BACKEND = 'dx12'
-          $env:WGPU_FORCE_FALLBACK_ADAPTER = '1'
-          # Exercise both bundled profiles and their models from the extracted ZIP.
-          # The original smoke filename is retained for the cockpit proof.
-          foreach ($case in @(
-            @{ Aircraft = 'light-single'; View = 'cockpit'; Suffix = '' },
-            @{ Aircraft = 'swift-sport'; View = 'chase'; Suffix = '-swift' }
-          )) {
-            $stem = 'flightsim-windows-smoke' + $case.Suffix
-            $screenshot = Join-Path $env:RUNNER_TEMP ($stem + '.png')
-            $stdout = Join-Path $env:RUNNER_TEMP ($stem + '.stdout.log')
-            $stderr = Join-Path $env:RUNNER_TEMP ($stem + '.stderr.log')
-            $log = Join-Path $env:RUNNER_TEMP ($stem + '.log')
-            $process = $null
-            try {
-              $quotedScreenshot = '"' + $screenshot + '"'
-              $process = Start-Process -FilePath $executable `
-                -ArgumentList @('--screenshot', $quotedScreenshot, '--screenshot-delay', '5', '--exit-after-screenshot',
-                  '--aircraft', $case.Aircraft, '--view', $case.View, '--traffic', 'synthetic') `
-                -WorkingDirectory $packageRoot `
-                -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-
-              # The app exits only after the PNG has been encoded and closed.
-              # alpha.18 saved at ~89s, too late for three stable-size observations
-              # before a 90s deadline. Wait for explicit batch completion, then validate.
-              # Batch mode flushes/closes output and exits without graphics teardown.
-              if (-not $process.WaitForExit(180000)) {
-                throw 'application did not complete its screenshot within 180 seconds'
-              }
-              $process.WaitForExit()
-              if ($process.ExitCode -ne 0) {
-                throw "application screenshot failed (status $($process.ExitCode))"
-              }
-            } finally {
-              if ($null -ne $process) {
-                $process.Refresh()
-                if (-not $process.HasExited) {
-                  Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-                }
-                if (-not $process.WaitForExit(10000)) {
-                  throw 'application process did not terminate after the smoke run'
-                }
-                # The timed overload only waits for process termination. The
-                # parameterless call additionally drains Start-Process' redirected
-                # stdout/stderr before Read-SmokeLogs inspects their final markers.
-                $process.WaitForExit()
-              }
-              $combinedLog = Read-SmokeLogs
-              [System.IO.File]::WriteAllText($log, $combinedLog)
-              if (Test-Path -LiteralPath $log -PathType Leaf) {
-                Get-Content -LiteralPath $log | Select-Object -Last 80
-              }
-            }
-
-            # Validate after process termination so an encoder-held file handle cannot
-            # turn a complete screenshot into a false negative. The first alpha.5 run
-            # produced a valid 1280x720 PNG with IEND but exposed precisely this race.
-            if (-not (Test-CompletePng $screenshot)) {
-              throw 'application screenshot is missing or not a complete PNG'
-            }
-            $logText = Read-SmokeLogs
-            foreach ($proof in @('aircraft model fitted:', ('(' + $case.Aircraft + ')'), 'Screenshot saved to', 'Batch capture complete: status 0')) {
-              if (-not $logText.Contains($proof)) {
-                throw "application log is missing the smoke proof: $proof"
-              }
-            }
-            $plainLog = [regex]::Replace($logText, "`e\[[0-?]*[ -/]*[@-~]", '')
-            # PowerShell's -match is case-insensitive by default. Use -cmatch
-            # for the tracing level so warning text containing lowercase
-            # "error" does not turn a successful smoke run into a failure.
-            $hasFatalLog =
-              ($plainLog -cmatch '(?m)(^|\s)ERROR(\s|:|$)') -or
-              ($plainLog -match '(?im)thread .+ panicked at|panic(?:ked)? at') -or
-              ($plainLog -match '(?im)Failed to load asset|unregistered type')
-            if ($hasFatalLog) {
-              throw 'application logged an error during the Windows smoke run'
-            }
-            Write-Host "software-D3D12 Windows bundle smoke passed: $($case.Aircraft)"
-          }
-
-      - name: Upload Windows smoke screenshot and log
-        if: always()
+      - name: Retain revalidated failed-run facts without publication inputs
+        if: failure() && steps.failure_native_facts.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: windows-smoke-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
+          name: ordinary-failed-native-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/flightsim-windows-smoke.png
-            ${{ runner.temp }}/flightsim-windows-smoke.log
-            ${{ runner.temp }}/flightsim-windows-smoke.stdout.log
-            ${{ runner.temp }}/flightsim-windows-smoke.stderr.log
-            ${{ runner.temp }}/flightsim-windows-smoke-swift.png
-            ${{ runner.temp }}/flightsim-windows-smoke-swift.log
-            ${{ runner.temp }}/flightsim-windows-smoke-swift.stdout.log
-            ${{ runner.temp }}/flightsim-windows-smoke-swift.stderr.log
-          if-no-files-found: warn
+            ${{ runner.temp }}/ordinary-failed-native-facts.json
+          if-no-files-found: error
           retention-days: 7
 
-      - name: Include the verified screenshot with the release
-        shell: pwsh
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke.png') `
-            -Destination (Join-Path $env:GITHUB_WORKSPACE "release-artifact/flightsim-claude-$env:TAG-windows-smoke.png")
-          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'flightsim-windows-smoke-swift.png') `
-            -Destination (Join-Path $env:GITHUB_WORKSPACE "release-artifact/flightsim-claude-$env:TAG-windows-smoke-swift.png")
+      - name: Retain successful bounded ordinary native evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ordinary-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ordinary-release-artifact/ordinary-native-review.json
+            ${{ runner.temp }}/ordinary-release-artifact/ordinary-release-evidence.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload the verified bundle for publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            release-artifact/${{ steps.version.outputs.bundle }}
-            release-artifact/${{ steps.version.outputs.bundle }}.sha256
-            release-artifact/release-metadata.json
-            release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke.png
-            release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke-swift.png
+            ${{ runner.temp }}/ordinary-release-artifact/${{ steps.version.outputs.bundle }}
+            ${{ runner.temp }}/ordinary-release-artifact/${{ steps.version.outputs.bundle }}.sha256
+            ${{ runner.temp }}/ordinary-release-artifact/release-metadata.json
+            ${{ runner.temp }}/ordinary-release-artifact/release-notes.md
+            ${{ runner.temp }}/ordinary-release-artifact/ordinary-release-evidence.json
+            ${{ runner.temp }}/ordinary-release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke.png
+            ${{ runner.temp }}/ordinary-release-artifact/flightsim-claude-${{ steps.version.outputs.tag }}-windows-smoke-swift.png
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -436,6 +304,35 @@ jobs:
           actual_digest="$(sha256sum "release-artifact/$bundle" | cut -d' ' -f1)"
           [[ "$actual_digest" == "$expected_digest" ]]
           (cd release-artifact && sha256sum --check "$bundle.sha256")
+          evidence=release-artifact/ordinary-release-evidence.json
+          test -s "$evidence"
+          [[ "$(sha256sum "$evidence" | cut -d' ' -f1)" == "$(jq -er '.evidence_sha256' "$metadata")" ]]
+          notes=release-artifact/release-notes.md
+          test -s "$notes"
+          [[ "$(sha256sum "$notes" | cut -d' ' -f1)" == "$(jq -er '.notes_sha256' "$metadata")" ]]
+          [[ "$(jq -er '.notes_sha256' "$metadata")" == "$(jq -er '.bindings.publication_notes.sha256' "$evidence")" ]]
+          ! grep -q '@SOURCE_SHA@' "$notes"
+          [[ "$(jq -er '.kind' "$evidence")" == 'ordinary_final_same_build_evidence_not_authority' ]]
+          [[ "$(jq -er '.source_sha' "$evidence")" == "$EXPECTED_SHA" ]]
+          [[ "$(jq -er '.release_inventory_sha256' "$evidence")" == "$EXPECTED_INVENTORY" ]]
+          [[ "$(jq -er '.authorization_sha256' "$evidence")" == "$EXPECTED_AUTHORIZATION" ]]
+          [[ "$(jq -er '.bindings.archive.sha256' "$evidence")" == "$expected_digest" ]]
+          jq -e '.component_terms.recipient_assent_collected == false and .component_terms.dialog_tested_by_smoke == false and .component_terms.source_sha == .source_sha and .component_terms.source_tree == .source_tree and .component_terms.executable == .files["flightsim-app.exe"]' "$evidence" >/dev/null
+          jq -e '.applicability.conditions_matched == true and (.scenes | keys == ["light-single-cockpit", "swift-sport-chase"])' "$evidence" >/dev/null
+          [[ "$(sha256sum "release-artifact/flightsim-claude-$EXPECTED_TAG-windows-smoke.png" | cut -d' ' -f1)" == "$(jq -er '.scenes["light-single-cockpit"].screenshot.sha256' "$evidence")" ]]
+          [[ "$(sha256sum "release-artifact/flightsim-claude-$EXPECTED_TAG-windows-smoke-swift.png" | cut -d' ' -f1)" == "$(jq -er '.scenes["swift-sport-chase"].screenshot.sha256' "$evidence")" ]]
+          [[ "$(stat -c %s "release-artifact/flightsim-claude-$EXPECTED_TAG-windows-smoke.png")" == "$(jq -er '.scenes["light-single-cockpit"].screenshot.bytes' "$evidence")" ]]
+          [[ "$(stat -c %s "release-artifact/flightsim-claude-$EXPECTED_TAG-windows-smoke-swift.png")" == "$(jq -er '.scenes["swift-sport-chase"].screenshot.bytes' "$evidence")" ]]
+          if find release-artifact -mindepth 1 ! -type f | grep -q .; then
+            echo 'unexpected non-file publication artifact' >&2
+            exit 1
+          fi
+          actual_members="$(find release-artifact -mindepth 1 -printf '%P\n' | LC_ALL=C sort)"
+          expected_members="$(printf '%s\n' "$EXPECTED_BUNDLE" "$EXPECTED_BUNDLE.sha256" \
+            release-metadata.json release-notes.md ordinary-release-evidence.json \
+            "flightsim-claude-$EXPECTED_TAG-windows-smoke.png" \
+            "flightsim-claude-$EXPECTED_TAG-windows-smoke-swift.png" | LC_ALL=C sort)"
+          [[ "$actual_members" == "$expected_members" ]]
 
       - name: Create the tag if absent and publish idempotently
         shell: bash
@@ -468,18 +365,20 @@ jobs:
 
           archive="release-artifact/$BUNDLE"
           checksum="$archive.sha256"
+          evidence=release-artifact/ordinary-release-evidence.json
+          notes=release-artifact/release-notes.md
           screenshot="release-artifact/flightsim-claude-$TAG-windows-smoke.png"
           swift_screenshot="release-artifact/flightsim-claude-$TAG-windows-smoke-swift.png"
           test -s "$screenshot"
           test -s "$swift_screenshot"
           if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" --repo "$REPOSITORY" \
-              --title "$TAG" --prerelease
-            gh release upload "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" --repo "$REPOSITORY" --clobber
+              --title "$TAG" --notes-file "$notes" --prerelease
+            gh release upload "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" "$evidence" --repo "$REPOSITORY" --clobber
           else
-            gh release create "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" --repo "$REPOSITORY" \
+            gh release create "$TAG" "$archive" "$checksum" "$screenshot" "$swift_screenshot" "$evidence" --repo "$REPOSITORY" \
               --verify-tag --target "$SOURCE_SHA" --title "$TAG" \
-              --generate-notes --prerelease
+              --notes-file "$notes" --prerelease
           fi
 
   cleanup_merged_branch:

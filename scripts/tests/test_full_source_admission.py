@@ -22,9 +22,9 @@ candidate = load('source_admission_candidate', 'check-swift-windows-candidate.py
 class FullSourceAdmissionTests(unittest.TestCase):
     def test_new_identity_preserves_historical_contracts_and_runtime(self):
         contract = candidate.load_replay_contract(ROOT)
-        self.assertEqual(contract['contract'], 'full-two-aircraft-reviewed-source-v1')
-        self.assertEqual(contract['reviewed_source'], '960c3126e6a4bc22b8d4acc6e6737f8f2b473bef')
-        self.assertEqual(contract['reviewed_runtime_tree'], 'b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e')
+        self.assertEqual(contract['contract'], 'full-two-aircraft-component-terms-source-v1')
+        self.assertEqual(contract['base_reviewed_source'], '960c3126e6a4bc22b8d4acc6e6737f8f2b473bef')
+        self.assertEqual(contract['base_reviewed_runtime_tree'], 'b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e')
         self.assertIs(contract['release_authorized'], False)
         for path, expected in candidate.HISTORICAL_CONTRACT_HASHES.items():
             self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), expected, path)
@@ -35,7 +35,10 @@ class FullSourceAdmissionTests(unittest.TestCase):
         preserved = json.loads((ROOT / candidate.PRESERVED_RUNTIME_PATH).read_text())['source_sha256']
         self.assertEqual(len(preserved), 497)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
-        for path, expected in {**preserved, **candidate.INDEPENDENT_REPLAY_HASHES}.items():
+        relocations = {candidate.COMPONENT_TERMS_MAIN_PATH: candidate.COMPONENT_TERMS_HISTORY_PATH}
+        for path, expected in preserved.items():
+            self.assertEqual(candidate.digest(ROOT / relocations.get(path, path)), expected, path)
+        for path, expected in candidate.INDEPENDENT_REPLAY_HASHES.items():
             self.assertEqual(candidate.digest(ROOT / path), expected, path)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
         self.assertTrue(candidate.CORE_PIPELINE_SOURCE_PATHS <= set(contract['source_sha256']))
@@ -43,7 +46,8 @@ class FullSourceAdmissionTests(unittest.TestCase):
     def test_source_identity_authority_and_preserved_pin_mutations_rejected(self):
         positive = candidate.load_replay_contract(ROOT)
         for key, value in [('contract', candidate.HISTORICAL_REPLAY_CONTRACT_ID),
-                           ('reviewed_source', '0' * 40), ('reviewed_runtime_tree', '0' * 40),
+                           ('base_reviewed_source', '0' * 40), ('base_reviewed_runtime_tree', '0' * 40),
+                           ('source_migration_sha256', '0' * 64),
                            ('release_authorized', True), ('release_authorized', 0),
                            ('scope', 'native and publication approved')]:
             bad = copy.deepcopy(positive); bad[key] = value
@@ -80,6 +84,9 @@ class AutoDiscoveredCrateInputTests(unittest.TestCase):
         expected = {p for p in preserved if p.startswith('crates/')}
         self.assertEqual(len(expected), 492)
         self.assertEqual(candidate.PRESERVED_CRATE_SOURCE_PATHS, expected)
+        self.assertEqual(candidate.CURRENT_CRATE_SOURCE_PATHS,
+                         expected | candidate.COMPONENT_TERMS_RUNTIME_PATHS)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 494)
         candidate.validate_modified_source_boundaries(set(candidate.REPLAY_CONTRACT_PATHS))
 
     def test_committed_auto_discovered_targets_aliases_and_omission_are_rejected(self):
