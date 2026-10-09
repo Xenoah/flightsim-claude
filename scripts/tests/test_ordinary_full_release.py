@@ -11,6 +11,7 @@ import copy
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -160,6 +161,96 @@ class OrdinaryFullReleaseTests(unittest.TestCase):
         for key in ('release_authorized', 'dependency_review_approved', 'runtime_accepted', 'appearance_accepted'):
             self.assertIs(result[key], False)
         self.assertEqual(self.f.fixture.git('status', '--porcelain').stdout, b'')
+
+    def cargo_hardlink(self):
+        peer = self.p.executable.parent / 'deps/flightsim_app-SYNTHETIC.exe'
+        peer.parent.mkdir()
+        os.link(self.p.executable, peer)
+        self.assertEqual(self.p.executable.stat().st_nlink, 2)
+        return peer
+
+    def test_cargo_hardlink_is_copied_without_changing_audited_or_shipped_bytes(self):
+        peer = self.cargo_hardlink()
+        expected = q.capture.file_record(peer)
+        with self.assertRaisesRegex(ValueError, 'independent regular file'):
+            q.payload.independent_file(self.p.executable)
+        result = self.prepare()
+        self.assertEqual(self.p.executable.stat().st_nlink, 1)
+        self.assertFalse(os.path.samefile(peer, self.p.executable))
+        for path in (peer, self.p.executable, self.staged / 'flightsim-app.exe',
+                     self.extracted / 'flightsim-app.exe'):
+            self.assertEqual(q.capture.file_record(path), expected)
+            self.assertEqual(path.stat().st_nlink, 1)
+        self.assertEqual(result['files']['flightsim-app.exe'], expected)
+        self.assertEqual(len(self.execution_calls), 2)
+        self.assertEqual(list(self.p.executable.parent.glob('.ordinary-audited-*')), [])
+
+    def test_independent_executable_needs_no_copy_and_stale_audit_never_copies(self):
+        expected = q.capture.file_record(self.p.executable)
+        with patch.object(q.tempfile, 'mkstemp', side_effect=AssertionError('must not copy')):
+            q.independent_audited_executable(self.p.executable, expected)
+            with self.assertRaisesRegex(ValueError, 'audited executable changed'):
+                q.independent_audited_executable(self.p.executable, {**expected, 'sha256': '0' * 64})
+
+    def test_full_capture_is_revalidated_after_copy_before_any_staging_or_execution(self):
+        self.cargo_hardlink()
+        changed = copy.deepcopy(self.p.verified)
+        changed['source_tree'] = '0' * 40
+        with self.boundaries(), patch.object(q.capture, 'validate_export',
+                side_effect=[self.p.verified, changed]) as audited, \
+                patch.object(q.release, 'verify_distribution_info', side_effect=AssertionError('must not execute')), \
+                self.assertRaisesRegex(ValueError, 'original build audit changed'):
+            q.prepare(*self.arguments())
+        self.assertEqual(audited.call_count, 2)
+        self.assertEqual(self.p.executable.stat().st_nlink, 1)
+        self.assertFalse(self.private.exists())
+        self.assertFalse(self.output.exists())
+        self.assertEqual(self.runtime_calls, [])
+
+    def test_failed_or_changed_copy_keeps_original_alias_and_cleans_only_temporary_file(self):
+        peer = self.cargo_hardlink()
+        expected = q.capture.file_record(peer)
+        def changed_copy(source, output):
+            output.write(b'SYNTHETIC COPY CORRUPTION')
+        for failure in ('changed-copy', 'replace-error'):
+            with self.subTest(failure=failure), contextlib.ExitStack() as stack:
+                if failure == 'changed-copy':
+                    stack.enter_context(patch.object(q.shutil, 'copyfileobj', side_effect=changed_copy))
+                else:
+                    stack.enter_context(patch.object(q.os, 'replace', side_effect=OSError('SYNTHETIC FAILURE')))
+                with self.assertRaises((ValueError, OSError)):
+                    q.independent_audited_executable(self.p.executable, expected)
+            self.assertTrue(os.path.samefile(peer, self.p.executable))
+            self.assertEqual(q.capture.file_record(peer), expected)
+            self.assertEqual(list(self.p.executable.parent.glob('.ordinary-audited-*')), [])
+
+    def test_same_bytes_replacement_of_source_identity_during_copy_is_rejected(self):
+        peer = self.cargo_hardlink()
+        expected = q.capture.file_record(peer)
+        file_record = q.capture.file_record
+        def replace_before_recheck(path):
+            # Inject only after streams close; Windows rejects replacing an
+            # open executable. Equal bytes must not conceal a different file.
+            if Path(path).name.startswith('.ordinary-audited-'):
+                replacement = self.p.executable.with_suffix('.synthetic-copy')
+                replacement.write_bytes(peer.read_bytes())
+                os.replace(replacement, self.p.executable)
+            return file_record(path)
+        with patch.object(q.capture, 'file_record', side_effect=replace_before_recheck), \
+                self.assertRaisesRegex(ValueError, 'changed during independent copy'):
+            q.independent_audited_executable(self.p.executable, expected)
+        self.assertEqual(q.capture.file_record(peer), expected)
+        self.assertEqual(list(self.p.executable.parent.glob('.ordinary-audited-*')), [])
+
+    def test_preparation_stage_messages_are_closed_and_contain_no_input_data(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            for name in sorted(q.STAGES):
+                q.stage(name)
+            with self.assertRaisesRegex(ValueError, 'unknown ordinary preparation stage'):
+                q.stage('SYNTHETIC PRIVATE PATH OR EXCEPTION')
+        self.assertEqual(stderr.getvalue().splitlines(),
+                         ['Ordinary preparation stage: ' + name for name in sorted(q.STAGES)])
 
     def test_component_disclosure_output_and_schedule_cannot_be_changed(self):
         self.prepare()

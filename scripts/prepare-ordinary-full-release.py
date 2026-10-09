@@ -10,10 +10,12 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 import zlib
 
@@ -36,6 +38,57 @@ NOTES = 'release-notes.md'
 COMPONENT_FILES = tuple('docs/release/components/' + name for name in (
     'MICROSOFT-COMPONENT-TERMS.txt', 'MICROSOFT-COMPONENT-TERMS.ja.txt',
     'MICROSOFT-COMPONENT-NOTICE.txt'))
+STAGES = frozenset(('source', 'capture', 'executable-independence', 'executable-copy', 'capture-revalidation',
+                   'distribution-info', 'staging', 'runtime-collection', 'native-projection',
+                   'applicability', 'archive', 'smoke', 'final-revalidation'))
+
+
+def stage(name):
+    require(name in STAGES, 'unknown ordinary preparation stage')
+    print('Ordinary preparation stage: ' + name, file=sys.stderr, flush=True)
+
+
+def independent_audited_executable(executable, expected):
+    """Detach only Cargo's final name, preserving the exact audited bytes.
+
+    Cargo may hardlink this file from release/deps. Do not relax the independent
+    input/payload guards or modify the deps artifact. Revalidate before replacing
+    this one name atomically; the original build audit remains byte-identical.
+    """
+    executable = payload.absolute(executable)
+    require(executable.name == 'flightsim-app.exe' and executable.parent.name == 'release'
+            and executable.parent.parent.name == release.TARGET, 'invalid audited executable layout')
+    require(capture.valid_record(expected) and expected['bytes'] > 0
+            and capture.file_record(executable) == expected, 'audited executable changed')
+    before = executable.stat()
+    if before.st_nlink == 1:
+        payload.independent_file(executable)
+        return
+    require(before.st_nlink > 1, 'invalid executable link count')
+    stage('executable-copy')
+    descriptor, name = tempfile.mkstemp(prefix='.ordinary-audited-', suffix='.tmp', dir=executable.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, 'wb') as output, executable.open('rb') as source:
+            shutil.copyfileobj(source, output)
+            output.flush()
+            os.fsync(output.fileno())
+        copied = payload.independent_file(temporary)
+        require(capture.file_record(temporary) == expected
+                and capture.file_record(executable) == expected, 'audited executable copy changed')
+        after = executable.stat()
+        require((before.st_dev, before.st_ino, before.st_nlink, before.st_size, before.st_mtime_ns)
+                == (after.st_dev, after.st_ino, after.st_nlink, after.st_size, after.st_mtime_ns),
+                'audited executable changed during independent copy')
+        os.replace(temporary, executable)
+        installed = payload.independent_file(executable)
+        require((copied.st_dev, copied.st_ino, copied.st_size, copied.st_mtime_ns)
+                == (installed.st_dev, installed.st_ino, installed.st_size, installed.st_mtime_ns),
+                'independent executable identity changed')
+        require(capture.file_record(executable) == expected, 'independent executable differs from audit')
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
 def canonical(value):
@@ -80,18 +133,23 @@ def publication_notes(repo, expected):
 
 def project(repo, expected, build_private, build_text, private, output):
     """Read-only complete revalidation; original private inputs are mandatory."""
+    stage('source')
     repo, build_private, build_text, private, output = paths(repo, build_private, build_text, private, output)
     source, gate, plan, top = context(repo, expected)
     staged, extracted = private / 'staged' / top, private / 'extracted' / top
+    stage('native-projection')
     native_facts = native.project(repo, expected, build_private, build_text, staged,
                                   runtime_facts_private=private / 'runtime-facts')
+    stage('applicability')
     conditions = applicability.validate(repo, native_facts)
+    stage('archive')
     executable = build_private / 'target-ordinary' / release.TARGET / 'release/flightsim-app.exe'
     release.verify_bundle(extracted, plan, executable)
     staged_files, extracted_files = payload.snapshot_payload(staged), payload.snapshot_payload(extracted)
     require(staged_files == extracted_files, 'fresh extraction differs from staged authorized payload')
     frozen = output / (top + '.zip')
     archive_binding = archive.audit_archive(frozen, staged_files, top)
+    stage('smoke')
     observation = archive.validate_smoke(extracted, private / 'smoke')
     require(observation['bundle_files'] == staged_files, 'smoke bundle differs from final archive')
     scenes = {}
@@ -128,6 +186,7 @@ def project(repo, expected, build_private, build_text, private, output):
               'limits': ['software_d3d12_only', 'physical_gpu_controller_audio_not_qualified',
                          'subjective_appearance_not_decided', 'publication_authority_is_existing_ordinary_receipt']}
     # Revalidate after smoke/private reads. Never authorize a cached snapshot.
+    stage('final-revalidation')
     require(native.project(repo, expected, build_private, build_text, staged,
                            runtime_facts_private=private / 'runtime-facts') == native_facts,
             'same-build native facts changed during final revalidation')
@@ -143,6 +202,7 @@ def project(repo, expected, build_private, build_text, private, output):
 
 
 def validate(repo, expected, build_private, build_text, private, output):
+    stage('final-revalidation')
     output_before = payload.snapshot_payload(output)
     result, facts = project(repo, expected, build_private, build_text, private, output)
     require((output / PUBLIC).read_bytes() == canonical(result), 'final evidence changed')
@@ -180,14 +240,23 @@ def validate(repo, expected, build_private, build_text, private, output):
 
 def prepare(repo, expected, build_private, build_text, private, output):
     require(sys.platform == 'win32', 'native Windows is required for final ordinary preparation')
+    stage('source')
     repo, build_private, build_text, private, output = paths(repo, build_private, build_text, private, output)
     source, gate, plan, top = context(repo, expected)
     require(not private.exists() and not output.exists(), 'fresh preparation and output roots required')
+    stage('capture')
     verified = capture.validate_export(build_text, repo=repo, expected=expected, private=build_private)
     require(verified['status'] == capture.PASS, 'completed same-build audit required')
     executable = build_private / 'target-ordinary' / release.TARGET / 'release/flightsim-app.exe'
     require(capture.file_record(executable) == verified['builds']['ordinary']['executable'], 'audited executable changed')
+    stage('executable-independence')
+    independent_audited_executable(executable, verified['builds']['ordinary']['executable'])
+    stage('capture-revalidation')
+    require(capture.validate_export(build_text, repo=repo, expected=expected, private=build_private) == verified,
+            'original build audit changed after independent copy')
+    stage('distribution-info')
     release.verify_distribution_info(executable, gate['version'])
+    stage('staging')
     private.mkdir(parents=True); output.mkdir(parents=True)
     staged = private / 'staged' / top
     staged.mkdir(parents=True)
@@ -197,17 +266,23 @@ def prepare(repo, expected, build_private, build_text, private, output):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(release.staging.safe_file(repo, item['source']), destination)
     release.verify_bundle(staged, plan, executable)
+    stage('runtime-collection')
     native.runtime_facts.collect_runtime_facts(private / 'runtime-facts', source_sha=expected,
         recipe_cfg_args=['-D', 'warnings'], linker_trace=build_private / 'capture/ordinary/build.stderr',
         audited_executable=executable)
+    stage('native-projection')
     facts = native.project(repo, expected, build_private, build_text, staged,
                            runtime_facts_private=private / 'runtime-facts')
+    stage('applicability')
     applicability.validate(repo, facts)
+    stage('archive')
     frozen = output / (top + '.zip')
     files = archive.create_archive(staged, frozen, top)
     extracted = archive.extract_verified_archive(frozen, private / 'extracted', files, top)
     release.verify_bundle(extracted, plan, executable)
+    stage('smoke')
     archive.run_smoke(extracted, private / 'smoke')
+    stage('final-revalidation')
     result, facts = project(repo, expected, build_private, build_text, private, output)
     write_new(output / PUBLIC, result); write_new(output / 'ordinary-native-review.json', facts)
     with (output / NOTES).open('xb') as stream:

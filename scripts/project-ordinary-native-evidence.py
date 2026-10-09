@@ -38,6 +38,13 @@ CONTENT_VERSION = 2
 MAX_BYTES = 8 * 1024 * 1024
 MAX_TEXT_BYTES = 64 * 1024 * 1024
 NATIVE_SUFFIXES = {'.exe', '.dll', '.lib', '.a', '.pdb', '.msi'}
+STAGES = frozenset(('paths', 'payload', 'metadata-graph', 'packages', 'build-messages',
+                   'headers-pe', 'runtime', 'source-content', 'revalidation'))
+
+
+def stage(name):
+    require(name in STAGES, 'unknown ordinary native projection stage')
+    print('Ordinary native projection stage: ' + name, file=sys.stderr, flush=True)
 
 
 def read_text(path, maximum=MAX_TEXT_BYTES, *, binding=None):
@@ -133,10 +140,13 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
     All roots must be canonical, absolute, pairwise disjoint paths. There is no
     caller-supplied receipt, skip-validation switch or UI capability requirement.
     """
+    stage('paths')
     repo, build_private, build_text, bundle, runtime_facts_private = map(payload.absolute,
         (repo, build_private, build_text, bundle, runtime_facts_private))
     capture.disjoint(repo, build_private, build_text, bundle, runtime_facts_private)
+    stage('payload')
     packet = payload.project_payload(repo, expected, build_private, build_text, bundle)
+    stage('metadata-graph')
     verified, summary_binding = payload.read_object(build_text / capture.EXPORT_NAME)
     require(summary_binding == packet['bindings']['native_build_summary'], 'validated native summary changed')
     require(verified['status'] == capture.PASS and verified['source_sha'] == expected
@@ -168,6 +178,7 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
     records, edges = [], []
     by_id = {row['id']: row for row in inventory['packages']}
     require(set(by_id) == set(names.values()), 'inventory differs from complete package closure')
+    stage('packages')
     for key in ids:
         package, node = packages[key], nodes[key]
         row = by_id[names[key]]
@@ -216,6 +227,7 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
                     edges.append({'from': names[key], 'to': names[dependency['pkg']],
                                   'kind': kind['kind'] or 'normal', 'condition': condition})
     require(len(edges) <= 8192, 'native edge budget exceeded')
+    stage('build-messages')
     messages = read_messages(directory / 'messages.jsonl', binding=input_bindings['messages'])
     requests = []
     for message in messages:
@@ -253,6 +265,7 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
         embedded.append({'id': asset['id'], 'package': token(asset['package']), 'version': token(asset['version']),
                          'feature': token(asset['feature']), 'source_path': relative(asset['source_path']),
                          'sha256': asset['sha256'], 'notices': notices, 'review_status': 'not_reviewed'})
+    stage('headers-pe')
     result = {'schema_version': 1, 'kind': KIND, 'source_recipe': SOURCE_RECIPE, 'source_sha': expected,
               'source_tree': source['source_tree'], 'target': check.TARGET, 'rust_release': check.TOOLCHAIN,
               'rust_commit': compiler['commit'], 'rust_host': compiler['host'], 'profile': 'release',
@@ -280,6 +293,7 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
     result['payload_projection'] = packet
     result['inventory_comparison'] = packet['inventory_comparison']
     result['bindings'].update(input_bindings)
+    stage('runtime')
     facts = validate_runtime_facts(runtime_facts_private, repo, expected, build_private, build_text,
                                    build_bindings=result['bindings'])
     result['runtime_facts'] = facts
@@ -293,10 +307,12 @@ def project(repo, expected, build_private, build_text, bundle, *, runtime_facts_
         'installed_candidates_are_actual_selection': False,
         'dynamic_module_closure': 'not_established',
     })
+    stage('source-content')
     result['source_content_files'] = source_content_files(repo, source, packet, records)
     result['content_view'] = content_view(result)
     # Replay native capture, source, gate, notices, bundle, installed runtime and
     # build-origin observations before returning; no cached caller grant wins.
+    stage('revalidation')
     require(payload.canonical(payload.project_payload(repo, expected, build_private, build_text, bundle))
             == payload.canonical(packet), 'ordinary payload facts changed during projection')
     require(capture.source_evidence(repo, expected) == source, 'native source changed during projection')

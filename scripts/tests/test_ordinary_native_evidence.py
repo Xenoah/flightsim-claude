@@ -539,6 +539,17 @@ class RuntimeContentTests(unittest.TestCase):
 
 
 class BuildScriptContentTests(unittest.TestCase):
+    def test_projection_stage_messages_are_closed_and_keep_json_stdout_clear(self):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            for name in sorted(native.STAGES):
+                native.stage(name)
+            with self.assertRaisesRegex(ValueError, 'unknown ordinary native projection stage'):
+                native.stage('SYNTHETIC PRIVATE PATH OR EXCEPTION')
+        self.assertEqual(out.getvalue(), '')
+        self.assertEqual(err.getvalue().splitlines(),
+                         ['Ordinary native projection stage: ' + name for name in sorted(native.STAGES)])
+
     def test_cross_package_order_only_is_ignored_without_mutation(self):
         rows = [{'package_id': 'z@1', 'linked_libs': ['static=first', 'second']},
                 {'package_id': 'a@1', 'linked_libs': []}]

@@ -22,7 +22,8 @@
       "VS2026 official agreement SHA256 dd2ab92a7c2bb90dd509e16572707a34b13bc0bc09b9199d115f25594ac39053",
       "Exact reviewed v2 source 4e943edb82128007807371105a272965f0b88e1e tree 20ad0a0c44a8c1dc4be14381b6b97824bba1dda4",
       "Reviewed CI correction source 298ace599a216ff556aabcb4cbf07372178ad704 tree 0e50e8191726405cd999f3e3c16369bda7066fbb; progress-only suppression and parser documentation links; original terms, dependency review, notice bytes and all ten non-source native conditions unchanged.",
-      "Reviewed asset-local test correction source b0c5d2b7517345c81d0df4f8c29b40257ca8feb7 tree 4634be38065212362344cc971db3925c8b197501; only the obsolete whole-target-review absence assertion is removed. Exact asset proof/notice/history checks and all five false asset-local scope flags remain mandatory. All eleven prospective native-content conditions are unchanged from the preceding reviewed correction."
+      "Reviewed asset-local test correction source b0c5d2b7517345c81d0df4f8c29b40257ca8feb7 tree 4634be38065212362344cc971db3925c8b197501; only the obsolete whole-target-review absence assertion is removed. Exact asset proof/notice/history checks and all five false asset-local scope flags remain mandatory. All eleven prospective native-content conditions are unchanged from the preceding reviewed correction.",
+      "Reviewed ordinary preparation source f567f8318c743c747199af04bc5e8a7e5dafa34f tree 7a07404c134d89bf1d0071e8792d6acc37632c72; same-byte independent Cargo final-name copy, exact original audit replay and closed stage markers only. All eleven native-content conditions, asset/notice/dependency review and recipient terms remain unchanged. The unavailable prior runner inode state is not asserted."
     ],
     "native_runtime_coverage_complete": true,
     "reason": "Completed source/notice coverage assessment uses the controlled ordinary Rust1.93.0 MSVC release recipe, exact359 Cargo source closure,1264 edges,510 verified header records, three complete modified vendor trees and exact source/runtime notice bytes. The unchanged supported hosted VS Enterprise source route and standard release CRT/startup family, plus eligible public SDK UM/UCRT library category where actually applicable, cover the plausible supplier set conservatively. Nonempty build-script requests are the reviewed BLAKE3 assembly libraries and winapi Windows API families. No observed contribution falls outside these covered source families. Installed tool samples are not asserted exhaustive, final linker command/toolset/SDK/static membership remain unknown, and no exact member map is required by this coverage method. SDK installations do not establish copied proprietary SDK code; no separate SDK benchmark restriction is imposed on FlightSim. Only the executable is shipped as native code; external OS, graphics and v14 runtime prerequisites are not redistributed app files. Approved component terms and project/supplier notices are represented at their exact separate source-copy destinations. Coverage here means source/notice/licensing applicability, not dynamic module execution, successful rendering, physical hardware coverage, individual recipient assent or publication permission. Exact installed candidate comparison is now bound to real environment-only run37902203369 (VS Enterprise18.10, toolsets14.29/14.44/14.51, SDK26100). This updates the supplier applicability assessment without claiming that the future application has used those files. All actual candidate fields remain exact future-match conditions; no new family-based acceptance rule was introduced.",
@@ -58,10 +59,10 @@
     "runtime_rust": "f886a1927b6b10e2731c880f5e4870d496d9d776455769ade98e7cdcce3ec431",
     "source": "a8232fce4e12db2dad77e1c6210071229892ffed9ecb627286dfea88a4313fb0"
   },
-  "reviewed_at": "2026-10-09T14:49:00Z",
+  "reviewed_at": "2026-10-09T16:49:00Z",
   "reviewed_by": "OpenAI assistant; substantive source, license-route and notice applicability review",
   "schema_version": 1,
-  "scope": "Explicit v2 source/native conditions: reviewed correction sourceb0c5d2b, genuine source550 application/build facts, and separately observed environment-only Windows-latest supplier facts. Corrections suppress only PowerShell progress before module loading, repair stale parser documentation links, and keep the Filmic asset-local test independent of a separately completed whole-target review, with corresponding tests and exact source seals. A future ordinary producer must independently recompute and match every complete section. No joined native build, dialog execution or runtime success is fabricated.",
+  "scope": "Explicit v2 source/native conditions: reviewed source f567f8318c743c747199af04bc5e8a7e5dafa34f, genuine source550 application/build facts, and separately observed environment-only Windows-latest supplier facts. Ordinary preparation now preserves exact audited Cargo executable bytes in an independent final-name copy, fully revalidates the original build before use, and emits only closed operation-stage markers. No native comparison, runtime scenario, content/notice condition or recipient-assent rule changes. A future ordinary producer must independently recompute and match every complete section. No new native build, dialog execution or runtime success is fabricated.",
   "source_content_files": [
     {
       "bytes": 3012,
@@ -8944,9 +8945,9 @@
       "sha256": "1cbccdbd02e6bbdcf452def51aff09d54fd142b36dba85bc508830185f782837"
     },
     {
-      "bytes": 15130,
+      "bytes": 18761,
       "path": "scripts/prepare-ordinary-full-release.py",
-      "sha256": "b3bb5bb29ca64b17fab630bb99594d483f555f097a71373478c1b585ba6ef022"
+      "sha256": "4fba73a8aa4bff2e7fc6e84978cf820c6d05920f9dde96cb4193ea6111e2d2d8"
     },
     {
       "bytes": 24408,
@@ -8954,9 +8955,9 @@
       "sha256": "ddf2b043758158ba53c202e8abd5b868059ff1902f33a039d6d57380c5a5d6f0"
     },
     {
-      "bytes": 34365,
+      "bytes": 34924,
       "path": "scripts/project-ordinary-native-evidence.py",
-      "sha256": "9f024f9a94fc003d0a7728ceb23ed67ae2eed77685bd98cbf6b343d78e0b5c77"
+      "sha256": "06736558541268c7adbf4254fd951331c67b22158609611e8218ab8b5145884b"
     },
     {
       "bytes": 15297,
@@ -9109,14 +9110,14 @@
       "sha256": "c01b964e8ef448fa487679eb3d83900a588d895af9ffacbe37c15c8639591c9a"
     },
     {
-      "bytes": 22258,
+      "bytes": 27573,
       "path": "scripts/tests/test_ordinary_full_release.py",
-      "sha256": "9197837f306a64cfffa6d8f6097d5b69175aeb311c7a99f01e3337e65ca89fd9"
+      "sha256": "22860cca7576c06cf4b22b6579211306a4b1ea710d669e4ec7e2c0b5b7b49e46"
     },
     {
-      "bytes": 32515,
+      "bytes": 33179,
       "path": "scripts/tests/test_ordinary_native_evidence.py",
-      "sha256": "de8b1da0da3ad30d5fbee734f73c90f9e4e8102a02a5d96033666e52976352ed"
+      "sha256": "e736f55d34b4849a6c0cc0bb1d1bb277cc192576943383f313db750f2c028dc1"
     },
     {
       "bytes": 13926,
