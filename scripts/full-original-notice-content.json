@@ -7151,18 +7151,6 @@
         "name": "cosmic-text",
         "notices": [
           {
-            "bytes": 11357,
-            "path": "licenses/cosmic-text-0.16.0/LICENSE-APACHE",
-            "sha256": "000b4962e6b27176a0ff89cce4be555b16472cafb5671eb2804a8fdac6854793",
-            "upstream_path": "LICENSE-APACHE"
-          },
-          {
-            "bytes": 1075,
-            "path": "licenses/cosmic-text-0.16.0/LICENSE-MIT",
-            "sha256": "95557bafe728379e206f3b6d4aceeaa054d271c71d722411a6222e2dec01138c",
-            "upstream_path": "LICENSE-MIT"
-          },
-          {
             "bytes": 4386,
             "path": "licenses/cosmic-text-0.16.0/fonts/FiraMono-LICENSE",
             "sha256": "587dd9548304fd421cd254f7550bd101c1250ffc95417f2f7f92d55b44ecbe53",
@@ -7179,6 +7167,18 @@
             "path": "licenses/cosmic-text-0.16.0/fonts/NotoSans-LICENSE",
             "sha256": "5ec4347054089def6904da61d04f0360968f9ef36634b1fe007a5b6ec2f7aa96",
             "upstream_path": "fonts/NotoSans-LICENSE"
+          },
+          {
+            "bytes": 11357,
+            "path": "licenses/cosmic-text-0.16.0/LICENSE-APACHE",
+            "sha256": "000b4962e6b27176a0ff89cce4be555b16472cafb5671eb2804a8fdac6854793",
+            "upstream_path": "LICENSE-APACHE"
+          },
+          {
+            "bytes": 1075,
+            "path": "licenses/cosmic-text-0.16.0/LICENSE-MIT",
+            "sha256": "95557bafe728379e206f3b6d4aceeaa054d271c71d722411a6222e2dec01138c",
+            "upstream_path": "LICENSE-MIT"
           }
         ],
         "repository": "https://github.com/pop-os/cosmic-text",
@@ -15285,18 +15285,6 @@
             "upstream_path": "LICENSE-ZLIB"
           },
           {
-            "bytes": 528,
-            "path": "licenses/zune-jpeg-0.5.15/third-party-notices/STANFORD-NOTICE.txt",
-            "sha256": "44cbe28eee934caf9f3ffd119df0bc1813343c3928d7456e362b9964a26e299b",
-            "upstream_path": "third-party-notices/STANFORD-NOTICE.txt"
-          },
-          {
-            "bytes": 12732,
-            "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-LICENSE.ijg",
-            "sha256": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb",
-            "upstream_path": "third-party-notices/libjpeg-turbo-LICENSE.ijg"
-          },
-          {
             "bytes": 74,
             "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt",
             "sha256": "d903a69ab39425283b44e2ea355cbfaf79bcd738b69c2b1c3c700ce80f2d89f9",
@@ -15315,6 +15303,12 @@
             "upstream_path": "third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt"
           },
           {
+            "bytes": 12732,
+            "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libjpeg-turbo-LICENSE.ijg",
+            "sha256": "4b7b9f8c03bb8d60270dfd12684e70ab21e4abfd27e73905cd1a7c4cae6f5cdb",
+            "upstream_path": "third-party-notices/libjpeg-turbo-LICENSE.ijg"
+          },
+          {
             "bytes": 11358,
             "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt",
             "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
@@ -15331,6 +15325,12 @@
             "path": "licenses/zune-jpeg-0.5.15/third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt",
             "sha256": "746d8c9c414b335bb7c9615918a15a6489a4dcc1c5c3aac2bda410d1072c332a",
             "upstream_path": "third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt"
+          },
+          {
+            "bytes": 528,
+            "path": "licenses/zune-jpeg-0.5.15/third-party-notices/STANFORD-NOTICE.txt",
+            "sha256": "44cbe28eee934caf9f3ffd119df0bc1813343c3928d7456e362b9964a26e299b",
+            "upstream_path": "third-party-notices/STANFORD-NOTICE.txt"
           },
           {
             "bytes": 1066,

@@ -4,7 +4,7 @@ import copy
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,6 +16,79 @@ SPEC.loader.exec_module(api)
 
 
 class ContentPolicyTests(unittest.TestCase):
+    # Public source paths observed in the genuine 550 Windows capture. These
+    # are ordering fixtures only, not original inventory/native evidence.
+    WINDOWS_NOTICE_ORDER = {
+        'cosmic-text@0.16.0': (
+            'fonts/FiraMono-LICENSE', 'fonts/Inter-LICENSE', 'fonts/NotoSans-LICENSE',
+            'LICENSE-APACHE', 'LICENSE-MIT'),
+        'zune-jpeg@0.5.15': (
+            'FLIGHTSIM-MODIFICATION-NOTICE.txt', 'LICENSE-APACHE', 'LICENSE-FLIGHTSIM-APACHE',
+            'LICENSE-FLIGHTSIM-MIT', 'LICENSE-MIT', 'LICENSE-ZLIB',
+            'third-party-notices/libjpeg-turbo-acknowledgement-NOTICE.txt',
+            'third-party-notices/libjpeg-turbo-adaptation-NOTICE.txt',
+            'third-party-notices/libjpeg-turbo-jdhuff-copyright-header.txt',
+            'third-party-notices/libjpeg-turbo-LICENSE.ijg',
+            'third-party-notices/libultrahdr-Apache-2.0-LICENSE.txt',
+            'third-party-notices/libultrahdr-copyright-headers.txt',
+            'third-party-notices/libultrahdr-upstream-Adobe-NOTICE.txt',
+            'third-party-notices/STANFORD-NOTICE.txt',
+            'third-party-notices/stb-MIT-NOTICE.txt',
+            'third-party-notices/stb-upstream-dual-license.txt'),
+    }
+
+    def ordering_fixture(self):
+        policy = api.content_policy(ROOT)
+        projection = {'packages': [], 'embedded_assets': []}
+        for item in policy['packages']:
+            row = item['inventory_fields']
+            projection['packages'].append({
+                'id': row['id'], 'name': row['name'], 'version': row['version'],
+                'declared_license': row['license_expression'],
+                'conservative_features': ['default'] if row['name'] == 'flightsim-app' else [],
+                'notices': [{k: n[k] for k in ('path', 'upstream_path', 'sha256', 'bytes')}
+                            for n in row['notices']]})
+        projection['embedded_assets'] = [{k: a[k] for k in
+            ('id', 'package', 'version', 'feature', 'source_path', 'sha256', 'notices')}
+            for a in policy['embedded_assets']]
+        build = {'bindings': {'lock': policy['source_files']['Cargo.lock']},
+                 'builds': {'ordinary': {'metadata': api.bytes_record(b'synthetic metadata, not a capture')}}}
+        return policy, projection, build
+
+    def test_pinned_windows_notice_order_matches_pathlib_target_semantics(self):
+        policy, projection, build = self.ordering_fixture()
+        by_id = {r['inventory_fields']['id']: r['inventory_fields'] for r in policy['packages']}
+        for identity, expected in self.WINDOWS_NOTICE_ORDER.items():
+            actual = tuple(n['upstream_path'] for n in by_id[identity]['notices'])
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual, tuple(p.as_posix() for p in sorted(map(PureWindowsPath, actual))))
+            self.assertNotEqual(actual, tuple(p.as_posix() for p in sorted(map(PurePosixPath, actual))))
+        self.assertEqual(api.expected_inventory(policy, projection, build)['review_status'], 'not_reviewed')
+
+    def test_historical_posix_policy_reproduces_the_real_order_rejection(self):
+        policy, projection, build = self.ordering_fixture()
+        for row in policy['packages']:
+            if row['inventory_fields']['id'] in self.WINDOWS_NOTICE_ORDER:
+                row['inventory_fields']['notices'].sort(key=lambda n: PurePosixPath(n['upstream_path']))
+        with self.assertRaisesRegex(ValueError, 'native notice set differs from pinned original content'):
+            api.expected_inventory(policy, projection, build)
+
+    def test_windows_order_fix_does_not_accept_other_notice_permutations_or_bytes(self):
+        policy, projection, build = self.ordering_fixture()
+        rows = {r['id']: r for r in projection['packages']}
+        for identity in self.WINDOWS_NOTICE_ORDER:
+            original = copy.deepcopy(rows[identity]['notices'])
+            mutations = [lambda n: n.reverse(), lambda n: n.append(copy.deepcopy(n[0])),
+                         lambda n: n.pop(), lambda n: n[0].update(path='licenses/injected/LICENSE'),
+                         lambda n: n[0].update(upstream_path='unreviewed/LICENSE'),
+                         lambda n: n[0].update(sha256='0' * 64), lambda n: n[0].update(bytes=n[0]['bytes'] + 1),
+                         lambda n: n[0].update(extra='unreviewed field')]
+            for mutate in mutations:
+                changed = copy.deepcopy(original); mutate(changed); rows[identity]['notices'] = changed
+                with self.subTest(identity=identity, mutate=mutate), self.assertRaisesRegex(ValueError, 'pinned original content'):
+                    api.expected_inventory(policy, projection, build)
+            rows[identity]['notices'] = original
+
     def test_pinned_public_corpus_and_source_are_closed_and_current(self):
         policy = api.content_policy(ROOT)
         self.assertEqual(len(policy['packages']), 359)
