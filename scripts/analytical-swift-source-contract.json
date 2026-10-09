@@ -8,7 +8,7 @@
   "source_migration_sha256": "b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9",
   "source_recipe": "bevy-0.18.1-tony-filmic-source-v1",
   "source_sha256": {
-    ".github/workflows/ci.yml": "1c058173851fbc448fb7c36cdbae749f3e1321a6baa4a55fb70d43d3da2b4994",
+    ".github/workflows/ci.yml": "9018bf9b4a64d7a68d007a2000a7cdf45439ebe92fb16c42c4d0aab9f670d6dd",
     "Cargo.lock": "198064f4ec49650db29b76de5834880de1e3fd9bc8e9860890eb3987703599b2",
     "Cargo.toml": "d02e563c40d92d180cfa8ca321cf69b029285cd6c0da553e5209cf66ebb03300",
     "LICENSE-APACHE": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
@@ -34,7 +34,7 @@
     "scripts/check-analytical-swift-recipe.py": "1e1956d1d215aef87220a704d7cfa6023decfe79ed76ed3f4b350f4ad6f21820",
     "scripts/check-commercial-readiness.py": "a33119350da4b0a7e7e57a062283eacdb8cab4fa2ef5b11b3497de7529a7f111",
     "scripts/check-release-authorization.py": "b8ad298984f385724d3bee748f8af32bc29468d543f3b8f3ab6782ca45453a67",
-    "scripts/check-swift-windows-candidate.py": "706a9259980d88f782da6794fbf281f89e0ce71a0592d40f086f813cc4596411",
+    "scripts/check-swift-windows-candidate.py": "9d8f9df6b5098dacfa0c8e265f13191256821c31901410a47b28c08479a5bd37",
     "scripts/check-tonemapping-build.py": "1a4e8a60b65c0ca1b000e3041978b47c88fdeb50f6eeb90fa8bb1d18a348dfd1",
     "scripts/ci-tonemapping.py": "c350a212fa5e316b30c88492ae8513457ba237bd440a40ec72c9419844630af2",
     "scripts/collect-analytical-runtime-facts.py": "a3a3762e4a3f68ead49257ad0fe3b86cd1d75a1cfc9ffa8a4528add6c30586f4",
@@ -50,7 +50,7 @@
     "scripts/tests/test_full_source_admission.py": "4278b68c263ea88b1dd9d4896bdd329399055e6f65b2a1760b5a2e1066f4df52",
     "scripts/tests/test_historical_release_copy_plan.py": "c01b964e8ef448fa487679eb3d83900a588d895af9ffacbe37c15c8639591c9a",
     "scripts/tests/test_release_authorization.py": "523b3f0c6f3a9883c6ace59604204106aca30cc93a0bc2b7f12ba14d8712e561",
-    "scripts/tests/test_swift_windows_candidate.py": "fcaf5128cabffebaab4c6a56a9e9fd0b4c6fe34ab3c9a908849765afb0c2dee6",
+    "scripts/tests/test_swift_windows_candidate.py": "ac077502207bdeabbb8b0a0682ed101e7c795fed4c547adf189493fa21895de8",
     "scripts/tests/test_tonemapping_build.py": "58fe33b902160b2a3c3016ccecb09a39d2447bacdbbd6cc4c6bbc5f262aafaf1",
     "scripts/tonemapping-two-lut-source.json": "8d98eac4df13df864cf9aea40422b153b8c41cc1f7bcb6c1cb23a87c2737cb51"
   }

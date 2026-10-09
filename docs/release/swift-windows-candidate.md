@@ -4,7 +4,33 @@ This separate candidate checks the existing `commercial-staging` distribution
 policy on Windows MSVC. It does not change `release.yml`, its two-aircraft
 payload/acceptance, any rights record, or publication authorization. A green
 candidate result means **engineering checks passed**, never permission to ship.
-The ordinary eight source-CI checks and this separate Windows run are distinct.
+Source CI and this separate manually dispatched Windows run are distinct.
+
+## Manual execution and startup consent
+
+This legacy workflow is manual-only (`workflow_dispatch`) on `main`; successful
+source CI no longer starts it automatically. The ordinary release workflow keeps
+its automatic two-aircraft package capture and publication gates unchanged.
+
+These candidate checks use ordinary app startup. On a fresh Windows account,
+the actual user must review and accept the component terms in the app before
+ordinary capture/replay can proceed. An unattended hosted runner has no such
+assent and can therefore fail at this gate. The harness never clicks agreement,
+writes a receipt, substitutes the closed internal-release-smoke command, or
+calls a diagnostic image ordinary acceptance. For a full local candidate run,
+use an appropriately prepared Windows environment with the user's actual assent.
+The existing fixed-scene internal-release-smoke invocation remains the separate
+noninteractive diagnostic used by ordinary release package validation.
+
+Process output now goes to private temporary files rather than pipes. At the
+unchanged 180-second capture deadline, the harness attempts to stop the process
+tree (including a waiting consent dialog), with at most three separately bounded
+10-second cleanup waits. It then saves bounded captured output and reports the
+original timeout. Cleanup failure is recorded in the log and cannot turn the
+candidate green. This cleanup budget is not additional screenshot runtime.
+The normal Windows console/startup flags and all success checks stay unchanged.
+The existing Windows source-CI job executes the process deadline regressions
+with real child processes and taskkill, independently of app startup or assent.
 
 ## Exact build and notice recipe
 
@@ -190,7 +216,7 @@ info,wgpu_core::device::global=trace,wgpu_core::device::queue=trace,wgpu_core::c
 By default, a primary default Swift capture failure ends acceptance without
 launching another process. The failed report retains the primary command,
 180-second timeout, launch settings and hash-bound log; no diagnostic files are
-produced. This is also the automatic candidate workflow's behavior.
+produced. The manually dispatched candidate workflow has the same behavior.
 
 An explicitly authorized investigation can pass `--diagnose-readback` to this
 Python checker to request **at most one** fresh diagnostic process after primary
@@ -208,7 +234,7 @@ stops the diagnostic safely while preserving the original failure.
 
 The completed [Windows v2 investigation](../qa/windows-readback-diagnostic-2026-10-04.md#completed-windows-v2-observation-and-opt-in-boundary)
 does not authorize repeated diagnostic runs or establish a production rendering
-fix. Subsequent source pushes keep the ordinary screenshot acceptance gate;
+fix. Manual candidate runs keep the ordinary screenshot acceptance gate;
 they do not opt into the secondary diagnostic.
 
 The explicitly enabled v2 probe includes a shader-free 4×4 pre-scene clear/copy

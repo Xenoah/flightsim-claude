@@ -1,12 +1,15 @@
 """Candidate/evidence boundaries without compiling, graphics, network or approval."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import struct
 import subprocess
+import sys
+import time
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zlib
 
 
@@ -3183,26 +3186,191 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(candidate.BASELINE_LAUNCH, {"creationflags": 0, "startupinfo": None})
 
 
+class CandidateProcessTimeoutTests(unittest.TestCase):
+    """Regression for run 37955865712: a dialog descendant retained pipe ends."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+
+    def test_exited_parent_does_not_wait_for_descendant_output_handles(self):
+        # The root exits normally, while a descendant inherits both output
+        # handles. Waiting for pipe EOF would falsely time out this command.
+        code = ("import subprocess, sys; "
+                "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(3)']); "
+                "print('root complete', flush=True)")
+        started = time.monotonic()
+        result = candidate.run_bounded([sys.executable, '-c', code], cwd=self.root,
+                                       env=os.environ.copy(), timeout=1, private=self.root)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn(b'root complete', result.stdout)
+        self.assertLess(time.monotonic() - started, 2.5)
+        # Let this deliberately detached child close its inherited private file
+        # handles before TemporaryDirectory cleanup on Windows.
+        time.sleep(3.1)
+
+    def test_late_descendant_writer_cannot_overwrite_output_during_readback(self):
+        code = ("import subprocess, sys; "
+                "subprocess.Popen([sys.executable, '-c', "
+                "\"import sys, time; time.sleep(2); print('late child', flush=True)\"]); "
+                "print('original root output', flush=True)")
+        result = candidate.run_bounded([sys.executable, '-c', code], cwd=self.root,
+                                       env=os.environ.copy(), timeout=1, private=self.root)
+        self.assertEqual(result.stdout, b'original root output' + os.linesep.encode())
+        time.sleep(2.2)
+        logs = list(self.root.glob('command-*-stdout.log'))
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0].read_bytes(), os.linesep.join(('original root output', 'late child', '')).encode())
+
+    def test_timeout_retains_streams_and_stops_descendant_before_it_writes(self):
+        marker = self.root / 'escaped.txt'
+        child = "import time; from pathlib import Path; time.sleep(2); Path('escaped.txt').write_text('orphan')"
+        code = ("import subprocess, sys, time; "
+                f"subprocess.Popen([sys.executable, '-c', {child!r}]); "
+                "print('stdout before timeout', flush=True); "
+                "print('stderr before timeout', file=sys.stderr, flush=True); time.sleep(30)")
+        started = time.monotonic()
+        with self.assertRaises(subprocess.TimeoutExpired) as raised:
+            candidate.run_bounded([sys.executable, '-c', code], cwd=self.root,
+                                  env=os.environ.copy(), timeout=0.5, private=self.root)
+        self.assertLess(time.monotonic() - started, 2.5)
+        self.assertIn(b'stdout before timeout', raised.exception.stdout)
+        self.assertIn(b'stderr before timeout', raised.exception.stderr)
+        time.sleep(2.1)
+        self.assertFalse(marker.exists(), 'timed-out descendant survived the process tree cleanup')
+
+    def test_windows_cleanup_terminates_tree_before_bounded_root_wait(self):
+        process = Mock(pid=123, poll=Mock(return_value=9))
+        killer = Mock(wait=Mock(return_value=0))
+        with patch.object(candidate.sys, "platform", "win32"), \
+                patch.dict(candidate.os.environ, {"SystemRoot": "C:/Windows"}), \
+                patch.object(candidate.subprocess, "Popen", return_value=killer) as launch:
+            failure = candidate.stop_candidate_process_tree(process)
+        self.assertEqual(failure, "")
+        self.assertEqual(launch.call_args.args[0],
+                         [str(Path("C:/Windows") / "System32/taskkill.exe"), "/PID", "123", "/T", "/F"])
+        self.assertEqual(launch.call_args.kwargs,
+                         {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL})
+        killer.wait.assert_called_once_with(timeout=10)
+        process.wait.assert_called_once_with(timeout=10)
+        process.kill.assert_not_called()
+
+    def test_windows_cleanup_failure_has_only_bounded_waits_and_root_fallback(self):
+        process = Mock(pid=123, poll=Mock(return_value=None))
+        process.wait.side_effect = subprocess.TimeoutExpired("root", 10)
+        killer = Mock()
+        killer.wait.side_effect = subprocess.TimeoutExpired("taskkill", 10)
+        with patch.object(candidate.sys, "platform", "win32"), \
+                patch.dict(candidate.os.environ, {"SystemRoot": "C:/Windows"}), \
+                patch.object(candidate.subprocess, "Popen", return_value=killer):
+            failure = candidate.stop_candidate_process_tree(process)
+        self.assertIn("process-tree termination failed", failure)
+        self.assertIn("root-process cleanup failed", failure)
+        self.assertEqual(killer.wait.call_count, 2)
+        for call in killer.wait.call_args_list + process.wait.call_args_list:
+            self.assertEqual(call.kwargs, {"timeout": 10})
+        killer.kill.assert_called_once_with()
+        process.kill.assert_called_once_with()
+
+    def test_timeout_stays_failure_when_tree_cleanup_reports_failure(self):
+        # Simulate Windows tree-cleanup failure while still reaping our real
+        # disposable Linux child; logs must not silently claim clean shutdown.
+        real_stop = candidate.stop_candidate_process_tree
+        def failed_stop(process):
+            real_stop(process)
+            return "injected process-tree termination failure"
+        with patch.object(candidate, "stop_candidate_process_tree", side_effect=failed_stop):
+            with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                candidate.run_bounded([sys.executable, '-c', 'import time; time.sleep(30)'],
+                                      cwd=self.root, env=os.environ.copy(), timeout=0.2, private=self.root)
+        self.assertIn(b'injected process-tree termination failure', raised.exception.stderr)
+
+    def test_windows_launcher_keeps_baseline_flags_and_file_backed_output(self):
+        process = Mock(returncode=0)
+        with patch.object(candidate.sys, "platform", "win32"), \
+                patch.object(candidate.subprocess, "Popen", return_value=process) as launch:
+            result = candidate.run_bounded(['app.exe'], cwd=self.root, env={},
+                                           timeout=180, private=self.root)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn('creationflags', launch.call_args.kwargs)
+        self.assertNotIn('startupinfo', launch.call_args.kwargs)
+        self.assertNotIn('start_new_session', launch.call_args.kwargs)
+        self.assertNotEqual(launch.call_args.kwargs['stdout'], subprocess.PIPE)
+        self.assertNotEqual(launch.call_args.kwargs['stderr'], subprocess.PIPE)
+        process.wait.assert_called_once_with(timeout=180)
+        process.communicate.assert_not_called()
+
+    def test_final_log_bound_includes_both_streams_utf8_and_cleanup_notes(self):
+        with patch.object(candidate, 'MAX_EVIDENCE_BYTES', 256):
+            log, truncated = candidate.command_log(b'out' * 100, b'\xff' * 100 + b'cleanup failed',
+                                                    self.root / 'source', self.root / 'private')
+        self.assertTrue(truncated)
+        self.assertLessEqual(len(log.encode('utf-8')), 256)
+        self.assertIn('[harness] Output exceeded', log)
+        self.assertTrue(log.endswith('cleanup failed'))
+
+    def test_timeout_output_truncation_stays_bounded_and_explicit(self):
+        with patch.object(candidate, 'MAX_EVIDENCE_BYTES', 256):
+            with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                candidate.run_bounded(
+                    [sys.executable, '-c', "import sys, time; sys.stderr.write('x' * 257); sys.stderr.flush(); time.sleep(30)"],
+                    cwd=self.root, env=os.environ.copy(), timeout=0.2, private=self.root)
+            log, truncated = candidate.command_log(raised.exception.stdout, raised.exception.stderr,
+                                                    self.root / 'source', self.root / 'private')
+        self.assertTrue(truncated)
+        self.assertLessEqual(len(log.encode('utf-8')), 256)
+        self.assertIn('truncated', log)
+
+    def test_windows_taskkill_launch_and_nonzero_errors_are_reported(self):
+        for error in (OSError('taskkill unavailable'), None):
+            process = Mock(pid=123, poll=Mock(return_value=None))
+            killer = Mock(wait=Mock(return_value=1))
+            with self.subTest(error=error), patch.object(candidate.sys, 'platform', 'win32'), \
+                    patch.dict(candidate.os.environ, {'SystemRoot': 'C:/Windows'}), \
+                    patch.object(candidate.subprocess, 'Popen', return_value=killer, side_effect=error):
+                failure = candidate.stop_candidate_process_tree(process)
+            self.assertIn('termination', failure)
+            process.kill.assert_called_once_with()
+            process.wait.assert_called_once_with(timeout=10)
+
+    def test_completed_nonzero_status_and_separate_byte_streams_are_preserved(self):
+        result = candidate.run_bounded(
+            [sys.executable, '-c', "import sys; sys.stdout.buffer.write(b'out\\x00'); sys.stderr.write('err'); sys.exit(7)"],
+            cwd=self.root, env=os.environ.copy(), timeout=2, private=self.root)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (7, b'out\x00', b'err'))
+
+
 class CandidateWorkflowTests(unittest.TestCase):
-    def test_workflow_is_exact_successful_main_ci_diagnostics_only(self):
+    def test_windows_process_regressions_run_in_existing_native_ci_job(self):
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        job = text.split("  content_download_smoke:\n", 1)[1].split("  world_source_tools:\n", 1)[0]
+        self.assertIn("os: [windows-latest, ubuntu-latest]", job)
+        setup = job.split("      - uses: actions/setup-python@", 1)[1].split("      - name:", 1)[0]
+        self.assertIn("if: runner.os == 'Windows'", setup)
+        self.assertIn("python-version: '3.12'", setup)
+        step = job.split("      - name: Check Windows candidate process deadlines\n", 1)[1].split("      - uses:", 1)[0]
+        self.assertIn("if: runner.os == 'Windows'", step)
+        self.assertIn("python -m unittest scripts.tests.test_swift_windows_candidate.CandidateProcessTimeoutTests -v", step)
+
+    def test_workflow_is_manual_exact_main_diagnostics_only(self):
         text = (ROOT / ".github/workflows/swift-windows-candidate.yml").read_text(encoding="utf-8")
-        for guard in ("workflow_run:", "workflows: [CI]", "conclusion == 'success'", "event == 'push'",
-                      "head_branch == 'main'", "head_sha == github.sha",
-                      "head_repository.full_name == github.repository", "persist-credentials: false",
-                      "ref: ${{ github.event.workflow_run.head_sha }}", "timeout-minutes: 90"):
+        for guard in ("workflow_dispatch:", "github.ref == 'refs/heads/main'",
+                      "persist-credentials: false", "ref: ${{ github.sha }}", "timeout-minutes: 90",
+                      "EXPECTED_SOURCE_SHA: ${{ github.sha }}"):
             self.assertIn(guard, text)
         for setting in ("GIT_CONFIG_COUNT: '2'", "GIT_CONFIG_KEY_0: core.autocrlf",
                         "GIT_CONFIG_VALUE_0: 'false'", "GIT_CONFIG_KEY_1: core.eol", "GIT_CONFIG_VALUE_1: 'lf'"):
             self.assertIn(setting, text)
         for forbidden in ("contents: write", "uses: Swatinem/rust-cache", "uses: actions/cache",
-                          "gh release", "git tag", "workflow_dispatch:", "--diagnose-readback"):
+                          "gh release", "git tag", "workflow_run:", "--diagnose-readback"):
             self.assertNotIn(forbidden, text)
         block = text.split("          path: |\n", 1)[1].split("          if-no-files-found:", 1)[0]
         names = {line.strip().rsplit("/", 1)[1] for line in block.splitlines() if line.strip()}
         self.assertEqual(names, candidate.TEXT_EVIDENCE | candidate.PNG_EVIDENCE)
         self.assertNotIn("*", block)
         self.assertIn("steps.evidence.outputs.validated == 'true'", text)
-        self.assertNotIn("release.yml", text)
+        self.assertNotIn("uses: ./.github/workflows/release.yml", text)
 
 
 if __name__ == "__main__":

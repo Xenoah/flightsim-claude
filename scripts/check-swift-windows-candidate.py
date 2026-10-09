@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -1250,6 +1251,7 @@ CAPTURE_TRACE = ("info,wgpu_core::device::global=trace,wgpu_core::device::queue=
 # The diagnostic keeps the primary's ordinary Python launcher unchanged.
 BASELINE_LAUNCH = {"creationflags": 0, "startupinfo": None}
 CAPTURE_TIMEOUT_SECONDS = 180
+PROCESS_CLEANUP_TIMEOUT_SECONDS = 10
 PROBE_PREFIX = "FS_READBACK_PROBE"
 PROBE_MAX_JSON_BYTES = 64 * 1024
 PROBE_MAX_EVENTS = 32
@@ -2301,6 +2303,93 @@ def validate_evidence(directory):
     validate_probe_evidence(directory, report)
 
 
+def stop_candidate_process_tree(process):
+    """Bound cleanup independently; never drain a descendant-owned output pipe."""
+    failures = []
+    try:
+        if sys.platform == "win32":
+            taskkill = Path(os.environ["SystemRoot"]) / "System32/taskkill.exe"
+            killer = subprocess.Popen([str(taskkill), "/PID", str(process.pid), "/T", "/F"],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                code = killer.wait(timeout=PROCESS_CLEANUP_TIMEOUT_SECONDS)
+                if code != 0:
+                    failures.append("process-tree termination returned a failure")
+            except subprocess.TimeoutExpired:
+                killer.kill()
+                killer.wait(timeout=PROCESS_CLEANUP_TIMEOUT_SECONDS)
+                failures.append("process-tree termination exceeded its cleanup deadline")
+        else:
+            # Real subprocess regression tests run on Linux; production rejects it.
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, KeyError, subprocess.SubprocessError) as error:
+        failures.append("process-tree termination failed: " + str(error))
+    try:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=PROCESS_CLEANUP_TIMEOUT_SECONDS)
+    except (OSError, subprocess.SubprocessError) as error:
+        failures.append("root-process cleanup failed: " + str(error))
+    return "; ".join(failures)
+
+
+def run_bounded(command, *, cwd, env, timeout, private):
+    """Use private files so inherited handles cannot defeat the process deadline.
+
+    Do not use Popen's context manager: its exit waits without a deadline. Windows
+    keeps the ordinary launch flags; only Linux regression tests use a new group.
+    """
+    command = [str(arg) for arg in command]
+    # Retain raw streams only in the private workspace. Separate read handles
+    # below must not seek a file offset shared with a surviving descendant.
+    with tempfile.NamedTemporaryFile(mode="wb", dir=private, prefix="command-", suffix="-stdout.log",
+                                     delete=False) as out, \
+            tempfile.NamedTemporaryFile(mode="wb", dir=private, prefix="command-", suffix="-stderr.log",
+                                        delete=False) as err:
+        options = {} if sys.platform == "win32" else {"start_new_session": True}
+        process = subprocess.Popen(command, cwd=cwd, env=env, stdout=out, stderr=err, **options)
+        timed_out = None
+        cleanup_failure = ""
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            timed_out = error
+            cleanup_failure = stop_candidate_process_tree(process)
+        streams = []
+        oversized = False
+        for stream in (out, err):
+            # Snapshot regular-file length rather than following a surviving
+            # writer to EOF. Export already imposes this same per-file bound.
+            size = os.fstat(stream.fileno()).st_size
+            oversized |= size > MAX_EVIDENCE_BYTES
+            with open(stream.name, "rb") as reader:
+                streams.append(reader.read(min(size, MAX_EVIDENCE_BYTES)))
+        if timed_out is not None:
+            timed_out.stdout, timed_out.stderr = streams
+            if oversized:
+                timed_out.stderr += b"\n[harness] Timed-out output exceeded the evidence size limit; output truncated.\n"
+            if cleanup_failure:
+                timed_out.stderr += ("\n[harness] " + cleanup_failure + "\n").encode("utf-8", errors="replace")
+            raise timed_out
+        require(not oversized, "command output exceeds evidence size limit")
+        return subprocess.CompletedProcess(command, process.returncode, *streams)
+
+
+
+def command_log(stdout, stderr, repo, work):
+    """Bound the final UTF-8 representation, retaining head and cleanup tail."""
+    log = sanitize((stdout + b"\n" + stderr).decode("utf-8", errors="replace"), repo, work)
+    encoded = log.encode("utf-8")
+    if len(encoded) <= MAX_EVIDENCE_BYTES:
+        return log, False
+    marker = b"\n[harness] Output exceeded the evidence size limit; middle truncated.\n"
+    tail = min(8192, (MAX_EVIDENCE_BYTES - len(marker)) // 2)
+    head = MAX_EVIDENCE_BYTES - len(marker) - tail
+    log = (encoded[:head].decode("utf-8", errors="ignore") + marker.decode("ascii")
+           + encoded[-tail:].decode("utf-8", errors="ignore"))
+    return log, True
+
+
 def run_candidate(repo, expected, work, evidence, *, diagnose_readback=False):
     require(sys.platform == "win32", "actual candidate execution requires Windows")
     require(not work.exists() and not evidence.exists(), "use new work and evidence directories")
@@ -2332,19 +2421,17 @@ def run_candidate(repo, expected, work, evidence, *, diagnose_readback=False):
                 run_env["RUST_LOG"] = CAPTURE_TRACE
         timed_out = None
         try:
-            result = subprocess.run([str(x) for x in command], cwd=cwd, env=run_env,
-                                    capture_output=True, timeout=timeout)
+            result = run_bounded(command, cwd=cwd, env=run_env, timeout=timeout, private=work)
         except subprocess.TimeoutExpired as error:
-            # subprocess.run kills and waits for its process. Keep the captured
-            # diagnostic bytes, but no partial screenshot enters evidence.
+            # Tree cleanup and output collection have separate finite bounds.
+            # Keep the diagnostic bytes; partial screenshots stay private.
             timed_out = error
             result = subprocess.CompletedProcess(command, -1, error.stdout or b"", error.stderr or b"")
         # Cargo output is text; raw metadata goes only into the private workspace.
-        log = (result.stdout + b"\n" + result.stderr).decode("utf-8", errors="replace")
-        log = sanitize(log, repo, work)
+        log, truncated = command_log(result.stdout, result.stderr, repo, work)
         if output:
-            output.write_text(log, encoding="utf-8")
-        with (evidence / "commands.log").open("a", encoding="utf-8") as stream:
+            output.write_bytes(log.encode("utf-8"))
+        with (evidence / "commands.log").open("a", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps([str(x).replace(str(work), "<private-work>").replace(str(repo), "<source>") for x in command]) + "\n")
             stream.write(f"exit_code={result.returncode}\n")
             if output:
@@ -2353,6 +2440,7 @@ def run_candidate(repo, expected, work, evidence, *, diagnose_readback=False):
                 stream.write(log.replace(str(work), "<private-work>").replace(str(repo), "<source>") + "\n")
         if timed_out is not None:
             raise timed_out
+        require(not truncated, "command output exceeds evidence size limit")
         require(accepted is None or result.returncode in accepted, f"command failed with {result.returncode}: {command[0]}")
         return result, log
 
