@@ -18,7 +18,8 @@ native = stage.native
 class FullStageTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name); self.repo = self.root / 'repo'; self.repo.mkdir()
+        # Windows TEMP may use an 8.3 alias; qualification requires canonical roots.
+        self.root = Path(temporary.name).resolve(); self.repo = self.root / 'repo'; self.repo.mkdir()
         self.notices = self.root / 'notices'; self.notices.mkdir()
         self.exe = self.root / 'build/flightsim-app.exe'; self.exe.parent.mkdir(); self.exe.write_bytes(b'SYNTHETIC-NOT-AN-EXECUTABLE')
         self.out = self.root / 'candidate'

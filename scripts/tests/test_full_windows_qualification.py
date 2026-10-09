@@ -131,9 +131,10 @@ class PolicyInheritanceTests(unittest.TestCase):
 class FullRuntimeContractTests(unittest.TestCase):
     def test_exact_two_existing_scene_commands(self):
         self.assertEqual(list(q.SCENES), ['light-single-cockpit', 'swift-sport-chase'])
+        app, image = Path('/bundle/flightsim-app.exe'), Path('/private/image.png')
         for name, (aircraft, view, _) in q.SCENES.items():
-            self.assertEqual(q.command(Path('/bundle/flightsim-app.exe'), Path('/private/image.png'), name),
-                ['/bundle/flightsim-app.exe', '--screenshot', '/private/image.png', '--screenshot-delay', '5',
+            self.assertEqual(q.command(app, image, name),
+                [str(app), '--screenshot', str(image), '--screenshot-delay', '5',
                  '--exit-after-screenshot', '--aircraft', aircraft, '--view', view, '--traffic', 'synthetic'])
         self.assertEqual(q.TIMEOUT, 180)
 
