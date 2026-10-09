@@ -33,6 +33,32 @@ def digest(value):
 
 
 class ComponentTermsContentTests(unittest.TestCase):
+    def test_dialog_suppresses_only_progress_before_module_loading(self):
+        source = (ROOT / 'crates/flightsim-app/src/component_terms_dialog.ps1').read_text(encoding='utf-8')
+        statements = [line.strip() for line in source.splitlines()
+                      if line.strip() and not line.lstrip().startswith('#')]
+        self.assertEqual(statements[0], "$ProgressPreference = 'SilentlyContinue'")
+        self.assertEqual(statements[1], "$ErrorActionPreference = 'Stop'")
+        self.assertEqual(source.count('$ProgressPreference ='), 1)
+        self.assertIn("[Console]::Error.WriteLine('Unable to display the complete component terms; no agreement recorded.')", source)
+        self.assertIn('    exit 2\n}', source)
+        runtime = (ROOT / 'crates/flightsim-app/src/component_terms.rs').read_text(encoding='utf-8')
+        self.assertIn('stderr.is_empty()', runtime)
+
+    def test_windows_harness_exercises_progress_and_preserves_real_error_checks(self):
+        harness = (ROOT / 'scripts/tests/test-component-terms-dialog.ps1').read_text(encoding='ascii')
+        self.assertIn("@('decline', 'decline-with-progress', 'close', 'missing-document')", harness)
+        self.assertIn("Write-Progress -Activity 'Synthetic module preparation'", harness)
+        self.assertIn('$stderr.Length -ne 0', harness)
+        self.assertIn('$process.ExitCode -ne 2 -or $stdout.Length -ne 0 -or $stderr.Length -eq 0', harness)
+        self.assertNotIn('$agree.PerformClick()', harness)
+
+    def test_argument_diagnostic_link_names_the_existing_parser(self):
+        source = (ROOT / 'crates/flightsim-app/src/main.rs').read_text(encoding='utf-8')
+        self.assertIn('fn parse_arguments_from(', source)
+        self.assertIn('[`parse_arguments_from`]', source)
+        self.assertNotIn('[`parse_arguments`]', source)
+
     def test_english_matches_reviewed_proposal_with_only_framing_activated(self):
         active = (ROOT / ENGLISH).read_bytes()
         self.assertEqual(len(active), 4537)

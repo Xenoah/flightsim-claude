@@ -51,7 +51,7 @@ PRESERVED_RUNTIME_SHA256 = "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47
 # The old reviewed tree is base provenance only. This exact migration owns the
 # changed startup gate; historical runtime hashes never become current evidence.
 COMPONENT_TERMS_MIGRATION_PATH = "scripts/component-terms-source-migration.json"
-COMPONENT_TERMS_MIGRATION_SHA256 = "f742f4678d6af0197408acc16619e7220c8b1c9433c1c7347254fa1d8e88195e"
+COMPONENT_TERMS_MIGRATION_SHA256 = "b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9"
 COMPONENT_TERMS_MAIN_PATH = "crates/flightsim-app/src/main.rs"
 COMPONENT_TERMS_HISTORY_PATH = "scripts/history/4d40f9a-flightsim-app-main.rs"
 COMPONENT_TERMS_RUNTIME_PATHS = frozenset({

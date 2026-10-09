@@ -3,7 +3,7 @@
     "LICENSE-APACHE": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
     "LICENSE-MIT": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
     "crates/flightsim-app/src/component_terms.rs": "20d2d9ecc046ef619a0d4102dc19eb06fff2084979c46bfbe378c8a0874f2553",
-    "crates/flightsim-app/src/component_terms_dialog.ps1": "47ebe9c2b79a168f21ecae8b50b1f4b6a50168f15856a135f85920e20f031b35",
+    "crates/flightsim-app/src/component_terms_dialog.ps1": "071a4ad78fd5ab1f161f8d23e6a2630230e7bdb4d24ed3cf63d38b41d6540ed2",
     "docs/release/components/MICROSOFT-COMPONENT-NOTICE.txt": "140023bab16a1c65bf55554a4db7a760bda222afe46fdcc401930f87a2ac0006",
     "docs/release/components/MICROSOFT-COMPONENT-TERMS.ja.txt": "639a4b64da625b37afffd42b9563f0550c3725aeca5940f8a819334cba5e1fde",
     "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt": "052656e63c7f2df77a7cfffb7d78fcbb64d8525f9d0ca69d39e5475e5bce9d20"
@@ -20,7 +20,7 @@
   "replaced_source_sha256": {
     "crates/flightsim-app/src/main.rs": {
       "previous_sha256": "160cc900acbb0029452c4175fee9ba24bc26611ce41faaa57a97a8426b97811a",
-      "sha256": "fe78b9415040a27cd11397c6aebebd9f2e59669fb8dbd8cd88be79c303a3f9a0"
+      "sha256": "e7a8480d1a4f5af9a0e14c982fe1645ac94cc5748a9f224edc00e3f63d48aada"
     }
   },
   "schema_version": 1

@@ -7,10 +7,10 @@
     "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt",
     "docs/release/windows-component-release-notes.md"
   ],
-  "release_inventory_sha256": "38a92ded80c31dc95ecc95b11435f337b0b12b52cd477e526871fb82144be608",
+  "release_inventory_sha256": "5136550777ee30e1b391fb10159cd04dccfe62c08c6a7f19da14129873fd954c",
   "schema_version": 1,
   "scope": "github-windows-prerelease",
-  "source_inventory_sha256": "f78f81604c9c7bfd221a6273964d38a24be22ab184888a6279339be7b86ad97f",
+  "source_inventory_sha256": "f4715ca98d1a52b93a248af74e596c9199c674159ea0111d87ba592b9515ae06",
   "status": "authorized",
   "target": "x86_64-pc-windows-msvc",
   "version": "0.6.0-alpha.21"

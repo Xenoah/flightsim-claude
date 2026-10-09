@@ -7,6 +7,10 @@ Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'This control contract requires Windows Forms on Windows.' }
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $source = [IO.File]::ReadAllText((Join-Path $root 'crates/flightsim-app/src/component_terms_dialog.ps1'))
+$progressAnchor = '$ProgressPreference = ''SilentlyContinue'''
+if (($source.Split(@($progressAnchor), [StringSplitOptions]::None)).Count -ne 2) {
+    throw 'The exact production progress preference changed; review this synthetic harness.'
+}
 $anchor = '    [void]$form.ShowDialog()'
 if (($source.Split(@($anchor), [StringSplitOptions]::None)).Count -ne 2) {
     throw 'The exact production dialog anchor changed; review this synthetic harness.'
@@ -44,7 +48,7 @@ $probe = @'
             $japaneseEnd = '6 ' + (-join [char[]]@(0x540c, 0x610f, 0x306e, 0x7bc4, 0x56f2))
             if (-not $tabs.TabPages[1].Controls[0].Text.Contains($japaneseEnd)) { throw 'Japanese end section was not delivered.' }
             $script:observed = $true
-            if ($caseName -eq 'decline') {
+            if ($caseName -eq 'decline' -or $caseName -eq 'decline-with-progress') {
                 # Synthetic sentinel detects that the actual Decline click
                 # handler ran. The Agree control is never activated.
                 $script:agreed = $true
@@ -66,8 +70,14 @@ $probe = @'
 $private = Join-Path ([IO.Path]::GetTempPath()) ('flightsim-terms-synthetic-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($private)
 try {
-    foreach ($caseName in @('decline', 'close', 'missing-document')) {
+    foreach ($caseName in @('decline', 'decline-with-progress', 'close', 'missing-document')) {
         $program = '$caseName = ''' + $caseName + "'`n" + $source.Replace($anchor, $probe)
+        if ($caseName -eq 'decline-with-progress') {
+            # Force the same progress stream as first-use module preparation,
+            # before any document/UI work. Real stderr is still rejected below.
+            $progress = "`nWrite-Progress -Activity 'Synthetic module preparation' -Status 'Synthetic progress only' -PercentComplete 50"
+            $program = $program.Replace($progressAnchor, $progressAnchor + $progress)
+        }
         $start = New-Object Diagnostics.ProcessStartInfo
         $start.FileName = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($program))

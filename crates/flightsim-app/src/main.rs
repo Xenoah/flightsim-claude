@@ -282,7 +282,7 @@ enum RunwaySource {
 ///
 /// # なぜ溜めるのか
 ///
-/// **`parse_arguments` は `LogPlugin` より前に走る。** そこで `warn!` を呼んでも
+/// **`parse_arguments_from` は `LogPlugin` より前に走る。** そこで `warn!` を呼んでも
 /// 購読者がまだ居らず、**何も出ない**。実際、`--bogus-flag` を渡しても無言だった。
 /// 溜めておいて、ログが立ち上がってから出す。
 #[derive(Resource, Debug, Default, Clone)]
@@ -3627,7 +3627,7 @@ fn landing_runway_metrics(
 
 /// 引数の指摘を出す。
 ///
-/// [`parse_arguments`] が溜めたものを、ログが立ち上がってから出す。
+/// [`parse_arguments_from`] が溜めたものを、ログが立ち上がってから出す。
 fn report_arguments(diagnostics: Res<StartupDiagnostics>) {
     for note in &diagnostics.0 {
         warn!("{note}");

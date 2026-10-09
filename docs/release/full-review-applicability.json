@@ -20,7 +20,9 @@
       "Actual environment identity SHA256 f8c8e4b5d091e24aec44dda1286b5fa3b5eb6a900eeefcf658cc5d6b72d5ea65",
       "Exact unchanged notice assembly SHA256 b58dcb27460a04e0023f11510e38b832f97322880d3e719a108457a02e1fb0b9",
       "VS2026 official agreement SHA256 dd2ab92a7c2bb90dd509e16572707a34b13bc0bc09b9199d115f25594ac39053",
-      "Exact reviewed v2 source 4e943edb82128007807371105a272965f0b88e1e tree 20ad0a0c44a8c1dc4be14381b6b97824bba1dda4"
+      "Exact reviewed v2 source 4e943edb82128007807371105a272965f0b88e1e tree 20ad0a0c44a8c1dc4be14381b6b97824bba1dda4",
+      "Reviewed CI correction source 298ace599a216ff556aabcb4cbf07372178ad704 tree 0e50e8191726405cd999f3e3c16369bda7066fbb; progress-only suppression and parser documentation links; original terms, dependency review, notice bytes and all ten non-source native conditions unchanged.",
+      "Reviewed asset-local test correction source b0c5d2b7517345c81d0df4f8c29b40257ca8feb7 tree 4634be38065212362344cc971db3925c8b197501; only the obsolete whole-target-review absence assertion is removed. Exact asset proof/notice/history checks and all five false asset-local scope flags remain mandatory. All eleven prospective native-content conditions are unchanged from the preceding reviewed correction."
     ],
     "native_runtime_coverage_complete": true,
     "reason": "Completed source/notice coverage assessment uses the controlled ordinary Rust1.93.0 MSVC release recipe, exact359 Cargo source closure,1264 edges,510 verified header records, three complete modified vendor trees and exact source/runtime notice bytes. The unchanged supported hosted VS Enterprise source route and standard release CRT/startup family, plus eligible public SDK UM/UCRT library category where actually applicable, cover the plausible supplier set conservatively. Nonempty build-script requests are the reviewed BLAKE3 assembly libraries and winapi Windows API families. No observed contribution falls outside these covered source families. Installed tool samples are not asserted exhaustive, final linker command/toolset/SDK/static membership remain unknown, and no exact member map is required by this coverage method. SDK installations do not establish copied proprietary SDK code; no separate SDK benchmark restriction is imposed on FlightSim. Only the executable is shipped as native code; external OS, graphics and v14 runtime prerequisites are not redistributed app files. Approved component terms and project/supplier notices are represented at their exact separate source-copy destinations. Coverage here means source/notice/licensing applicability, not dynamic module execution, successful rendering, physical hardware coverage, individual recipient assent or publication permission. Exact installed candidate comparison is now bound to real environment-only run37902203369 (VS Enterprise18.10, toolsets14.29/14.44/14.51, SDK26100). This updates the supplier applicability assessment without claiming that the future application has used those files. All actual candidate fields remain exact future-match conditions; no new family-based acceptance rule was introduced.",
@@ -54,12 +56,12 @@
     "runtime_microsoft": "fb75b315c39dc63b68ecbb3df53eea0fca199fb9be19e7e0406018a88fa4b2c2",
     "runtime_query_outcomes": "e03f8eed69168d57f9f765ec39661fd067c8652bb416274328ec5c672d8be0fb",
     "runtime_rust": "f886a1927b6b10e2731c880f5e4870d496d9d776455769ade98e7cdcce3ec431",
-    "source": "660b5292194e8dd54a2f8cf4314c7ff67452e74b37e8f19e9a1eef927f9ccc18"
+    "source": "a8232fce4e12db2dad77e1c6210071229892ffed9ecb627286dfea88a4313fb0"
   },
-  "reviewed_at": "2026-10-09T08:03:00Z",
+  "reviewed_at": "2026-10-09T14:49:00Z",
   "reviewed_by": "OpenAI assistant; substantive source, license-route and notice applicability review",
   "schema_version": 1,
-  "scope": "Explicit v2 source/native conditions: current source4e943ed, genuine source550 application/build facts, and separately observed environment-only Windows-latest supplier facts. A future ordinary producer must independently recompute and match every complete section. No joined native build or runtime success is fabricated.",
+  "scope": "Explicit v2 source/native conditions: reviewed correction sourceb0c5d2b, genuine source550 application/build facts, and separately observed environment-only Windows-latest supplier facts. Corrections suppress only PowerShell progress before module loading, repair stale parser documentation links, and keep the Filmic asset-local test independent of a separately completed whole-target review, with corresponding tests and exact source seals. A future ordinary producer must independently recompute and match every complete section. No joined native build, dialog execution or runtime success is fabricated.",
   "source_content_files": [
     {
       "bytes": 3012,
@@ -332,9 +334,9 @@
       "sha256": "20d2d9ecc046ef619a0d4102dc19eb06fff2084979c46bfbe378c8a0874f2553"
     },
     {
-      "bytes": 6576,
+      "bytes": 6695,
       "path": "crates/flightsim-app/src/component_terms_dialog.ps1",
-      "sha256": "47ebe9c2b79a168f21ecae8b50b1f4b6a50168f15856a135f85920e20f031b35"
+      "sha256": "071a4ad78fd5ab1f161f8d23e6a2630230e7bdb4d24ed3cf63d38b41d6540ed2"
     },
     {
       "bytes": 7007,
@@ -382,9 +384,9 @@
       "sha256": "5b5c47e4d6d3cf838944f39bfa52eec14318a7713d3d66da637c3d2bb9cb2847"
     },
     {
-      "bytes": 259253,
+      "bytes": 259263,
       "path": "crates/flightsim-app/src/main.rs",
-      "sha256": "fe78b9415040a27cd11397c6aebebd9f2e59669fb8dbd8cd88be79c303a3f9a0"
+      "sha256": "e7a8480d1a4f5af9a0e14c982fe1645ac94cc5748a9f224edc00e3f63d48aada"
     },
     {
       "bytes": 11706,
@@ -8784,12 +8786,12 @@
     {
       "bytes": 1242,
       "path": "scripts/analytical-swift-capture-contract.json",
-      "sha256": "99fabc84c57e82b372808e8fad9c24fefc61368eeeea779eb8c12854ed3f1702"
+      "sha256": "3a49802c16014ef2705817e065fb6fad9eca41f4953f984f75068af15fdd8944"
     },
     {
       "bytes": 5686,
       "path": "scripts/analytical-swift-source-contract.json",
-      "sha256": "79a78d2ed432fc6ba38e4a5ee3d35eb0fcedc0f273354ef3225d8ddd2782126a"
+      "sha256": "e39402bd3dd0210ff5ad2159bc3b2df330626e948e290ff7a99619d400d15399"
     },
     {
       "bytes": 12884,
@@ -8804,7 +8806,7 @@
     {
       "bytes": 35688,
       "path": "scripts/capture-analytical-swift-msvc.py",
-      "sha256": "25a6fde7701897f325af4c95a44df27cfdb211611841eba5cc1daa24a4a489b8"
+      "sha256": "976e7a66ba01083ade04779fcc929ac59a93aa61a4e92ece9076b67a2731fdb8"
     },
     {
       "bytes": 29338,
@@ -8854,7 +8856,7 @@
     {
       "bytes": 156824,
       "path": "scripts/check-swift-windows-candidate.py",
-      "sha256": "bc39ab589ef590e4bd40a0d8e92cf7c2c34273b8fc9e15c5e9e7112a89ebb757"
+      "sha256": "706a9259980d88f782da6794fbf281f89e0ce71a0592d40f086f813cc4596411"
     },
     {
       "bytes": 29248,
@@ -8879,7 +8881,7 @@
     {
       "bytes": 1720,
       "path": "scripts/component-terms-source-migration.json",
-      "sha256": "f742f4678d6af0197408acc16619e7220c8b1c9433c1c7347254fa1d8e88195e"
+      "sha256": "b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9"
     },
     {
       "bytes": 13639,
@@ -8979,7 +8981,7 @@
     {
       "bytes": 116559,
       "path": "scripts/replay-candidate-contract.json",
-      "sha256": "6a66967636c162b7b381fc162723faebb10bef3d14d09b1f663de6b2cfc30875"
+      "sha256": "00b8aaada63fed4e10375e2eefa543eefdff7baa014b424cfb89c148e5686dad"
     },
     {
       "bytes": 14432,
@@ -8997,9 +8999,9 @@
       "sha256": "f270fb6418b326435bd611622f6d74b9202f1614b0981783c9759a675db4271e"
     },
     {
-      "bytes": 7270,
+      "bytes": 8023,
       "path": "scripts/tests/test-component-terms-dialog.ps1",
-      "sha256": "f4145bbea44a1ef2c2855dc5e719a08377504e3f1d8a81b73fad1688c544fe4b"
+      "sha256": "faeaf7fde12cb8ebcac630e6623fbfbc4aa936b63a9c9abbb654c324eb1f6cc7"
     },
     {
       "bytes": 4366,
@@ -9077,9 +9079,9 @@
       "sha256": "14e10801f972aed2795ff4d2e78b6fad1659f42352dca4fb101bb447703ee2aa"
     },
     {
-      "bytes": 10283,
+      "bytes": 12107,
       "path": "scripts/tests/test_component_terms_package.py",
-      "sha256": "4919ca32997f020525892ed4196c8da57c91f2e7ce27874323e0076eeb498d1f"
+      "sha256": "242abde499c7a53be617a8cf56d35312e782ea7005a5482d2af93002803c9a86"
     },
     {
       "bytes": 10266,
@@ -9087,9 +9089,9 @@
       "sha256": "eeea0d6415da1f91e5a0b5dd2bf3f308af1e6a6db5186a678992bed8de46be9a"
     },
     {
-      "bytes": 15463,
+      "bytes": 16665,
       "path": "scripts/tests/test_filmic_asset_integration.py",
-      "sha256": "1cbeace18369567e4d38e401b83308c9e90bac73d3fb70509024fb6c8b226718"
+      "sha256": "c5832634d306608bdc671ac3eeaecafce68db61d1933605dcd858aa3d4b4f226"
     },
     {
       "bytes": 14431,

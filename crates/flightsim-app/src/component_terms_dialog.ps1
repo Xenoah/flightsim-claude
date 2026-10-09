@@ -1,5 +1,7 @@
 # Fixed embedded local Windows Forms program. All document text arrives as JSON
 # data on standard input. Only the Agree button emits the acceptance protocol.
+# Suppress first-use module progress on redirected stderr, never real errors.
+$ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 try {

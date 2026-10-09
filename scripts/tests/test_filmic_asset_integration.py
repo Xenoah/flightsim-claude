@@ -56,7 +56,11 @@ def checked_record(root, item):
 
 
 def verify_candidate(root):
-    """Test-only integrity contract for this specific reviewed evidence set."""
+    """Asset-local integrity; a separate whole-target review may also exist.
+
+    Its presence or absence does not grant this asset decision any additional
+    authority. The five asset-local scope flags must still remain false.
+    """
     decision, manifest = read(root / DECISION), read(root / MANIFEST)
     if decision['kind'] != 'single-embedded-asset-source-rights-decision':
         raise ValueError('scope changed')
@@ -120,8 +124,6 @@ def verify_candidate(root):
         checked_record(root, {**item, 'path': 'vendor/bevy_core_pipeline/' + item['source_path']})
     if (root / 'vendor/bevy_core_pipeline' / historical_assets[0]['source_path']).exists():
         raise ValueError('historical AgX payload restored')
-    if (root / 'docs/release/dependency-review.json').exists():
-        raise ValueError('unexpected whole-target review')
 
 
 def load(name):
@@ -137,23 +139,48 @@ stager = load('stage-commercial-candidate')
 
 
 class ActualCandidateEvidence(unittest.TestCase):
+    @staticmethod
+    def copy_candidate(root):
+        shutil.copytree(REPO / 'docs/release', root / 'docs/release')
+        current_manifest = read(REPO / MANIFEST)
+        current_files = [LIGHT_PATH] + [
+            'vendor/bevy_core_pipeline/' + a['source_path']
+            for a in current_manifest['dependency_assets'] if a['id'] in (TONY_IDENTITY, IDENTITY)]
+        for relative in current_files:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(REPO / relative, target)
+
     def test_actual_scoped_records_and_complete_proof(self):
         verify_candidate(REPO)
+
+    def test_separate_whole_target_review_does_not_expand_asset_scope(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.copy_candidate(root)
+            review = root / 'docs/release/dependency-review.json'
+            write(review, {'status': 'synthetic-unreviewed-fixture'})
+            verify_candidate(root)
+            review.unlink()
+            verify_candidate(root)
+            write(review, {'status': 'synthetic-unreviewed-fixture'})
+            verify_candidate(root)
+            decision = read(root / DECISION)
+            for key in ('whole_target_dependency_review_complete', 'native_platform_review_complete',
+                        'runtime_appearance_accepted', 'user_variant_choice_recorded', 'release_authorized'):
+                with self.subTest(scope=key):
+                    write(root / DECISION, {**decision, key: True})
+                    with self.assertRaisesRegex(ValueError, 'scope or authority expanded'):
+                        verify_candidate(root)
+                    write(root / DECISION, decision)
 
     def test_mutated_notice_proof_identity_or_scope_rejected(self):
         for mutation in ('license', 'comparison', 'inventory', 'authority', 'identity', 'notice-list',
                          'historical-agx', 'historical-meshy', 'current-light', 'current-tony', 'active-agx'):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
-                shutil.copytree(REPO / 'docs/release', root / 'docs/release')
-                current_manifest = read(REPO / MANIFEST)
-                current_files = [LIGHT_PATH] + [
-                    'vendor/bevy_core_pipeline/' + a['source_path']
-                    for a in current_manifest['dependency_assets'] if a['id'] in (TONY_IDENTITY, IDENTITY)]
-                for relative in current_files:
-                    target = root / relative
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(REPO / relative, target)
+                self.copy_candidate(root)
+                verify_candidate(root)
                 if mutation == 'license':
                     (root / next(n for n in NOTICES if n.endswith('LICENSE'))).write_text('Truncated notice')
                 elif mutation == 'comparison':
