@@ -1,0 +1,18 @@
+[package]
+name = "device-policy-formatter-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+tracing = { version = "=0.1.44", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "ansi", "std", "tracing-log"] }
+log = "=0.4.33"
+tracing-log = "=0.2.0"
+wgpu-types = { version = "=27.0.1", default-features = false }
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[workspace]

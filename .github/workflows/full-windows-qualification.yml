@@ -1,0 +1,173 @@
+name: Full two-aircraft Windows qualification
+
+on:
+  push:
+    branches: [qualification/full-two-aircraft]
+
+# Engineering evidence only. No release/tag write permission or binary upload.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: full-windows-qualification-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Actual independently reviewed source object; source CI is checked below.
+  FULL_SOURCE_SHA: '55094fa928fbb8f907a2103740ee6824171c26e7'
+  FULL_SOURCE_TREE: 'fdd9fc4eeb8eacc8aae9e4a5c6e18da6bdd00cf5'
+  GIT_CONFIG_COUNT: '2'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.eol
+  GIT_CONFIG_VALUE_1: 'lf'
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONUTF8: '1'
+
+jobs:
+  qualify:
+    name: qualify exact ordinary two-aircraft Windows bundle
+    if: github.repository == 'Xenoah/flightsim-claude' && github.event_name == 'push'
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: policy
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require independently pinned admitted source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:FULL_SOURCE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+              $env:FULL_SOURCE_TREE -cnotmatch '^[0-9a-f]{40}$') {
+            throw 'qualification policy has no reviewed source pins'
+          }
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.FULL_SOURCE_SHA }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Require successful exact source CI
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -B source/scripts/check-analytical-source-ci.py `
+            --repository Xenoah/flightsim-claude --source-sha $env:FULL_SOURCE_SHA `
+            --output (Join-Path $env:RUNNER_TEMP 'full-source-ci.json')
+          if ($LASTEXITCODE -ne 0) { throw 'exact admitted source CI is not successful' }
+      - name: Install the exact native toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'pinned native toolchain installation failed' }
+      - name: Check full consumer and P4 boundaries without compiling
+        shell: pwsh
+        run: |
+          foreach ($pattern in @('test_full_native_consumers.py', 'test_full_windows_qualification.py', 'test_full_original_notices.py',
+              'test_device_error_facts.py', 'test_present_error_excerpt.py',
+              'test_analytical_runtime_failure.py', 'test_analytical_wgpu_error_details.py')) {
+            python -B -m unittest discover -s policy/scripts/tests -p $pattern -v
+            if ($LASTEXITCODE -ne 0) { throw 'full policy boundary test failed' }
+          }
+      - name: Fetch the exact private upstream reference
+        shell: pwsh
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'full-upstream-reference'
+          New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+          $reference = Join-Path $directory 'bevy_core_pipeline-0.18.1.crate'
+          curl.exe --fail --location --silent --show-error --proto '=https' `
+            --max-time 120 --retry 2 --max-filesize 4194304 --output $reference `
+            https://static.crates.io/crates/bevy_core_pipeline/bevy_core_pipeline-0.18.1.crate
+          if ($LASTEXITCODE -ne 0) { throw 'private reference download failed' }
+          if ((Get-FileHash -Algorithm SHA256 $reference).Hash.ToLowerInvariant() -ne
+              '4d0810e85c2436e50c67448d48a83bf0bb1b5849899619ae2c7ea817221e9172') {
+            throw 'private reference differs from reviewed archive'
+          }
+      - name: Capture the admitted source once with its own migrated producer
+        shell: pwsh
+        run: |
+          python -B source/scripts/capture-analytical-swift-msvc.py `
+            --repo (Join-Path $env:GITHUB_WORKSPACE 'source') --source-sha $env:FULL_SOURCE_SHA `
+            --private (Join-Path $env:RUNNER_TEMP 'full-build-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'full-build-evidence') `
+            --upstream-archive (Join-Path $env:RUNNER_TEMP 'full-upstream-reference/bevy_core_pipeline-0.18.1.crate')
+          if ($LASTEXITCODE -ne 0) { throw 'real source capture failed; no full runtime observation attempted' }
+      - name: Observe the same-host ordinary full bundle
+        shell: pwsh
+        run: |
+          $policyTree = git -C policy rev-parse 'HEAD^{tree}'
+          if ($LASTEXITCODE -ne 0) { throw 'policy tree is unavailable' }
+          python -B policy/scripts/qualify-full-windows-candidate.py `
+            --repo (Join-Path $env:GITHUB_WORKSPACE 'source') `
+            --source-sha $env:FULL_SOURCE_SHA --source-tree $env:FULL_SOURCE_TREE `
+            --policy-sha $env:GITHUB_SHA --policy-tree $policyTree `
+            --build-private (Join-Path $env:RUNNER_TEMP 'full-build-private') `
+            --build-evidence (Join-Path $env:RUNNER_TEMP 'full-build-evidence') `
+            --private (Join-Path $env:RUNNER_TEMP 'full-runtime-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'full-runtime-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'full runtime is unqualified; retain only separately validated evidence' }
+      - name: Independently validate the original bounded build export
+        if: always()
+        id: build_validation
+        shell: pwsh
+        run: |
+          python -B source/scripts/capture-analytical-swift-msvc.py `
+            --repo (Join-Path $env:GITHUB_WORKSPACE 'source') --source-sha $env:FULL_SOURCE_SHA `
+            --private (Join-Path $env:RUNNER_TEMP 'full-build-private') `
+            --validate-evidence (Join-Path $env:RUNNER_TEMP 'full-build-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'build evidence is unavailable or invalid' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Independently validate full evidence after success or failure
+        if: always()
+        id: full_validation
+        shell: pwsh
+        run: |
+          $policyTree = git -C policy rev-parse 'HEAD^{tree}'
+          if ($LASTEXITCODE -ne 0) { throw 'policy tree is unavailable' }
+          python -B policy/scripts/qualify-full-windows-candidate.py --validate-only `
+            --repo (Join-Path $env:GITHUB_WORKSPACE 'source') `
+            --source-sha $env:FULL_SOURCE_SHA --source-tree $env:FULL_SOURCE_TREE `
+            --policy-sha $env:GITHUB_SHA --policy-tree $policyTree `
+            --build-private (Join-Path $env:RUNNER_TEMP 'full-build-private') `
+            --build-evidence (Join-Path $env:RUNNER_TEMP 'full-build-evidence') `
+            --private (Join-Path $env:RUNNER_TEMP 'full-runtime-private') `
+            --evidence (Join-Path $env:RUNNER_TEMP 'full-runtime-evidence')
+          if ($LASTEXITCODE -ne 0) { throw 'full evidence is unavailable or invalid' }
+          'validated=true' >> $env:GITHUB_OUTPUT
+      - name: Retain only the validated source build JSON
+        if: always() && steps.build_validation.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: full-source-build-${{ env.FULL_SOURCE_SHA }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/full-build-evidence/build-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain only fixed validated full observations
+        if: always() && steps.full_validation.outputs.validated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: full-windows-observations-${{ env.FULL_SOURCE_SHA }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/full-runtime-evidence/full-qualification.json
+            ${{ runner.temp }}/full-runtime-evidence/native-review.json
+            ${{ runner.temp }}/full-runtime-evidence/original-notices.json
+            ${{ runner.temp }}/full-runtime-evidence/runtime-facts.json
+            ${{ runner.temp }}/full-runtime-evidence/ui-capabilities.json
+            ${{ runner.temp }}/full-runtime-evidence/bundle-manifest.json
+            ${{ runner.temp }}/full-runtime-evidence/full-windows-candidate.zip.sha256
+            ${{ runner.temp }}/full-runtime-evidence/device-failure.json
+            ${{ runner.temp }}/full-runtime-evidence/flightsim-windows-smoke.png
+            ${{ runner.temp }}/full-runtime-evidence/flightsim-windows-smoke-swift.png
+            ${{ runner.temp }}/full-runtime-evidence/flightsim-light-single-exterior.png
+          if-no-files-found: error
+          retention-days: 7

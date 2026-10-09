@@ -1,0 +1,388 @@
+{
+  "application_postlude_source": {
+    "line": 349,
+    "path": "crates/flightsim-app/src/screen_capture.rs",
+    "sha256": "40694e0029491bd0cf0cade97fe518695e7225d0a54b5ae4ccca072faddd5962"
+  },
+  "compiler": "rustc 1.93.0 (254b59607 2026-01-19)",
+  "fieldless_span_literals": [
+    {
+      "name": "present_frames",
+      "sites": [
+        {
+          "line": 83,
+          "path": "bevy_render-0.18.1/src/renderer/mod.rs"
+        }
+      ]
+    },
+    {
+      "name": "command_buffer_generation_tasks",
+      "sites": [
+        {
+          "line": 610,
+          "path": "bevy_render-0.18.1/src/renderer/mod.rs"
+        }
+      ]
+    },
+    {
+      "name": "submit_graph_commands",
+      "sites": [
+        {
+          "line": 86,
+          "path": "bevy_render-0.18.1/src/renderer/graph_runner.rs"
+        }
+      ]
+    },
+    {
+      "name": "write_current_input_buffers",
+      "sites": [
+        {
+          "line": 2026,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "write_previous_input_buffers",
+      "sites": [
+        {
+          "line": 2032,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "write_phase_instance_buffers",
+      "sites": [
+        {
+          "line": 2047,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "write_work_item_buffers",
+      "sites": [
+        {
+          "line": 2056,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "indexed_data",
+      "sites": [
+        {
+          "line": 2109,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "non_indexed_data",
+      "sites": [
+        {
+          "line": 2116,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "indexed_cpu_metadata",
+      "sites": [
+        {
+          "line": 2124,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "non_indexed_cpu_metadata",
+      "sites": [
+        {
+          "line": 2131,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "non_indexed_gpu_metadata",
+      "sites": [
+        {
+          "line": 2139,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "indexed_gpu_metadata",
+      "sites": [
+        {
+          "line": 2146,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "indexed_batch_sets",
+      "sites": [
+        {
+          "line": 2154,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "non_indexed_batch_sets",
+      "sites": [
+        {
+          "line": 2161,
+          "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs"
+        }
+      ]
+    },
+    {
+      "name": "collect_screenshots",
+      "sites": [
+        {
+          "line": 626,
+          "path": "bevy_render-0.18.1/src/view/window/screenshot.rs"
+        }
+      ]
+    },
+    {
+      "name": "entity_sync",
+      "sites": [
+        {
+          "line": 517,
+          "path": "bevy_render-0.18.1/src/lib.rs"
+        }
+      ]
+    },
+    {
+      "name": "render thread",
+      "sites": [
+        {
+          "line": 151,
+          "path": "bevy_render-0.18.1/src/pipelined_rendering.rs"
+        }
+      ]
+    },
+    {
+      "name": "no_camera_clear_pass",
+      "sites": [
+        {
+          "line": 83,
+          "path": "bevy_render-0.18.1/src/render_graph/camera_driver_node.rs"
+        }
+      ]
+    }
+  ],
+  "fixture_dependency_crates": [
+    {
+      "checksum": "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da",
+      "name": "bitflags",
+      "version": "2.13.1"
+    },
+    {
+      "checksum": "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797",
+      "name": "bytemuck",
+      "version": "1.25.2"
+    },
+    {
+      "checksum": "f65693059b6b9c588b9f62fed1cedbf0a8b805631457ea162d68f0de186f3de5",
+      "name": "bytemuck_derive",
+      "version": "1.11.0"
+    },
+    {
+      "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+      "name": "cfg-if",
+      "version": "1.0.4"
+    },
+    {
+      "checksum": "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe",
+      "name": "lazy_static",
+      "version": "1.5.0"
+    },
+    {
+      "checksum": "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad",
+      "name": "log",
+      "version": "0.4.33"
+    },
+    {
+      "checksum": "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5",
+      "name": "nu-ansi-term",
+      "version": "0.50.3"
+    },
+    {
+      "checksum": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "name": "once_cell",
+      "version": "1.21.4"
+    },
+    {
+      "checksum": "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd",
+      "name": "pin-project-lite",
+      "version": "0.2.17"
+    },
+    {
+      "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "name": "proc-macro2",
+      "version": "1.0.107"
+    },
+    {
+      "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "name": "quote",
+      "version": "1.0.47"
+    },
+    {
+      "checksum": "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6",
+      "name": "sharded-slab",
+      "version": "0.1.7"
+    },
+    {
+      "checksum": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+      "name": "syn",
+      "version": "2.0.119"
+    },
+    {
+      "checksum": "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070",
+      "name": "thread_local",
+      "version": "1.1.10"
+    },
+    {
+      "checksum": "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100",
+      "name": "tracing",
+      "version": "0.1.44"
+    },
+    {
+      "checksum": "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a",
+      "name": "tracing-core",
+      "version": "0.1.36"
+    },
+    {
+      "checksum": "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3",
+      "name": "tracing-log",
+      "version": "0.2.0"
+    },
+    {
+      "checksum": "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319",
+      "name": "tracing-subscriber",
+      "version": "0.3.23"
+    },
+    {
+      "checksum": "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75",
+      "name": "unicode-ident",
+      "version": "1.0.24"
+    },
+    {
+      "checksum": "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65",
+      "name": "valuable",
+      "version": "0.1.1"
+    },
+    {
+      "checksum": "afdcf84c395990db737f2dd91628706cb31e86d72e53482320d368e52b5da5eb",
+      "name": "wgpu-types",
+      "version": "27.0.1"
+    },
+    {
+      "checksum": "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5",
+      "name": "windows-link",
+      "version": "0.2.1"
+    },
+    {
+      "checksum": "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc",
+      "name": "windows-sys",
+      "version": "0.61.2"
+    }
+  ],
+  "fixture_files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "41b035f454fe65d08171c7b8debb07d8ce5e6e5f148def16f2d54d2a7e0fa414"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "d064cb7a6964b3306053ddd11acf076f2585fffcb2d19a0aba302ca716e21a46"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "b2d32471013211e2a2c6bf262ffaf3dd0e8ac4100672b785bda881742e2b4ab2"
+    },
+    {
+      "path": "output.json",
+      "sha256": "a4f7524893d179cbba1e81470545e75297a0def8bb3cdb13bad114b47c3dce69"
+    }
+  ],
+  "kind": "locked_formatter_fixture_provenance",
+  "log_bridge_matches_direct_tracing_for_shader_fixture": true,
+  "native_failure_evidence": false,
+  "notes": [
+    "Actual tracing-subscriber Full output with deterministic six-digit UTC timer and actual wgpu-types AdapterInfo Debug.",
+    "ANSI and plain output are separate generated cases; shader framing exemptions are ANSI-only.",
+    "Payload ESC is sanitized by default; raw fixture bodies containing plain logger/fatal strings remain one message until next canonical ANSI envelope.",
+    "This fixture reproduces formatter behavior only and supplies no application runtime evidence."
+  ],
+  "production_source_sha": "fe7373e96396131ef4a1c2a9af9cfabdb8aab82b",
+  "source_members": [
+    {
+      "path": "tracing-subscriber-0.3.23/src/fmt/format/mod.rs",
+      "sha256": "8933844e059b8f56788fdeb289074da0d4051de1b3b125a7d11c8d5a36cbf986"
+    },
+    {
+      "path": "tracing-subscriber-0.3.23/src/fmt/format/escape.rs",
+      "sha256": "d017fe11bbe9e4848babd4dcb01e8b72c3a6fc573dae54d9a24a8a65ac92307b"
+    },
+    {
+      "path": "tracing-subscriber-0.3.23/src/fmt/fmt_layer.rs",
+      "sha256": "7a47a6c7d2242b377e09221909c141b3f7e9f15c4b106f678b04317f8d4dd2b7"
+    },
+    {
+      "path": "tracing-subscriber-0.3.23/src/fmt/time/datetime.rs",
+      "sha256": "a6eeeb475e1f0b8cf90d1ef0dcb862b244cea58261485d440d51095694637213"
+    },
+    {
+      "path": "bevy_log-0.18.1/src/lib.rs",
+      "sha256": "bd7044c294db7cf16f874c8cf92f01a368cf6ca8affcd04a3f0fac7cd4e0a4d4"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/renderer/mod.rs",
+      "sha256": "d10e4b156ccd4e58f7eda0f71601f5a820e2cf0aa73e5e43fdf55a233b1e6007"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/renderer/graph_runner.rs",
+      "sha256": "77e388b88df302b40cb4d027eec16b8aea4192a1647aa7e6df28d3db1232fec3"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/batching/gpu_preprocessing.rs",
+      "sha256": "6f71be0039a7f93e738505dcf9f42a17aecad51c01d34e456e43aa95738bfcee"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/view/window/screenshot.rs",
+      "sha256": "f1211896e9214e3c4bc7eae3a9c1799a21a798313c70860bad71745567b862d7"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/lib.rs",
+      "sha256": "d8329c988afbe9e02f5df1e8b579d8b6749da02411ef260ee7f74a8402d41109"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/pipelined_rendering.rs",
+      "sha256": "411151ee92ab53d39ca5cfb00c8fe6526da974ef80a27d446b563b7aeebeeef2"
+    },
+    {
+      "path": "bevy_render-0.18.1/src/render_graph/camera_driver_node.rs",
+      "sha256": "e1e51edf2f96f5c30cc839a8ec38160e2d5aeaf0e935250fbecad6091fad0292"
+    },
+    {
+      "path": "wgpu-hal-27.0.4/src/dx12/device.rs",
+      "sha256": "15c075fe5fed3869e8d0c3bac01bb8cc4d8a0b91f6a420ce723d337653dc3d30"
+    },
+    {
+      "path": "wgpu-types-27.0.1/src/lib.rs",
+      "sha256": "781f9ceceedd869f9cc2461d687958a08c857432595a172e592fcf02525401a6"
+    },
+    {
+      "path": "naga-27.0.3/src/ir/mod.rs",
+      "sha256": "2933daabb5e22d023682ad5368d9c65a136000ad85f48a29104a562326a91a40"
+    }
+  ]
+}

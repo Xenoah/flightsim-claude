@@ -1,0 +1,79 @@
+{
+  "files": [
+    {
+      "bytes": 30849,
+      "path": "scripts/project-device-error-facts.py",
+      "sha256": "30cf282546908508f16bbd5c69bd8adee28d4d09bb0af0ef35de854eec482920"
+    },
+    {
+      "bytes": 5432,
+      "path": "scripts/tests/fixtures/tracing-full-0.3.23/Cargo.lock",
+      "sha256": "d064cb7a6964b3306053ddd11acf076f2585fffcb2d19a0aba302ca716e21a46"
+    },
+    {
+      "bytes": 479,
+      "path": "scripts/tests/fixtures/tracing-full-0.3.23/Cargo.toml",
+      "sha256": "41b035f454fe65d08171c7b8debb07d8ce5e6e5f148def16f2d54d2a7e0fa414"
+    },
+    {
+      "bytes": 17037,
+      "path": "scripts/tests/fixtures/tracing-full-0.3.23/output.json",
+      "sha256": "a4f7524893d179cbba1e81470545e75297a0def8bb3cdb13bad114b47c3dce69"
+    },
+    {
+      "bytes": 11048,
+      "path": "scripts/tests/fixtures/tracing-full-0.3.23/provenance.json",
+      "sha256": "69fe576ad82879909376860ee8971a0b50d3a8008117c9ace56bb6b28b4a8ae3"
+    },
+    {
+      "bytes": 5450,
+      "path": "scripts/tests/fixtures/tracing-full-0.3.23/src/main.rs",
+      "sha256": "b2d32471013211e2a2c6bf262ffaf3dd0e8ac4100672b785bda881742e2b4ab2"
+    },
+    {
+      "bytes": 30271,
+      "path": "scripts/tests/test_device_error_facts.py",
+      "sha256": "cafaf76bdaf066a2dcd9acb08afeb6d7721aa0a69c751beb13591fdf296532ff"
+    },
+    {
+      "bytes": 17945,
+      "path": "scripts/project-present-error-excerpt.py",
+      "sha256": "5d60146f8503ac64d75a5141193e205bec2eb149ec4cf476206faf659519c1ed"
+    },
+    {
+      "bytes": 11128,
+      "path": "scripts/project-analytical-runtime-failure.py",
+      "sha256": "703e339c6215b25bbcb60ebf860d19ef79ea8bd7c571f0a723de4eac7056db73"
+    },
+    {
+      "bytes": 18243,
+      "path": "scripts/analytical-wgpu-error-details.py",
+      "sha256": "fc3aaa50dc154da001f18d7ee6bb71d10fd4ef0efcd027b9912422a2b11b6e55"
+    },
+    {
+      "bytes": 25763,
+      "path": "scripts/tests/test_present_error_excerpt.py",
+      "sha256": "b0f3ed1d602814d9f9b04e81af28c20907ca159c5e11251309101c68e06c8fa8"
+    },
+    {
+      "bytes": 8992,
+      "path": "scripts/tests/test_analytical_runtime_failure.py",
+      "sha256": "81d999320dc66af596e3ba4a53e44cd36fdf529b2d5c571fea047c8890003ee5"
+    },
+    {
+      "bytes": 11671,
+      "path": "scripts/tests/test_analytical_wgpu_error_details.py",
+      "sha256": "c1bf047c2ad6362ea3fd2801509803f4517e84210b20cb43db1196ceecab4204"
+    },
+    {
+      "bytes": 15451,
+      "path": "scripts/tests/fixtures/device-error-source-provenance.json",
+      "sha256": "d4cef499b417d889847164215a1e60a80af5002e9896cf8b53c4b7014d8d0d93"
+    }
+  ],
+  "kind": "public_parser_implementation_and_fixture_inventory",
+  "native_execution_performed": false,
+  "release_authorized": false,
+  "schema_version": 1,
+  "scope": "Current parser source and synthetic formatter fixtures; public dependency provenance is recorded in the fixture manifests."
+}

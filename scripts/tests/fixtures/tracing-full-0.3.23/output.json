@@ -1,0 +1,160 @@
+{
+  "kind": "real_locked_formatter_synthetic_output",
+  "native_failure_evidence": false,
+  "outputs": [
+    {
+      "ansi": true,
+      "bytes": 651,
+      "mode": "ordinary",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[35mTRACE\u001b[0m \u001b[2mwgpu_hal::dx12\u001b[0m\u001b[2m:\u001b[0m ordinary trace\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[34mDEBUG\u001b[0m \u001b[2mwgpu_hal::dx12\u001b[0m\u001b[2m:\u001b[0m ordinary debug\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mwgpu_core::instance\u001b[0m\u001b[2m:\u001b[0m ordinary info\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mwgpu_hal::dx12\u001b[0m\u001b[2m:\u001b[0m ordinary warn\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::auxil::dxgi::result\u001b[0m\u001b[2m:\u001b[0m Signal fence failed: Device was removed. (0x887A0005)\n",
+      "sha256": "b280e0b5c2eee7eaf22ae8e55edad0f500fb19ae54e25640acc19aea4d86c76c"
+    },
+    {
+      "ansi": true,
+      "bytes": 379,
+      "mode": "adapter",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mbevy_render::renderer\u001b[0m\u001b[2m:\u001b[0m AdapterInfo { name: \"Microsoft Basic Render Driver\", vendor: 5140, device: 4294967295, device_type: Cpu, driver: \"escaped \\\\\\\"'\", driver_info: \"unicode \u65e5\u672c\u8a9e \ud83d\udee9\", backend: Dx12 }\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "909e5be6d5f536bdb45a2100cd5f9f68b7bc74719b263457fb75508eb1b5c3b5"
+    },
+    {
+      "ansi": true,
+      "bytes": 457,
+      "mode": "adapter_escaped",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mbevy_render::renderer\u001b[0m\u001b[2m:\u001b[0m AdapterInfo { name: \"private label: \\\"quoted\\\" C:\\\\private\\\\name\\nERROR wgpu_hal::dx12::device: Wait failed!\\r\\t\\0\\u{85}\\u{200d}\", vendor: 5140, device: 4294967295, device_type: Cpu, driver: \"escaped \\\\\\\"'\", driver_info: \"unicode \u65e5\u672c\u8a9e \ud83d\udee9\", backend: Dx12 }\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "bcf704d7078d9876b902c3baa65158f2a76bcab3e3380dc182456cf5fc532956"
+    },
+    {
+      "ansi": true,
+      "bytes": 2709,
+      "mode": "spans",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mpresent_frames\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mcommand_buffer_generation_tasks\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1msubmit_graph_commands\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_current_input_buffers\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_previous_input_buffers\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_phase_instance_buffers\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_work_item_buffers\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mindexed_data\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mnon_indexed_data\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mindexed_cpu_metadata\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mnon_indexed_cpu_metadata\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mnon_indexed_gpu_metadata\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mindexed_gpu_metadata\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mindexed_batch_sets\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mnon_indexed_batch_sets\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mcollect_screenshots\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mentity_sync\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mrender thread\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mno_camera_clear_pass\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "9b313def333334766a34dcbcf8ff9c3ae91b79872ebb76f2a0a1bc51ad290e37"
+    },
+    {
+      "ansi": true,
+      "bytes": 198,
+      "mode": "span_fields",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_current_input_buffers\u001b[0m\u001b[1m{\u001b[0m\u001b[3mlabel\u001b[0m\u001b[2m=\u001b[0m\"private\"\u001b[1m}\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "48536d96812b53f5533dde5618d987714a5d1e74f98e7eded429d53c81a2ca9d"
+    },
+    {
+      "ansi": true,
+      "bytes": 132,
+      "mode": "span_unknown",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mother_name\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "5e80f97e879c6aa4eb69e269d181cb65c7ff210e0213882ff1a60f58dce6d640"
+    },
+    {
+      "ansi": true,
+      "bytes": 194,
+      "mode": "span_nested",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[1mwrite_current_input_buffers\u001b[0m\u001b[2m:\u001b[0m\u001b[1mwrite_previous_input_buffers\u001b[0m\u001b[2m:\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "f71229772093c5820f4a0db9cfac3ea9940ff41ccd5fb15dc0c0e669452fff91"
+    },
+    {
+      "ansi": true,
+      "bytes": 213,
+      "mode": "hresult_continuation",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::auxil::dxgi::result\u001b[0m\u001b[2m:\u001b[0m Signal fence failed: fake (0x887A0005)\nERROR wgpu_hal::dx12::device: Wait failed!\nactual continuation (0x8007000E)\n",
+      "sha256": "a7f0ea6e9436a297a75c2f5cf13abf0e033902b6c61c09896df6fe3ffa3cffdc"
+    },
+    {
+      "ansi": true,
+      "bytes": 291,
+      "mode": "shader",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Naga generated shader for \"main\" at Compute:\nstruct private_shader {\n    uint private_field;\n};\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "d57dbd76fcebea4b2c7e340b5c9bb6de698e5bb93a46001a1410a6a0b62f45e8"
+    },
+    {
+      "ansi": true,
+      "bytes": 291,
+      "mode": "shader_bridge",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Naga generated shader for \"main\" at Compute:\nstruct private_shader {\n    uint private_field;\n};\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "d57dbd76fcebea4b2c7e340b5c9bb6de698e5bb93a46001a1410a6a0b62f45e8"
+    },
+    {
+      "ansi": true,
+      "bytes": 560,
+      "mode": "shader_payload",
+      "raw_utf8": "\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Naga generated shader for \"main\" at Compute:\nprivate shader label with 'secret' label\nERROR wgpu_hal::auxil::dxgi::result: Signal fence failed: 0x8007000E\nError in Surface::present: Validation Error\nCaused by:\n  Parent device is lost\n\\x1b[2m2026-10-08T21:00:00.123456Z\\x1b[0m \\x1b[31mERROR\\x1b[0m \\x1b[2mwgpu_hal::dx12::device\\x1b[0m\\x1b[2m:\\x1b[0m Wait failed!\n};\n\u001b[2m2026-10-08T21:00:00.123456Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mwgpu_hal::dx12::device\u001b[0m\u001b[2m:\u001b[0m Wait failed!\n",
+      "sha256": "4a494a12820f47ec00116fbe4b3975822f857a2af41a865647d0733c5f631e54"
+    },
+    {
+      "ansi": false,
+      "bytes": 453,
+      "mode": "ordinary",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z TRACE wgpu_hal::dx12: ordinary trace\n2026-10-08T21:00:00.123456Z DEBUG wgpu_hal::dx12: ordinary debug\n2026-10-08T21:00:00.123456Z  INFO wgpu_core::instance: ordinary info\n2026-10-08T21:00:00.123456Z  WARN wgpu_hal::dx12: ordinary warn\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::auxil::dxgi::result: Signal fence failed: Device was removed. (0x887A0005)\n",
+      "sha256": "86d3393c007ba5c38dedc7d896b74c4be746821e09e35fd33f0c4592a875a56c"
+    },
+    {
+      "ansi": false,
+      "bytes": 313,
+      "mode": "adapter",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z  INFO bevy_render::renderer: AdapterInfo { name: \"Microsoft Basic Render Driver\", vendor: 5140, device: 4294967295, device_type: Cpu, driver: \"escaped \\\\\\\"'\", driver_info: \"unicode \u65e5\u672c\u8a9e \ud83d\udee9\", backend: Dx12 }\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "1f81df34f5db18474ef541dd12456e25dc34f23c86356f992ea1f02039da8192"
+    },
+    {
+      "ansi": false,
+      "bytes": 391,
+      "mode": "adapter_escaped",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z  INFO bevy_render::renderer: AdapterInfo { name: \"private label: \\\"quoted\\\" C:\\\\private\\\\name\\nERROR wgpu_hal::dx12::device: Wait failed!\\r\\t\\0\\u{85}\\u{200d}\", vendor: 5140, device: 4294967295, device_type: Cpu, driver: \"escaped \\\\\\\"'\", driver_info: \"unicode \u65e5\u672c\u8a9e \ud83d\udee9\", backend: Dx12 }\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "7d22cea3fbb41db59b0edccfdcc28e4703de87a0cb836a8279dcffa51cf15f7d"
+    },
+    {
+      "ansi": false,
+      "bytes": 1778,
+      "mode": "spans",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z ERROR present_frames: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR command_buffer_generation_tasks: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR submit_graph_commands: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR write_current_input_buffers: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR write_previous_input_buffers: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR write_phase_instance_buffers: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR write_work_item_buffers: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR indexed_data: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR non_indexed_data: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR indexed_cpu_metadata: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR non_indexed_cpu_metadata: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR non_indexed_gpu_metadata: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR indexed_gpu_metadata: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR indexed_batch_sets: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR non_indexed_batch_sets: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR collect_screenshots: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR entity_sync: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR render thread: wgpu_hal::dx12::device: Wait failed!\n2026-10-08T21:00:00.123456Z ERROR no_camera_clear_pass: wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "155c5f9e86554c27226fdf1f1d9d22213b38ddd9d03a06161cadf8f689a50203"
+    },
+    {
+      "ansi": false,
+      "bytes": 117,
+      "mode": "span_fields",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z ERROR write_current_input_buffers{label=\"private\"}: wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "ab646c2de044c9b66f2be98f4ed75d994c033cef785997f0e4b9bc16cd4f5071"
+    },
+    {
+      "ansi": false,
+      "bytes": 83,
+      "mode": "span_unknown",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z ERROR other_name: wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "8e1331a6cbf2eaa8765581b9e7fd0a472ac7759a23b02b95118b3108d3466089"
+    },
+    {
+      "ansi": false,
+      "bytes": 129,
+      "mode": "span_nested",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z ERROR write_current_input_buffers:write_previous_input_buffers: wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "e024001efadf2620827ee408dc320589cd641b11bd92490b79538a5df84124a6"
+    },
+    {
+      "ansi": false,
+      "bytes": 180,
+      "mode": "hresult_continuation",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z ERROR wgpu_hal::auxil::dxgi::result: Signal fence failed: fake (0x887A0005)\nERROR wgpu_hal::dx12::device: Wait failed!\nactual continuation (0x8007000E)\n",
+      "sha256": "bbad45eaed67e197c64c6ca0cbb9393f75ecfca99bd5efd60a3491f9dc2ae604"
+    },
+    {
+      "ansi": false,
+      "bytes": 225,
+      "mode": "shader",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z  INFO wgpu_hal::dx12::device: Naga generated shader for \"main\" at Compute:\nstruct private_shader {\n    uint private_field;\n};\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "62458ea8723b57cf83c1acd076942d05baa34c62b7e72a3f673f61b0c276ab27"
+    },
+    {
+      "ansi": false,
+      "bytes": 225,
+      "mode": "shader_bridge",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z  INFO wgpu_hal::dx12::device: Naga generated shader for \"main\" at Compute:\nstruct private_shader {\n    uint private_field;\n};\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "62458ea8723b57cf83c1acd076942d05baa34c62b7e72a3f673f61b0c276ab27"
+    },
+    {
+      "ansi": false,
+      "bytes": 494,
+      "mode": "shader_payload",
+      "raw_utf8": "2026-10-08T21:00:00.123456Z  INFO wgpu_hal::dx12::device: Naga generated shader for \"main\" at Compute:\nprivate shader label with 'secret' label\nERROR wgpu_hal::auxil::dxgi::result: Signal fence failed: 0x8007000E\nError in Surface::present: Validation Error\nCaused by:\n  Parent device is lost\n\\x1b[2m2026-10-08T21:00:00.123456Z\\x1b[0m \\x1b[31mERROR\\x1b[0m \\x1b[2mwgpu_hal::dx12::device\\x1b[0m\\x1b[2m:\\x1b[0m Wait failed!\n};\n2026-10-08T21:00:00.123456Z ERROR wgpu_hal::dx12::device: Wait failed!\n",
+      "sha256": "29017aba7b6b00867f7fca70642bf12150b912a4b8b13464642e30ab2e651f88"
+    }
+  ]
+}
