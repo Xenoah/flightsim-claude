@@ -11,10 +11,10 @@
     "This authorization does not attest native success. Changed-source applicability, same-build archive verification and extracted two-aircraft smoke remain independent required gates.",
     "docs/release/full-two-aircraft-source-admission.md"
   ],
-  "release_inventory_sha256": "6356a5b1ec68728dfa107b514eab9e5320ee021e070907cdfa729666ba5e08fe",
+  "release_inventory_sha256": "22e3ccb5ba2c54d2d6fa971aee08d90d61ff70f560ab41254cd8d164e6e4245b",
   "schema_version": 1,
   "scope": "github-windows-prerelease",
-  "source_inventory_sha256": "c8c6a0aacc9a85e159542cb2cb6e67356937e260f25d58127e3dda92e6fb4233",
+  "source_inventory_sha256": "16cfd2f8c22aa67411204507dbde418ee80806e544b862f4225959a93f065243",
   "status": "authorized",
   "target": "x86_64-pc-windows-msvc",
   "version": "0.6.0-alpha.23"
