@@ -1,20 +1,23 @@
-# Full two-aircraft alpha.23 version-only source admission, version 1
+# Full two-aircraft aircraft-specific cockpit source admission, version 1
 
-This source-only identity is `full-two-aircraft-alpha23-version-source-v1`.
-The current version-only migration extends the preserved cockpit, alpha.22 version,
-terrain-stitch, terrain-centroid and component-terms migrations; none is native or
-publication evidence.
+This source-only identity is `full-two-aircraft-cockpit-variant-source-v1`.
+The current aircraft-specific cockpit migration extends the released alpha.23
+version-only source and all preserved cockpit, alpha.22 version, terrain-stitch,
+terrain-centroid and component-terms migrations; none is native or publication
+evidence for this successor. The alpha.23 version-only boundary is retained below
+as explicit history, not the current outer admission identity.
 The `base_reviewed_source` and `base_reviewed_runtime_tree` fields identify the
 previous runtime composition `960c3126e6a4bc22b8d4acc6e6737f8f2b473bef`, tree
 `b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e`, as historical base provenance only.
-They do not identify the changed component-terms, terrain-centroid, terrain-stitch or cockpit runtime. The separately pinned
+They do not identify the changed component-terms, terrain-centroid, terrain-stitch,
+state-coupled cockpit or aircraft-specific cockpit runtime. The separately pinned
 `scripts/component-terms-source-migration.json` binds the exact startup change,
 two new runtime inputs, three component documents and two unchanged embedded
 project-license texts. Every execution still requires its actual final clean commit, complete tree and canonical input bytes.
 Prior `55094fa` builds, graphs and native observations remain reference evidence;
 none are qualified evidence for the changed runtime.
 
-The current replay source contract names 956 exact files. Its literal path sets
+The current replay source contract names 968 exact files. Its literal path sets
 include the previous 404-file boundary, every one of the 55 local core-pipeline
 files, complete original-highwing inputs and provenance, and the frozen 497
 runtime identities. The frozen map itself is unchanged. Its earlier changed
@@ -30,8 +33,13 @@ single render-test addition. The subsequent stitch migration preserves old
 also retains the complete previous 930-member replay contract at
 `scripts/history/5eaaff3-replay-candidate-contract.json`; every other prior pin
 must remain unchanged. The later cockpit migration additionally preserves four replaced runtime files at
-separate published-base witness paths, as described below. Every other frozen
-identity stays at its original path; no old digest is overwritten or relabeled.
+separate published-base witness paths, as described below. The aircraft-specific
+outer layer additionally preserves six pre-variant source files and all three
+alpha.23 contracts under `scripts/history/alpha23-cockpit-variant-base-*`.
+Original-map comparisons retain oldest-witness precedence: `main.rs` still uses
+the component-terms witness, and `aircraft_scene.rs` and `cockpit.rs` still use
+their pre-cockpit witnesses. The original `aircraft_picker_tests.rs` identity now
+uses its alpha.23 witness. No old digest is overwritten or relabeled.
 
 The stitch migration base `5eaaff379f19cc986fa5600619f1491213e9da0d`, tree
 `a469ee76cd0d7aabf3dd2c07114d44c0bbdf5d37`, is an unpublished local centroid
@@ -46,8 +54,10 @@ unrelated runtime/profile byte is refreshed to satisfy a test. Clean Git state,
 regular files, canonical blob hashes, checkout hashes, case-sensitive exact path sets,
 and rejection of ignored local vendor/witness inputs remain required. The 492
 preserved crate paths, two literal component-terms inputs, one terrain test and
-two literal cockpit helpers form a closed 497-member set: committed, ignored or untracked Cargo-discovered build
-scripts, binaries, examples and benchmarks cannot expand it. The three component
+two literal state-coupled cockpit helpers and two aircraft-layout modules form a
+closed 499-member current set. The two newest modules are excluded from the
+original 492-path preserved set. Committed, ignored or untracked Cargo-discovered
+build scripts, binaries, examples and benchmarks cannot expand either boundary. The three component
 documents also form an exact closed directory boundary. Root-case aliases and
 reparse/symlink paths remain rejected.
 
@@ -63,7 +73,7 @@ manifest. Capture has a separate source contract and exact inherited hashes.
 Current capture and audit require a checksum-verified original Bevy crate held
 outside shipped source. They retain its hash/size privately and in bounded
 metadata. The original AgX bytes are a negative reference, never distributed.
-The selected source must match all 55 declared files. Ordinary compilation must
+The selected core-pipeline source must match all 55 declared local files. Ordinary compilation must
 contain exact Tony and Filmic payloads and omit AgX; analytical regression must
 omit all three payloads. Both branches use the same verified negative reference.
 Historical three-LUT fixtures explicitly select the upstream recipe. Historical
@@ -147,7 +157,7 @@ unimplemented aircraft systems. Its [development QA](../qa/functional-cockpit-20
 distinguishes automated/source checks and software captures from native-window,
 physical hardware or pilot usability acceptance.
 
-## Alpha.23 version-only boundary
+## Historical alpha.23 version-only boundary
 
 `scripts/alpha23-version-source-migration.json` permits only the workspace version
 in `Cargo.toml` and the versions of the thirteen literal local flightsim packages
@@ -159,10 +169,10 @@ commit, tree and canonical source bytes.
 
 Five byte-exact witnesses under `scripts/history/81bb3ea-*` preserve its three
 source contracts, `Cargo.toml` and `Cargo.lock`. The complete 950-member cockpit
-validator and path boundary are frozen as a historical layer. The outer layer
-adds exactly these five witnesses and the new migration descriptor, preserving
-every previous pin and relocating only the two Cargo identities. The replay
-contract therefore has 956 members. No historical Git object or fetch is needed.
+validator and path boundary were frozen as a historical layer. That version-only
+layer added exactly these five witnesses and its migration descriptor, preserving
+every previous pin and relocating only the two Cargo identities. Its historical
+replay contract therefore has 956 members. No historical Git object or fetch is needed.
 The alpha.22 historical validator still reconstructs alpha.22 from its original
 alpha.21 witnesses; neither its old descriptor nor any old witness is rewritten.
 
@@ -171,18 +181,75 @@ lock package versions and unchanged complete parsed documents after reversing
 those fields. Exact byte substitution separately rejects changed comments,
 whitespace, package ordering or other incidental bytes; each input remains
 bounded to one MiB. Runtime files, dependencies, features, profiles, workspace
-membership, checksums, the 497-member current crate boundary and all 102
-independent replay anchors remain unchanged. All five previous migration
+membership, checksums, the then-current 497-member crate boundary and all 102
+independent replay anchors remained unchanged. All five previous migration
 descriptors, the 497 original runtime identities, licensing terms and startup UI
 remain byte-exact.
 
-The current analytical source contract binds 55 exact inputs, including the new
-alpha.23 version mutation tests; capture retains four inputs and exact inherited
-hashes. Both receive explicit new source-admission identities. Prior alpha.22
+The historical alpha.23 analytical source contract bound 55 exact inputs, including
+the alpha.23 version mutation tests; its capture retained four inputs and exact
+inherited hashes. Both received explicit source-admission identities. Prior alpha.22
 source, CI, inventory, Windows and authorization evidence stays historical.
 Fresh exact-final-source CI, target inventory review, Windows build and
 extracted-archive smoke, source-hosting verification and inventory-bound
 publication authorization remain separate gates.
+
+## Aircraft-specific cockpit outer boundary
+
+`scripts/cockpit-variant-source-migration.json` binds the true released alpha.23
+parent `130de6f2872cab4932a4b2e61c6828a7dccc883b`, tree
+`26b935ac8c60cf0b87a8367f93a45ebc6a4fc2a8`. Its base kind is `published-commit`
+and its status is `released-alpha23-parent`. This identifies actual published
+provenance; it does not grant this successor native acceptance, rights review or
+release authority. The descriptor and current source contracts remain source-only,
+with `release_authorized=false` wherever that field exists. The released parent's
+Cargo, applicability record and authorization receipt are preserved exactly, but
+the unchanged release gate rejects that stale receipt for the changed successor.
+
+Exactly six current Rust pins are replaced:
+
+- `crates/flightsim-app/src/aircraft_picker_tests.rs`
+- `crates/flightsim-app/src/aircraft_scene.rs`
+- `crates/flightsim-app/src/cockpit_runtime.rs`
+- `crates/flightsim-app/src/main.rs`
+- `crates/flightsim-render/src/cockpit.rs`
+- `crates/flightsim-render/src/cockpit/texture.rs`
+
+Exactly two runtime modules are added: `crates/flightsim-app/src/cockpit_layout.rs`
+and `crates/flightsim-render/src/cockpit/variants.rs`. Nine immutable witnesses
+under `scripts/history/alpha23-cockpit-variant-base-*` preserve the released
+parent's six replaced source files and three complete replay/analytical/capture
+contracts. Their exact bytes were rechecked against the final released parent;
+stable filenames do not relabel the provisional parent as a released one.
+
+The alpha.23 validator and its 956-path snapshot remain a complete historical
+layer. The new outer layer preserves every prior pin through only the six declared
+relocations, then adds precisely twelve members: nine witnesses, one descriptor
+and two modules. Thus the current replay boundary is 968, and the current crate
+closure is 499. The original runtime map retains all 497 identities and its
+original 492 crate paths. All six earlier migration descriptors, all older
+witnesses, 102 independent replay anchors, 55 core-pipeline files and the original
+404-path historical boundary remain unchanged. Verification requires no historical
+Git object or fetch; canonical and checkout bytes still bind each actual run.
+
+The current analytical source contract binds 56 exact inputs, including the
+new aircraft-cockpit mutation suite. This existing admission document remains
+one of those inputs; updating it does not add a contract member. The capture
+contract retains its four literal members and refreshed inherited hashes. The
+new identities are `analytical-swift-cockpit-variant-source-admission-v1` and
+`analytical-swift-cockpit-variant-capture-source-admission-v1`. Mutation tests retain
+exact-delta, omission/extra/alias, canonical/checkout, concealed-dirty, exported
+hash, closure, symlink/reparse and authority-escalation checks. Earlier alpha.23
+and provisional-draft test results remain tied to their original commits, never
+relabelled as final-successor results.
+
+This presentation change does not change FDM, profile/replay bytes, dependencies,
+features, distribution allowlists, terms or licenses. The ordinary bundle remains
+Light Single plus Swift Sport; Meadow and Kestrel remain optional/development-source
+choices, and commercial staging remains Swift-only. Fresh exact-final-source CI,
+native build/capture, inventory/applicability and rights/terms review, same-archive
+smoke, source/archive verification and inventory-bound publication authorization
+remain independent gates.
 
 A source pass establishes neither native execution, appearance, whole-target
 rights, source-hosting verification nor publication authority. The final full

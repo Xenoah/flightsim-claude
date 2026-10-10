@@ -222,12 +222,19 @@ fn assert_target(app: &mut App, index: usize, old_root: Entity) {
     );
     assert_eq!(world.resource::<FlightSimulation>().0.log().landings, 0);
     let bounded = choice.profile.uses_bounded_model();
+    // Kestrel is the one explicitly supported bounded generated interior.
+    // Other bounded families, model replacements and unknown IDs retain GLB/2D.
+    let generated = !bounded
+        || (choice.profile.is_jet()
+            && choice.profile.id() == "kestrel-jet-trainer"
+            && choice.profile.model_path() == "aircraft/kestrel_jet_trainer.glb"
+            && choice.model.as_deref() == Some("aircraft/kestrel_jet_trainer.glb"));
     assert_eq!(world.contains_resource::<FlightRecorder>(), !bounded);
     let interior = world
         .query_filtered::<Entity, With<InteriorModel>>()
         .iter(world)
         .count();
-    assert_eq!(interior == 0, bounded);
+    assert_eq!(interior > 0, generated);
     assert!(!world.resource::<flightsim_ui::Paused>().is_paused());
     if bounded {
         assert_eq!(

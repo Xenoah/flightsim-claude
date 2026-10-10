@@ -37,7 +37,8 @@ class Alpha23VersionSourceAdmissionTests(unittest.TestCase):
 
     def test_exact_two_file_transition_preserves_all_950_prior_pins(self):
         candidate.load_replay_contract(ROOT)
-        contract = json.loads((ROOT / candidate.REPLAY_CONTRACT_PATH).read_text())
+        contract = json.loads((ROOT / candidate.COCKPIT_VARIANT_BASE_CONTRACT_PATH).read_text())
+        candidate.validate_alpha23_replay_contract(contract)
         base = json.loads((ROOT / candidate.ALPHA23_BASE_CONTRACT_PATH).read_text())
         migration = json.loads((ROOT / candidate.ALPHA23_MIGRATION_PATH).read_text())
         self.assertEqual(candidate.ALPHA23_SOURCE_PATHS, ADDED)
@@ -58,7 +59,7 @@ class Alpha23VersionSourceAdmissionTests(unittest.TestCase):
         for path, expected in base['source_sha256'].items():
             historical = RELOCATIONS.get(path, path)
             self.assertEqual(contract['source_sha256'][historical], expected, path)
-            self.assertEqual(candidate.digest(ROOT / historical), expected, path)
+            self.assertEqual(candidate.digest(ROOT / candidate.COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.get(historical, historical)), expected, path)
         for path, expected in candidate.ALPHA23_BASE_CONTRACT_HASHES.items():
             self.assertEqual(candidate.digest(ROOT / path), expected)
         for path in CHANGED:
@@ -71,9 +72,9 @@ class Alpha23VersionSourceAdmissionTests(unittest.TestCase):
         self.assertEqual(len(candidate.ALPHA23_SOURCE_PATHS), 6)
         self.assertEqual(len(candidate.ALPHA23_WORKSPACE_PACKAGES), 13)
         self.assertEqual(candidate.ALPHA23_WORKSPACE_PACKAGES, candidate.ALPHA22_WORKSPACE_PACKAGES)
-        self.assertEqual(len(capture.check.SOURCE_PATHS), 55)
+        self.assertEqual(len(capture.check.SOURCE_PATHS), 56)
         self.assertEqual(len(capture.BOUND_FILES), 4)
-        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 499)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(json.loads((ROOT / candidate.PRESERVED_RUNTIME_PATH).read_text())['source_sha256']), 497)
         self.assertIs(contract['release_authorized'], False)

@@ -75,6 +75,7 @@ mod aircraft_profile_schema_contract;
 mod aircraft_scene;
 mod airport_drape_runtime;
 mod cloud_runtime;
+mod cockpit_layout;
 mod cockpit_runtime;
 mod component_terms;
 mod distance_runtime;
@@ -518,7 +519,8 @@ struct Aircraft;
 /// 機体の**外形**につける印。プレースホルダでも glTF モデルでも付ける。
 ///
 /// コックピット視点では目線が胴体の内側に入るので、外形をそのまま描くと
-/// **視界が自分の機体で塞がる**。内装モデルはまだ無いので、外形を隠す。
+/// **視界が自分の機体で塞がる**。生成内装がある機体では外形を隠し、
+/// 未対応機体はモデル内蔵の内装と 2D 計器へフォールバックする。
 #[derive(Component, Debug, Clone, Copy)]
 struct ExteriorModel;
 
@@ -2396,16 +2398,14 @@ const fn shows_exterior(mode: ViewMode) -> bool {
 /// 中からは自分の胴体で視界が塞がる。
 fn update_model_visibility(
     mode: Res<ViewMode>,
-    startup: Option<Res<Startup>>,
     mut models: Query<&mut Visibility, (With<ExteriorModel>, Without<InteriorModel>)>,
     mut interior: Query<&mut Visibility, (With<InteriorModel>, Without<ExteriorModel>)>,
 ) {
-    let exterior_wanted =
-        if shows_exterior(*mode) || startup.is_some_and(|s| s.aircraft.uses_bounded_model()) {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+    let exterior_wanted = if shows_exterior(*mode) || interior.is_empty() {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
     let interior_wanted = if shows_exterior(*mode) {
         Visibility::Hidden
     } else {

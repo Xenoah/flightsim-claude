@@ -1,0 +1,55 @@
+{
+  "added_source_sha256": {
+    "crates/flightsim-app/src/cockpit_layout.rs": "f6c4a90ba9041aecb5deedd855826690789e85fc8e3caddf40f5659e181418af",
+    "crates/flightsim-render/src/cockpit/variants.rs": "8a9576b7e129529c15e602ff52fcc98b57c62b9a0d999d6fb7954f4a51c3544d"
+  },
+  "base_contract_sha256": {
+    "scripts/history/alpha23-cockpit-variant-base-analytical-swift-capture-contract.json": "dd0d9b53bf57582e8bdb6d8211bc25a8125076fd566f5a91dcbab666c1c2d9ae",
+    "scripts/history/alpha23-cockpit-variant-base-analytical-swift-source-contract.json": "5317070ebc7c70eb1c62cd66c1d49805f7ef8652f0d60b703fd45730723f734f",
+    "scripts/history/alpha23-cockpit-variant-base-replay-candidate-contract.json": "469a2e07f14d566a6c331ef1d99705e8170989bdcda271e4600b3d45800cc5fe"
+  },
+  "base_source": "130de6f2872cab4932a4b2e61c6828a7dccc883b",
+  "base_source_kind": "published-commit",
+  "base_source_status": "released-alpha23-parent",
+  "base_tree": "26b935ac8c60cf0b87a8367f93a45ebc6a4fc2a8",
+  "historical_relocations": {
+    "crates/flightsim-app/src/aircraft_picker_tests.rs": "scripts/history/alpha23-cockpit-variant-base-aircraft_picker_tests.rs",
+    "crates/flightsim-app/src/aircraft_scene.rs": "scripts/history/alpha23-cockpit-variant-base-aircraft_scene.rs",
+    "crates/flightsim-app/src/cockpit_runtime.rs": "scripts/history/alpha23-cockpit-variant-base-cockpit_runtime.rs",
+    "crates/flightsim-app/src/main.rs": "scripts/history/alpha23-cockpit-variant-base-flightsim-app-main.rs",
+    "crates/flightsim-render/src/cockpit.rs": "scripts/history/alpha23-cockpit-variant-base-cockpit.rs",
+    "crates/flightsim-render/src/cockpit/texture.rs": "scripts/history/alpha23-cockpit-variant-base-cockpit-texture.rs"
+  },
+  "identity": "full-two-aircraft-cockpit-variant-source-migration-v1",
+  "preserved_runtime_sha256": "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667",
+  "previous_source_migration_sha256": "151492942d97e3bbf11c04c7d84ae669e09aeaa1553f704b9b17573d02a3c115",
+  "release_authorized": false,
+  "replaced_source_sha256": {
+    "crates/flightsim-app/src/aircraft_picker_tests.rs": {
+      "previous_sha256": "44d63b566dda0bd589204567d7d2a901e6aa344c6b118bfbeadaca094445cf59",
+      "sha256": "b06f7324ef26f62dcb15e51a054eaff92048989a173e7882ba1f71b0990fbd20"
+    },
+    "crates/flightsim-app/src/aircraft_scene.rs": {
+      "previous_sha256": "223defd3568b917502cdb16575325e55c23eafe8fe0665016938ec89f74688ee",
+      "sha256": "76cffbf8892bd66c95250b3a95d808d4b1bd6c9553cd7eaa939e0584ba2a9751"
+    },
+    "crates/flightsim-app/src/cockpit_runtime.rs": {
+      "previous_sha256": "cab3c9495570b6e059c3f02a05bcf32bb65cc8f3e633e9db7660ba3c7419343f",
+      "sha256": "f88145f0f12a197d25d9daf9f881b48d1f98ddfdc9e4a167ef0958548e470546"
+    },
+    "crates/flightsim-app/src/main.rs": {
+      "previous_sha256": "0abcf25778a12c2ad56cc7cb1fd7b71ec628f93be83e3023a20e7dbb12588771",
+      "sha256": "4587a0a986d031b6c8aabf0f09510820b263320e7a1351fdf57027c3f33e86f3"
+    },
+    "crates/flightsim-render/src/cockpit.rs": {
+      "previous_sha256": "776c04d65d60fc29a12d06230fafe2fb19c66b8daafd5099c300385d82db0693",
+      "sha256": "f3876b27ddfb9ca4195fa6d34436346ca0bd41a3aa361855030c9c8badccffab"
+    },
+    "crates/flightsim-render/src/cockpit/texture.rs": {
+      "previous_sha256": "385b60a58a82dc7000ca8cdc63f4fe316d7200f12b593564781535372a7ee254",
+      "sha256": "8ebd457e898a5d6f5cbf0002b3ca418d276101a7386928f293d6337630749668"
+    }
+  },
+  "schema_version": 1,
+  "scope": "source-only; native, whole-target and publication gates remain unqualified"
+}

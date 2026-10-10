@@ -6,6 +6,9 @@ use bevy::window::PrimaryWindow;
 use flightsim_render::cockpit::{self, CockpitControl, CockpitState, Display, Motion};
 
 #[derive(Component)]
+pub(super) struct GeneratedCockpit(pub cockpit::CockpitLayout);
+
+#[derive(Component)]
 pub(super) struct AnimatedPart {
     pub base: Transform,
     pub motion: Motion,
@@ -45,6 +48,7 @@ pub(super) struct CockpitInteraction {
     hovered: Option<CockpitControl>,
     yaw: Radians,
     pitch: Radians,
+    centered_pitch: Radians,
     lighting: bool,
     show_hud: bool,
 }
@@ -59,6 +63,7 @@ impl Default for CockpitInteraction {
             hovered: None,
             yaw: Radians(5f64.to_radians()),
             pitch: Radians(15f64.to_radians()),
+            centered_pitch: Radians(15f64.to_radians()),
             lighting: true,
             show_hud: false,
         }
@@ -84,7 +89,7 @@ impl CockpitInteraction {
     }
     fn center(&mut self) {
         self.yaw = Radians(5f64.to_radians());
-        self.pitch = Radians(15f64.to_radians());
+        self.pitch = self.centered_pitch;
     }
 }
 
@@ -178,7 +183,7 @@ fn merge_command(action: CockpitControl, delta: Vec2, keys: &mut flightsim_input
         CockpitControl::Brake => keys.brakes = true,
         CockpitControl::RudderLeft => keys.yaw_left = true,
         CockpitControl::RudderRight => keys.yaw_right = true,
-        CockpitControl::Yoke => {
+        CockpitControl::Yoke | CockpitControl::Stick => {
             keys.roll_left |= delta.x < -4.0;
             keys.roll_right |= delta.x > 4.0;
             keys.pitch_up |= down;
@@ -198,7 +203,7 @@ fn sample_pointer(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<world_runtime::FlightCamera>>,
     targets: Query<(&HitTarget, &GlobalTransform, &Transform), With<InteriorModel>>,
-    aircraft: Query<Entity, With<Aircraft>>,
+    aircraft: Query<(Entity, Option<&GeneratedCockpit>), With<Aircraft>>,
     simulation: Res<FlightSimulation>,
     playback: Option<Res<ReplayPlayback>>,
     mode: Res<ViewMode>,
@@ -207,14 +212,21 @@ fn sample_pointer(
     mut pointer: ResMut<CockpitInteraction>,
     mut sample: ResMut<SampledPilotInput>,
 ) {
-    let scene = aircraft.single().ok();
+    let active = aircraft.single().ok();
+    let scene = active.map(|(entity, _)| entity);
     let changed_scene = scene != pointer.scene;
     if changed_scene {
         pointer.scene = scene;
+        pointer.centered_pitch = active
+            .and_then(|(_, layout)| layout)
+            .map_or(Radians(15f64.to_radians()), |layout| {
+                layout.0.centered_pitch()
+            });
         pointer.release();
         pointer.center();
     }
-    pointer.enabled = !targets.is_empty() && !simulation.0.uses_bounded_model();
+    // Only active generated interiors carry HitTarget; unknown bounded models do not.
+    pointer.enabled = !targets.is_empty();
     if changed_scene {
         return;
     }
@@ -368,6 +380,7 @@ fn publish_panel(
         wind_from: hud.wind_from,
         controls: mechanical,
         trim: hud.trim,
+        service_brakes: (!replaying).then(|| controls.to_control_inputs().brakes()),
         replay: playback.is_some() || simulation.0.is_replay(),
         stall: hud.stall_warning,
         stall_unavailable: hud.stall_warning_unavailable,
@@ -645,6 +658,44 @@ mod integration_tests {
         }
     }
     #[test]
+    fn active_layout_switch_resets_camera_but_staged_layout_cannot_change_it() {
+        let mut app = pointer_app();
+        let active = app
+            .world_mut()
+            .query_filtered::<Entity, With<Aircraft>>()
+            .single(app.world())
+            .unwrap();
+        app.world_mut()
+            .spawn(GeneratedCockpit(cockpit::CockpitLayout::Sport));
+        for layout in [
+            cockpit::CockpitLayout::Trainer,
+            cockpit::CockpitLayout::Sport,
+            cockpit::CockpitLayout::JetTrainer,
+            cockpit::CockpitLayout::Meadow,
+        ] {
+            app.world_mut()
+                .entity_mut(active)
+                .insert(GeneratedCockpit(layout));
+            app.world_mut().resource_mut::<CockpitInteraction>().scene = None;
+            sample(&mut app);
+            let pointer = app.world().resource::<CockpitInteraction>();
+            assert_eq!(pointer.pitch, layout.centered_pitch());
+            assert!(pointer.held.is_none());
+            app.world_mut().resource_mut::<CockpitInteraction>().pitch = Radians(0.8);
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Home);
+            sample(&mut app);
+            assert_eq!(
+                app.world().resource::<CockpitInteraction>().pitch,
+                layout.centered_pitch()
+            );
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+        }
+    }
+    #[test]
     fn restart_and_scene_change_drop_drag_before_the_first_new_input() {
         let mut app = pointer_app();
         app.world_mut()
@@ -727,6 +778,57 @@ mod integration_tests {
                 .frames()
                 .is_empty()
         );
+    }
+    #[test]
+    fn supported_jet_stick_uses_existing_fixed_step_and_replay_lock() {
+        let profile = aircraft_profile::SelectedAircraftProfile::from_bytes(include_bytes!(
+            "../../../assets/aircraft/kestrel_jet_trainer.json"
+        ))
+        .unwrap();
+        let startup = Startup {
+            aircraft: profile,
+            ..default()
+        };
+        let initial = flightsim_fdm::RigidBodyState::from_geodetic(
+            Geodetic::from_degrees(35.55, 139.78, 1000.0),
+            Attitude::from_degrees(0.0, 2.0, 0.0),
+            Ned::new(60.0, 0.0, 0.0),
+        );
+        let session =
+            FlightSession::prepare_jet(&startup, &default(), StartCondition::InFlight(initial))
+                .unwrap();
+        let mut app = pointer_app();
+        app.insert_resource(world_runtime::initial_controls(&startup));
+        app.world_mut().resource_mut::<FlightSimulation>().0 = session;
+        {
+            let mut pointer = app.world_mut().resource_mut::<CockpitInteraction>();
+            pointer.held = Some(CockpitControl::Stick);
+            pointer.anchor = Vec2::new(70.0, 130.0);
+        }
+        sample(&mut app);
+        let keys = app.world().resource::<SampledPilotInput>().keys;
+        assert!(keys.roll_right && keys.pitch_down);
+        crate::controls_runtime_tests::tick(&mut app, Duration::ZERO, keys);
+        assert_eq!(
+            app.world().resource::<FlightSimulation>().0.state(),
+            &initial
+        );
+        crate::controls_runtime_tests::tick(&mut app, Duration::from_secs_f64(1.0 / 60.0), keys);
+        let recorded = match &app.world().resource::<FlightSimulation>().0 {
+            FlightSession::JetLive { recorder, .. } => recorder.export(),
+            _ => panic!("jet live"),
+        };
+        let replay = flightsim_sim::replay_v4::JetReplayPlayer::new(
+            startup.aircraft.jet().unwrap().configuration().clone(),
+            recorded,
+        )
+        .unwrap();
+        app.world_mut().resource_mut::<FlightSimulation>().0 = FlightSession::replay(replay);
+        sample(&mut app);
+        assert!(app.world().resource::<CockpitInteraction>().enabled);
+        assert!(app.world().resource::<CockpitInteraction>().held.is_none());
+        let keys = app.world().resource::<SampledPilotInput>().keys;
+        assert!(!keys.roll_right && !keys.pitch_down);
     }
 }
 
@@ -813,34 +915,44 @@ mod picking_tests {
     #[test]
     fn every_production_control_center_is_reachable_without_other_control_occlusion() {
         let eye = Vec3::new(0.0, -0.25, 0.0);
-        let parts = cockpit::interior_parts([Meters(0.0), Meters(-0.25), Meters(0.0)]);
-        let camera = camera();
-        let targets: Vec<_> = parts
-            .iter()
-            .filter_map(|part| part.control.map(|(action, size)| (action, size, part)))
-            .collect();
-        for (wanted, _, selected) in &targets {
-            let center = selected.transform.translation;
-            let view = GlobalTransform::from(
-                Transform::from_translation(eye).looking_at(center, Vec3::NEG_Z),
+        for layout in [
+            cockpit::CockpitLayout::Trainer,
+            cockpit::CockpitLayout::Meadow,
+            cockpit::CockpitLayout::Sport,
+            cockpit::CockpitLayout::JetTrainer,
+        ] {
+            let parts = cockpit::interior_parts_for_layout(
+                [Meters(0.0), Meters(-0.25), Meters(0.0)],
+                layout,
             );
-            let cursor = camera.world_to_viewport(&view, center).unwrap();
-            let ray = camera.viewport_to_world(&view, cursor).unwrap();
-            let hit = targets
+            let camera = camera();
+            let targets: Vec<_> = parts
                 .iter()
-                .filter_map(|(action, size, part)| {
-                    let surface = part.transform.compute_affine()
-                        * Affine3A::from_quat(part.transform.rotation.inverse());
-                    ray_hit(ray.origin, *ray.direction, surface, *size)
-                        .map(|distance| (*action, distance))
-                })
-                .min_by(|a, b| a.1.total_cmp(&b.1))
-                .unwrap();
-            assert_eq!(
-                hit.0, *wanted,
-                "{} is occluded by {:?}",
-                selected.name, hit.0
-            );
+                .filter_map(|part| part.control.map(|(action, size)| (action, size, part)))
+                .collect();
+            for (wanted, _, selected) in &targets {
+                let center = selected.transform.translation;
+                let view = GlobalTransform::from(
+                    Transform::from_translation(eye).looking_at(center, Vec3::NEG_Z),
+                );
+                let cursor = camera.world_to_viewport(&view, center).unwrap();
+                let ray = camera.viewport_to_world(&view, cursor).unwrap();
+                let hit = targets
+                    .iter()
+                    .filter_map(|(action, size, part)| {
+                        let surface = part.transform.compute_affine()
+                            * Affine3A::from_quat(part.transform.rotation.inverse());
+                        ray_hit(ray.origin, *ray.direction, surface, *size)
+                            .map(|distance| (*action, distance))
+                    })
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .unwrap();
+                assert_eq!(
+                    hit.0, *wanted,
+                    "{} is occluded by {:?}",
+                    selected.name, hit.0
+                );
+            }
         }
     }
     #[test]
@@ -856,6 +968,87 @@ mod picking_tests {
                 ray_hit(eye, direction, stable, Vec2::new(0.072, 0.14)).is_some(),
                 "trim {trim}"
             );
+        }
+    }
+    #[test]
+    fn primary_instruments_are_inside_the_actual_default_look_viewport_for_all_layouts() {
+        let camera = camera();
+        for (layout, eye) in [
+            (cockpit::CockpitLayout::Trainer, Vec3::new(0.6, -0.25, -0.9)),
+            (cockpit::CockpitLayout::Meadow, Vec3::new(0.6, -0.25, -0.9)),
+            (cockpit::CockpitLayout::Sport, Vec3::new(0.2, -0.25, -0.8)),
+            (
+                cockpit::CockpitLayout::JetTrainer,
+                Vec3::new(0.6, -0.25, -0.9),
+            ),
+        ] {
+            let pointer = CockpitInteraction {
+                enabled: true,
+                pitch: layout.centered_pitch(),
+                centered_pitch: layout.centered_pitch(),
+                ..default()
+            };
+            let global = GlobalTransform::from(Transform {
+                translation: eye,
+                rotation: pointer.view_rotation() * flightsim_render::body_to_camera_rotation(),
+                ..default()
+            });
+            let parts = cockpit::interior_parts_for_layout(
+                eye.to_array().map(|v| Meters(f64::from(v))),
+                layout,
+            );
+            for part in parts.iter().filter(|p| {
+                matches!(
+                    p.display,
+                    Some(Display::Primary | Display::Dial(_) | Display::Flight | Display::Controls)
+                ) || p.control.is_some_and(|(action, _)| {
+                    action == CockpitControl::Stick
+                        || (layout == cockpit::CockpitLayout::JetTrainer
+                            && action == CockpitControl::Throttle)
+                })
+            }) {
+                let pixel = camera
+                    .world_to_viewport(&global, part.transform.translation)
+                    .unwrap();
+                assert!(
+                    camera.logical_viewport_rect().unwrap().contains(pixel),
+                    "{layout:?}: {} at {pixel:?}",
+                    part.name
+                );
+            }
+        }
+    }
+    #[test]
+    fn moving_stick_remains_pickable_at_each_roll_pitch_extreme() {
+        let eye = Vec3::new(0.2, -0.25, -0.8);
+        for layout in [
+            cockpit::CockpitLayout::Sport,
+            cockpit::CockpitLayout::JetTrainer,
+        ] {
+            let parts = cockpit::interior_parts_for_layout(
+                eye.to_array().map(|v| Meters(f64::from(v))),
+                layout,
+            );
+            for part in parts
+                .iter()
+                .filter(|p| p.control.is_some_and(|c| c.0 == CockpitControl::Stick))
+            {
+                for pitch in [-1.0, 0.0, 1.0] {
+                    for roll in [-1.0, 0.0, 1.0] {
+                        let state = CockpitState {
+                            controls: flightsim_fdm::ControlInputs::new(roll, pitch, 0.0, 0.0, 0.0),
+                            ..default()
+                        };
+                        let pose = cockpit::animated_transform(part.transform, part.motion, &state);
+                        let direction = (pose.translation - eye).normalize();
+                        let surface = pose.compute_affine()
+                            * Affine3A::from_quat(part.transform.rotation.inverse());
+                        assert!(
+                            ray_hit(eye, direction, surface, part.control.unwrap().1).is_some()
+                        );
+                    }
+                }
+            }
         }
     }
     #[test]

@@ -45,7 +45,8 @@ REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
 ALPHA22_REPLAY_CONTRACT_ID = "full-two-aircraft-alpha22-version-source-v1"
 COCKPIT_REPLAY_CONTRACT_ID = "full-two-aircraft-cockpit-source-v1"
-REPLAY_CONTRACT_ID = "full-two-aircraft-alpha23-version-source-v1"
+ALPHA23_REPLAY_CONTRACT_ID = "full-two-aircraft-alpha23-version-source-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-cockpit-variant-source-v1"
 REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
 REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
 SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
@@ -178,9 +179,40 @@ ALPHA23_WORKSPACE_PACKAGES = frozenset({
     "flightsim-tilegen", "flightsim-assetgen", "flightsim-sim", "flightsim-render",
     "flightsim-app", "flightsim-audio", "flightsim-ui", "flightsim-input", "flightsim-net",
 })
+# Seventh, source-only migration over the final released alpha.23 parent.
+# Its nine stable witnesses preserve the exact published source/contract bytes.
+# Released-parent provenance never grants native, rights or release acceptance.
+COCKPIT_VARIANT_MIGRATION_PATH = 'scripts/cockpit-variant-source-migration.json'
+COCKPIT_VARIANT_MIGRATION_SHA256 = 'df88b6a7740626cb14c43a3421253d96336b66d4524e37fd2964e57c82b44bfd'
+COCKPIT_VARIANT_BASE_SOURCE = '130de6f2872cab4932a4b2e61c6828a7dccc883b'
+COCKPIT_VARIANT_BASE_TREE = '26b935ac8c60cf0b87a8367f93a45ebc6a4fc2a8'
+COCKPIT_VARIANT_BASE_SOURCE_STATUS = 'released-alpha23-parent'
+COCKPIT_VARIANT_BASE_CONTRACT_PATH = 'scripts/history/alpha23-cockpit-variant-base-replay-candidate-contract.json'
+COCKPIT_VARIANT_BASE_CONTRACT_HASHES = {'scripts/history/alpha23-cockpit-variant-base-analytical-swift-capture-contract.json': 'dd0d9b53bf57582e8bdb6d8211bc25a8125076fd566f5a91dcbab666c1c2d9ae',
+ 'scripts/history/alpha23-cockpit-variant-base-analytical-swift-source-contract.json': '5317070ebc7c70eb1c62cd66c1d49805f7ef8652f0d60b703fd45730723f734f',
+ 'scripts/history/alpha23-cockpit-variant-base-replay-candidate-contract.json': '469a2e07f14d566a6c331ef1d99705e8170989bdcda271e4600b3d45800cc5fe'}
+COCKPIT_VARIANT_HISTORICAL_RELOCATIONS = {'crates/flightsim-app/src/aircraft_picker_tests.rs': 'scripts/history/alpha23-cockpit-variant-base-aircraft_picker_tests.rs',
+ 'crates/flightsim-app/src/aircraft_scene.rs': 'scripts/history/alpha23-cockpit-variant-base-aircraft_scene.rs',
+ 'crates/flightsim-app/src/cockpit_runtime.rs': 'scripts/history/alpha23-cockpit-variant-base-cockpit_runtime.rs',
+ 'crates/flightsim-app/src/main.rs': 'scripts/history/alpha23-cockpit-variant-base-flightsim-app-main.rs',
+ 'crates/flightsim-render/src/cockpit.rs': 'scripts/history/alpha23-cockpit-variant-base-cockpit.rs',
+ 'crates/flightsim-render/src/cockpit/texture.rs': 'scripts/history/alpha23-cockpit-variant-base-cockpit-texture.rs'}
+COCKPIT_VARIANT_PREVIOUS_SHA256 = {'crates/flightsim-app/src/aircraft_picker_tests.rs': '44d63b566dda0bd589204567d7d2a901e6aa344c6b118bfbeadaca094445cf59',
+ 'crates/flightsim-app/src/aircraft_scene.rs': '223defd3568b917502cdb16575325e55c23eafe8fe0665016938ec89f74688ee',
+ 'crates/flightsim-app/src/cockpit_runtime.rs': 'cab3c9495570b6e059c3f02a05bcf32bb65cc8f3e633e9db7660ba3c7419343f',
+ 'crates/flightsim-app/src/main.rs': '0abcf25778a12c2ad56cc7cb1fd7b71ec628f93be83e3023a20e7dbb12588771',
+ 'crates/flightsim-render/src/cockpit.rs': '776c04d65d60fc29a12d06230fafe2fb19c66b8daafd5099c300385d82db0693',
+ 'crates/flightsim-render/src/cockpit/texture.rs': '385b60a58a82dc7000ca8cdc63f4fe316d7200f12b593564781535372a7ee254'}
+COCKPIT_VARIANT_RUNTIME_PATHS = frozenset(['crates/flightsim-app/src/cockpit_layout.rs',
+ 'crates/flightsim-render/src/cockpit/variants.rs'])
+COCKPIT_VARIANT_SOURCE_PATHS = frozenset({
+    COCKPIT_VARIANT_MIGRATION_PATH, *COCKPIT_VARIANT_BASE_CONTRACT_HASHES,
+    *COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.values(), *COCKPIT_VARIANT_RUNTIME_PATHS,
+})
 # The oldest main.rs witness remains the component-terms witness. Other newly
 # replaced preserved files now have their own exact published-base witnesses.
 CURRENT_HISTORICAL_RUNTIME_RELOCATIONS = {
+    **COCKPIT_VARIANT_HISTORICAL_RELOCATIONS,
     **COCKPIT_HISTORICAL_RELOCATIONS, **HISTORICAL_RUNTIME_RELOCATIONS,
 }
 # The reviewed additive jet/turboprop exports change this file, but no legacy FDM
@@ -1239,6 +1271,8 @@ ALPHA22_REPLAY_CONTRACT_PATHS = frozenset(REPLAY_CONTRACT_PATHS)
 REPLAY_CONTRACT_PATHS |= COCKPIT_SOURCE_PATHS
 COCKPIT_REPLAY_CONTRACT_PATHS = frozenset(REPLAY_CONTRACT_PATHS)
 REPLAY_CONTRACT_PATHS |= ALPHA23_SOURCE_PATHS
+ALPHA23_REPLAY_CONTRACT_PATHS = frozenset(REPLAY_CONTRACT_PATHS)
+REPLAY_CONTRACT_PATHS |= COCKPIT_VARIANT_SOURCE_PATHS
 
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -1418,15 +1452,17 @@ def git(repo, *args):
 
 # Cargo auto-discovers build scripts, binary/example/benchmark targets. These
 # retain 492 preserved members, two terms inputs, one terrain test and two
-# explicitly reviewed cockpit helpers.
+# explicitly reviewed cockpit helpers plus two aircraft-layout helpers.
 # No on-disk glob can admit additional build, binary, example or benchmark files.
 PRESERVED_CRATE_SOURCE_PATHS = frozenset(path for path in REPLAY_CONTRACT_PATHS
                                        if path.startswith("crates/")
                                        and path not in (COMPONENT_TERMS_RUNTIME_PATHS
                                                         | TERRAIN_CENTROID_RUNTIME_PATHS
-                                                        | COCKPIT_RUNTIME_PATHS))
+                                                        | COCKPIT_RUNTIME_PATHS
+                                                        | COCKPIT_VARIANT_RUNTIME_PATHS))
 CURRENT_CRATE_SOURCE_PATHS = (PRESERVED_CRATE_SOURCE_PATHS | COMPONENT_TERMS_RUNTIME_PATHS
-                              | TERRAIN_CENTROID_RUNTIME_PATHS | COCKPIT_RUNTIME_PATHS)
+                              | TERRAIN_CENTROID_RUNTIME_PATHS | COCKPIT_RUNTIME_PATHS
+                              | COCKPIT_VARIANT_RUNTIME_PATHS)
 MODIFIED_SOURCE_BOUNDARIES = (
     ("crates/", CURRENT_CRATE_SOURCE_PATHS),
     ("docs/release/components/", COMPONENT_TERMS_DOCUMENT_PATHS),
@@ -1869,13 +1905,13 @@ def validate_alpha23_version_delta(previous, current):
                 "alpha23 version bytes differ outside approved substitutions: " + path)
 
 
-def validate_replay_contract(contract):
+def validate_alpha23_replay_contract(contract):
     """Admit only alpha.22 to alpha.23 versions over the frozen cockpit proof."""
     require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
             "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
             "scope", "release_authorized", "source_sha256"}
             and type(contract.get("schema_version")) is int and contract["schema_version"] == 1
-            and contract.get("contract") == REPLAY_CONTRACT_ID,
+            and contract.get("contract") == ALPHA23_REPLAY_CONTRACT_ID,
             "invalid reviewed replay contract")
     require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
             and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
@@ -1884,7 +1920,7 @@ def validate_replay_contract(contract):
             and contract.get("release_authorized") is False,
             "source admission identity or scope changed")
     pins = contract.get("source_sha256")
-    require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
+    require(isinstance(pins, dict) and set(pins) == ALPHA23_REPLAY_CONTRACT_PATHS,
             "reviewed replay source boundary changed")
     require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
                 for value in pins.values()), "invalid reviewed replay source digest")
@@ -1904,7 +1940,7 @@ def validate_replay_contract(contract):
     validate_cockpit_replay_contract(previous)
     previous_pins = previous["source_sha256"]
     require(len(previous_pins) == 950
-            and set(previous_pins) == REPLAY_CONTRACT_PATHS - ALPHA23_SOURCE_PATHS,
+            and set(previous_pins) == ALPHA23_REPLAY_CONTRACT_PATHS - ALPHA23_SOURCE_PATHS,
             "alpha23 prior source boundary changed")
     for path, expected in previous_pins.items():
         historical = ALPHA23_HISTORICAL_RELOCATIONS.get(path, path)
@@ -1947,6 +1983,92 @@ def validate_replay_contract(contract):
         require(replacements[path] == {"previous_sha256": expected, "sha256": current_digest}
                 and pins[path] == current_digest, "alpha23 version replacement changed: " + path)
     validate_alpha23_version_delta(previous_bytes, current_bytes)
+    return contract
+
+
+def validate_cockpit_variant_migration(migration, pins, previous_pins, root):
+    """Validate the bounded source descriptor; never admit a release or receipt."""
+    require(isinstance(migration, dict) and set(migration) == {
+            "schema_version", "identity", "base_source", "base_tree", "base_source_kind",
+            "base_source_status", "scope", "release_authorized", "base_contract_sha256",
+            "previous_source_migration_sha256", "preserved_runtime_sha256",
+            "historical_relocations", "replaced_source_sha256", "added_source_sha256"}
+            and type(migration["schema_version"]) is int and migration["schema_version"] == 1
+            and migration["identity"] == "full-two-aircraft-cockpit-variant-source-migration-v1"
+            and migration["base_source"] == COCKPIT_VARIANT_BASE_SOURCE
+            and migration["base_tree"] == COCKPIT_VARIANT_BASE_TREE
+            and migration["base_source_kind"] == "published-commit"
+            and migration["base_source_status"] == COCKPIT_VARIANT_BASE_SOURCE_STATUS
+            and migration["scope"] == SOURCE_ADMISSION_SCOPE
+            and migration["release_authorized"] is False
+            and migration["base_contract_sha256"] == COCKPIT_VARIANT_BASE_CONTRACT_HASHES
+            and migration["previous_source_migration_sha256"] == ALPHA23_MIGRATION_SHA256
+            and migration["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256
+            and migration["historical_relocations"] == COCKPIT_VARIANT_HISTORICAL_RELOCATIONS,
+            "invalid cockpit variant source migration identity")
+    replacements = migration["replaced_source_sha256"]
+    require(isinstance(replacements, dict)
+            and set(replacements) == set(COCKPIT_VARIANT_PREVIOUS_SHA256),
+            "cockpit variant replacement boundary changed")
+    for path, expected in COCKPIT_VARIANT_PREVIOUS_SHA256.items():
+        historical = COCKPIT_VARIANT_HISTORICAL_RELOCATIONS[path]
+        row = replacements[path]
+        require(isinstance(row, dict) and set(row) == {"previous_sha256", "sha256"}
+                and row["previous_sha256"] == expected == previous_pins[path]
+                and digest(root / historical) == expected == pins[historical]
+                and row["sha256"] != expected and pins[path] == row["sha256"],
+                "cockpit variant replacement changed: " + path)
+    additions = migration["added_source_sha256"]
+    require(isinstance(additions, dict) and set(additions) == COCKPIT_VARIANT_RUNTIME_PATHS
+            and all(pins.get(path) == expected for path, expected in additions.items()),
+            "cockpit variant source additions changed")
+
+
+def validate_replay_contract(contract):
+    """Admit exactly six replacements and two modules over frozen alpha.23."""
+    require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
+            "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
+            "scope", "release_authorized", "source_sha256"}
+            and type(contract.get("schema_version")) is int and contract["schema_version"] == 1
+            and contract.get("contract") == REPLAY_CONTRACT_ID,
+            "invalid reviewed replay contract")
+    require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
+            and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
+            and contract.get("source_migration_sha256") == COCKPIT_VARIANT_MIGRATION_SHA256
+            and contract.get("scope") == SOURCE_ADMISSION_SCOPE
+            and contract.get("release_authorized") is False,
+            "source admission identity or scope changed")
+    pins = contract.get("source_sha256")
+    require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
+            "reviewed replay source boundary changed")
+    require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+                for value in pins.values()), "invalid reviewed replay source digest")
+    # Preserve the diagnostics and all independent anchors of every earlier layer.
+    for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs"):
+        require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
+    require(pins["crates/flightsim-fdm/src/lib.rs"] == REVIEWED_ADDITIVE_FDM_LIB_SHA256,
+            "frozen reviewed FDM module input changed")
+    root = Path(__file__).parent.parent
+    for path, expected in COCKPIT_VARIANT_BASE_CONTRACT_HASHES.items():
+        require(digest(root / path) == expected and pins[path] == expected,
+                "cockpit variant historical contract changed: " + path)
+    previous = json.loads((root / COCKPIT_VARIANT_BASE_CONTRACT_PATH).read_text(encoding="utf-8"))
+    # Historical objects need not exist: exact checked-in witness bytes carry the
+    # complete original proof, including the frozen 956-path alpha.23 boundary.
+    validate_alpha23_replay_contract(previous)
+    previous_pins = previous["source_sha256"]
+    require(len(previous_pins) == 956
+            and set(previous_pins) == REPLAY_CONTRACT_PATHS - COCKPIT_VARIANT_SOURCE_PATHS,
+            "cockpit variant prior source boundary changed")
+    for path, expected in previous_pins.items():
+        historical = COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.get(path, path)
+        require(pins.get(historical) == expected,
+                "cockpit variant prior source pins changed (preserved runtime/historical contract): " + path)
+    require(digest(root / COCKPIT_VARIANT_MIGRATION_PATH) == COCKPIT_VARIANT_MIGRATION_SHA256
+            and pins[COCKPIT_VARIANT_MIGRATION_PATH] == COCKPIT_VARIANT_MIGRATION_SHA256,
+            "cockpit variant source migration changed")
+    migration = json.loads((root / COCKPIT_VARIANT_MIGRATION_PATH).read_text(encoding="utf-8"))
+    validate_cockpit_variant_migration(migration, pins, previous_pins, root)
     return contract
 
 

@@ -90,11 +90,10 @@ pub(super) fn spawn(
             parts.push(entity.id());
         }
     }
-    let interior = if startup.aircraft.uses_bounded_model() {
-        Vec::new()
-    } else {
-        flightsim_render::cockpit::interior_parts(startup.aircraft.camera_eye())
-    };
+    let layout = cockpit_layout::selected(startup);
+    let interior = layout.map_or_else(Vec::new, |layout| {
+        flightsim_render::cockpit::interior_parts_for_layout(startup.aircraft.camera_eye(), layout)
+    });
     for part in interior {
         let image = part.display.map(|display| {
             images.add(flightsim_render::cockpit::display_image(
@@ -168,6 +167,9 @@ pub(super) fn spawn(
             "aircraft"
         }),
     ));
+    if let Some(layout) = layout {
+        root.insert(cockpit_runtime::GeneratedCockpit(layout));
+    }
     if !staged {
         root.insert((
             Aircraft,
@@ -376,11 +378,15 @@ impl AircraftScene {
             .get_resource::<ViewMode>()
             .copied()
             .unwrap_or(startup.view);
-        for entity in descendants(world, self.root) {
+        let descendants = descendants(world, self.root);
+        let generated_interior = descendants
+            .iter()
+            .any(|entity| world.get::<StagedInterior>(*entity).is_some());
+        for entity in descendants {
             if world.get::<StagedExterior>(entity).is_some() {
                 world.entity_mut(entity).remove::<StagedExterior>().insert((
                     ExteriorModel,
-                    if shows_exterior(mode) || startup.aircraft.uses_bounded_model() {
+                    if shows_exterior(mode) || !generated_interior {
                         Visibility::Inherited
                     } else {
                         Visibility::Hidden
@@ -450,6 +456,98 @@ fn despawn(world: &mut World, root: Entity) {
 #[cfg(test)]
 mod cockpit_asset_tests {
     use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    #[test]
+    fn generated_fallback_switch_and_cancel_use_active_scene_visibility() {
+        let simulation_app = crate::controls_runtime_tests::control_app("light-single");
+        let simulation = &simulation_app.world().resource::<FlightSimulation>().0;
+        let startup = Startup::default();
+        let mut app = App::new();
+        app.insert_resource(ViewMode::Cockpit)
+            .init_resource::<Assets<Mesh>>()
+            .init_resource::<Assets<StandardMaterial>>()
+            .init_resource::<Assets<Image>>();
+        let stage = |world: &mut World, generated: bool| {
+            let root = world
+                .spawn((
+                    OwnedAircraftAssets::default(),
+                    Transform::default(),
+                    Visibility::Hidden,
+                ))
+                .id();
+            world.spawn((ChildOf(root), StagedExterior, Visibility::Hidden));
+            if generated {
+                world.spawn((ChildOf(root), StagedInterior, Visibility::Hidden));
+            }
+            AircraftScene {
+                root,
+                model: None,
+                document: None,
+                fit: startup.model_fit,
+                ready_seen: true,
+                began: Instant::now(),
+            }
+        };
+        for generated in [true, false, true] {
+            let candidate = stage(app.world_mut(), generated);
+            let active_before: Vec<_> = app
+                .world_mut()
+                .query_filtered::<Entity, With<InteriorModel>>()
+                .iter(app.world())
+                .collect();
+            assert!(
+                active_before
+                    .iter()
+                    .all(|entity| app.world().get::<StagedInterior>(*entity).is_none())
+            );
+            let root = candidate.root;
+            candidate.commit(app.world_mut(), &startup, simulation);
+            for mode in [
+                ViewMode::Cockpit,
+                ViewMode::Chase,
+                ViewMode::Tower,
+                ViewMode::Cockpit,
+            ] {
+                *app.world_mut().resource_mut::<ViewMode>() = mode;
+                app.world_mut()
+                    .run_system_once(update_model_visibility)
+                    .unwrap();
+                for entity in descendants(app.world(), root) {
+                    if app.world().get::<ExteriorModel>(entity).is_some() {
+                        assert_eq!(
+                            *app.world().get::<Visibility>(entity).unwrap(),
+                            if shows_exterior(mode) || !generated {
+                                Visibility::Inherited
+                            } else {
+                                Visibility::Hidden
+                            }
+                        );
+                    }
+                    if app.world().get::<InteriorModel>(entity).is_some() {
+                        assert_eq!(
+                            *app.world().get::<Visibility>(entity).unwrap(),
+                            if shows_exterior(mode) {
+                                Visibility::Hidden
+                            } else {
+                                Visibility::Inherited
+                            }
+                        );
+                    }
+                }
+            }
+            let cancelled = stage(app.world_mut(), !generated);
+            cancelled.cancel(app.world_mut());
+            assert!(app.world().get::<Aircraft>(root).is_some());
+            assert_eq!(
+                app.world_mut()
+                    .query_filtered::<Entity, With<Aircraft>>()
+                    .iter(app.world())
+                    .count(),
+                1
+            );
+        }
+    }
 
     #[test]
     fn cockpit_cleanup_releases_only_the_cancelled_aircraft_assets() {

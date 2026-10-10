@@ -56,7 +56,7 @@ class TerrainCentroidSourceAdmissionTests(unittest.TestCase):
             self.assertEqual(candidate.digest(ROOT / relative), expected)
         self.assertEqual(len(candidate.COCKPIT_REPLAY_CONTRACT_PATHS - candidate.TERRAIN_STITCH_SOURCE_PATHS
                              - candidate.ALPHA22_SOURCE_PATHS - candidate.COCKPIT_SOURCE_PATHS), 930)
-        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 499)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)

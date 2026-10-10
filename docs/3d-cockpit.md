@@ -1,11 +1,12 @@
-# Functional analog 3D cockpit
+# Functional aircraft-specific 3D cockpits
 
-The procedural cockpit for Light Single, Swift Sport and legacy-model external
-profiles is now an original, aircraft-local three-dimensional interior. Its
-reference was a user-provided collage of analog Cessna-style light-aircraft
-cockpits. It is not a replica of an identified Cessna model, a certified training
-device, or a claim of complete aircraft-system fidelity. No source photograph,
-third-party mesh, texture or font is included.
+Light Single, Meadow Trainer, Swift Sport and the supported Kestrel Jet Trainer
+have original, aircraft-local three-dimensional interiors. Trainer layouts use
+analog instruments and yokes; Swift uses an original primary flight display and
+two sticks; Kestrel uses analog instruments, sticks and a single throttle lever.
+See [layout mapping and reference provenance](aircraft-cockpit-layouts.md).
+These are fictional/original layouts, not replicas or certified training devices.
+No source photograph, third-party mesh, texture or font is included.
 
 ## Viewing and operating
 
@@ -15,14 +16,15 @@ third-party mesh, texture or font is included.
 - Pause reveals the full ordinary HUD. Replay identity, warnings, crash/pause
   notices and data attribution remain independent of this switch
 - Hover a physical control for its operating instruction
-- Hold the left button on either yoke and drag: left/right commands roll, down
+- Hold the left button on either yoke or stick and drag: left/right commands roll, down
   pulls back, up pushes forward. Releasing returns the existing input axes toward neutral
 - Hold either rudder pedal to command that direction; look down to reach the pedals
-- Drag the black THROTTLE knob up/down to increase/decrease the throttle setting
+- Drag the black THROTTLE knob or Kestrel lever up/down to increase/decrease the throttle setting
 - Drag the white FLAPS paddle down/up to extend/retract flaps
 - Drag the ELEVATOR TRIM wheel down/up for nose-up/nose-down trim
-- Hold BRAKE HOLD to apply the existing wheel brakes. This is a momentary service
-  brake, not a new parking-brake system
+- Hold BRAKE HOLD / SERVICE BRAKE to apply the existing wheel brakes. This is a momentary service
+  brake, not a new parking-brake system. Kestrel retains its separate B-key parking
+  brake; releasing the pointer does not release a latched parking brake
 - PANEL LIGHT switches actual illumination of the instrument faces and needles
 
 Pointer displacement commands the same held inputs as the corresponding keys.
@@ -33,7 +35,7 @@ Mouse commands do not bypass controller arbitration or add a separate physics
 path. Flight controls lock during replay, pause, map capture, focus loss,
 crash/fault, or unsupported aircraft modes. An interrupted drag requires a fresh
 click; it cannot silently resume after closing the map or unpausing. Center the
-yoke to reach controls physically hidden behind it at extreme displacement.
+yoke or stick to reach controls physically hidden behind it at extreme displacement.
 
 ## What each instrument measures
 
@@ -44,21 +46,22 @@ yoke to reach controls physically hidden behind it at extreme displacement.
 | Altitude / feet | Geodetic ellipsoid height, with 1,000-ft and 10,000-ft revolutions; no pressure setting or barometric model |
 | Body yaw / deg/sec | Body-axis yaw angular rate; not a gyro turn coordinator or slip ball |
 | True heading | Simulated true heading; no magnetic variation or compass deviation model |
-| VSI / ×100 ft/min | Simulated vertical speed; bounded display range ±2,000 ft/min |
+| VSI / ×100 ft/min | Simulated vertical speed; bounded display range ±2,000 ft/min (Kestrel ±6,000 ft/min) |
 | Throttle / percent | Actual throttle command, not measured RPM, torque or engine power |
 | Flaps / percent | Actual normalized flap setting |
 | Flight data stack | Ground speed, AGL, true wind direction/speed, ellipsoid altitude and flight/warning state |
 | Control state stack | Throttle, flaps, separate trim when available, and actual brake command |
 
-The eight instruments, 3D needles, two yokes, pedals, throttle knob, flap paddle,
-trim wheel and switches are coupled to state. The center stack is deliberately
+Analog instruments or Swift’s primary display, 3D needles, dual yokes or sticks,
+pedals, throttle, flap paddle, trim wheel and switches are coupled to state. The center stack is deliberately
 labeled FLIGHT DATA / CONTROL STATE; it does not impersonate a radio.
 
-Live yokes and pedals show the pilot's untrimmed axis displacement. Replay only
+Live yokes, sticks and pedals show the pilot's untrimmed axis displacement. Replay only
 contains effective control commands, so replay animation uses those recorded
 commands and explicitly labels this approximation. Separate trim is unavailable
 in replay and displays N/A; its wheel rests at neutral rather than inventing
-historical trim. Physical controls cannot modify replay.
+historical trim. Replay also lacks a separate service-brake handle position;
+the handle rests neutral while BRK TOT shows recorded aggregate braking. Physical controls cannot modify replay.
 
 ## Scope still missing
 
@@ -69,10 +72,15 @@ systems were added. Full operation of all systems in a real aircraft is still a
 separate development task. Fixed cabin hardware (seats, upholstery, screws,
 window frame and carpet) is visual structure.
 
-Bounded-model jets/turboprops retain their existing model-owned interiors and
-2D instrument fallback. This change does not replace those interiors or alter
-physics coefficients, aircraft/replay identity, terrain or licensing gates.
+Unknown bounded-model aircraft, bounded-profile model overrides and missing Kestrel assets
+retain the authored exterior/2D fallback. Other legacy external profiles retain a
+generic trainer interior. Generated cockpit scenes hide the whole exterior GLB
+inside, avoiding opaque canopy shells and duplicate authored instruments; this
+also means the exterior nose and wings are not visible from the cockpit. External
+views restore the unchanged GLB. Physics coefficients, aircraft/replay identity,
+terrain and licensing/distribution gates are unchanged.
 
-Validation is recorded in the [cockpit QA report](qa/functional-cockpit-2026-10-10.md). Automated ECS and
-software rendering do not establish physical GPU, controller, audio or pilot
-handling acceptance.
+The initial generic cockpit is covered by its [dated QA report](qa/functional-cockpit-2026-10-10.md).
+Aircraft-specific validation is recorded in the [successor QA report](qa/aircraft-cockpits-2026-10-10.md).
+Automated ECS and software rendering do not establish physical GPU, controller,
+audio or pilot handling acceptance.

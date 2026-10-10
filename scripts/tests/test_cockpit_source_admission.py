@@ -69,18 +69,21 @@ class CockpitSourceAdmissionTests(unittest.TestCase):
         for path, expected in base['source_sha256'].items():
             historical = RELOCATIONS.get(path, path)
             self.assertEqual(current['source_sha256'][historical], expected, path)
-            self.assertEqual(candidate.digest(ROOT / candidate.ALPHA23_HISTORICAL_RELOCATIONS.get(historical, historical)), expected, path)
+            checkout = candidate.ALPHA23_HISTORICAL_RELOCATIONS.get(historical, historical)
+            checkout = candidate.COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.get(checkout, checkout)
+            self.assertEqual(candidate.digest(ROOT / checkout), expected, path)
         for path in CHANGED:
             self.assertEqual(migration['replaced_source_sha256'][path], {
-                'previous_sha256': base['source_sha256'][path], 'sha256': candidate.digest(ROOT / path)})
+                'previous_sha256': base['source_sha256'][path], 'sha256': candidate.digest(ROOT / candidate.COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.get(path, path))})
         for path in RUNTIME:
-            self.assertEqual(migration['added_source_sha256'][path], candidate.digest(ROOT / path))
+            self.assertEqual(migration['added_source_sha256'][path],
+                             candidate.digest(ROOT / candidate.COCKPIT_VARIANT_HISTORICAL_RELOCATIONS.get(path, path)))
         self.assertEqual(len(candidate.PRESERVED_CRATE_SOURCE_PATHS), 492)
-        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 499)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(capture.check.SOURCE_PATHS), 55)
+        self.assertEqual(len(capture.check.SOURCE_PATHS), 56)
         self.assertEqual(len(capture.BOUND_FILES), 4)
         self.assertIs(current['release_authorized'], False)
 

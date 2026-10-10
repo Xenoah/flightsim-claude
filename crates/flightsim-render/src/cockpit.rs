@@ -1,6 +1,7 @@
-//! Original, procedural analog light-aircraft cockpit. The supplied reference is
-//! a collage of Cessna-style interiors, not an identified or licensed aircraft.
-//! This is an authored layout, not a certified replica. Every dial and movable
+//! Original procedural trainer, sport and jet-trainer cockpits. The supplied
+//! reference is a collage of Cessna-style interiors; further manufacturer and
+//! historical sources inform seating/control architecture, not aircraft identity.
+//! These are authored layouts, not certified replicas. Every dial and movable
 //! control below has an explicit simulation or presentation binding. There are
 //! deliberately no fictional fuel, mixture, electrical-bus or radio controls.
 //!
@@ -25,6 +26,7 @@ use flightsim_core::{Meters, MetersPerSecond, Radians, RadiansPerSecond};
 use flightsim_fdm::ControlInputs;
 
 mod texture;
+mod variants;
 pub use texture::display_image;
 
 pub const CABIN_WIDTH: f64 = 40.0 * 0.0254;
@@ -35,14 +37,34 @@ pub const EYE_TO_FLOOR: f64 = 0.95;
 pub const PILOT_SEAT_OFFSET: f64 = 0.25;
 pub const SIX_PACK_DROP: f64 = 0.24;
 
+/// Authored interior families, independent of aircraft physics and replay identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CockpitLayout {
+    Trainer,
+    Meadow,
+    Sport,
+    JetTrainer,
+}
+impl CockpitLayout {
+    #[must_use]
+    pub fn centered_pitch(self) -> Radians {
+        Radians(if self.sticks() { 24_f64 } else { 15_f64 }.to_radians())
+    }
+    const fn sticks(self) -> bool {
+        matches!(self, Self::Sport | Self::JetTrainer)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dial {
     Airspeed,
+    JetAirspeed,
     Attitude,
     Altitude,
     Turn,
     Heading,
     VerticalSpeed,
+    JetVerticalSpeed,
     Power,
     Flaps,
 }
@@ -50,6 +72,7 @@ pub enum Dial {
 pub enum Display {
     Dial(Dial),
     Flight,
+    Primary,
     Controls,
     Label(&'static str),
 }
@@ -58,13 +81,17 @@ impl Display {
     pub const fn dynamic(self) -> bool {
         matches!(
             self,
-            Self::Dial(Dial::Attitude | Dial::Heading) | Self::Flight | Self::Controls
+            Self::Dial(Dial::Attitude | Dial::Heading)
+                | Self::Flight
+                | Self::Controls
+                | Self::Primary
         )
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CockpitControl {
     Yoke,
+    Stick,
     RudderLeft,
     RudderRight,
     Throttle,
@@ -79,13 +106,16 @@ impl CockpitControl {
     #[must_use]
     pub const fn hint(self) -> &'static str {
         match self {
+            Self::Stick => "STICK: hold and drag left/right; down pulls, up pushes",
             Self::Yoke => "YOKE: hold and drag left/right; down pulls, up pushes",
             Self::RudderLeft => "LEFT RUDDER: hold left mouse button",
             Self::RudderRight => "RIGHT RUDDER: hold left mouse button",
             Self::Throttle => "THROTTLE: hold and drag up to increase / down to reduce",
             Self::Flaps => "FLAPS: hold and drag down to extend / up to retract",
             Self::Trim => "ELEVATOR TRIM: hold and drag down for nose up / up for nose down",
-            Self::Brake => "WHEEL BRAKES: hold left mouse button; release to let go",
+            Self::Brake => {
+                "SERVICE BRAKES: hold left mouse; release lets go (jet parking brake: B)"
+            }
             Self::Lighting => "INSTRUMENT LIGHT: click to switch illumination",
             Self::CenterView => "CENTER VIEW: click, or press Home",
             Self::Hud => "FLIGHT HUD: click, or V to show/hide readouts and help",
@@ -102,6 +132,12 @@ pub enum Motion {
         pivot: Vec3,
     },
     Yoke {
+        pivot: Vec3,
+    },
+    Stick {
+        pivot: Vec3,
+    },
+    ThrottleLever {
         pivot: Vec3,
     },
     Pedal {
@@ -152,6 +188,8 @@ pub struct CockpitState {
     pub wind_from: Radians,
     pub controls: ControlInputs,
     pub trim: Option<f64>,
+    /// Separate service-brake handle position; replay only records combined braking.
+    pub service_brakes: Option<f64>,
     pub replay: bool,
     pub stall: bool,
     pub stall_unavailable: bool,
@@ -175,6 +213,7 @@ impl Default for CockpitState {
             wind_from: Radians(0.0),
             controls: ControlInputs::neutral(),
             trim: Some(0.0),
+            service_brakes: Some(0.0),
             replay: false,
             stall: false,
             stall_unavailable: false,
@@ -191,6 +230,9 @@ fn finite(value: f64) -> f64 {
 pub fn dial_angle(dial: Dial, secondary: bool, state: &CockpitState) -> f32 {
     let degrees = match dial {
         Dial::Airspeed => -150.0 + finite(state.airspeed.to_knots().get()).clamp(0.0, 200.0) * 1.5,
+        Dial::JetAirspeed => {
+            -150.0 + finite(state.airspeed.to_knots().get()).clamp(0.0, 400.0) * 0.75
+        }
         Dial::Altitude => {
             finite(state.altitude.to_feet().get()).rem_euclid(if secondary {
                 10000.0
@@ -201,6 +243,11 @@ pub fn dial_angle(dial: Dial, secondary: bool, state: &CockpitState) -> f32 {
         }
         Dial::VerticalSpeed => {
             finite(state.vertical_speed.to_feet_per_minute().get()).clamp(-2000.0, 2000.0) / 2000.0
+                * 135.0
+                - 90.0
+        }
+        Dial::JetVerticalSpeed => {
+            finite(state.vertical_speed.to_feet_per_minute().get()).clamp(-6000.0, 6000.0) / 6000.0
                 * 135.0
                 - 90.0
         }
@@ -236,6 +283,15 @@ pub fn animated_transform(base: Transform, motion: Motion, state: &CockpitState)
             );
             result.translation.x -= state.controls.elevator() as f32 * 0.055;
         }
+        Motion::Stick { pivot } => around(
+            pivot,
+            Quat::from_rotation_x(state.controls.aileron() as f32 * 0.30)
+                * Quat::from_rotation_y(state.controls.elevator() as f32 * 0.30),
+        ),
+        Motion::ThrottleLever { pivot } => around(
+            pivot,
+            Quat::from_rotation_y(-state.controls.throttle() as f32 * 0.70),
+        ),
         Motion::Pedal { right } => {
             result.translation.x +=
                 state.controls.rudder() as f32 * if right { 0.045 } else { -0.045 }
@@ -249,7 +305,7 @@ pub fn animated_transform(base: Transform, motion: Motion, state: &CockpitState)
             pivot,
             Quat::from_rotation_y(state.trim.unwrap_or(0.0) as f32 * 6.0),
         ),
-        Motion::Brake => result.translation.x -= state.controls.brakes() as f32 * 0.025,
+        Motion::Brake => result.translation.x -= state.service_brakes.unwrap_or(0.0) as f32 * 0.025,
         Motion::Hud { pivot } => around(
             pivot,
             Quat::from_rotation_y(if state.show_hud { -0.35 } else { 0.35 }),
@@ -392,6 +448,11 @@ fn add_dial(parts: &mut Vec<CockpitPart>, center: Vec3, radius: f32, dial: Dial)
 /// everything presented as a switch, lever or instrument is functionally bound.
 #[must_use]
 pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
+    interior_parts_for_layout(eye, CockpitLayout::Trainer)
+}
+
+#[must_use]
+pub fn interior_parts_for_layout(eye: [Meters; 3], layout: CockpitLayout) -> Vec<CockpitPart> {
     let eye = Vec3::new(
         eye[0].get() as f32,
         eye[1].get() as f32,
@@ -436,9 +497,17 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
     ));
     parts.push(cuboid(
         "carpet floor",
-        Vec3::new(eye.x + 0.03, 0.0, eye.z + 0.95),
-        Vec3::new(1.30, 0.99, 0.025),
+        Vec3::new(eye.x + 0.07, 0.0, eye.z + 0.95),
+        Vec3::new(1.38, 0.99, 0.025),
         Color::srgb(0.055, 0.065, 0.071),
+    ));
+    // The exterior GLB is hidden in this view. Close the forward footwell so
+    // terrain cannot show through below the panel, clear of full pedal travel.
+    parts.push(cuboid(
+        "forward footwell bulkhead",
+        Vec3::new(eye.x + 0.75, 0.0, eye.z + 0.70),
+        Vec3::new(0.030, 1.03, 0.52),
+        TRIM,
     ));
     for side in [-1.0, 1.0] {
         let y = side * 0.51;
@@ -455,27 +524,29 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
             0.026,
             BLACK,
         ));
-        parts.push(bar(
-            "windscreen pillar",
-            Vec3::new(x + 0.14, y, eye.z + 0.15),
-            Vec3::new(eye.x + 0.12, y * 0.9, eye.z - 0.34),
-            0.025,
-            TRIM,
-        ));
-        parts.push(bar(
-            "door frame",
-            Vec3::new(eye.x - 0.38, y, eye.z + 0.16),
-            Vec3::new(eye.x - 0.40, y, eye.z - 0.31),
-            0.023,
-            TRIM,
-        ));
-        parts.push(bar(
-            "ceiling rail",
-            Vec3::new(eye.x - 0.40, y, eye.z - 0.31),
-            Vec3::new(eye.x + 0.12, y * 0.9, eye.z - 0.34),
-            0.024,
-            TRIM,
-        ));
+        if !layout.sticks() {
+            parts.push(bar(
+                "windscreen pillar",
+                Vec3::new(x + 0.14, y, eye.z + 0.15),
+                Vec3::new(eye.x + 0.12, y * 0.9, eye.z - 0.34),
+                0.025,
+                TRIM,
+            ));
+            parts.push(bar(
+                "door frame",
+                Vec3::new(eye.x - 0.38, y, eye.z + 0.16),
+                Vec3::new(eye.x - 0.40, y, eye.z - 0.31),
+                0.023,
+                TRIM,
+            ));
+            parts.push(bar(
+                "ceiling rail",
+                Vec3::new(eye.x - 0.40, y, eye.z - 0.31),
+                Vec3::new(eye.x + 0.12, y * 0.9, eye.z - 0.34),
+                0.024,
+                TRIM,
+            ));
+        }
         parts.push(cuboid(
             "stitched door insert",
             Vec3::new(eye.x + 0.13, y - side * 0.022, eye.z + 0.47),
@@ -495,61 +566,65 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
             Vec3::new(0.43, 0.41, 0.10),
             Color::srgb(0.16, 0.19, 0.20),
         ));
-        let yoke = Vec3::new(x - 0.18, side * 0.25, eye.z + 0.40);
-        let mut shaft = bar(
-            "yoke steering shaft",
-            yoke + Vec3::X * 0.01,
-            yoke + Vec3::X * 0.23,
-            0.013,
-            METAL,
-        );
-        shaft.motion = Motion::Yoke { pivot: yoke };
-        parts.push(shaft);
-        let mut yoke_parts = vec![part(
-            "contoured yoke boss",
-            Sphere::new(1.0)
-                .mesh()
-                .uv(24, 12)
-                .scaled_by(Vec3::new(0.027, 0.043, 0.030)),
-            yoke,
-            Color::srgb(0.055, 0.065, 0.070),
-        )];
-        // Smoothly joined U-shaped arms and slim grips, rather than a bar with blocks.
-        for hand in [-1.0, 1.0] {
-            let offsets = [
-                Vec3::new(0.0, hand * 0.026, 0.005),
-                Vec3::new(-0.009, hand * 0.063, 0.024),
-                Vec3::new(-0.019, hand * 0.095, 0.025),
-                Vec3::new(-0.025, hand * 0.112, 0.010),
-                Vec3::new(-0.030, hand * 0.115, -0.020),
-                Vec3::new(-0.034, hand * 0.110, -0.057),
-            ];
-            for (i, pair) in offsets.windows(2).enumerate() {
-                let radius = if i >= 3 { 0.013 } else { 0.010 };
-                yoke_parts.push(bar(
-                    "curved yoke arm",
-                    yoke + pair[0],
-                    yoke + pair[1],
-                    radius,
-                    BLACK,
-                ));
-                let mut joint = part(
-                    "rounded yoke joint",
-                    Sphere::new(radius).mesh().uv(12, 8),
-                    yoke + pair[1],
-                    BLACK,
-                );
-                if i >= 3 {
-                    joint.control = Some((CockpitControl::Yoke, Vec2::new(0.032, 0.040)));
+        if layout.sticks() {
+            variants::add_stick(&mut parts, eye, side, layout);
+        } else {
+            let yoke = Vec3::new(x - 0.18, side * 0.25, eye.z + 0.40);
+            let mut shaft = bar(
+                "yoke steering shaft",
+                yoke + Vec3::X * 0.01,
+                yoke + Vec3::X * 0.23,
+                0.013,
+                METAL,
+            );
+            shaft.motion = Motion::Yoke { pivot: yoke };
+            parts.push(shaft);
+            let mut yoke_parts = vec![part(
+                "contoured yoke boss",
+                Sphere::new(1.0)
+                    .mesh()
+                    .uv(24, 12)
+                    .scaled_by(Vec3::new(0.027, 0.043, 0.030)),
+                yoke,
+                Color::srgb(0.055, 0.065, 0.070),
+            )];
+            // Smoothly joined U-shaped arms and slim grips, rather than a bar with blocks.
+            for hand in [-1.0, 1.0] {
+                let offsets = [
+                    Vec3::new(0.0, hand * 0.026, 0.005),
+                    Vec3::new(-0.009, hand * 0.063, 0.024),
+                    Vec3::new(-0.019, hand * 0.095, 0.025),
+                    Vec3::new(-0.025, hand * 0.112, 0.010),
+                    Vec3::new(-0.030, hand * 0.115, -0.020),
+                    Vec3::new(-0.034, hand * 0.110, -0.057),
+                ];
+                for (i, pair) in offsets.windows(2).enumerate() {
+                    let radius = if i >= 3 { 0.013 } else { 0.010 };
+                    yoke_parts.push(bar(
+                        "curved yoke arm",
+                        yoke + pair[0],
+                        yoke + pair[1],
+                        radius,
+                        BLACK,
+                    ));
+                    let mut joint = part(
+                        "rounded yoke joint",
+                        Sphere::new(radius).mesh().uv(12, 8),
+                        yoke + pair[1],
+                        BLACK,
+                    );
+                    if i >= 3 {
+                        joint.control = Some((CockpitControl::Yoke, Vec2::new(0.032, 0.040)));
+                    }
+                    yoke_parts.push(joint);
                 }
-                yoke_parts.push(joint);
             }
+            for p in &mut yoke_parts {
+                p.motion = Motion::Yoke { pivot: yoke };
+            }
+            yoke_parts[0].control = Some((CockpitControl::Yoke, Vec2::new(0.085, 0.065)));
+            parts.extend(yoke_parts);
         }
-        for p in &mut yoke_parts {
-            p.motion = Motion::Yoke { pivot: yoke };
-        }
-        yoke_parts[0].control = Some((CockpitControl::Yoke, Vec2::new(0.085, 0.065)));
-        parts.extend(yoke_parts);
         for right in [false, true] {
             let p = Vec3::new(
                 x - 0.04,
@@ -579,35 +654,51 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
             }
         }
     }
-    parts.push(cuboid(
-        "ceiling headliner",
-        Vec3::new(eye.x - 0.1, 0.0, eye.z - 0.36),
-        Vec3::new(0.85, 0.98, 0.035),
-        TRIM,
-    ));
-    // Standard six-pack layout; the lower-left instrument honestly labels body yaw.
+    if !layout.sticks() {
+        parts.push(cuboid(
+            "ceiling headliner",
+            Vec3::new(eye.x - 0.1, 0.0, eye.z - 0.36),
+            Vec3::new(0.85, 0.98, 0.035),
+            TRIM,
+        ));
+    } else {
+        variants::add_canopy(&mut parts, eye, layout);
+    }
     let r = INSTRUMENT_DIAMETER as f32 * 0.5;
-    for (i, dial) in [
-        Dial::Airspeed,
-        Dial::Attitude,
-        Dial::Altitude,
-        Dial::Turn,
-        Dial::Heading,
-        Dial::VerticalSpeed,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        add_dial(
-            &mut parts,
-            Vec3::new(
-                x - 0.033,
-                eye.y + (i % 3) as f32 * 0.102 - 0.102,
-                eye.z + 0.18 + (i / 3) as f32 * 0.105,
-            ),
-            r,
-            dial,
-        );
+    if layout == CockpitLayout::Sport {
+        variants::add_primary_display(&mut parts, eye);
+    } else {
+        // Standard six-pack layout; the lower-left instrument honestly labels body yaw.
+        for (i, dial) in [
+            if layout == CockpitLayout::JetTrainer {
+                Dial::JetAirspeed
+            } else {
+                Dial::Airspeed
+            },
+            Dial::Attitude,
+            Dial::Altitude,
+            Dial::Turn,
+            Dial::Heading,
+            if layout == CockpitLayout::JetTrainer {
+                Dial::JetVerticalSpeed
+            } else {
+                Dial::VerticalSpeed
+            },
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            add_dial(
+                &mut parts,
+                Vec3::new(
+                    x - 0.033,
+                    eye.y + (i % 3) as f32 * 0.102 - 0.102,
+                    eye.z + 0.18 + (i / 3) as f32 * 0.105,
+                ),
+                r,
+                dial,
+            );
+        }
     }
     for (z, dial) in [(0.19, Dial::Power), (0.295, Dial::Flaps)] {
         add_dial(
@@ -648,25 +739,29 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
         Vec2::new(0.31, 0.025),
         "EAS KT  /  TRUE HDG  /  ELLIPSOID FT",
     );
-    // Throttle has an actual axial stroke. White flap paddle, textured trim wheel.
-    let throttle = Vec3::new(x - 0.14, -0.045, eye.z + 0.445);
-    parts.push(bar(
-        "throttle shaft",
-        throttle,
-        throttle + Vec3::X * 0.105,
-        0.005,
-        METAL,
-    ));
-    let mut knob = disk("working throttle knob", throttle, 0.020, 0.036, BLACK);
-    knob.motion = Motion::Throttle;
-    knob.control = Some((CockpitControl::Throttle, Vec2::splat(0.060)));
-    parts.push(knob);
-    label(
-        &mut parts,
-        Vec3::new(x - 0.028, -0.045, eye.z + 0.405),
-        Vec2::new(0.080, 0.024),
-        "THROTTLE",
-    );
+    if layout == CockpitLayout::JetTrainer {
+        variants::add_jet_throttle(&mut parts, eye);
+    } else {
+        // Throttle has an actual axial stroke. White flap paddle, textured trim wheel.
+        let throttle = Vec3::new(x - 0.14, -0.045, eye.z + 0.445);
+        parts.push(bar(
+            "throttle shaft",
+            throttle,
+            throttle + Vec3::X * 0.105,
+            0.005,
+            METAL,
+        ));
+        let mut knob = disk("working throttle knob", throttle, 0.020, 0.036, BLACK);
+        knob.motion = Motion::Throttle;
+        knob.control = Some((CockpitControl::Throttle, Vec2::splat(0.060)));
+        parts.push(knob);
+        label(
+            &mut parts,
+            Vec3::new(x - 0.028, -0.045, eye.z + 0.405),
+            Vec2::new(0.080, 0.024),
+            "THROTTLE",
+        );
+    }
     let flap = Vec3::new(x - 0.07, 0.14, eye.z + 0.445);
     let mut lever = bar("flap lever", flap, flap - Vec3::X * 0.075, 0.007, METAL);
     lever.motion = Motion::Flaps { pivot: flap };
@@ -741,8 +836,8 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
     );
     for (y, action, text) in [
         (-0.45, CockpitControl::Lighting, "PANEL LIGHT"),
-        (-0.37, CockpitControl::CenterView, "CENTER VIEW"),
-        (-0.29, CockpitControl::Hud, "FLIGHT HUD"),
+        (-0.3625, CockpitControl::CenterView, "CENTER VIEW"),
+        (-0.275, CockpitControl::Hud, "FLIGHT HUD"),
     ] {
         let pivot = Vec3::new(x - 0.035, y, eye.z + 0.423);
         parts.push(disk("switch mounting nut", pivot, 0.008, 0.009, METAL));
@@ -768,6 +863,7 @@ pub fn interior_parts(eye: [Meters; 3]) -> Vec<CockpitPart> {
             text,
         );
     }
+    variants::finish(&mut parts, eye, layout);
     parts
 }
 
@@ -854,6 +950,63 @@ fn panel_mesh(outline: &[(f32, f32)], depth: f32) -> Mesh {
 mod tests {
     use super::*;
     #[test]
+    fn footwell_is_closed_and_bulkhead_clears_full_pedal_travel() {
+        let eye = Vec3::new(0.6, -0.25, -0.9);
+        let bounds = |part: &CockpitPart, pose: Transform| {
+            let Some(bevy::mesh::VertexAttributeValues::Float32x3(vertices)) =
+                part.mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            else {
+                panic!("position vertices")
+            };
+            vertices.iter().fold(
+                (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY)),
+                |(lower, upper), point| {
+                    let point = pose.transform_point(Vec3::from_array(*point));
+                    (lower.min(point), upper.max(point))
+                },
+            )
+        };
+        for layout in [
+            CockpitLayout::Trainer,
+            CockpitLayout::Meadow,
+            CockpitLayout::Sport,
+            CockpitLayout::JetTrainer,
+        ] {
+            let parts =
+                interior_parts_for_layout(eye.to_array().map(|v| Meters(f64::from(v))), layout);
+            let wall = parts
+                .iter()
+                .find(|p| p.name == "forward footwell bulkhead")
+                .unwrap();
+            let floor = parts.iter().find(|p| p.name == "carpet floor").unwrap();
+            let (wall_min, wall_max) = bounds(wall, wall.transform);
+            let (floor_min, floor_max) = bounds(floor, floor.transform);
+            assert!(wall.control.is_none() && wall.display.is_none());
+            assert!(matches!(wall.motion, Motion::Fixed));
+            assert!(wall_min.z < eye.z + 0.525 && wall_max.z > floor_min.z);
+            assert!(floor_max.x > wall_min.x);
+            assert!(wall_min.y < -0.50 && wall_max.y > 0.50);
+            for pedal in parts
+                .iter()
+                .filter(|p| matches!(p.motion, Motion::Pedal { .. }))
+            {
+                for rudder in [-1.0, 0.0, 1.0] {
+                    let state = CockpitState {
+                        controls: ControlInputs::new(0.0, 0.0, rudder, 0.0, 0.0),
+                        ..default()
+                    };
+                    let pose = animated_transform(pedal.transform, pedal.motion, &state);
+                    let (_, pedal_max) = bounds(pedal, pose);
+                    assert!(
+                        pedal_max.x + 0.02 < wall_min.x,
+                        "{layout:?}: {}",
+                        pedal.name
+                    );
+                }
+            }
+        }
+    }
+    #[test]
     fn physical_dials_and_actions_are_real_and_finite() {
         let parts = interior_parts([Meters(0.6), Meters(-0.25), Meters(-0.9)]);
         assert!(parts.len() > 120);
@@ -932,6 +1085,122 @@ mod tests {
                 .translation
                 .x
                 < b.translation.x
+        );
+    }
+    #[test]
+    fn each_layout_has_only_its_own_control_architecture_and_live_displays() {
+        let eye = [Meters(0.2), Meters(-0.25), Meters(-0.8)];
+        for layout in [
+            CockpitLayout::Trainer,
+            CockpitLayout::Meadow,
+            CockpitLayout::Sport,
+            CockpitLayout::JetTrainer,
+        ] {
+            let parts = interior_parts_for_layout(eye, layout);
+            let controls: Vec<_> = parts
+                .iter()
+                .filter_map(|p| p.control.map(|c| c.0))
+                .collect();
+            assert_eq!(controls.contains(&CockpitControl::Stick), layout.sticks());
+            assert_eq!(controls.contains(&CockpitControl::Yoke), !layout.sticks());
+            assert_eq!(
+                parts.iter().any(|p| p.name == "ceiling headliner"),
+                !layout.sticks()
+            );
+            assert_eq!(
+                parts.iter().any(|p| p.display == Some(Display::Primary)),
+                layout == CockpitLayout::Sport
+            );
+            for action in [
+                CockpitControl::Throttle,
+                CockpitControl::Flaps,
+                CockpitControl::Trim,
+                CockpitControl::Brake,
+                CockpitControl::RudderLeft,
+                CockpitControl::RudderRight,
+                CockpitControl::Lighting,
+                CockpitControl::CenterView,
+                CockpitControl::Hud,
+            ] {
+                assert!(controls.contains(&action), "{layout:?}: {action:?}");
+            }
+            assert_eq!(
+                controls
+                    .iter()
+                    .filter(|c| **c == CockpitControl::Throttle)
+                    .count(),
+                1
+            );
+            for part in parts {
+                for elevator in [-1.0, 0.0, 1.0] {
+                    for aileron in [-1.0, 0.0, 1.0] {
+                        let state = CockpitState {
+                            controls: ControlInputs::new(aileron, elevator, 1.0, 1.0, 1.0),
+                            ..default()
+                        };
+                        assert!(
+                            animated_transform(part.transform, part.motion, &state).is_finite()
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn sticks_pull_back_roll_right_and_jet_throttle_advances_forward() {
+        let pivot = Vec3::ZERO;
+        let base = Transform::from_xyz(0.0, 0.0, -0.27);
+        let state = CockpitState {
+            controls: ControlInputs::new(1.0, 1.0, 0.0, 1.0, 0.0),
+            ..default()
+        };
+        let stick = animated_transform(base, Motion::Stick { pivot }, &state);
+        assert!(stick.translation.x < 0.0 && stick.translation.y > 0.0);
+        assert!((stick.translation.length() - base.translation.length()).abs() < 1e-6);
+        let lever = animated_transform(base, Motion::ThrottleLever { pivot }, &state);
+        assert!(lever.translation.x > 0.0);
+        let roll_only = CockpitState {
+            controls: ControlInputs::new(1.0, 0.0, 0.0, 0.0, 0.0),
+            ..default()
+        };
+        let roll = animated_transform(base, Motion::Stick { pivot }, &roll_only);
+        assert!(roll.translation.y > 0.0 && roll.translation.x.abs() < 1e-6);
+        let pitch_only = CockpitState {
+            controls: ControlInputs::new(0.0, 1.0, 0.0, 0.0, 0.0),
+            ..default()
+        };
+        let pitch = animated_transform(base, Motion::Stick { pivot }, &pitch_only);
+        assert!(pitch.translation.x < 0.0 && pitch.translation.y.abs() < 1e-6);
+    }
+    #[test]
+    fn service_brake_handle_does_not_impersonate_parking_brake_or_unknown_replay_state() {
+        let base = Transform::IDENTITY;
+        let mut state = CockpitState {
+            controls: ControlInputs::neutral().with_brakes(1.0),
+            ..default()
+        };
+        assert_eq!(animated_transform(base, Motion::Brake, &state), base);
+        state.service_brakes = Some(1.0);
+        assert!(
+            animated_transform(base, Motion::Brake, &state)
+                .translation
+                .x
+                < 0.0
+        );
+        state.service_brakes = None;
+        state.replay = true;
+        assert_eq!(animated_transform(base, Motion::Brake, &state), base);
+    }
+    #[test]
+    fn jet_scales_are_wider_without_changing_aircraft_limits() {
+        let state = CockpitState {
+            airspeed: Knots(200.0).to_meters_per_second(),
+            vertical_speed: FeetPerMinute(6000.0).to_meters_per_second(),
+            ..default()
+        };
+        assert!(dial_angle(Dial::JetAirspeed, false, &state).abs() < 1e-5);
+        assert!(
+            (dial_angle(Dial::JetVerticalSpeed, false, &state).to_degrees() - 45.0).abs() < 1e-4
         );
     }
 }

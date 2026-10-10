@@ -16,16 +16,23 @@ const DARK: [u8; 4] = [12, 18, 21, 255];
 const AMBER: [u8; 4] = [245, 191, 94, 255];
 struct Canvas {
     data: Vec<u8>,
+    width: i32,
+    height: i32,
 }
 impl Canvas {
     fn new(color: [u8; 4]) -> Self {
+        Self::sized(color, S, S)
+    }
+    fn sized(color: [u8; 4], width: i32, height: i32) -> Self {
         Self {
-            data: color.repeat((S * S) as usize),
+            data: color.repeat((width * height) as usize),
+            width,
+            height,
         }
     }
     fn dot(&mut self, x: i32, y: i32, color: [u8; 4]) {
-        if (0..S).contains(&x) && (0..S).contains(&y) {
-            let p = ((y * S + x) * 4) as usize;
+        if (0..self.width).contains(&x) && (0..self.height).contains(&y) {
+            let p = ((y * self.width + x) * 4) as usize;
             self.data[p..p + 4].copy_from_slice(&color);
         }
     }
@@ -69,7 +76,7 @@ impl Canvas {
     fn centered(&mut self, text: &str, y: i32, scale: i32, color: [u8; 4]) {
         self.text(
             text,
-            (S - text.len() as i32 * 6 * scale) / 2,
+            (self.width - text.len() as i32 * 6 * scale) / 2,
             y,
             scale,
             color,
@@ -97,9 +104,14 @@ impl Canvas {
 }
 #[must_use]
 pub fn display_image(display: Display, state: &CockpitState) -> Image {
-    let mut c = Canvas::new(DARK);
+    let mut c = if display == Display::Primary {
+        Canvas::sized(DARK, 480, 320)
+    } else {
+        Canvas::new(DARK)
+    };
     match display {
         Display::Dial(dial) => draw_dial(&mut c, dial, state),
+        Display::Primary => draw_primary(&mut c, state),
         Display::Flight => {
             c.text("FLIGHT DATA", 10, 10, 3, AMBER);
             let lines = [
@@ -149,16 +161,16 @@ pub fn display_image(display: Display, state: &CockpitState) -> Image {
                     || "TRIM  N/A REPLAY".to_owned(),
                     |t| format!("TRIM  {:+.0}%", t * 100.0),
                 ),
-                format!("BRAKE {:03.0}%", state.controls.brakes() * 100.0),
+                format!("BRK TOT {:03.0}%", state.controls.brakes() * 100.0),
             ];
             for (i, line) in lines.iter().enumerate() {
                 c.text(line, 10, 58 + i as i32 * 40, 2, INK);
             }
             c.text(
                 if state.replay {
-                    "YOKE = EFFECTIVE CMD"
+                    "AXES = EFFECTIVE CMD"
                 } else {
-                    "DRAG KNOBS / YOKES"
+                    "DRAG FLIGHT CONTROLS"
                 },
                 10,
                 226,
@@ -186,11 +198,11 @@ pub fn display_image(display: Display, state: &CockpitState) -> Image {
             lines.len() as i32 * 9 * scale + 8,
         )
     } else {
-        (S, S)
+        (c.width, c.height)
     };
     let mut data = Vec::with_capacity((width * height * 4) as usize);
-    for y in (S - height) / 2..(S - height) / 2 + height {
-        let start = (y * S * 4 + (S - width) / 2 * 4) as usize;
+    for y in (c.height - height) / 2..(c.height - height) / 2 + height {
+        let start = (y * c.width * 4 + (c.width - width) / 2 * 4) as usize;
         data.extend_from_slice(&c.data[start..start + (width * 4) as usize]);
     }
     let mut image = Image::new(
@@ -211,6 +223,110 @@ pub fn display_image(display: Display, state: &CockpitState) -> Image {
     });
     image
 }
+fn draw_primary(c: &mut Canvas, state: &CockpitState) {
+    // Original telemetry-only display: no navigation source, flight director,
+    // synthetic terrain, certified limits or avionics brand is implied.
+    let roll = finite(state.roll.get()) as f32;
+    let offset = finite(state.pitch.get()).to_degrees().clamp(-90.0, 90.0) as f32 * 2.5;
+    for y in 32..255 {
+        for x in 91..367 {
+            let h = (x as f32 - 229.0) * roll.sin() + (y as f32 - 140.0) * roll.cos() - offset;
+            c.dot(
+                x,
+                y,
+                if h.abs() < 1.0 {
+                    INK
+                } else if h < 0.0 {
+                    [56, 125, 169, 255]
+                } else {
+                    [124, 77, 44, 255]
+                },
+            );
+        }
+    }
+    // Clip ladder into the attitude aperture, retaining the same pitch/roll
+    // signs as the mechanical horizon and the flight simulation.
+    for pitch in [-30, -20, -10, 10, 20, 30] {
+        let v = offset - pitch as f32 * 2.5;
+        let width = if pitch % 20 == 0 { 32 } else { 20 };
+        for u in -width..=width {
+            let x = (229.0 + u as f32 * roll.cos() + v * roll.sin()).round() as i32;
+            let y = (140.0 - u as f32 * roll.sin() + v * roll.cos()).round() as i32;
+            if (93..365).contains(&x) && (34..253).contains(&y) {
+                c.dot(x, y, INK);
+            }
+        }
+    }
+    c.line((174.0, 140.0), (216.0, 140.0), AMBER, 3);
+    c.line((242.0, 140.0), (284.0, 140.0), AMBER, 3);
+    c.line((229.0, 133.0), (229.0, 147.0), AMBER, 3);
+    c.text("EAS KT", 8, 10, 2, INK);
+    c.text("ELLIPSOID FT", 326, 10, 2, INK);
+    c.text(
+        &format!(
+            "{:03.0}",
+            finite(state.airspeed.to_knots().get()).clamp(0.0, 999.0)
+        ),
+        8,
+        122,
+        4,
+        INK,
+    );
+    c.text(
+        &format!(
+            "{:06.0}",
+            finite(state.altitude.to_feet().get()).clamp(-99999.0, 999999.0)
+        ),
+        375,
+        126,
+        2,
+        INK,
+    );
+    c.text("VSI FPM", 375, 175, 2, INK);
+    c.text(
+        &format!(
+            "{:+06.0}",
+            finite(state.vertical_speed.to_feet_per_minute().get()).clamp(-99999.0, 99999.0)
+        ),
+        375,
+        200,
+        2,
+        INK,
+    );
+    c.centered(
+        &format!(
+            "TRUE HDG {:03.0}",
+            finite(state.heading.get()).to_degrees().rem_euclid(360.0)
+        ),
+        265,
+        3,
+        INK,
+    );
+    c.text(
+        &format!(
+            "BODY YAW {:+.1} DEG/S",
+            finite(state.yaw_rate.get()).to_degrees()
+        ),
+        8,
+        299,
+        2,
+        AMBER,
+    );
+    c.text(
+        if state.stall {
+            "STALL"
+        } else if state.replay {
+            "REPLAY"
+        } else {
+            "FLIGHT"
+        },
+        388,
+        299,
+        2,
+        AMBER,
+    );
+}
+
 fn draw_dial(c: &mut Canvas, dial: Dial, state: &CockpitState) {
     match dial {
         Dial::Attitude => {
@@ -286,7 +402,7 @@ fn draw_dial(c: &mut Canvas, dial: Dial, state: &CockpitState) {
                 AMBER,
             );
         }
-        Dial::Airspeed => {
+        Dial::Airspeed | Dial::JetAirspeed => {
             for n in 0..=40 {
                 let a = -150.0 + n as f32 * 7.5;
                 c.tick(
@@ -297,7 +413,11 @@ fn draw_dial(c: &mut Canvas, dial: Dial, state: &CockpitState) {
                     if n % 4 == 0 { 3 } else { 1 },
                 );
                 if n % 8 == 0 {
-                    c.number(&format!("{}", n * 5), a, 78.0);
+                    c.number(
+                        &format!("{}", n * if dial == Dial::JetAirspeed { 10 } else { 5 }),
+                        a,
+                        78.0,
+                    );
                 }
             }
             c.centered("EAS", 78, 2, INK);
@@ -321,7 +441,7 @@ fn draw_dial(c: &mut Canvas, dial: Dial, state: &CockpitState) {
             c.centered("100 / 1000 FT", 166, 1, INK);
             c.centered("ELLIPSOID", 186, 1, AMBER);
         }
-        Dial::VerticalSpeed => {
+        Dial::VerticalSpeed | Dial::JetVerticalSpeed => {
             for n in -20i32..=20 {
                 let a = -90.0 + n as f32 * 6.75;
                 c.tick(
@@ -332,7 +452,14 @@ fn draw_dial(c: &mut Canvas, dial: Dial, state: &CockpitState) {
                     if n % 5 == 0 { 3 } else { 1 },
                 );
                 if n % 5 == 0 {
-                    c.number(&format!("{}", n.abs()), a, 77.0);
+                    c.number(
+                        &format!(
+                            "{}",
+                            n.abs() * if dial == Dial::JetVerticalSpeed { 3 } else { 1 }
+                        ),
+                        a,
+                        77.0,
+                    );
                 }
             }
             c.centered("VSI", 88, 2, INK);
@@ -431,6 +558,46 @@ fn glyph(c: char) -> [u8; 7] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn primary_display_has_correct_aspect_and_attitude_signs() {
+        let state = CockpitState {
+            pitch: Radians(20f64.to_radians()),
+            ..default()
+        };
+        let image = display_image(Display::Primary, &state);
+        assert_eq!(image.texture_descriptor.size.width, 480);
+        assert_eq!(image.texture_descriptor.size.height, 320);
+        let p = ((175 * 480 + 240) * 4) as usize;
+        assert_eq!(&image.data.unwrap()[p..p + 3], &[56, 125, 169]);
+        let image = display_image(
+            Display::Primary,
+            &CockpitState {
+                roll: Radians(30f64.to_radians()),
+                ..default()
+            },
+        );
+        let data = image.data.unwrap();
+        let left = ((140 * 480 + 110) * 4) as usize;
+        let right = ((140 * 480 + 350) * 4) as usize;
+        assert_eq!(&data[left..left + 3], &[56, 125, 169]);
+        assert_eq!(&data[right..right + 3], &[124, 77, 44]);
+    }
+    #[test]
+    fn primary_display_changes_with_all_supported_flight_readouts() {
+        let baseline = display_image(Display::Primary, &default()).data;
+        for field in 0..6 {
+            let mut state = CockpitState::default();
+            match field {
+                0 => state.airspeed = Knots(85.0).to_meters_per_second(),
+                1 => state.altitude = Feet(1234.0).to_meters(),
+                2 => state.vertical_speed = FeetPerMinute(-550.0).to_meters_per_second(),
+                3 => state.heading = Radians(1.0),
+                4 => state.yaw_rate = RadiansPerSecond(0.03),
+                _ => state.replay = true,
+            }
+            assert_ne!(display_image(Display::Primary, &state).data, baseline);
+        }
+    }
     #[test]
     fn nose_up_puts_more_sky_in_the_aperture() {
         let image = display_image(
