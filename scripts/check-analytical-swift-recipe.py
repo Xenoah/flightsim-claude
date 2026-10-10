@@ -35,7 +35,7 @@ IDENTITY = tone.ANALYTICAL_SWIFT_RECIPE
 TARGET, TOOLCHAIN = candidate.TARGET, candidate.TOOLCHAIN
 FEATURES = ['analytic-tonemapping', 'commercial-staging']
 CONTRACT = 'scripts/analytical-swift-source-contract.json'
-SOURCE_ADMISSION = 'analytical-swift-alpha22-version-source-admission-v1'
+SOURCE_ADMISSION = 'analytical-swift-cockpit-source-admission-v1'
 SOURCE_RECIPE = tone.TWO_LUT_SOURCE
 SOURCE_PATHS = {
     'Cargo.toml', 'Cargo.lock', 'crates/flightsim-app/Cargo.toml',
@@ -70,6 +70,7 @@ SOURCE_PATHS = {
     'docs/qa/terrain-centroid-source-bindings-2026-10-09.md',
     'scripts/tests/test_terrain_stitch_source_admission.py',
     'scripts/tests/test_alpha22_version_source_admission.py',
+    'scripts/tests/test_cockpit_source_admission.py',
     'scripts/tests/test_dependency_notice_ordering.py',
     'docs/qa/dependency-notice-ordering-2026-10-10.md',
     'docs/qa/terrain-stitch-source-bindings-2026-10-09.md',
@@ -136,7 +137,7 @@ def source_evidence(repo, expected):
             and contract.get('schema_version') == 1 and contract.get('recipe') == IDENTITY
             and contract.get('base_reviewed_source') == candidate.REVIEWED_RUNTIME_SOURCE
             and contract.get('base_reviewed_runtime_tree') == candidate.REVIEWED_RUNTIME_TREE
-            and contract.get('source_migration_sha256') == candidate.ALPHA22_MIGRATION_SHA256
+            and contract.get('source_migration_sha256') == candidate.COCKPIT_MIGRATION_SHA256
             and contract.get('source_admission') == SOURCE_ADMISSION
             and contract.get('source_recipe') == SOURCE_RECIPE
             and contract.get('release_authorized') is False,

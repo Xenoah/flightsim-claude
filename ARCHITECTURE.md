@@ -614,3 +614,15 @@ Light Single cockpit と Swift Sport chase を個別に起動して 2 枚を検�
   複数実マシン LAN / WAN は未確認
 
 詳細は [docs/ROADMAP.md](docs/ROADMAP.md) と [統合 QA](docs/qa/overnight-status-2026-10-01.md)。
+
+
+## State-coupled 3D cockpit (2026-10-10)
+
+The legacy-model cockpit is original body-axis geometry with aircraft-local
+instrument surfaces and moving controls. App owns picking, fixed-step input
+merging, replay/live control selection and scene asset lifetime; render owns
+only geometry/artwork/presentation. No FDM or replay law changes. Read
+[ADR-0033](docs/adr/0033-state-coupled-3d-cockpit.md) and the
+[control and instrument inventory](docs/3d-cockpit.md). The active 3D panel
+suppresses the old screen-fixed six-pack; bounded-model interiors retain their
+existing fallback. HUD decluttering never owns critical notices or attribution.

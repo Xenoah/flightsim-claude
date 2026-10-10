@@ -75,7 +75,6 @@ mod aircraft_profile_schema_contract;
 mod aircraft_scene;
 mod airport_drape_runtime;
 mod cloud_runtime;
-mod cockpit_runtime;
 mod component_terms;
 mod distance_runtime;
 mod distribution;
@@ -1032,7 +1031,6 @@ fn main() -> bevy::app::AppExit {
     aircraft_picker_runtime::configure(&mut app);
     configure_live_input_scheduling(&mut app);
     configure_flight_presentation(&mut app);
-    cockpit_runtime::configure(&mut app);
 
     if headless {
         app.add_plugins(bevy::app::ScheduleRunnerPlugin::run_loop(
@@ -3713,7 +3711,6 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut terrain_materials: ResMut<Assets<flightsim_render::terrain_detail::TerrainMaterial>>,
     mut media: ResMut<Assets<ScatteringMedium>>,
-    mut images: ResMut<Assets<Image>>,
     lighting: Res<flightsim_render::SunLighting>,
     sun: Res<SunDirection>,
 ) {
@@ -4333,7 +4330,6 @@ fn setup(
         &simulation,
         &mut meshes,
         &mut materials,
-        &mut images,
         false,
     );
     // The launch choice must retain the scene actually accepted at startup,
@@ -4582,7 +4578,6 @@ fn update_camera(
     playback: Option<Res<ReplayPlayback>>,
     mut was_seeking: Local<bool>,
     mut previous_frame: Local<Option<flightsim_core::RenderFrame>>,
-    cockpit: Option<Res<cockpit_runtime::CockpitInteraction>>,
     mut rig: ResMut<CameraRig>,
     mut camera: Query<&mut Transform, With<Camera3d>>,
     aircraft: Query<&Transform, (With<Aircraft>, Without<Camera3d>)>,
@@ -4643,11 +4638,7 @@ fn update_camera(
                 rig.eye_offset[2].get() as f32,
             );
             camera.translation = aircraft.translation + aircraft.rotation * offset;
-            camera.rotation = aircraft.rotation
-                * cockpit
-                    .as_ref()
-                    .map_or(Quat::IDENTITY, |c| c.view_rotation())
-                * flightsim_render::body_to_camera_rotation();
+            camera.rotation = aircraft.rotation * flightsim_render::body_to_camera_rotation();
         }
         ViewMode::Chase => {
             #[allow(

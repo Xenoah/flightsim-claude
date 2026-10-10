@@ -387,11 +387,6 @@ pub struct InstrumentReadout(pub Instrument);
 #[derive(Component, Debug, Clone, Copy)]
 pub struct DialFace;
 
-/// App announces an active aircraft-local 3D panel. Standalone UI and aircraft
-/// without that panel retain the accessible 2D fallback.
-#[derive(Resource, Debug, Default)]
-pub struct CockpitPanel3d(pub bool);
-
 /// 計器盤を組み立てる。
 ///
 /// **画面下端の中央**に横並び。左上の計器列・右上の着陸評価・
@@ -569,10 +564,9 @@ fn spawn_needles(dial: &mut ChildSpawnerCommands, instrument: Instrument) {
 /// コックピット視点のときだけ計器盤を出す。
 pub fn update_instrument_visibility(
     state: Res<HudState>,
-    panel3d: Option<Res<CockpitPanel3d>>,
     mut panels: Query<&mut Visibility, With<InstrumentPanel>>,
 ) {
-    let wanted = if state.view_mode == "COCKPIT" && !panel3d.is_some_and(|p| p.0) {
+    let wanted = if state.view_mode == "COCKPIT" {
         Visibility::Inherited
     } else {
         Visibility::Hidden

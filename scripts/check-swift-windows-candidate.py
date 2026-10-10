@@ -43,7 +43,8 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
-REPLAY_CONTRACT_ID = "full-two-aircraft-alpha22-version-source-v1"
+ALPHA22_REPLAY_CONTRACT_ID = "full-two-aircraft-alpha22-version-source-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-cockpit-source-v1"
 REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
 REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
 SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
@@ -134,6 +135,25 @@ HISTORICAL_RUNTIME_RELOCATIONS = {
     COMPONENT_TERMS_MAIN_PATH: COMPONENT_TERMS_HISTORY_PATH,
     TERRAIN_CENTROID_DETAIL_PATH: TERRAIN_CENTROID_HISTORY_PATH,
     **TERRAIN_STITCH_HISTORICAL_RELOCATIONS,
+}
+# Fifth, source-only migration: four state-coupled cockpit replacements and
+# two exact runtime helpers. The published base and all seven witnesses remain
+# immutable; no source migration is native, rights or publication evidence.
+COCKPIT_MIGRATION_PATH = "scripts/cockpit-source-migration.json"
+COCKPIT_MIGRATION_SHA256 = "9086bfdc723889ca94a388e6b61111a2174703badf48e0afadc9375c78127814"
+COCKPIT_BASE_CONTRACT_PATH = "scripts/history/be587384-replay-candidate-contract.json"
+COCKPIT_BASE_CONTRACT_HASHES = {'scripts/history/be587384-replay-candidate-contract.json': 'd5575c552cdf2522da4a2e8a50c9b41ff800632dae55138700bbed3b165e7412', 'scripts/history/be587384-analytical-swift-source-contract.json': 'f018b328d06f464f7d30d3a272dba49ac00a98bd8ad96c7b846a6b09fc46a173', 'scripts/history/be587384-analytical-swift-capture-contract.json': 'ae3b0831127698b2f2fd38f1675176cee1a7a730b7dbd953d9e8c3d76df95eff'}
+COCKPIT_HISTORICAL_RELOCATIONS = {'crates/flightsim-app/src/main.rs': 'scripts/history/be587384-flightsim-app-main.rs', 'crates/flightsim-app/src/aircraft_scene.rs': 'scripts/history/be587384-aircraft_scene.rs', 'crates/flightsim-render/src/cockpit.rs': 'scripts/history/be587384-cockpit.rs', 'crates/flightsim-ui/src/instruments.rs': 'scripts/history/be587384-instruments.rs'}
+COCKPIT_PREVIOUS_SHA256 = {'crates/flightsim-app/src/main.rs': 'e7a8480d1a4f5af9a0e14c982fe1645ac94cc5748a9f224edc00e3f63d48aada', 'crates/flightsim-app/src/aircraft_scene.rs': '23cdbd0bc5fde9182c3704827fb997f68225c524871f0a00819642a93eb53f60', 'crates/flightsim-render/src/cockpit.rs': '769673b6a930280d657b90fde65821ba3443d8505da46d14d742a7e7a96a702d', 'crates/flightsim-ui/src/instruments.rs': '9295167b8c1c4089b441f92c36510884fc863a993d5f8882267ef32e9b1e2ab4'}
+COCKPIT_RUNTIME_PATHS = frozenset(['crates/flightsim-app/src/cockpit_runtime.rs', 'crates/flightsim-render/src/cockpit/texture.rs'])
+COCKPIT_SOURCE_PATHS = frozenset({
+    COCKPIT_MIGRATION_PATH, *COCKPIT_BASE_CONTRACT_HASHES,
+    *COCKPIT_HISTORICAL_RELOCATIONS.values(), *COCKPIT_RUNTIME_PATHS,
+})
+# The oldest main.rs witness remains the component-terms witness. Other newly
+# replaced preserved files now have their own exact published-base witnesses.
+CURRENT_HISTORICAL_RUNTIME_RELOCATIONS = {
+    **COCKPIT_HISTORICAL_RELOCATIONS, **HISTORICAL_RUNTIME_RELOCATIONS,
 }
 # The reviewed additive jet/turboprop exports change this file, but no legacy FDM
 # body. Keep a literal full-file guard; the historical lib hash above never moves.
@@ -1187,6 +1207,8 @@ REPLAY_CONTRACT_PATHS |= (TERRAIN_CENTROID_RUNTIME_PATHS
                           | {TERRAIN_CENTROID_MIGRATION_PATH, TERRAIN_CENTROID_HISTORY_PATH})
 REPLAY_CONTRACT_PATHS |= TERRAIN_STITCH_SOURCE_PATHS
 REPLAY_CONTRACT_PATHS |= ALPHA22_SOURCE_PATHS
+ALPHA22_REPLAY_CONTRACT_PATHS = frozenset(REPLAY_CONTRACT_PATHS)
+REPLAY_CONTRACT_PATHS |= COCKPIT_SOURCE_PATHS
 
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -1365,14 +1387,16 @@ def git(repo, *args):
 
 
 # Cargo auto-discovers build scripts, binary/example/benchmark targets. These
-# retain 492 preserved members, two component-terms inputs and one terrain test.
+# retain 492 preserved members, two terms inputs, one terrain test and two
+# explicitly reviewed cockpit helpers.
 # No on-disk glob can admit additional build, binary, example or benchmark files.
 PRESERVED_CRATE_SOURCE_PATHS = frozenset(path for path in REPLAY_CONTRACT_PATHS
                                        if path.startswith("crates/")
                                        and path not in (COMPONENT_TERMS_RUNTIME_PATHS
-                                                        | TERRAIN_CENTROID_RUNTIME_PATHS))
+                                                        | TERRAIN_CENTROID_RUNTIME_PATHS
+                                                        | COCKPIT_RUNTIME_PATHS))
 CURRENT_CRATE_SOURCE_PATHS = (PRESERVED_CRATE_SOURCE_PATHS | COMPONENT_TERMS_RUNTIME_PATHS
-                              | TERRAIN_CENTROID_RUNTIME_PATHS)
+                              | TERRAIN_CENTROID_RUNTIME_PATHS | COCKPIT_RUNTIME_PATHS)
 MODIFIED_SOURCE_BOUNDARIES = (
     ("crates/", CURRENT_CRATE_SOURCE_PATHS),
     ("docs/release/components/", COMPONENT_TERMS_DOCUMENT_PATHS),
@@ -1480,12 +1504,12 @@ def validate_alpha22_version_delta(previous, current):
                 "alpha22 version bytes differ outside approved substitutions: " + path)
 
 
-def validate_replay_contract(contract):
+def validate_alpha22_replay_contract(contract):
     require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
             "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
             "scope", "release_authorized", "source_sha256"}
             and type(contract.get("schema_version")) is int and contract.get("schema_version") == 1
-            and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
+            and contract.get("contract") == ALPHA22_REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
     require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
             and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
             and contract.get("source_migration_sha256") == ALPHA22_MIGRATION_SHA256
@@ -1494,7 +1518,7 @@ def validate_replay_contract(contract):
     require(isinstance(contract.get("base_reviewed_source"), str)
             and re.fullmatch(r"[0-9a-f]{40}", contract["base_reviewed_source"]), "missing reviewed replay source")
     pins = contract.get("source_sha256")
-    require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
+    require(isinstance(pins, dict) and set(pins) == ALPHA22_REPLAY_CONTRACT_PATHS,
             "reviewed replay source boundary changed")
     require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) for value in pins.values()),
             "invalid reviewed replay source digest")
@@ -1626,7 +1650,7 @@ def validate_replay_contract(contract):
     base_pins = base_contract["source_sha256"]
     require(base_contract["contract"] == "full-two-aircraft-terrain-centroid-source-v1"
             and base_contract["source_migration_sha256"] == TERRAIN_CENTROID_MIGRATION_SHA256
-            and set(base_pins) == REPLAY_CONTRACT_PATHS - TERRAIN_STITCH_SOURCE_PATHS - ALPHA22_SOURCE_PATHS
+            and set(base_pins) == ALPHA22_REPLAY_CONTRACT_PATHS - TERRAIN_STITCH_SOURCE_PATHS - ALPHA22_SOURCE_PATHS
             and all(pins.get(ALPHA22_HISTORICAL_RELOCATIONS.get(
                         path, TERRAIN_STITCH_HISTORICAL_RELOCATIONS.get(path, path))) == value
                     for path, value in base_pins.items()),
@@ -1664,7 +1688,7 @@ def validate_replay_contract(contract):
     require(previous_contract["contract"] == "full-two-aircraft-terrain-stitch-source-v1"
             and previous_contract["source_migration_sha256"] == TERRAIN_STITCH_MIGRATION_SHA256
             and len(previous_pins) == 934
-            and set(previous_pins) == REPLAY_CONTRACT_PATHS - ALPHA22_SOURCE_PATHS
+            and set(previous_pins) == ALPHA22_REPLAY_CONTRACT_PATHS - ALPHA22_SOURCE_PATHS
             and all(pins.get(ALPHA22_HISTORICAL_RELOCATIONS.get(path, path)) == value
                     for path, value in previous_pins.items()),
             "alpha22 prior source pins changed")
@@ -1685,6 +1709,82 @@ def validate_replay_contract(contract):
         require(replacements[path] == {"previous_sha256": previous, "sha256": expected}
                 and pins[path] == expected, "alpha22 version replacement changed: " + path)
     validate_alpha22_version_delta(previous_bytes, current_bytes)
+    return contract
+
+def validate_replay_contract(contract):
+    """Admit exactly the frozen cockpit delta over the complete alpha.22 proof."""
+    require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
+            "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
+            "scope", "release_authorized", "source_sha256"}
+            and type(contract.get("schema_version")) is int and contract["schema_version"] == 1
+            and contract.get("contract") == REPLAY_CONTRACT_ID,
+            "invalid reviewed replay contract")
+    require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
+            and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
+            and contract.get("source_migration_sha256") == COCKPIT_MIGRATION_SHA256
+            and contract.get("scope") == SOURCE_ADMISSION_SCOPE
+            and contract.get("release_authorized") is False,
+            "source admission identity or scope changed")
+    pins = contract.get("source_sha256")
+    require(isinstance(pins, dict) and set(pins) == REPLAY_CONTRACT_PATHS,
+            "reviewed replay source boundary changed")
+    require(all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+                for value in pins.values()), "invalid reviewed replay source digest")
+    # Keep the existing current-contract physics guards and diagnostics explicit;
+    # the historical proof below independently retains the same frozen anchors.
+    for path in ("assets/aircraft/light_single.json", "crates/flightsim-fdm/src/aircraft.rs"):
+        require(pins[path] == LEGACY_SOURCE_HASHES[path], "frozen legacy input changed: " + path)
+    require(pins["crates/flightsim-fdm/src/lib.rs"] == REVIEWED_ADDITIVE_FDM_LIB_SHA256,
+            "frozen reviewed FDM module input changed")
+    root = Path(__file__).parent.parent
+    for path, expected in COCKPIT_BASE_CONTRACT_HASHES.items():
+        require(digest(root / path) == expected and pins[path] == expected,
+                "cockpit historical contract changed: " + path)
+    previous = json.loads((root / COCKPIT_BASE_CONTRACT_PATH).read_text(encoding="utf-8"))
+    # This invokes every existing migration, preserved runtime and physics guard
+    # against the byte-exact historical contract, without rewriting any history.
+    validate_alpha22_replay_contract(previous)
+    previous_pins = previous["source_sha256"]
+    require(len(previous_pins) == 940
+            and set(previous_pins) == REPLAY_CONTRACT_PATHS - COCKPIT_SOURCE_PATHS,
+            "cockpit prior source boundary changed")
+    for path, expected in previous_pins.items():
+        historical = COCKPIT_HISTORICAL_RELOCATIONS.get(path, path)
+        require(pins.get(historical) == expected,
+                "cockpit prior source pins changed (preserved runtime/historical contract): " + path)
+    require(digest(root / COCKPIT_MIGRATION_PATH) == COCKPIT_MIGRATION_SHA256
+            and pins[COCKPIT_MIGRATION_PATH] == COCKPIT_MIGRATION_SHA256,
+            "cockpit source migration changed")
+    migration = json.loads((root / COCKPIT_MIGRATION_PATH).read_text(encoding="utf-8"))
+    require(set(migration) == {"schema_version", "identity", "base_source", "base_tree",
+            "base_source_kind", "base_contract_sha256", "previous_source_migration_sha256",
+            "preserved_runtime_sha256", "historical_relocations", "replaced_source_sha256",
+            "added_source_sha256"}
+            and type(migration["schema_version"]) is int and migration["schema_version"] == 1
+            and migration["identity"] == "full-two-aircraft-cockpit-source-migration-v1"
+            and migration["base_source"] == "be5873840dc86eb551971bad6e7290840eaf9cd2"
+            and migration["base_tree"] == "49479664f838700cf52ed7621a727db7732752e2"
+            and migration["base_source_kind"] == "published-commit"
+            and migration["base_contract_sha256"] == COCKPIT_BASE_CONTRACT_HASHES
+            and migration["previous_source_migration_sha256"] == ALPHA22_MIGRATION_SHA256
+            and migration["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256
+            and migration["historical_relocations"] == COCKPIT_HISTORICAL_RELOCATIONS,
+            "invalid cockpit source migration identity")
+    replacements = migration["replaced_source_sha256"]
+    require(isinstance(replacements, dict) and set(replacements) == set(COCKPIT_PREVIOUS_SHA256),
+            "cockpit replacement boundary changed")
+    for path, expected in COCKPIT_PREVIOUS_SHA256.items():
+        historical = COCKPIT_HISTORICAL_RELOCATIONS[path]
+        row = replacements[path]
+        require(isinstance(row, dict) and set(row) == {"previous_sha256", "sha256"}
+                and row["previous_sha256"] == expected == previous_pins[path]
+                and digest(root / historical) == expected == pins[historical]
+                and row["sha256"] != expected and pins[path] == row["sha256"],
+                "cockpit replacement changed: " + path)
+    additions = migration["added_source_sha256"]
+    require(isinstance(additions, dict) and set(additions) == COCKPIT_RUNTIME_PATHS
+            and all(pins.get(path) == expected for path, expected in additions.items()),
+            "cockpit source additions changed")
     return contract
 
 

@@ -36,7 +36,8 @@ class Alpha22VersionSourceAdmissionTests(unittest.TestCase):
                 {path: (ROOT / path).read_bytes() for path in CHANGED})
 
     def test_exact_two_file_transition_preserves_all_934_prior_pins(self):
-        contract = candidate.load_replay_contract(ROOT)
+        candidate.load_replay_contract(ROOT)
+        contract = json.loads((ROOT / candidate.COCKPIT_BASE_CONTRACT_PATH).read_text())
         base = json.loads((ROOT / candidate.ALPHA22_BASE_CONTRACT_PATH).read_text())
         migration = json.loads((ROOT / candidate.ALPHA22_MIGRATION_PATH).read_text())
         self.assertEqual(candidate.ALPHA22_SOURCE_PATHS, ADDED)
@@ -57,7 +58,7 @@ class Alpha22VersionSourceAdmissionTests(unittest.TestCase):
         for path, expected in base['source_sha256'].items():
             historical = RELOCATIONS.get(path, path)
             self.assertEqual(contract['source_sha256'][historical], expected, path)
-            self.assertEqual(candidate.digest(ROOT / historical), expected, path)
+            self.assertEqual(candidate.digest(ROOT / candidate.COCKPIT_HISTORICAL_RELOCATIONS.get(historical, historical)), expected, path)
         for path, expected in candidate.ALPHA22_BASE_CONTRACT_HASHES.items():
             self.assertEqual(candidate.digest(ROOT / path), expected)
         for path in CHANGED:
@@ -66,7 +67,7 @@ class Alpha22VersionSourceAdmissionTests(unittest.TestCase):
                 'sha256': candidate.digest(ROOT / path),
             })
         candidate.validate_alpha22_version_delta(*self.version_bytes())
-        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 495)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(json.loads((ROOT / candidate.PRESERVED_RUNTIME_PATH).read_text())['source_sha256']), 497)
         self.assertIs(contract['release_authorized'], False)

@@ -14,7 +14,6 @@ struct StagedInterior;
 struct OwnedAircraftAssets {
     meshes: Vec<Handle<Mesh>>,
     materials: Vec<Handle<StandardMaterial>>,
-    images: Vec<Handle<Image>>,
 }
 
 pub(super) struct AircraftScene {
@@ -29,10 +28,6 @@ pub(super) struct AircraftScene {
 /// Startup and new flights share geometry construction, while their activation
 /// markers and readiness rules remain explicit. Only generated assets are owned
 /// here; GLB assets follow the asset server's strong-handle lifecycle.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "aircraft owner tracks meshes, materials and images through the existing scene transaction"
-)]
 pub(super) fn spawn(
     commands: &mut Commands,
     server: &AssetServer,
@@ -40,7 +35,6 @@ pub(super) fn spawn(
     simulation: &FlightSession,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    images: &mut Assets<Image>,
     staged: bool,
 ) -> AircraftScene {
     let mut owned = OwnedAircraftAssets::default();
@@ -96,23 +90,15 @@ pub(super) fn spawn(
         flightsim_render::cockpit::interior_parts(startup.aircraft.camera_eye())
     };
     for part in interior {
-        let image = part.display.map(|display| {
-            images.add(flightsim_render::cockpit::display_image(
-                display,
-                &default(),
-            ))
-        });
-        if let Some(image) = &image {
-            owned.images.push(image.clone());
-        }
         let mesh = meshes.add(part.mesh);
         let material = materials.add(StandardMaterial {
             base_color: part.color,
-            perceptual_roughness: if part.metallic > 0.0 { 0.38 } else { 0.78 },
-            emissive_exposure_weight: 0.0,
-            metallic: part.metallic,
-            base_color_texture: image.clone(),
-            unlit: image.is_some(),
+            perceptual_roughness: 0.85,
+            emissive: if part.emissive {
+                LinearRgba::from(part.color) * 0.6
+            } else {
+                LinearRgba::BLACK
+            },
             ..default()
         });
         owned.meshes.push(mesh.clone());
@@ -124,29 +110,6 @@ pub(super) fn spawn(
             Visibility::Hidden,
             Name::new(part.name),
         ));
-        if part.display.is_none() {
-            entity.insert(cockpit_runtime::CabinMaterial(part.color));
-        }
-        if matches!(
-            part.motion,
-            flightsim_render::cockpit::Motion::Needle { .. }
-        ) {
-            entity.insert(cockpit_runtime::IlluminatedNeedle);
-        }
-        entity.insert(cockpit_runtime::AnimatedPart {
-            base: part.transform,
-            motion: part.motion,
-        });
-        if let Some((action, size)) = part.control {
-            entity.insert(cockpit_runtime::HitTarget {
-                action,
-                size,
-                inverse_rest_rotation: part.transform.rotation.inverse(),
-            });
-        }
-        if let (Some(display), Some(image)) = (part.display, image) {
-            entity.insert(cockpit_runtime::PanelDisplay { display, image });
-        }
         if staged {
             entity.insert(StagedInterior);
         } else {
@@ -210,10 +173,6 @@ pub(super) fn stage(
         world.insert_resource(meshes);
         return Err("Aircraft material storage is unavailable".into());
     };
-    world.init_resource::<Assets<Image>>();
-    let mut images = world
-        .remove_resource::<Assets<Image>>()
-        .expect("initialized image storage");
     let mut queue = CommandQueue::default();
     let scene = spawn(
         &mut Commands::new(&mut queue, world),
@@ -222,13 +181,11 @@ pub(super) fn stage(
         &prepared.simulation,
         &mut meshes,
         &mut materials,
-        &mut images,
         true,
     );
     queue.apply(world);
     world.insert_resource(meshes);
     world.insert_resource(materials);
-    world.insert_resource(images);
     Ok(scene)
 }
 
@@ -437,60 +394,9 @@ fn despawn(world: &mut World, root: Entity) {
     for mesh in owned.meshes {
         world.resource_mut::<Assets<Mesh>>().remove(&mesh);
     }
-    for image in owned.images {
-        world.resource_mut::<Assets<Image>>().remove(&image);
-    }
     for material in owned.materials {
         world
             .resource_mut::<Assets<StandardMaterial>>()
             .remove(&material);
-    }
-}
-
-#[cfg(test)]
-mod cockpit_asset_tests {
-    use super::*;
-
-    #[test]
-    fn cockpit_cleanup_releases_only_the_cancelled_aircraft_assets() {
-        let mut world = World::new();
-        world.init_resource::<Assets<Mesh>>();
-        world.init_resource::<Assets<StandardMaterial>>();
-        world.init_resource::<Assets<Image>>();
-        let unrelated = world.resource_mut::<Assets<Image>>().add(Image::default());
-        let image =
-            world
-                .resource_mut::<Assets<Image>>()
-                .add(flightsim_render::cockpit::display_image(
-                    flightsim_render::cockpit::Display::Flight,
-                    &default(),
-                ));
-        let mesh = world.resource_mut::<Assets<Mesh>>().add(Cuboid::default());
-        let material = world
-            .resource_mut::<Assets<StandardMaterial>>()
-            .add(StandardMaterial {
-                base_color_texture: Some(image.clone()),
-                ..default()
-            });
-        let root = world
-            .spawn(OwnedAircraftAssets {
-                meshes: vec![mesh.clone()],
-                materials: vec![material.clone()],
-                images: vec![image.clone()],
-            })
-            .id();
-        let child = world.spawn((ChildOf(root), StagedInterior)).id();
-        despawn(&mut world, root);
-        assert!(world.get_entity(root).is_err());
-        assert!(world.get_entity(child).is_err());
-        assert!(world.resource::<Assets<Mesh>>().get(&mesh).is_none());
-        assert!(
-            world
-                .resource::<Assets<StandardMaterial>>()
-                .get(&material)
-                .is_none()
-        );
-        assert!(world.resource::<Assets<Image>>().get(&image).is_none());
-        assert!(world.resource::<Assets<Image>>().get(&unrelated).is_some());
     }
 }

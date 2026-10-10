@@ -76,15 +76,16 @@ class ComponentTermsSourceAdmissionTests(unittest.TestCase):
         self.assertEqual(candidate.digest(ROOT / HISTORY), previous)
         self.assertEqual(migration['replaced_source_sha256'][MAIN]['previous_sha256'], previous)
         self.assertNotEqual(candidate.digest(ROOT / MAIN), previous)
-        self.assertEqual(migration['replaced_source_sha256'][MAIN]['sha256'], candidate.digest(ROOT / MAIN))
+        self.assertEqual(migration['replaced_source_sha256'][MAIN]['sha256'],
+                         candidate.digest(ROOT / candidate.COCKPIT_HISTORICAL_RELOCATIONS[MAIN]))
         frozen = json.loads((ROOT / candidate.PRESERVED_RUNTIME_PATH).read_text())['source_sha256']
         self.assertEqual(len(frozen), 497)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 495)
+        self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
         for relative, expected in frozen.items():
-            actual_path = candidate.HISTORICAL_RUNTIME_RELOCATIONS.get(relative, relative)
+            actual_path = candidate.CURRENT_HISTORICAL_RUNTIME_RELOCATIONS.get(relative, relative)
             self.assertEqual(contract['source_sha256'][actual_path], expected, relative)
             self.assertEqual(candidate.digest(ROOT / actual_path), expected, relative)
         for relative in {MAIN, HISTORY} | RUNTIME | TERMS | LICENSES:
@@ -94,15 +95,15 @@ class ComponentTermsSourceAdmissionTests(unittest.TestCase):
         replay = candidate.load_replay_contract(ROOT)
         analytical = json.loads((ROOT / capture.check.CONTRACT).read_text())
         captured = json.loads((ROOT / capture.CONTRACT).read_text())
-        self.assertEqual(replay['contract'], 'full-two-aircraft-alpha22-version-source-v1')
-        self.assertEqual(analytical['source_admission'], 'analytical-swift-alpha22-version-source-admission-v1')
-        self.assertEqual(captured['source_admission'], 'analytical-swift-alpha22-version-capture-source-admission-v1')
+        self.assertEqual(replay['contract'], 'full-two-aircraft-cockpit-source-v1')
+        self.assertEqual(analytical['source_admission'], 'analytical-swift-cockpit-source-admission-v1')
+        self.assertEqual(captured['source_admission'], 'analytical-swift-cockpit-capture-source-admission-v1')
         for contract in (replay, analytical, captured):
             self.assertNotIn('reviewed_source', contract)
             self.assertNotIn('reviewed_runtime_tree', contract)
             self.assertEqual(contract['base_reviewed_source'], '960c3126e6a4bc22b8d4acc6e6737f8f2b473bef')
             self.assertEqual(contract['base_reviewed_runtime_tree'], 'b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e')
-            self.assertEqual(contract['source_migration_sha256'], candidate.digest(ROOT / candidate.ALPHA22_MIGRATION_PATH))
+            self.assertEqual(contract['source_migration_sha256'], candidate.digest(ROOT / candidate.COCKPIT_MIGRATION_PATH))
         self.assertIs(replay['release_authorized'], False)
         self.assertIs(analytical['release_authorized'], False)
         with self.assertRaises(ValueError):
