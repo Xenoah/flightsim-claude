@@ -71,7 +71,7 @@ class TerrainStitchSourceAdmissionTests(unittest.TestCase):
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(capture.check.SOURCE_PATHS), 54)
+        self.assertEqual(len(capture.check.SOURCE_PATHS), 55)
         self.assertEqual(len(capture.BOUND_FILES), 4)
         self.assertIs(contract['release_authorized'], False)
 

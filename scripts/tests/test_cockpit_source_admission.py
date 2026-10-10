@@ -42,7 +42,9 @@ class CockpitSourceAdmissionTests(unittest.TestCase):
     commit = staticmethod(fixture_module.ComponentTermsSourceAdmissionTests.commit)
 
     def test_exact_delta_preserves_all_940_prior_pins_and_seven_witnesses(self):
-        current = candidate.load_replay_contract(ROOT)
+        candidate.load_replay_contract(ROOT)
+        current = json.loads((ROOT / candidate.ALPHA23_BASE_CONTRACT_PATH).read_text())
+        candidate.validate_cockpit_replay_contract(current)
         base = json.loads((ROOT / candidate.COCKPIT_BASE_CONTRACT_PATH).read_text())
         migration = json.loads((ROOT / candidate.COCKPIT_MIGRATION_PATH).read_text())
         candidate.validate_alpha22_replay_contract(base)
@@ -67,7 +69,7 @@ class CockpitSourceAdmissionTests(unittest.TestCase):
         for path, expected in base['source_sha256'].items():
             historical = RELOCATIONS.get(path, path)
             self.assertEqual(current['source_sha256'][historical], expected, path)
-            self.assertEqual(candidate.digest(ROOT / historical), expected, path)
+            self.assertEqual(candidate.digest(ROOT / candidate.ALPHA23_HISTORICAL_RELOCATIONS.get(historical, historical)), expected, path)
         for path in CHANGED:
             self.assertEqual(migration['replaced_source_sha256'][path], {
                 'previous_sha256': base['source_sha256'][path], 'sha256': candidate.digest(ROOT / path)})
@@ -78,7 +80,7 @@ class CockpitSourceAdmissionTests(unittest.TestCase):
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(capture.check.SOURCE_PATHS), 54)
+        self.assertEqual(len(capture.check.SOURCE_PATHS), 55)
         self.assertEqual(len(capture.BOUND_FILES), 4)
         self.assertIs(current['release_authorized'], False)
 
@@ -126,9 +128,10 @@ class CockpitSourceAdmissionTests(unittest.TestCase):
         paths |= {path for path in base if path.startswith(('crates/flightsim-fdm/', 'crates/flightsim-sim/'))}
         for path in paths:
             expected = base.get(path, candidate.INDEPENDENT_REPLAY_HASHES.get(path))
-            self.assertEqual(candidate.digest(ROOT / path), expected, path)
+            historical = candidate.ALPHA23_HISTORICAL_RELOCATIONS.get(path, path)
+            self.assertEqual(candidate.digest(ROOT / historical), expected, path)
             if path in base:
-                self.assertEqual(current[path], expected, path)
+                self.assertEqual(current[historical], expected, path)
 
     def test_missing_aliased_and_extra_contract_members_are_rejected(self):
         positive = candidate.load_replay_contract(ROOT)

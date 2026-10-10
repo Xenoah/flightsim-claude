@@ -54,7 +54,7 @@ class TerrainCentroidSourceAdmissionTests(unittest.TestCase):
             relative = candidate.CURRENT_HISTORICAL_RUNTIME_RELOCATIONS.get(path, path)
             self.assertEqual(contract['source_sha256'][relative], expected)
             self.assertEqual(candidate.digest(ROOT / relative), expected)
-        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS - candidate.TERRAIN_STITCH_SOURCE_PATHS
+        self.assertEqual(len(candidate.COCKPIT_REPLAY_CONTRACT_PATHS - candidate.TERRAIN_STITCH_SOURCE_PATHS
                              - candidate.ALPHA22_SOURCE_PATHS - candidate.COCKPIT_SOURCE_PATHS), 930)
         self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 497)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)

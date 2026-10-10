@@ -3,17 +3,17 @@
   "base_reviewed_source": "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef",
   "identity": "analytical-swift-msvc-build-capture-v1",
   "inherited_contracts": {
-    "scripts/analytical-swift-source-contract.json": "5317070ebc7c70eb1c62cd66c1d49805f7ef8652f0d60b703fd45730723f734f",
-    "scripts/replay-candidate-contract.json": "469a2e07f14d566a6c331ef1d99705e8170989bdcda271e4600b3d45800cc5fe"
+    "scripts/analytical-swift-source-contract.json": "3c66368433780758de6cc4193fc996f8eb72f05974f7dd5183757e48b4d22249",
+    "scripts/replay-candidate-contract.json": "07e307974d5dc8d243245a1df0b150c521e2913ba5b77014254ddb3710c19480"
   },
   "schema_version": 1,
-  "source_admission": "analytical-swift-alpha23-version-capture-source-admission-v1",
-  "source_migration_sha256": "151492942d97e3bbf11c04c7d84ae669e09aeaa1553f704b9b17573d02a3c115",
+  "source_admission": "analytical-swift-cockpit-capture-source-admission-v1",
+  "source_migration_sha256": "9086bfdc723889ca94a388e6b61111a2174703badf48e0afadc9375c78127814",
   "source_recipe": "bevy-0.18.1-tony-filmic-source-v1",
   "source_sha256": {
     ".github/workflows/analytical-swift-msvc-build.yml": "d23c764b900f7d66f0b2ed0df77feb984323bdd038cc7451805b56a456b70976",
     "docs/release/analytical-swift-msvc-capture.md": "a81f848e85ffe6210c7c4c3b30cd4e2f35f2f5a5b3e3e569a304ef4959f7993e",
-    "scripts/capture-analytical-swift-msvc.py": "46c51b70015f554913bddbd3a54747033b4b3c1ccdc2178f3e1a31263965c55d",
+    "scripts/capture-analytical-swift-msvc.py": "ac1bbb42fe862c8b3900bf35112ab8c8f6682b3b60ffd9d21240fc3270af3190",
     "scripts/tests/test_analytical_swift_capture.py": "746b02bc0440baf4676eac519481a9ecc5a4bf10887f760fb32e089d518d2629"
   }
 }

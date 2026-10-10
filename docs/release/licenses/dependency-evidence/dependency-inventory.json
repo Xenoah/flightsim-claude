@@ -3,8 +3,8 @@
   "kind": "cargo-dependency-notices",
   "target": "x86_64-pc-windows-msvc",
   "root_package": "flightsim-app",
-  "cargo_lock_sha256": "7b71d6eb6f3156e3266164e5596067c9792778ff58ecf365da45b060774e05e3",
-  "metadata_sha256": "e79c0d9714b930c1b538bbabcec21ef494320665888f49f873cc8f0819434d6a",
+  "cargo_lock_sha256": "e700e74191334b92f0486ac5a60693c9b81b29fe0810138797230295b3a0e0cb",
+  "metadata_sha256": "9126bc307acea43d8872c6161d8137795cb7d1efe80a86ab68dc9bf409091034",
   "asset_manifest_sha256": "ac06195d27c82f48f1d7219b54dd5b28e11aecb89a0e976f3ddc7f6b9bd4bd3c",
   "supplement_manifest_sha256": "2f9ea61d636ba36059b24d5a3923c4ac03048410024a06e5239100b507255332",
   "scope": "Conservative normal/build dependency closure of target-filtered Cargo metadata; excludes dev-only edges, not proof of final linkage or exhaustive nested-source licensing",
@@ -4303,9 +4303,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-app@0.6.0-alpha.22",
+      "id": "flightsim-app@0.6.0-alpha.23",
       "name": "flightsim-app",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4317,13 +4317,13 @@
       ],
       "notices": [
         {
-          "path": "licenses/flightsim-app-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-app-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-app-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-app-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4332,9 +4332,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-audio@0.6.0-alpha.22",
+      "id": "flightsim-audio@0.6.0-alpha.23",
       "name": "flightsim-audio",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4344,13 +4344,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-audio-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-audio-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-audio-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-audio-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4359,9 +4359,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-content@0.6.0-alpha.22",
+      "id": "flightsim-content@0.6.0-alpha.23",
       "name": "flightsim-content",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4373,13 +4373,13 @@
       ],
       "notices": [
         {
-          "path": "licenses/flightsim-content-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-content-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-content-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-content-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4388,9 +4388,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-core@0.6.0-alpha.22",
+      "id": "flightsim-core@0.6.0-alpha.23",
       "name": "flightsim-core",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4400,13 +4400,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-core-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-core-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-core-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-core-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4415,9 +4415,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-fdm@0.6.0-alpha.22",
+      "id": "flightsim-fdm@0.6.0-alpha.23",
       "name": "flightsim-fdm",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4427,13 +4427,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-fdm-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-fdm-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-fdm-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-fdm-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4442,9 +4442,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-input@0.6.0-alpha.22",
+      "id": "flightsim-input@0.6.0-alpha.23",
       "name": "flightsim-input",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4454,13 +4454,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-input-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-input-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-input-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-input-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4469,9 +4469,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-net@0.6.0-alpha.22",
+      "id": "flightsim-net@0.6.0-alpha.23",
       "name": "flightsim-net",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4481,13 +4481,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-net-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-net-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-net-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-net-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4496,9 +4496,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-render@0.6.0-alpha.22",
+      "id": "flightsim-render@0.6.0-alpha.23",
       "name": "flightsim-render",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4510,13 +4510,13 @@
       ],
       "notices": [
         {
-          "path": "licenses/flightsim-render-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-render-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-render-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-render-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4525,9 +4525,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-sim@0.6.0-alpha.22",
+      "id": "flightsim-sim@0.6.0-alpha.23",
       "name": "flightsim-sim",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4537,13 +4537,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-sim-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-sim-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-sim-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-sim-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4552,9 +4552,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-ui@0.6.0-alpha.22",
+      "id": "flightsim-ui@0.6.0-alpha.23",
       "name": "flightsim-ui",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4564,13 +4564,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-ui-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-ui-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-ui-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-ui-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359
@@ -4579,9 +4579,9 @@
       "unresolved": []
     },
     {
-      "id": "flightsim-world@0.6.0-alpha.22",
+      "id": "flightsim-world@0.6.0-alpha.23",
       "name": "flightsim-world",
-      "version": "0.6.0-alpha.22",
+      "version": "0.6.0-alpha.23",
       "source": "workspace",
       "source_checksum": null,
       "source_revision": null,
@@ -4591,13 +4591,13 @@
       "features": [],
       "notices": [
         {
-          "path": "licenses/flightsim-world-0.6.0-alpha.22/LICENSE-MIT",
+          "path": "licenses/flightsim-world-0.6.0-alpha.23/LICENSE-MIT",
           "upstream_path": "LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
           "bytes": 1086
         },
         {
-          "path": "licenses/flightsim-world-0.6.0-alpha.22/LICENSE-APACHE",
+          "path": "licenses/flightsim-world-0.6.0-alpha.23/LICENSE-APACHE",
           "upstream_path": "LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
           "bytes": 11359

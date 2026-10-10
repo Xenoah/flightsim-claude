@@ -6,15 +6,16 @@
     "The repository owner approved the exact bundled Microsoft CRT component terms and assent presentation on 2026-10-09T06:47:12Z; the approved document is retained privately.",
     "docs/release/components/MICROSOFT-COMPONENT-TERMS.txt",
     "docs/release/windows-component-release-notes.md",
-    "The repository owner reaffirmed direct main updates and releases after validation on 2026-10-09T14:14:49Z; this receipt binds that standing publication instruction to the exact alpha.22 terrain source and inventory.",
-    "docs/qa/alpha22-release-preparation-2026-10-10.md",
-    "This authorization does not attest native success. Changed-source applicability, same-build archive verification and extracted two-aircraft smoke remain independent required gates."
+    "The repository owner reaffirmed direct main updates and releases after validation on 2026-10-09T14:14:49Z and requested the functional 3D cockpit on 2026-10-10; this receipt binds that standing publication instruction to the exact alpha.23 cockpit source and inventory.",
+    "docs/qa/functional-cockpit-2026-10-10.md",
+    "This authorization does not attest native success. Changed-source applicability, same-build archive verification and extracted two-aircraft smoke remain independent required gates.",
+    "docs/release/full-two-aircraft-source-admission.md"
   ],
-  "release_inventory_sha256": "7fa86b23e7bcf5b9d6f1d6505474c140c862da720c262438872f5a9022d0cd0d",
+  "release_inventory_sha256": "6356a5b1ec68728dfa107b514eab9e5320ee021e070907cdfa729666ba5e08fe",
   "schema_version": 1,
   "scope": "github-windows-prerelease",
-  "source_inventory_sha256": "ac3c3c2f14dffcefd422005fe6e1fe8a474571c48b829a7c762750810273df18",
+  "source_inventory_sha256": "c8c6a0aacc9a85e159542cb2cb6e67356937e260f25d58127e3dda92e6fb4233",
   "status": "authorized",
   "target": "x86_64-pc-windows-msvc",
-  "version": "0.6.0-alpha.22"
+  "version": "0.6.0-alpha.23"
 }

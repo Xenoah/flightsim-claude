@@ -1900,7 +1900,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(candidate.MODIFIED_SOURCE_POLICY_PATHS), 9)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 950)
+        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 956)
         component_additions = {
             "LICENSE-MIT", "LICENSE-APACHE",
             "crates/flightsim-app/src/component_terms.rs",
@@ -1919,7 +1919,7 @@ class CandidateAcceptanceTests(unittest.TestCase):
                              | {candidate.TERRAIN_CENTROID_MIGRATION_PATH, candidate.TERRAIN_CENTROID_HISTORY_PATH})
         self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS - component_additions - terrain_additions
                              - candidate.TERRAIN_STITCH_SOURCE_PATHS - candidate.ALPHA22_SOURCE_PATHS
-                             - candidate.COCKPIT_SOURCE_PATHS), 918)
+                             - candidate.COCKPIT_SOURCE_PATHS - candidate.ALPHA23_SOURCE_PATHS), 918)
         for prefix, paths in candidate.MODIFIED_SOURCE_BOUNDARIES:
             actual = {path.relative_to(ROOT).as_posix() for path in (ROOT / prefix).rglob('*') if path.is_file()}
             self.assertEqual(actual, {p for p in paths if p.startswith(prefix)}, prefix)
