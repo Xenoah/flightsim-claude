@@ -33,7 +33,15 @@ struct VertexOutput {
     // This is `clip position` when the struct is used as a vertex stage output
     // and `frag coord` when used as a fragment stage input
     @builtin(position) position: vec4<f32>,
+    // Terrain stitch triangles may cover an MSAA sample without covering the
+    // pixel center. Other materials keep the original interpolation contract.
+#ifdef FLIGHTSIM_TERRAIN_CENTROID
+    @interpolate(perspective, centroid)
+#endif
     @location(0) world_position: vec4<f32>,
+#ifdef FLIGHTSIM_TERRAIN_CENTROID
+    @interpolate(perspective, centroid)
+#endif
     @location(1) world_normal: vec3<f32>,
 #ifdef VERTEX_UVS_A
     @location(2) uv: vec2<f32>,
@@ -45,6 +53,9 @@ struct VertexOutput {
     @location(4) world_tangent: vec4<f32>,
 #endif
 #ifdef VERTEX_COLORS
+#ifdef FLIGHTSIM_TERRAIN_CENTROID
+    @interpolate(perspective, centroid)
+#endif
     @location(5) color: vec4<f32>,
 #endif
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

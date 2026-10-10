@@ -351,6 +351,13 @@ observable separately from DEM cache usage. Details and verification limits are
 in [mixed-LOD stitching QA](docs/qa/terrain-mixed-lod-stitching-2026-10-02.md) and
 [incremental planning QA](docs/qa/terrain-seam-planning-2026-10-02.md).
 
+Forward terrain tiles and their bridges opt into perspective-centroid
+interpolation for world position, world normal and vertex color. This prevents
+MSAA sample coverage on subpixel triangles from extrapolating shading at an
+uncovered pixel center. Other materials and prepass/deferred interfaces retain
+their original interpolation; geometry, coverage and physical data are unchanged.
+See [terrain centroid interpolation](docs/adr/0031-terrain-centroid-interpolation.md).
+
 One-shot screenshots retain their minimum delay and 30-frame floor, then require
 CPU world readiness after Update commands and PostUpdate visibility/transform
 propagation. The last sampled live/displayed cut must match exact tile IDs with

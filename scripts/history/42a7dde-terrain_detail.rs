@@ -8,24 +8,16 @@
 
 use bevy::{
     asset::{load_internal_asset, uuid_handle},
-    mesh::MeshVertexBufferLayoutRef,
-    pbr::{ExtendedMaterial, MaterialExtension, MaterialExtensionKey, MaterialExtensionPipeline},
+    pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    render::render_resource::{
-        AsBindGroup, RenderPipelineDescriptor, ShaderType, SpecializedMeshPipelineError,
-    },
+    render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
 use flightsim_core::RenderFrame;
 
 use crate::{RenderOrigin, RenderSet};
 
-#[cfg(test)]
-#[path = "terrain_interpolation_tests.rs"]
-mod interpolation_tests;
-
 const SHADER_HANDLE: Handle<Shader> = uuid_handle!("74d47bf6-a823-48c8-aa7c-09ae7ba2f027");
-const CENTROID_SHADER_DEF: &str = "FLIGHTSIM_TERRAIN_CENTROID";
 const LATTICE_PERIOD: f64 = 256.0;
 const CELL_METERS: [f64; 4] = [2048.0, 256.0, 32.0, 4.0];
 
@@ -79,26 +71,6 @@ impl MaterialExtension for TerrainDetail {
 
     fn deferred_fragment_shader() -> ShaderRef {
         SHADER_HANDLE.into()
-    }
-
-    fn specialize(
-        _pipeline: &MaterialExtensionPipeline,
-        descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayoutRef,
-        _key: MaterialExtensionKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        // Subpixel stitch triangles can cover an MSAA sample but not its pixel
-        // center. Keep forward terrain varyings inside coverage instead of
-        // extrapolating color/normal/position. Both stages must share the IO.
-        // The separate prepass IO ignores this terrain-only definition.
-        descriptor
-            .vertex
-            .shader_defs
-            .push(CENTROID_SHADER_DEF.into());
-        if let Some(fragment) = &mut descriptor.fragment {
-            fragment.shader_defs.push(CENTROID_SHADER_DEF.into());
-        }
-        Ok(())
     }
 }
 

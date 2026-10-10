@@ -420,7 +420,7 @@ class AnalyticalSwiftRecipeTests(unittest.TestCase):
                 with self.assertRaises(ValueError): check.tone.validate_graph(graph, mode, kind, recipe=recipe)
         self.assertEqual(check.candidate.FEATURES, ['commercial-staging'])
         self.assertEqual(len(check.candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
-        self.assertEqual(len(check.SOURCE_PATHS), 45)
+        self.assertEqual(len(check.SOURCE_PATHS), 50)
         self.assertEqual(check.recipe()['source_recipe'], check.tone.TWO_LUT_SOURCE)
         self.assertEqual(len(check.candidate.INDEPENDENT_REPLAY_HASHES), 102)
 

@@ -37,7 +37,8 @@ The documentation-only src/meshlet/meshlet_preview.png is omitted because its
 specific redistribution grant was not established; its sole external-image
 rustdoc line in src/meshlet/mod.rs becomes an omission note. No runtime or
 include_bytes use exists, and optional meshlet functionality is unchanged.
-All other original members are retained byte-for-byte. The third-party-notices
+All other original members were retained byte-for-byte at that migration; the
+2026-10-09 terrain-only forward IO change is described below. The third-party-notices
 directory preserves the Bruneton/INRIA and raymarch-source notices for retained
 components. These additions do not claim actual final link inclusion.
 
@@ -54,3 +55,20 @@ BSD-3-Clause; the exact 2023 EA licence and factual provenance notice are suppli
 in third-party-notices. This preserves the optional bluenoise_texture feature;
 the project’s analytical feature graph does not enable it. NVIDIA STBN terms are
 not the source grant for this exact file.
+
+## Terrain-only centroid interpolation, 2026-10-09
+
+`src/render/forward_io.wgsl` conditionally adds perspective-centroid interpolation
+to world position, world normal and vertex color. The application-owned terrain
+material supplies `FLIGHTSIM_TERRAIN_CENTROID` to both forward shader stages.
+Without that define, all original IO declarations remain unchanged. UV, tangent,
+flat instance fields and the separate prepass IO remain unchanged.
+
+This keeps covered edge samples from using extrapolated terrain attributes at a
+pixel center outside the triangle. It does not alter terrain topology, physics,
+DEM values, MSAA settings, or material lighting. GPU/native appearance and any
+performance effect require separate evidence; source validation does not supply
+that evidence. Upstream origins in `FLIGHTSIM-UPSTREAM-SOURCE.json` remain exact
+original-member provenance, not a claim that the modified forward IO is pristine.
+The existing parallax replacement, its independent witnesses and its source
+authorship limitations are unchanged.

@@ -3861,14 +3861,15 @@ index 0000000..18c5929
 +features = ["bevy_image/zstd_rust"]
 diff --git a/vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt b/vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt
 new file mode 100644
-index 0000000..145c586
+index 0000000..f621965
 --- /dev/null
 +++ b/vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt
-@@ -0,0 +1,4 @@
-+Local flightsim modifications, 2026-10-08
+@@ -0,0 +1,5 @@
++Local flightsim modifications, 2026-10-08 and 2026-10-09
 +
 +Modified source paths: src/render/parallax_mapping.wgsl (original ray intersection replacement), src/meshlet/mod.rs (documentation-only preview omission note); src/meshlet/meshlet_preview.png is omitted, with no runtime or meshlet-feature change.
-+Original-equivalent replacements and regression tests were authored for this project under its existing MIT OR Apache-2.0 terms. Upstream copyrights, licence texts and retained-code notices are preserved. Exact original-source hashes, modifications and authoring limitations are in FLIGHTSIM-UPSTREAM-SOURCE.json and FLIGHTSIM-PATCHES.md. No upstream endorsement, human authorship or new upstream licence grant is asserted.
++src/render/forward_io.wgsl additionally uses perspective-centroid interpolation for world position, world normal and vertex color only when the terrain material supplies FLIGHTSIM_TERRAIN_CENTROID. Ordinary materials and prepass IO retain their existing interpolation. This render-only modification changes no mesh, DEM, physics, MSAA setting or PBR lighting model.
++The existing parallax function replacement and its regression tests retain their previously documented scope. The centroid shader modification intentionally changes boundary interpolation; no byte, pixel or original-behavior equivalence is claimed for it. Project-authored modifications use the existing MIT OR Apache-2.0 terms. Upstream copyrights, licence texts and retained-code notices are preserved. Exact original-source hashes, modifications and authoring limitations are in FLIGHTSIM-UPSTREAM-SOURCE.json and FLIGHTSIM-PATCHES.md. No upstream endorsement, human authorship or new upstream licence grant is asserted.
 diff --git a/vendor/bevy_pbr/FLIGHTSIM-PARALLAX-README.md b/vendor/bevy_pbr/FLIGHTSIM-PARALLAX-README.md
 new file mode 100644
 index 0000000..75c5d11
@@ -4033,10 +4034,10 @@ index 0000000..75c5d11
 +isolated replacement alone clears the entire project's release rights.
 diff --git a/vendor/bevy_pbr/FLIGHTSIM-PATCHES.md b/vendor/bevy_pbr/FLIGHTSIM-PATCHES.md
 new file mode 100644
-index 0000000..15a8739
+index 0000000..5e1e7c4
 --- /dev/null
 +++ b/vendor/bevy_pbr/FLIGHTSIM-PATCHES.md
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,74 @@
 +# Local original parallax replacement
 +
 +Upstream package: bevy_pbr 0.18.1. Source revision:
@@ -4076,7 +4077,8 @@ index 0000000..15a8739
 +specific redistribution grant was not established; its sole external-image
 +rustdoc line in src/meshlet/mod.rs becomes an omission note. No runtime or
 +include_bytes use exists, and optional meshlet functionality is unchanged.
-+All other original members are retained byte-for-byte. The third-party-notices
++All other original members were retained byte-for-byte at that migration; the
++2026-10-09 terrain-only forward IO change is described below. The third-party-notices
 +directory preserves the Bruneton/INRIA and raymarch-source notices for retained
 +components. These additions do not claim actual final link inclusion.
 +
@@ -4093,6 +4095,23 @@ index 0000000..15a8739
 +in third-party-notices. This preserves the optional bluenoise_texture feature;
 +the project’s analytical feature graph does not enable it. NVIDIA STBN terms are
 +not the source grant for this exact file.
++
++## Terrain-only centroid interpolation, 2026-10-09
++
++`src/render/forward_io.wgsl` conditionally adds perspective-centroid interpolation
++to world position, world normal and vertex color. The application-owned terrain
++material supplies `FLIGHTSIM_TERRAIN_CENTROID` to both forward shader stages.
++Without that define, all original IO declarations remain unchanged. UV, tangent,
++flat instance fields and the separate prepass IO remain unchanged.
++
++This keeps covered edge samples from using extrapolated terrain attributes at a
++pixel center outside the triangle. It does not alter terrain topology, physics,
++DEM values, MSAA settings, or material lighting. GPU/native appearance and any
++performance effect require separate evidence; source validation does not supply
++that evidence. Upstream origins in `FLIGHTSIM-UPSTREAM-SOURCE.json` remain exact
++original-member provenance, not a claim that the modified forward IO is pristine.
++The existing parallax replacement, its independent witnesses and its source
++authorship limitations are unchanged.
 diff --git a/vendor/bevy_pbr/FLIGHTSIM-UPSTREAM-SOURCE.json b/vendor/bevy_pbr/FLIGHTSIM-UPSTREAM-SOURCE.json
 new file mode 100644
 index 0000000..5ea95d2
@@ -63235,10 +63254,10 @@ index 0000000..a9e28ae
 +}
 diff --git a/vendor/bevy_pbr/src/render/forward_io.wgsl b/vendor/bevy_pbr/src/render/forward_io.wgsl
 new file mode 100644
-index 0000000..99f2ecc
+index 0000000..12462a7
 --- /dev/null
 +++ b/vendor/bevy_pbr/src/render/forward_io.wgsl
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,71 @@
 +#define_import_path bevy_pbr::forward_io
 +
 +struct Vertex {
@@ -63274,7 +63293,15 @@ index 0000000..99f2ecc
 +    // This is `clip position` when the struct is used as a vertex stage output
 +    // and `frag coord` when used as a fragment stage input
 +    @builtin(position) position: vec4<f32>,
++    // Terrain stitch triangles may cover an MSAA sample without covering the
++    // pixel center. Other materials keep the original interpolation contract.
++#ifdef FLIGHTSIM_TERRAIN_CENTROID
++    @interpolate(perspective, centroid)
++#endif
 +    @location(0) world_position: vec4<f32>,
++#ifdef FLIGHTSIM_TERRAIN_CENTROID
++    @interpolate(perspective, centroid)
++#endif
 +    @location(1) world_normal: vec3<f32>,
 +#ifdef VERTEX_UVS_A
 +    @location(2) uv: vec2<f32>,
@@ -63286,6 +63313,9 @@ index 0000000..99f2ecc
 +    @location(4) world_tangent: vec4<f32>,
 +#endif
 +#ifdef VERTEX_COLORS
++#ifdef FLIGHTSIM_TERRAIN_CENTROID
++    @interpolate(perspective, centroid)
++#endif
 +    @location(5) color: vec4<f32>,
 +#endif
 +#ifdef VERTEX_OUTPUT_INSTANCE_INDEX

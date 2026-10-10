@@ -1,0 +1,28 @@
+{
+  "added_source_sha256": {},
+  "base_replay_contract_path": "scripts/history/5eaaff3-replay-candidate-contract.json",
+  "base_replay_contract_sha256": "1b72efcc010124b0a02708f0c4b75c07c79a272e352ac697b71934fc9aa20869",
+  "base_source": "5eaaff379f19cc986fa5600619f1491213e9da0d",
+  "base_source_kind": "unpublished-local-checkpoint",
+  "base_tree": "a469ee76cd0d7aabf3dd2c07114d44c0bbdf5d37",
+  "historical_relocations": {
+    "crates/flightsim-world/src/seams.rs": "scripts/history/5eaaff3-seams.rs",
+    "crates/flightsim-world/tests/terrain_seam_geometry.rs": "scripts/history/5eaaff3-terrain_seam_geometry.rs"
+  },
+  "identity": "full-two-aircraft-terrain-stitch-source-migration-v1",
+  "preserved_runtime_sha256": "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667",
+  "previous_source_migration_sha256": "203d43b06ef860813fd3f21f482f4751d3ad0b625872086a7eb76d3b91d04db5",
+  "public_base_source": "42a7ddeae36f3022c2c77e54d5dce33f71b11bca",
+  "public_base_tree": "625c39f9b182b16a0dada2dc4131434d178a0831",
+  "replaced_source_sha256": {
+    "crates/flightsim-world/src/seams.rs": {
+      "previous_sha256": "4c69ca50946663ead1c82907793b37af75e54f886340c8986bfd4a573a8397ef",
+      "sha256": "db52efeb9669f8a1691c16ffce42e28134e7e2f0d598786c7ded2db6e79beb8a"
+    },
+    "crates/flightsim-world/tests/terrain_seam_geometry.rs": {
+      "previous_sha256": "a88108b3c2e7dedb5d483d4578101d7e37f90b3d6cab0ec71e18aa51f2be929f",
+      "sha256": "169633a8abb739953b9fc58bad1e871f9f06c060af179bc4100d367a5e9fde19"
+    }
+  },
+  "schema_version": 1
+}

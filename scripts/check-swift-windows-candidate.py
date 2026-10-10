@@ -42,7 +42,7 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
-REPLAY_CONTRACT_ID = "full-two-aircraft-component-terms-source-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-terrain-stitch-source-v1"
 REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
 REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
 SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
@@ -67,6 +67,46 @@ COMPONENT_TERMS_DOCUMENT_PATHS = frozenset({
 COMPONENT_TERMS_LICENSE_PATHS = frozenset({"LICENSE-MIT", "LICENSE-APACHE"})
 COMPONENT_TERMS_SOURCE_PATHS = (COMPONENT_TERMS_RUNTIME_PATHS | COMPONENT_TERMS_DOCUMENT_PATHS
                                | COMPONENT_TERMS_LICENSE_PATHS)
+# A second bounded migration changes terrain forward interpolation only. The
+# component-terms migration and all earlier runtime identities stay immutable.
+TERRAIN_CENTROID_MIGRATION_PATH = "scripts/terrain-centroid-source-migration.json"
+TERRAIN_CENTROID_MIGRATION_SHA256 = "203d43b06ef860813fd3f21f482f4751d3ad0b625872086a7eb76d3b91d04db5"
+TERRAIN_CENTROID_DETAIL_PATH = "crates/flightsim-render/src/terrain_detail.rs"
+TERRAIN_CENTROID_HISTORY_PATH = "scripts/history/42a7dde-terrain_detail.rs"
+TERRAIN_CENTROID_RUNTIME_PATHS = frozenset({
+    "crates/flightsim-render/src/terrain_interpolation_tests.rs",
+})
+TERRAIN_CENTROID_PREVIOUS_SHA256 = {
+    'crates/flightsim-render/src/terrain_detail.rs': '6670c630aa58391ae05d5b70b847bf2df1f2b01c3805dc594628053b3a317aa5',
+    'vendor/bevy_pbr/src/render/forward_io.wgsl': 'e140ef1063bf097432fc6866749e3fc2b3893dddcdb24ac1240de0f8fdd0ca8a',
+    'vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt': 'd038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287',
+    'vendor/bevy_pbr/FLIGHTSIM-PATCHES.md': '79549aa643f47a8a4098815b0107ac90ae3915afcf31821234f272c9ffa2a164',
+    'docs/release/analytical-modified-source-provenance.json': '010fb99b2073bc63b1a21eaeb36116e2d103f07340443090c940aff364f360e1',
+    'docs/release/modified-source-patches/bevy_pbr-added-vendor.patch': 'f5f59e6dbfb208c5dbb7e6400bf277b870c23e453107e9c9e7ad7ab5652ceae6',
+}
+# This third migration changes only closed, nondegenerate three-source caps.
+# Its base is an unpublished local checkpoint; checked-in witnesses suffice.
+TERRAIN_STITCH_MIGRATION_PATH = "scripts/terrain-stitch-source-migration.json"
+TERRAIN_STITCH_MIGRATION_SHA256 = "7e3bb3a090bb6ae345bea2795152d8368d72e88ea8352ea175e5ed38bb63ea02"
+TERRAIN_STITCH_BASE_CONTRACT_PATH = "scripts/history/5eaaff3-replay-candidate-contract.json"
+TERRAIN_STITCH_BASE_CONTRACT_SHA256 = "1b72efcc010124b0a02708f0c4b75c07c79a272e352ac697b71934fc9aa20869"
+TERRAIN_STITCH_HISTORICAL_RELOCATIONS = {
+    'crates/flightsim-world/src/seams.rs': 'scripts/history/5eaaff3-seams.rs',
+    'crates/flightsim-world/tests/terrain_seam_geometry.rs': 'scripts/history/5eaaff3-terrain_seam_geometry.rs',
+}
+TERRAIN_STITCH_PREVIOUS_SHA256 = {
+    'crates/flightsim-world/src/seams.rs': '4c69ca50946663ead1c82907793b37af75e54f886340c8986bfd4a573a8397ef',
+    'crates/flightsim-world/tests/terrain_seam_geometry.rs': 'a88108b3c2e7dedb5d483d4578101d7e37f90b3d6cab0ec71e18aa51f2be929f',
+}
+TERRAIN_STITCH_SOURCE_PATHS = frozenset({
+    TERRAIN_STITCH_MIGRATION_PATH, TERRAIN_STITCH_BASE_CONTRACT_PATH,
+    *TERRAIN_STITCH_HISTORICAL_RELOCATIONS.values(),
+})
+HISTORICAL_RUNTIME_RELOCATIONS = {
+    COMPONENT_TERMS_MAIN_PATH: COMPONENT_TERMS_HISTORY_PATH,
+    TERRAIN_CENTROID_DETAIL_PATH: TERRAIN_CENTROID_HISTORY_PATH,
+    **TERRAIN_STITCH_HISTORICAL_RELOCATIONS,
+}
 # The reviewed additive jet/turboprop exports change this file, but no legacy FDM
 # body. Keep a literal full-file guard; the historical lib hash above never moves.
 REVIEWED_ADDITIVE_FDM_LIB_SHA256 = "2328631f895921e4152de6f8107c4d6f07ba764b6f6225189a4b826c6f9f013c"
@@ -1115,6 +1155,9 @@ REPLAY_CONTRACT_PATHS |= (CORE_PIPELINE_SOURCE_PATHS | ORIGINAL_HIGHWING_SOURCE_
 # Add exact members after freezing the original 404-path history above.
 REPLAY_CONTRACT_PATHS |= (COMPONENT_TERMS_SOURCE_PATHS
                           | {COMPONENT_TERMS_MIGRATION_PATH, COMPONENT_TERMS_HISTORY_PATH})
+REPLAY_CONTRACT_PATHS |= (TERRAIN_CENTROID_RUNTIME_PATHS
+                          | {TERRAIN_CENTROID_MIGRATION_PATH, TERRAIN_CENTROID_HISTORY_PATH})
+REPLAY_CONTRACT_PATHS |= TERRAIN_STITCH_SOURCE_PATHS
 
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -1293,12 +1336,14 @@ def git(repo, *args):
 
 
 # Cargo auto-discovers build scripts, binary/example/benchmark targets. These
-# retain the 492 preserved members plus the two literal component-terms inputs.
+# retain 492 preserved members, two component-terms inputs and one terrain test.
 # No on-disk glob can admit additional build, binary, example or benchmark files.
 PRESERVED_CRATE_SOURCE_PATHS = frozenset(path for path in REPLAY_CONTRACT_PATHS
                                        if path.startswith("crates/")
-                                       and path not in COMPONENT_TERMS_RUNTIME_PATHS)
-CURRENT_CRATE_SOURCE_PATHS = PRESERVED_CRATE_SOURCE_PATHS | COMPONENT_TERMS_RUNTIME_PATHS
+                                       and path not in (COMPONENT_TERMS_RUNTIME_PATHS
+                                                        | TERRAIN_CENTROID_RUNTIME_PATHS))
+CURRENT_CRATE_SOURCE_PATHS = (PRESERVED_CRATE_SOURCE_PATHS | COMPONENT_TERMS_RUNTIME_PATHS
+                              | TERRAIN_CENTROID_RUNTIME_PATHS)
 MODIFIED_SOURCE_BOUNDARIES = (
     ("crates/", CURRENT_CRATE_SOURCE_PATHS),
     ("docs/release/components/", COMPONENT_TERMS_DOCUMENT_PATHS),
@@ -1363,7 +1408,7 @@ def validate_replay_contract(contract):
             and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
     require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
             and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
-            and contract.get("source_migration_sha256") == COMPONENT_TERMS_MIGRATION_SHA256
+            and contract.get("source_migration_sha256") == TERRAIN_STITCH_MIGRATION_SHA256
             and contract.get("scope") == SOURCE_ADMISSION_SCOPE
             and contract.get("release_authorized") is False, "source admission identity or scope changed")
     require(isinstance(contract.get("base_reviewed_source"), str)
@@ -1416,9 +1461,95 @@ def validate_replay_contract(contract):
     require(set(added) == COMPONENT_TERMS_SOURCE_PATHS
             and all(pins.get(path) == value for path, value in added.items()),
             "component terms source pins changed")
+    terrain_file = Path(__file__).with_name("terrain-centroid-source-migration.json")
+    require(digest(terrain_file) == TERRAIN_CENTROID_MIGRATION_SHA256
+            and pins[TERRAIN_CENTROID_MIGRATION_PATH] == TERRAIN_CENTROID_MIGRATION_SHA256,
+            "terrain centroid migration changed")
+    terrain = json.loads(terrain_file.read_text(encoding="utf-8"))
+    require(set(terrain) == {"schema_version", "identity", "base_source", "base_tree",
+            "base_replay_contract_sha256", "previous_source_migration_sha256",
+            "preserved_runtime_sha256", "historical_relocations", "replaced_source_sha256",
+            "added_source_sha256"}
+            and type(terrain["schema_version"]) is int and terrain["schema_version"] == 1
+            and terrain["identity"] == "full-two-aircraft-terrain-centroid-source-migration-v1"
+            and terrain["base_source"] == "42a7ddeae36f3022c2c77e54d5dce33f71b11bca"
+            and terrain["base_tree"] == "625c39f9b182b16a0dada2dc4131434d178a0831"
+            and terrain["base_replay_contract_sha256"] == "00b8aaada63fed4e10375e2eefa543eefdff7baa014b424cfb89c148e5686dad"
+            and terrain["previous_source_migration_sha256"] == COMPONENT_TERMS_MIGRATION_SHA256
+            and terrain["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256,
+            "invalid terrain centroid migration identity")
+    require(terrain["historical_relocations"] == {
+            TERRAIN_CENTROID_DETAIL_PATH: TERRAIN_CENTROID_HISTORY_PATH},
+            "terrain centroid historical relocation changed")
+    terrain_replaced = terrain["replaced_source_sha256"]
+    require(isinstance(terrain_replaced, dict)
+            and set(terrain_replaced) == set(TERRAIN_CENTROID_PREVIOUS_SHA256),
+            "terrain centroid replacement boundary changed")
+    for path, previous in TERRAIN_CENTROID_PREVIOUS_SHA256.items():
+        row = terrain_replaced[path]
+        require(isinstance(row, dict) and set(row) == {"previous_sha256", "sha256"}
+                and row["previous_sha256"] == previous
+                and row["sha256"] != previous and pins[path] == row["sha256"],
+                "terrain centroid replacement changed: " + path)
+    terrain_added = terrain["added_source_sha256"]
+    require(isinstance(terrain_added, dict) and set(terrain_added) == TERRAIN_CENTROID_RUNTIME_PATHS
+            and all(pins.get(path) == value for path, value in terrain_added.items()),
+            "terrain centroid source additions changed")
+    require(pins[TERRAIN_CENTROID_HISTORY_PATH] == preserved[TERRAIN_CENTROID_DETAIL_PATH]
+            == TERRAIN_CENTROID_PREVIOUS_SHA256[TERRAIN_CENTROID_DETAIL_PATH],
+            "terrain centroid historical bytes changed")
+    stitch_file = Path(__file__).with_name("terrain-stitch-source-migration.json")
+    require(digest(stitch_file) == TERRAIN_STITCH_MIGRATION_SHA256
+            and pins[TERRAIN_STITCH_MIGRATION_PATH] == TERRAIN_STITCH_MIGRATION_SHA256,
+            "terrain stitch migration changed")
+    stitch = json.loads(stitch_file.read_text(encoding="utf-8"))
+    require(set(stitch) == {"schema_version", "identity", "base_source", "base_tree",
+            "base_source_kind", "public_base_source", "public_base_tree",
+            "base_replay_contract_path", "base_replay_contract_sha256",
+            "previous_source_migration_sha256", "preserved_runtime_sha256",
+            "historical_relocations", "replaced_source_sha256", "added_source_sha256"}
+            and type(stitch["schema_version"]) is int and stitch["schema_version"] == 1
+            and stitch["identity"] == "full-two-aircraft-terrain-stitch-source-migration-v1"
+            and stitch["base_source"] == "5eaaff379f19cc986fa5600619f1491213e9da0d"
+            and stitch["base_tree"] == "a469ee76cd0d7aabf3dd2c07114d44c0bbdf5d37"
+            and stitch["base_source_kind"] == "unpublished-local-checkpoint"
+            and stitch["public_base_source"] == "42a7ddeae36f3022c2c77e54d5dce33f71b11bca"
+            and stitch["public_base_tree"] == "625c39f9b182b16a0dada2dc4131434d178a0831"
+            and stitch["base_replay_contract_path"] == TERRAIN_STITCH_BASE_CONTRACT_PATH
+            and stitch["base_replay_contract_sha256"] == TERRAIN_STITCH_BASE_CONTRACT_SHA256
+            and stitch["previous_source_migration_sha256"] == TERRAIN_CENTROID_MIGRATION_SHA256
+            and stitch["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256,
+            "invalid terrain stitch migration identity")
+    require(stitch["historical_relocations"] == TERRAIN_STITCH_HISTORICAL_RELOCATIONS
+            and stitch["added_source_sha256"] == {},
+            "terrain stitch relocation or additions changed")
+    stitch_replaced = stitch["replaced_source_sha256"]
+    require(isinstance(stitch_replaced, dict)
+            and set(stitch_replaced) == set(TERRAIN_STITCH_PREVIOUS_SHA256),
+            "terrain stitch replacement boundary changed")
+    for path, previous in TERRAIN_STITCH_PREVIOUS_SHA256.items():
+        row = stitch_replaced[path]
+        require(isinstance(row, dict) and set(row) == {"previous_sha256", "sha256"}
+                and row["previous_sha256"] == previous == preserved[path]
+                and row["sha256"] != previous and pins[path] == row["sha256"]
+                and pins[TERRAIN_STITCH_HISTORICAL_RELOCATIONS[path]] == previous,
+                "terrain stitch replacement changed: " + path)
     require(len(preserved) == 497
-            and all(pins.get(relocations.get(path, path)) == value for path, value in preserved.items()),
+            and all(pins.get(HISTORICAL_RUNTIME_RELOCATIONS.get(path, path)) == value
+                    for path, value in preserved.items()),
             "preserved runtime source pins changed")
+    base_contract_file = Path(__file__).parent.parent / TERRAIN_STITCH_BASE_CONTRACT_PATH
+    require(digest(base_contract_file) == TERRAIN_STITCH_BASE_CONTRACT_SHA256
+            and pins[TERRAIN_STITCH_BASE_CONTRACT_PATH] == TERRAIN_STITCH_BASE_CONTRACT_SHA256,
+            "terrain stitch base contract changed")
+    base_contract = json.loads(base_contract_file.read_text(encoding="utf-8"))
+    base_pins = base_contract["source_sha256"]
+    require(base_contract["contract"] == "full-two-aircraft-terrain-centroid-source-v1"
+            and base_contract["source_migration_sha256"] == TERRAIN_CENTROID_MIGRATION_SHA256
+            and set(base_pins) == REPLAY_CONTRACT_PATHS - TERRAIN_STITCH_SOURCE_PATHS
+            and all(pins.get(TERRAIN_STITCH_HISTORICAL_RELOCATIONS.get(path, path)) == value
+                    for path, value in base_pins.items()),
+            "terrain stitch prior source pins changed")
     return contract
 
 

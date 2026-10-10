@@ -532,10 +532,6 @@ fn only_endpoint_caps(mut mesh: TerrainMesh) -> TerrainMesh {
     mesh
 }
 
-#[allow(
-    clippy::float_cmp,
-    reason = "locate the exact retained f32 source block"
-)]
 fn assert_t_junction_caps(coarse_x: u32, fine_x: u32) {
     let coarse = TileId::new(3, coarse_x, 4);
     let north = TileId::new(4, fine_x, 8);
@@ -569,49 +565,6 @@ fn assert_t_junction_caps(coarse_x: u32, fine_x: u32) {
         .iter()
         .map(|seam| only_endpoint_caps(seam.build_mesh(&boundaries)))
         .collect();
-    // A closed three-source patch is already a triangle. Its complete source
-    // polygon must be repeated in every incident ribbon without an added mean
-    // vertex in any emitted face. Keep the old spoke-gap ray checks below too.
-    for mesh in &caps {
-        let encoded = endpoints.map(|point| {
-            (point - mesh.origin.as_vec())
-                .to_array()
-                .map(|value| value as f32)
-        });
-        let mean = endpoints[0]
-            .lerp(endpoints[1], 0.5)
-            .lerp(endpoints[2], 1.0 / 3.0);
-        let anchor = (mean - mesh.origin.as_vec()).to_array().map(|v| v as f32);
-        let start = mesh
-            .positions
-            .windows(4)
-            .position(|points| points[0] == anchor && points[1..] == encoded)
-            .expect("complete corner source block retained");
-        let start = u32::try_from(start).unwrap();
-        let source_triangles: Vec<_> = mesh
-            .indices
-            .chunks_exact(3)
-            .filter(|triangle| {
-                triangle
-                    .iter()
-                    .any(|index| (start..start + 4).contains(index))
-            })
-            .flatten()
-            .copied()
-            .collect();
-        assert_eq!(
-            source_triangles,
-            [
-                start + 1,
-                start + 2,
-                start + 3,
-                start + 1,
-                start + 3,
-                start + 2
-            ],
-            "each ribbon retains opposite windings and no mean-anchor faces"
-        );
-    }
     for weights in [
         [0.2, 0.3, 0.5],
         [0.7, 0.1, 0.2],
@@ -687,58 +640,6 @@ fn four_way_corner_caps_close_the_polygon_and_are_deterministic() {
 fn t_junction_caps_close_the_triangle_between_three_post_f32_endpoints() {
     assert_t_junction_caps(7, 16);
     assert_t_junction_caps(15, 0); // identical topology through longitude +/-180
-}
-
-#[test]
-#[allow(
-    clippy::float_cmp,
-    reason = "verify exact encoded source and anchor identities"
-)]
-fn open_three_source_corner_keeps_its_two_link_fan() {
-    // An L-shaped cut has three sources but no closing NW-to-SE edge.
-    // prepare() verifies the synchronous and bounded incremental planners.
-    let ids = [
-        TileId::new(4, 15, 7),
-        TileId::new(4, 16, 7),
-        TileId::new(4, 16, 8),
-    ];
-    let mut meshes: Vec<_> = ids.into_iter().map(|id| (id, flat(id, 0.0, 5))).collect();
-    let base = point(&meshes[0].1, 24);
-    let corners = [24, 20, 0];
-    let offsets = [
-        DVec3::new(0.0, -10.0, 10.0),
-        DVec3::new(0.0, 10.0, 10.0),
-        DVec3::new(0.0, 10.0, -10.0),
-    ];
-    for index in 0..3 {
-        set_point(&mut meshes[index].1, corners[index], base + offsets[index]);
-    }
-    let endpoints = std::array::from_fn::<_, 3, _>(|index| point(&meshes[index].1, corners[index]));
-    let mean = endpoints[0]
-        .lerp(endpoints[1], 0.5)
-        .lerp(endpoints[2], 1.0 / 3.0);
-    let (boundaries, seams) = prepare(&meshes);
-    assert_eq!(seams.len(), 2);
-    for seam in seams {
-        let cap = only_endpoint_caps(seam.build_mesh(&boundaries));
-        let encode = |value: DVec3| (value - cap.origin.as_vec()).to_array().map(|v| v as f32);
-        let sources = endpoints.map(encode);
-        let anchor = encode(mean);
-        let mut fan_triangles = 0;
-        for triangle in cap.indices.chunks_exact(3) {
-            let points =
-                [triangle[0], triangle[1], triangle[2]].map(|index| cap.positions[index as usize]);
-            assert!(
-                !sources.iter().all(|source| points.contains(source)),
-                "an open source path must not become a closed triangle"
-            );
-            if points.contains(&anchor) {
-                fan_triangles += 1;
-                assert!(points.iter().all(|p| *p == anchor || sources.contains(p)));
-            }
-        }
-        assert_eq!(fan_triangles, 4, "both links retain both windings");
-    }
 }
 
 #[test]

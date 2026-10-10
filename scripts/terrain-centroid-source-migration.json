@@ -1,0 +1,41 @@
+{
+  "added_source_sha256": {
+    "crates/flightsim-render/src/terrain_interpolation_tests.rs": "d57e9f056c21ee07cbf74770ce6684be53b03279c16ffb495f5625c1d2fc34c2"
+  },
+  "base_replay_contract_sha256": "00b8aaada63fed4e10375e2eefa543eefdff7baa014b424cfb89c148e5686dad",
+  "base_source": "42a7ddeae36f3022c2c77e54d5dce33f71b11bca",
+  "base_tree": "625c39f9b182b16a0dada2dc4131434d178a0831",
+  "historical_relocations": {
+    "crates/flightsim-render/src/terrain_detail.rs": "scripts/history/42a7dde-terrain_detail.rs"
+  },
+  "identity": "full-two-aircraft-terrain-centroid-source-migration-v1",
+  "preserved_runtime_sha256": "c9b71ddad46396b3b6ba8961a17f8323a28788f3c641e51f5c47098846653667",
+  "previous_source_migration_sha256": "b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9",
+  "replaced_source_sha256": {
+    "crates/flightsim-render/src/terrain_detail.rs": {
+      "previous_sha256": "6670c630aa58391ae05d5b70b847bf2df1f2b01c3805dc594628053b3a317aa5",
+      "sha256": "fbf9f0d7bc5637d20c7175c2e4395dd441d3d5cbe74aab8686dcdd5bba045b17"
+    },
+    "docs/release/analytical-modified-source-provenance.json": {
+      "previous_sha256": "010fb99b2073bc63b1a21eaeb36116e2d103f07340443090c940aff364f360e1",
+      "sha256": "f577a1f47bc6bb2a8be69dad00fc17b7df52913a53661108f529b4f744f7207b"
+    },
+    "docs/release/modified-source-patches/bevy_pbr-added-vendor.patch": {
+      "previous_sha256": "f5f59e6dbfb208c5dbb7e6400bf277b870c23e453107e9c9e7ad7ab5652ceae6",
+      "sha256": "014a6e02764dadef6579531e77cfb9dd44d32f5f6d1f2a65e99d1165d708b12d"
+    },
+    "vendor/bevy_pbr/FLIGHTSIM-MODIFICATION-NOTICE.txt": {
+      "previous_sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287",
+      "sha256": "8afc2937173e0732bb97416ccb1776354cb35e0577e41ab7f4197da209548700"
+    },
+    "vendor/bevy_pbr/FLIGHTSIM-PATCHES.md": {
+      "previous_sha256": "79549aa643f47a8a4098815b0107ac90ae3915afcf31821234f272c9ffa2a164",
+      "sha256": "c8363f10603759ecdbc8a90e0d77c1dd01d2814329e334d4f0ce8ce8937c3a58"
+    },
+    "vendor/bevy_pbr/src/render/forward_io.wgsl": {
+      "previous_sha256": "e140ef1063bf097432fc6866749e3fc2b3893dddcdb24ac1240de0f8fdd0ca8a",
+      "sha256": "6bd5a1eca996b64f3f60c6a53d4a9fd279a2b19fbc3cf84ee97d067eee3617bc"
+    }
+  },
+  "schema_version": 1
+}

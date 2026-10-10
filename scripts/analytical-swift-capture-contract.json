@@ -3,17 +3,17 @@
   "base_reviewed_source": "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef",
   "identity": "analytical-swift-msvc-build-capture-v1",
   "inherited_contracts": {
-    "scripts/analytical-swift-source-contract.json": "6ee77edda405d3400e55322185f8de1150d331db172ae1a26e8201c75123a37e",
-    "scripts/replay-candidate-contract.json": "00b8aaada63fed4e10375e2eefa543eefdff7baa014b424cfb89c148e5686dad"
+    "scripts/analytical-swift-source-contract.json": "a0bb5a2e4b85b0481e882ac287a49c69dd737583155c930e127f18762d5aaaf6",
+    "scripts/replay-candidate-contract.json": "88a7a983376e227171243a69e3560f43af1a4326092f638f98bde64fef4accd7"
   },
   "schema_version": 1,
-  "source_admission": "analytical-swift-component-terms-capture-source-admission-v1",
-  "source_migration_sha256": "b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9",
+  "source_admission": "analytical-swift-terrain-stitch-capture-source-admission-v1",
+  "source_migration_sha256": "7e3bb3a090bb6ae345bea2795152d8368d72e88ea8352ea175e5ed38bb63ea02",
   "source_recipe": "bevy-0.18.1-tony-filmic-source-v1",
   "source_sha256": {
     ".github/workflows/analytical-swift-msvc-build.yml": "d23c764b900f7d66f0b2ed0df77feb984323bdd038cc7451805b56a456b70976",
     "docs/release/analytical-swift-msvc-capture.md": "a81f848e85ffe6210c7c4c3b30cd4e2f35f2f5a5b3e3e569a304ef4959f7993e",
-    "scripts/capture-analytical-swift-msvc.py": "63432635386f9f556462a149cf7c782a00f2db51892c24e2ff4c083962241513",
+    "scripts/capture-analytical-swift-msvc.py": "69ea499e3967b0926a64a9090c3f705bbef574f6bdd8ba4b0858eecdb7c2dac0",
     "scripts/tests/test_analytical_swift_capture.py": "746b02bc0440baf4676eac519481a9ecc5a4bf10887f760fb32e089d518d2629"
   }
 }

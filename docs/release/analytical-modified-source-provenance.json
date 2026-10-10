@@ -358,8 +358,8 @@
       },
       "patch": {
         "path": "docs/release/modified-source-patches/bevy_pbr-added-vendor.patch",
-        "sha256": "f5f59e6dbfb208c5dbb7e6400bf277b870c23e453107e9c9e7ad7ab5652ceae6",
-        "bytes": 4231522
+        "sha256": "014a6e02764dadef6579531e77cfb9dd44d32f5f6d1f2a65e99d1165d708b12d",
+        "bytes": 4233657
       },
       "files": [
         {
@@ -379,8 +379,8 @@
         },
         {
           "path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
-          "sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287",
-          "bytes": 714
+          "sha256": "8afc2937173e0732bb97416ccb1776354cb35e0577e41ab7f4197da209548700",
+          "bytes": 1295
         },
         {
           "path": "FLIGHTSIM-PARALLAX-README.md",
@@ -389,8 +389,8 @@
         },
         {
           "path": "FLIGHTSIM-PATCHES.md",
-          "sha256": "79549aa643f47a8a4098815b0107ac90ae3915afcf31821234f272c9ffa2a164",
-          "bytes": 3470
+          "sha256": "c8363f10603759ecdbc8a90e0d77c1dd01d2814329e334d4f0ce8ce8937c3a58",
+          "bytes": 4594
         },
         {
           "path": "FLIGHTSIM-UPSTREAM-SOURCE.json",
@@ -844,8 +844,8 @@
         },
         {
           "path": "src/render/forward_io.wgsl",
-          "sha256": "e140ef1063bf097432fc6866749e3fc2b3893dddcdb24ac1240de0f8fdd0ca8a",
-          "bytes": 1487
+          "sha256": "6bd5a1eca996b64f3f60c6a53d4a9fd279a2b19fbc3cf84ee97d067eee3617bc",
+          "bytes": 1887
         },
         {
           "path": "src/render/gpu_preprocess.rs",
@@ -1116,6 +1116,7 @@
         "LICENSE-FLIGHTSIM-APACHE",
         "LICENSE-FLIGHTSIM-MIT",
         "src/meshlet/mod.rs",
+        "src/render/forward_io.wgsl",
         "src/render/parallax_mapping.wgsl",
         "third-party-notices/EA-fastnoise-LICENSE.txt",
         "third-party-notices/EA-fastnoise-NOTICE.txt",

@@ -327,20 +327,8 @@ impl TerrainSeam {
                 // differently. Repeated fans overlap harmlessly; a valid cut has
                 // at most four incident tiles, so this is a fixed-size guard.
                 let vertices: Vec<_> = patch.vertices.iter().map(|&v| output.push(v)).collect();
-                if patch.vertices.len() == 3
-                    && patch.links == [[0, 1], [0, 2], [1, 2]]
-                    && output.triangle_has_area(vertices[0], vertices[1], vertices[2])
-                {
-                    // This closed source polygon is already a triangle. Avoid
-                    // rounding an unnecessary mean subdivision off its plane.
-                    // Keep the whole cap in every ribbon, including both sides.
-                    output.triangle(vertices[0], vertices[1], vertices[2]);
-                } else {
-                    // A collapsed encoded triangle can still have a nonzero
-                    // rounded fan. Preserve that guard, and all other topology.
-                    for [first, second] in &patch.links {
-                        output.triangle(vertices[*first], vertices[*second], anchor);
-                    }
+                for [first, second] in &patch.links {
+                    output.triangle(vertices[*first], vertices[*second], anchor);
                 }
             } else {
                 output.triangle(a, b, anchor);
@@ -734,16 +722,13 @@ impl MeshBuilder {
         index
     }
 
-    fn triangle_has_area(&self, a: u32, b: u32, c: u32) -> bool {
+    fn triangle(&mut self, a: u32, b: u32, c: u32) {
         let point = |index: u32| vector(self.mesh.positions[index as usize]);
-        (point(b) - point(a))
+        if (point(b) - point(a))
             .cross(point(c) - point(a))
             .length_squared()
             > 0.0
-    }
-
-    fn triangle(&mut self, a: u32, b: u32, c: u32) {
-        if self.triangle_has_area(a, b, c) {
+        {
             // Either edge can be higher and corner fans can fold. Both windings
             // are intentional: never depend on the terrain material's cull mode.
             self.mesh.indices.extend_from_slice(&[a, b, c, a, c, b]);
@@ -753,153 +738,5 @@ impl MeshBuilder {
     fn finish(mut self) -> TerrainMesh {
         self.mesh.surface_vertex_count = self.mesh.positions.len();
         self.mesh
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn isolated_corner(
-        origin: [f64; 3],
-        positions: &[[f64; 3]],
-        links: &[[usize; 2]],
-    ) -> TerrainMesh {
-        let origin = Ecef(DVec3::from_array(origin));
-        let first = TileId::new(4, 15, 7);
-        let second = TileId::new(4, 16, 7);
-        let vertex = TerrainBoundaryVertex {
-            position: [0.0; 3],
-            normal: [0.0, 0.0, 1.0],
-            uv: [0.0; 2],
-            elevation: 0.0,
-            slope: 0.0,
-        };
-        // Degenerate ribbon data isolate the endpoint patch under test. Both
-        // boundary frames share the specified origin; no terrain is resampled.
-        let boundaries = [first, second]
-            .map(|id| {
-                (
-                    id,
-                    TerrainBoundary {
-                        id,
-                        origin,
-                        edges: std::array::from_fn(|_| vec![vertex; 2]),
-                        fingerprint: 0,
-                    },
-                )
-            })
-            .into_iter()
-            .collect();
-        let vertices: Vec<_> = positions
-            .iter()
-            .map(|&p| SeamVertex {
-                position: DVec3::from_array(p),
-                normal: DVec3::Z,
-                uv: [0.0; 2],
-                elevation: 0.0,
-                slope: 0.0,
-            })
-            .collect();
-        let anchor = mean_vertex(vertices.iter().copied());
-        let extent = EdgeExtent::new(first, TerrainEdge::East);
-        TerrainSeam {
-            key: TerrainSeamKey {
-                first,
-                second,
-                edge: TerrainEdge::East,
-            },
-            start: extent.start,
-            end: extent.end,
-            anchors: [
-                anchor,
-                SeamVertex {
-                    position: origin.as_vec(),
-                    ..anchor
-                },
-            ],
-            fingerprints: [0; 2],
-            pole_caps: Vec::new(),
-            corner_patches: [
-                Some(Arc::new(CornerPatch {
-                    vertices,
-                    links: links.to_vec(),
-                })),
-                None,
-            ],
-        }
-        .build_mesh(&boundaries)
-    }
-
-    #[test]
-    fn submillimetre_three_source_corner_retains_the_source_triangle() {
-        // Recorded Balzers source geometry: two sources are 0.983 mm apart,
-        // while the third is about 916 m away. The polygon has positive area.
-        let source = [
-            [
-                4_292_359.428_340_639,
-                704_162.919_302_338_5,
-                4_651_069.594_732_377,
-            ],
-            [
-                4_292_359.429_287_014,
-                704_162.919_037_277_6,
-                4_651_069.594_725_196,
-            ],
-            [
-                4_291_744.241_002_813,
-                704_061.997_131_515_1,
-                4_650_398.504_183_966,
-            ],
-        ];
-        let origin = [
-            4_298_430.722_448_125_5,
-            711_931.789_611_983_8,
-            4_644_518.530_551_153,
-        ];
-        let mesh = isolated_corner(origin, &source, &[[0, 1], [0, 2], [1, 2]]);
-        assert_eq!(mesh.indices, [5, 6, 7, 5, 7, 6]);
-        assert!(
-            !mesh.indices.contains(&4),
-            "rounded mean is not part of the surface"
-        );
-        let [a, b, c] = [5, 6, 7].map(|i| vector(mesh.positions[i]));
-        assert!((b - a).cross(c - a).length_squared() > 0.0);
-    }
-
-    #[test]
-    #[allow(
-        clippy::float_cmp,
-        reason = "exact degeneracy selects the production fallback"
-    )]
-    fn collapsed_direct_triangle_preserves_the_nonzero_rounded_fan() {
-        // All three endpoint encodings are collinear in this retained frame,
-        // but the separately rounded mean anchor still closes nonzero faces.
-        let source = [
-            [
-                2_447_829.521_310_841,
-                0.103_689_159_266_650_68,
-                5_870_022.584_623_937_5,
-            ],
-            [
-                2_447_829.500_513_407_4,
-                0.000_303_759_588_859_975_34,
-                5_870_022.561_679_438,
-            ],
-            [
-                2_447_829.520_367_544_6,
-                0.005_441_385_088_488_46,
-                5_870_022.574_627_887,
-            ],
-        ];
-        let origin = [
-            1_224_359.125_513_407_2,
-            243_540.172_178_759_6,
-            6_233_845.092_929_438,
-        ];
-        let mesh = isolated_corner(origin, &source, &[[0, 1], [0, 2], [1, 2]]);
-        let [a, b, c] = [5, 6, 7].map(|i| vector(mesh.positions[i]));
-        assert_eq!((b - a).cross(c - a).length_squared(), 0.0);
-        assert_eq!(mesh.indices, [5, 6, 4, 5, 4, 6, 5, 7, 4, 5, 4, 7]);
     }
 }
