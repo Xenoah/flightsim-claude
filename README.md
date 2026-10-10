@@ -5,7 +5,7 @@
 **M2 のゲームループを実装済み。M3 の実機・操縦感検証と、M4 の拡張を進めています。**
 実地形・滑走路・時刻・風・乱流・雲層、着陸練習と 5 段階評価に加え、
 2 機種の選択、保存できる入力設定、リプレイ、合成交通、ローカル/LAN 同期を実装しています。
-この README は alpha.21 のソースと同梱機能の説明です。配布物の公開状態と対象版は
+この README は alpha.22 のソースと同梱機能の説明です。配布物の公開状態と対象版は
 [Releases](https://github.com/Xenoah/flightsim-claude/releases) で確認してください。Windows 版は
 対象 commit の CI、展開 zip からの 2 機種の撮影・正常終了、checksum 検査の後にだけ公開されます。
 Windows 版のダウンロード・再配布前に、下記の
@@ -284,7 +284,7 @@ Windows、UCRT、グラフィックスドライバー、x64 Visual C++ v14 ラ�
 alpha.20 は source `f3d32d816cc625d10e4309f3506c150280e749a5` の CI、展開した zip の
 Windows WARP 起動・モデル読込・完全な PNG・終了コード 0 を確認済みです。
 公開アーカイブの SHA-256 と実 PNG の確認記録は [統合 QA](docs/qa/overnight-status-2026-10-01.md#verified-alpha20-release)
-にあります。alpha.21 の 2 機種入り配布・各機体の smoke は別の公開ゲートです。
+にあります。alpha.22 の 2 機種入り配布・各機体の smoke は別の公開ゲートです。
 
 ## 未実装・未検証
 

@@ -10,10 +10,10 @@
     "docs/qa/alpha22-release-preparation-2026-10-10.md",
     "This authorization does not attest native success. Changed-source applicability, same-build archive verification and extracted two-aircraft smoke remain independent required gates."
   ],
-  "release_inventory_sha256": "96f78b188b4bee6de684c6f6cecb4de4980f09ef4c3b458b9ac1504044597029",
+  "release_inventory_sha256": "7fa86b23e7bcf5b9d6f1d6505474c140c862da720c262438872f5a9022d0cd0d",
   "schema_version": 1,
   "scope": "github-windows-prerelease",
-  "source_inventory_sha256": "8d92acd4998f0a5910f3b8fd1ce7b500331b53d572ee3c03b6a369fa7febbcbe",
+  "source_inventory_sha256": "ac3c3c2f14dffcefd422005fe6e1fe8a474571c48b829a7c762750810273df18",
   "status": "authorized",
   "target": "x86_64-pc-windows-msvc",
   "version": "0.6.0-alpha.22"
