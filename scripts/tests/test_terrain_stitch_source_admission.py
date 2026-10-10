@@ -30,7 +30,8 @@ class TerrainStitchSourceAdmissionTests(unittest.TestCase):
     commit = staticmethod(fixture_module.ComponentTermsSourceAdmissionTests.commit)
 
     def test_exact_delta_preserves_all_prior_pins_without_local_git_history(self):
-        contract = candidate.load_replay_contract(ROOT)
+        candidate.load_replay_contract(ROOT)
+        contract = json.loads((ROOT / candidate.ALPHA22_BASE_CONTRACT_PATH).read_text())
         migration = json.loads((ROOT / MIGRATION).read_text())
         base = json.loads((ROOT / BASE_CONTRACT).read_text())
         self.assertEqual(candidate.TERRAIN_STITCH_SOURCE_PATHS, ADDED)
@@ -54,7 +55,8 @@ class TerrainStitchSourceAdmissionTests(unittest.TestCase):
         for path, expected in base['source_sha256'].items():
             historical_path = RELOCATIONS.get(path, path)
             self.assertEqual(contract['source_sha256'][historical_path], expected, path)
-            self.assertEqual(candidate.digest(ROOT / historical_path), expected, path)
+            checkout_path = candidate.ALPHA22_HISTORICAL_RELOCATIONS.get(historical_path, historical_path)
+            self.assertEqual(candidate.digest(ROOT / checkout_path), expected, path)
         for path in CHANGED:
             self.assertEqual(migration['replaced_source_sha256'][path], {
                 'previous_sha256': base['source_sha256'][path],
@@ -64,12 +66,12 @@ class TerrainStitchSourceAdmissionTests(unittest.TestCase):
                          '203d43b06ef860813fd3f21f482f4751d3ad0b625872086a7eb76d3b91d04db5')
         self.assertEqual(candidate.digest(ROOT / candidate.COMPONENT_TERMS_MIGRATION_PATH),
                          'b41c6e7d163f98d0ddc4bddb3063dbdff82ea3462064b2b887954367b457bcc9')
-        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS), 934)
+        self.assertEqual(len(candidate.REPLAY_CONTRACT_PATHS - candidate.ALPHA22_SOURCE_PATHS), 934)
         self.assertEqual(len(candidate.CURRENT_CRATE_SOURCE_PATHS), 495)
         self.assertEqual(len(candidate.HISTORICAL_REPLAY_CONTRACT_PATHS), 404)
         self.assertEqual(len(candidate.INDEPENDENT_REPLAY_HASHES), 102)
         self.assertEqual(len(candidate.CORE_PIPELINE_SOURCE_PATHS), 55)
-        self.assertEqual(len(capture.check.SOURCE_PATHS), 50)
+        self.assertEqual(len(capture.check.SOURCE_PATHS), 53)
         self.assertEqual(len(capture.BOUND_FILES), 4)
         self.assertIs(contract['release_authorized'], False)
 

@@ -1,3 +1,18 @@
+## alpha.22 terrain stitch fixes
+
+Terrain-only perspective-centroid interpolation reduces the reproduced night
+stitch-color spikes. Closed nondegenerate three-source terrain corners use the
+complete source triangle without redundant mean-anchor faces. Degenerate/open
+cases, physical terrain, normal materials and MSAA settings retain their behavior.
+
+The source candidate has bounded Linux llvmpipe evidence for 901 night and 1,201
+high-flight frames. Ordinary-tile color residuals, one pre-existing skyline
+subsample and CPU-reference precision limits remain; issue #6 stays open.
+This historical candidate evidence is not a new Windows execution or a claim of
+universal artifact-free rendering or depth accuracy. This release's Windows
+build and two extracted-aircraft captures must have their own source-bound evidence.
+See the included CHANGELOG and source QA report for the measured limits.
+
 ## Windows component terms: review before download or redistribution
 
 This Windows executable includes proprietary Microsoft native runtime/startup

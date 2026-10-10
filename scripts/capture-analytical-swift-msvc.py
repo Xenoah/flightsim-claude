@@ -30,7 +30,7 @@ SPEC.loader.exec_module(check)
 require = check.require
 IDENTITY = 'analytical-swift-msvc-build-capture-v1'
 CONTRACT = 'scripts/analytical-swift-capture-contract.json'
-SOURCE_ADMISSION = 'analytical-swift-terrain-stitch-capture-source-admission-v1'
+SOURCE_ADMISSION = 'analytical-swift-alpha22-version-capture-source-admission-v1'
 REFERENCE = 'reference/bevy_core_pipeline-0.18.1.crate'
 BOUND_FILES = {
     'scripts/capture-analytical-swift-msvc.py',
@@ -38,7 +38,7 @@ BOUND_FILES = {
     '.github/workflows/analytical-swift-msvc-build.yml',
     'docs/release/analytical-swift-msvc-capture.md',
 }
-INHERITED_CONTRACTS = {'scripts/analytical-swift-source-contract.json': 'a0bb5a2e4b85b0481e882ac287a49c69dd737583155c930e127f18762d5aaaf6', 'scripts/replay-candidate-contract.json': '88a7a983376e227171243a69e3560f43af1a4326092f638f98bde64fef4accd7'}
+INHERITED_CONTRACTS = {'scripts/analytical-swift-source-contract.json': 'f018b328d06f464f7d30d3a272dba49ac00a98bd8ad96c7b846a6b09fc46a173', 'scripts/replay-candidate-contract.json': 'd5575c552cdf2522da4a2e8a50c9b41ff800632dae55138700bbed3b165e7412'}
 
 MODES = ('analytic', 'ordinary')
 OUTPUTS = {'rustc': 'rustc.txt', 'graph': 'graph.txt', 'build': 'messages.jsonl', 'metadata': 'metadata.json'}
@@ -114,7 +114,7 @@ def source_evidence(repo, expected):
             and contract['identity'] == IDENTITY
             and contract['base_reviewed_source'] == check.candidate.REVIEWED_RUNTIME_SOURCE
             and contract['base_reviewed_runtime_tree'] == check.candidate.REVIEWED_RUNTIME_TREE
-            and contract['source_migration_sha256'] == check.candidate.TERRAIN_STITCH_MIGRATION_SHA256
+            and contract['source_migration_sha256'] == check.candidate.ALPHA22_MIGRATION_SHA256
             and contract['source_admission'] == SOURCE_ADMISSION
             and contract['source_recipe'] == check.SOURCE_RECIPE,
             'invalid additive capture source contract')

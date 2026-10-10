@@ -19,6 +19,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 import zlib
 
@@ -42,7 +43,7 @@ LEGACY_SOURCE_HASHES = {
 }
 REPLAY_CONTRACT_PATH = "scripts/replay-candidate-contract.json"
 HISTORICAL_REPLAY_CONTRACT_ID = "swift-candidate-replay-v3-v1"
-REPLAY_CONTRACT_ID = "full-two-aircraft-terrain-stitch-source-v1"
+REPLAY_CONTRACT_ID = "full-two-aircraft-alpha22-version-source-v1"
 REVIEWED_RUNTIME_SOURCE = "960c3126e6a4bc22b8d4acc6e6737f8f2b473bef"
 REVIEWED_RUNTIME_TREE = "b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e"
 SOURCE_ADMISSION_SCOPE = "source-only; native, whole-target and publication gates remain unqualified"
@@ -101,6 +102,33 @@ TERRAIN_STITCH_PREVIOUS_SHA256 = {
 TERRAIN_STITCH_SOURCE_PATHS = frozenset({
     TERRAIN_STITCH_MIGRATION_PATH, TERRAIN_STITCH_BASE_CONTRACT_PATH,
     *TERRAIN_STITCH_HISTORICAL_RELOCATIONS.values(),
+})
+# The fourth migration changes release versions only. The previous Cargo and
+# all three source-contract witnesses retain their exact alpha.21 bytes.
+ALPHA22_MIGRATION_PATH = "scripts/alpha22-version-source-migration.json"
+ALPHA22_MIGRATION_SHA256 = "c35695a2319ca48b154617021ab9b48c43d7ae532d3f421e9a1058c4f7e4679a"
+ALPHA22_BASE_CONTRACT_PATH = "scripts/history/0bc4a49-replay-candidate-contract.json"
+ALPHA22_BASE_CONTRACT_HASHES = {
+    "scripts/history/0bc4a49-replay-candidate-contract.json": "88a7a983376e227171243a69e3560f43af1a4326092f638f98bde64fef4accd7",
+    "scripts/history/0bc4a49-analytical-swift-source-contract.json": "a0bb5a2e4b85b0481e882ac287a49c69dd737583155c930e127f18762d5aaaf6",
+    "scripts/history/0bc4a49-analytical-swift-capture-contract.json": "7ba04750322d10c754c14ada52aa052d99bc80a97f37759e25de87e7ec3c2619",
+}
+ALPHA22_HISTORICAL_RELOCATIONS = {
+    "Cargo.toml": "scripts/history/0bc4a49-Cargo.toml",
+    "Cargo.lock": "scripts/history/0bc4a49-Cargo.lock",
+}
+ALPHA22_PREVIOUS_SHA256 = {
+    "Cargo.toml": "d02e563c40d92d180cfa8ca321cf69b029285cd6c0da553e5209cf66ebb03300",
+    "Cargo.lock": "198064f4ec49650db29b76de5834880de1e3fd9bc8e9860890eb3987703599b2",
+}
+ALPHA22_SOURCE_PATHS = frozenset({
+    ALPHA22_MIGRATION_PATH, *ALPHA22_BASE_CONTRACT_HASHES,
+    *ALPHA22_HISTORICAL_RELOCATIONS.values(),
+})
+ALPHA22_WORKSPACE_PACKAGES = frozenset({
+    "flightsim-core", "flightsim-fdm", "flightsim-world", "flightsim-content",
+    "flightsim-tilegen", "flightsim-assetgen", "flightsim-sim", "flightsim-render",
+    "flightsim-app", "flightsim-audio", "flightsim-ui", "flightsim-input", "flightsim-net",
 })
 HISTORICAL_RUNTIME_RELOCATIONS = {
     COMPONENT_TERMS_MAIN_PATH: COMPONENT_TERMS_HISTORY_PATH,
@@ -1158,6 +1186,7 @@ REPLAY_CONTRACT_PATHS |= (COMPONENT_TERMS_SOURCE_PATHS
 REPLAY_CONTRACT_PATHS |= (TERRAIN_CENTROID_RUNTIME_PATHS
                           | {TERRAIN_CENTROID_MIGRATION_PATH, TERRAIN_CENTROID_HISTORY_PATH})
 REPLAY_CONTRACT_PATHS |= TERRAIN_STITCH_SOURCE_PATHS
+REPLAY_CONTRACT_PATHS |= ALPHA22_SOURCE_PATHS
 
 # Independent Python encoders and their existing bytes stay frozen separately
 # from the moving reviewed implementation. Never regenerate to satisfy a pin.
@@ -1400,6 +1429,57 @@ def validate_modified_source_checkout(repo):
         require(observed == expected, "modified source checkout boundary changed: " + prefix)
 
 
+def validate_alpha22_version_delta(previous, current):
+    """Admit only one workspace and thirteen local-package version changes.
+
+    TOML semantics fix the package/field boundary; exact replacement also rejects
+    comments, whitespace, dependency order and any other incidental byte drift.
+    """
+    paths = set(ALPHA22_HISTORICAL_RELOCATIONS)
+    require(isinstance(previous, dict) and isinstance(current, dict)
+            and set(previous) == paths and set(current) == paths,
+            "alpha22 version file boundary changed")
+    old, new = "0.6.0-alpha.21", "0.6.0-alpha.22"
+    for path in paths:
+        require(isinstance(previous[path], bytes) and isinstance(current[path], bytes)
+                and 0 < len(previous[path]) <= 1024 * 1024
+                and 0 < len(current[path]) <= 1024 * 1024,
+                "alpha22 version input exceeds byte boundary: " + path)
+    before = tomllib.loads(previous["Cargo.toml"].decode("utf-8"))
+    after = tomllib.loads(current["Cargo.toml"].decode("utf-8"))
+    require(before.get("workspace", {}).get("package", {}).get("version") == old
+            and after.get("workspace", {}).get("package", {}).get("version") == new,
+            "alpha22 workspace version changed outside approved transition")
+    require(len(before["workspace"]["members"]) == 13
+            and set(before["workspace"]["members"])
+                == {"crates/" + name for name in ALPHA22_WORKSPACE_PACKAGES},
+            "alpha22 workspace membership changed")
+    after["workspace"]["package"]["version"] = old
+    require(after == before, "alpha22 manifest contains non-version changes")
+    before = tomllib.loads(previous["Cargo.lock"].decode("utf-8"))
+    after = tomllib.loads(current["Cargo.lock"].decode("utf-8"))
+    require(isinstance(before.get("package"), list) and isinstance(after.get("package"), list)
+            and len(before["package"]) == len(after["package"]),
+            "alpha22 lock package boundary changed")
+    seen = set()
+    for prior, changed in zip(before["package"], after["package"]):
+        name = prior.get("name")
+        if name in ALPHA22_WORKSPACE_PACKAGES:
+            require(name not in seen and prior.get("version") == old
+                    and changed.get("name") == name and changed.get("version") == new
+                    and "source" not in prior and "checksum" not in prior,
+                    "alpha22 local package identity changed: " + name)
+            seen.add(name)
+            changed["version"] = old
+        require(changed == prior, "alpha22 lock contains non-version changes")
+    require(seen == ALPHA22_WORKSPACE_PACKAGES and after == before,
+            "alpha22 lock workspace or metadata changed")
+    for path, count in (("Cargo.toml", 1), ("Cargo.lock", 13)):
+        require(previous[path].count(old.encode("ascii")) == count
+                and current[path] == previous[path].replace(old.encode("ascii"), new.encode("ascii")),
+                "alpha22 version bytes differ outside approved substitutions: " + path)
+
+
 def validate_replay_contract(contract):
     require(isinstance(contract, dict) and set(contract) == {"schema_version", "contract",
             "base_reviewed_source", "base_reviewed_runtime_tree", "source_migration_sha256",
@@ -1408,7 +1488,7 @@ def validate_replay_contract(contract):
             and contract.get("contract") == REPLAY_CONTRACT_ID, "invalid reviewed replay contract")
     require(contract.get("base_reviewed_source") == REVIEWED_RUNTIME_SOURCE
             and contract.get("base_reviewed_runtime_tree") == REVIEWED_RUNTIME_TREE
-            and contract.get("source_migration_sha256") == TERRAIN_STITCH_MIGRATION_SHA256
+            and contract.get("source_migration_sha256") == ALPHA22_MIGRATION_SHA256
             and contract.get("scope") == SOURCE_ADMISSION_SCOPE
             and contract.get("release_authorized") is False, "source admission identity or scope changed")
     require(isinstance(contract.get("base_reviewed_source"), str)
@@ -1546,10 +1626,65 @@ def validate_replay_contract(contract):
     base_pins = base_contract["source_sha256"]
     require(base_contract["contract"] == "full-two-aircraft-terrain-centroid-source-v1"
             and base_contract["source_migration_sha256"] == TERRAIN_CENTROID_MIGRATION_SHA256
-            and set(base_pins) == REPLAY_CONTRACT_PATHS - TERRAIN_STITCH_SOURCE_PATHS
-            and all(pins.get(TERRAIN_STITCH_HISTORICAL_RELOCATIONS.get(path, path)) == value
+            and set(base_pins) == REPLAY_CONTRACT_PATHS - TERRAIN_STITCH_SOURCE_PATHS - ALPHA22_SOURCE_PATHS
+            and all(pins.get(ALPHA22_HISTORICAL_RELOCATIONS.get(
+                        path, TERRAIN_STITCH_HISTORICAL_RELOCATIONS.get(path, path))) == value
                     for path, value in base_pins.items()),
             "terrain stitch prior source pins changed")
+    root = Path(__file__).parent.parent
+    version_file = root / ALPHA22_MIGRATION_PATH
+    require(digest(version_file) == ALPHA22_MIGRATION_SHA256
+            and pins[ALPHA22_MIGRATION_PATH] == ALPHA22_MIGRATION_SHA256,
+            "alpha22 version migration changed")
+    version = json.loads(version_file.read_text(encoding="utf-8"))
+    require(set(version) == {"schema_version", "identity", "base_source", "base_tree",
+            "base_source_kind", "public_base_source", "public_base_tree",
+            "base_contract_sha256", "previous_source_migration_sha256", "preserved_runtime_sha256",
+            "previous_version", "version", "historical_relocations", "replaced_source_sha256",
+            "added_source_sha256"}
+            and type(version["schema_version"]) is int and version["schema_version"] == 1
+            and version["identity"] == "full-two-aircraft-alpha22-version-source-migration-v1"
+            and version["base_source"] == "0bc4a4961c677a5173350630bf2641a2c1b40b94"
+            and version["base_tree"] == "7ac0cedd0963ac4133fa8c5251f57f26037324d7"
+            and version["base_source_kind"] == "unpublished-local-checkpoint"
+            and version["public_base_source"] == "3574bf175c66851df51ae89903e04a13f4a172e6"
+            and version["public_base_tree"] == version["base_tree"]
+            and version["base_contract_sha256"] == ALPHA22_BASE_CONTRACT_HASHES
+            and version["previous_source_migration_sha256"] == TERRAIN_STITCH_MIGRATION_SHA256
+            and version["preserved_runtime_sha256"] == PRESERVED_RUNTIME_SHA256
+            and version["previous_version"] == "0.6.0-alpha.21"
+            and version["version"] == "0.6.0-alpha.22"
+            and version["historical_relocations"] == ALPHA22_HISTORICAL_RELOCATIONS
+            and version["added_source_sha256"] == {}, "invalid alpha22 version migration identity")
+    for path, expected in ALPHA22_BASE_CONTRACT_HASHES.items():
+        require(digest(root / path) == expected and pins[path] == expected,
+                "alpha22 historical contract changed: " + path)
+    previous_contract = json.loads((root / ALPHA22_BASE_CONTRACT_PATH).read_text(encoding="utf-8"))
+    previous_pins = previous_contract["source_sha256"]
+    require(previous_contract["contract"] == "full-two-aircraft-terrain-stitch-source-v1"
+            and previous_contract["source_migration_sha256"] == TERRAIN_STITCH_MIGRATION_SHA256
+            and len(previous_pins) == 934
+            and set(previous_pins) == REPLAY_CONTRACT_PATHS - ALPHA22_SOURCE_PATHS
+            and all(pins.get(ALPHA22_HISTORICAL_RELOCATIONS.get(path, path)) == value
+                    for path, value in previous_pins.items()),
+            "alpha22 prior source pins changed")
+    replacements = version["replaced_source_sha256"]
+    require(isinstance(replacements, dict) and set(replacements) == set(ALPHA22_PREVIOUS_SHA256),
+            "alpha22 version replacement boundary changed")
+    previous_bytes, current_bytes = {}, {}
+    for path, previous in ALPHA22_PREVIOUS_SHA256.items():
+        historical = ALPHA22_HISTORICAL_RELOCATIONS[path]
+        previous_bytes[path] = (root / historical).read_bytes()
+        require(hashlib.sha256(previous_bytes[path]).hexdigest() == previous
+                == pins[historical] == previous_pins[path],
+                "alpha22 historical Cargo bytes changed: " + path)
+        # Derive the sole admitted current bytes from the immutable witness.
+        # Actual checkout/canonical bytes are compared in source_inputs below.
+        current_bytes[path] = previous_bytes[path].replace(b"0.6.0-alpha.21", b"0.6.0-alpha.22")
+        expected = hashlib.sha256(current_bytes[path]).hexdigest()
+        require(replacements[path] == {"previous_sha256": previous, "sha256": expected}
+                and pins[path] == expected, "alpha22 version replacement changed: " + path)
+    validate_alpha22_version_delta(previous_bytes, current_bytes)
     return contract
 
 

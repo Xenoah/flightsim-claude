@@ -1,8 +1,8 @@
-# Full two-aircraft terrain-stitch source admission, version 1
+# Full two-aircraft alpha.22 version source admission, version 1
 
-This source-only identity is `full-two-aircraft-terrain-stitch-source-v1`.
-The current terrain-stitch migration extends the preserved terrain-centroid and
-component-terms migrations; none is native or publication evidence.
+This source-only identity is `full-two-aircraft-alpha22-version-source-v1`.
+The current version-only migration extends the preserved terrain-stitch,
+terrain-centroid and component-terms migrations; none is native or publication evidence.
 The `base_reviewed_source` and `base_reviewed_runtime_tree` fields identify the
 previous runtime composition `960c3126e6a4bc22b8d4acc6e6737f8f2b473bef`, tree
 `b3bbd57bc3819b1b1eda35ce4f8b476c52d1b24e`, as historical base provenance only.
@@ -13,7 +13,7 @@ project-license texts. Every execution still requires its actual final clean com
 Prior `55094fa` builds, graphs and native observations remain reference evidence;
 none are qualified evidence for the changed runtime.
 
-The current replay source contract names 934 exact files. Its literal path sets
+The current replay source contract names 940 exact files. Its literal path sets
 include the previous 404-file boundary, every one of the 55 local core-pipeline
 files, complete original-highwing inputs and provenance, and the frozen 497
 runtime identities. The frozen map itself is unchanged. Its earlier changed
@@ -80,6 +80,39 @@ for its historical preservation boundary, and [the terrain-centroid migration](.
 for its preserved shading-only source boundary. The [three-source stitch
 migration](../qa/terrain-stitch-source-bindings-2026-10-09.md) binds the current
 geometry change, its historical witnesses and source mutation-test boundary.
+
+## Alpha.22 version-only boundary
+
+`scripts/alpha22-version-source-migration.json` permits exactly the workspace
+version in `Cargo.toml` and the versions of the thirteen named local flightsim
+packages in `Cargo.lock` to move from `0.6.0-alpha.21` to `0.6.0-alpha.22`.
+The exact historical Cargo witnesses are `scripts/history/0bc4a49-Cargo.toml`
+and `scripts/history/0bc4a49-Cargo.lock`. TOML checks constrain the changed
+fields and local package membership; an exact byte-substitution check additionally
+forbids comment, whitespace, ordering or other incidental changes. Each file is
+bounded to one MiB. Dependency versions, sources, checksums, features, profiles,
+workspace membership and lockfile metadata remain unchanged.
+
+The base is local checkpoint `0bc4a4961c677a5173350630bf2641a2c1b40b94`, tree
+`7ac0cedd0963ac4133fa8c5251f57f26037324d7`. The same candidate tree is published
+as `3574bf175c66851df51ae89903e04a13f4a172e6`; the local checkpoint is not
+relabeled as a published commit. Checked-in witnesses suffice without either Git
+object. The previous three source contracts remain byte-exact at
+`scripts/history/0bc4a49-{replay-candidate,analytical-swift-source,analytical-swift-capture}-contract.json`.
+All 934 previous replay pins survive, with only the two Cargo entries relocated
+to their historical paths. The original 497 runtime identities, all three prior
+migration manifests, 102 independent replay anchors, CRT terms/startup UI and
+runtime source bytes remain unchanged.
+
+The analytical contract now binds 53 exact inputs, including the new version
+mutation tests. Its separate, bounded dependency-notice collector change makes
+relative POSIX path ordering host-independent and fixes generated README/inventory
+newlines to LF; see [the collector ordering evidence](../qa/dependency-notice-ordering-2026-10-10.md).
+That tooling change does not widen the version migration or alter original
+dependency notice bytes. The capture contract retains four inputs and explicit inherited
+contract hashes. Historical alpha.21 reports, inventory review and authorization
+never become alpha.22 approvals. Fresh inventory-bound review and authorization,
+exact-final-source CI, Windows build and extracted-archive smoke remain separate.
 
 A source pass establishes neither native execution, appearance, whole-target
 rights, source-hosting verification nor publication authority. The final full

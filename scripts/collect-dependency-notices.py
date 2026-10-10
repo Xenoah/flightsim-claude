@@ -70,6 +70,16 @@ def closure(metadata: dict, root_package: str) -> tuple[dict, dict, list[str]]:
     return packages, nodes, sorted(seen, key=lambda i: (packages[i]["name"], packages[i]["version"], i))
 
 
+def source_notice_order(path: Path, source: Path) -> str:
+    """Use exact case-sensitive POSIX relative names on every collector host.
+
+    pathlib's default ordering is host-flavored: Windows folds case while POSIX
+    does not. The emitted original inventory must not depend on that behavior.
+    This orders discovery only; it never rewrites an existing inventory/notice.
+    """
+    return path.relative_to(source).as_posix()
+
+
 def collect(metadata_path: Path, repo: Path, output: Path, target: str, root_package: str) -> dict:
     if output.is_symlink() or (output.exists() and any(output.iterdir())):
         raise ValueError("output must be absent or empty; do not reuse a stale notice tree")
@@ -107,7 +117,7 @@ def collect(metadata_path: Path, repo: Path, output: Path, target: str, root_pac
         if package_id in metadata["workspace_members"]:
             candidates = [(workspace / p, workspace) for p in ("LICENSE-MIT", "LICENSE-APACHE")]
         else:
-            for path in sorted(source.rglob("*")):
+            for path in sorted(source.rglob("*"), key=lambda path: source_notice_order(path, source)):
                 if path.is_file() and NOTICE_NAME.search(path.name) and ".git" not in path.parts:
                     candidates.append((path, source))
             explicit = package.get("license_file")
@@ -202,12 +212,12 @@ def collect(metadata_path: Path, repo: Path, output: Path, target: str, root_pac
         "review_status": "not_reviewed",
         "packages": records, "embedded_assets": embedded, "unresolved": unresolved,
     }
-    (output / "dependency-inventory.json").write_text(json.dumps(inventory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (output / "dependency-inventory.json").write_text(json.dumps(inventory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     (output / "README.txt").write_text(
         "Exact upstream notice bytes and declared license expressions, collected for review.\n"
         "This is not a license grant, legal approval, or a complete linked-binary SBOM.\n"
         "AND obligations, OR alternatives, embedded assets, source headers and platform runtimes\n"
-        "need review. Missing notices remain unresolved in dependency-inventory.json.\n", encoding="utf-8")
+        "need review. Missing notices remain unresolved in dependency-inventory.json.\n", encoding="utf-8", newline="\n")
     return inventory
 
 

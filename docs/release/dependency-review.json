@@ -103,7 +103,7 @@
     },
     "windows_dialog_execution_accepted": false
   },
-  "coverage_interpretation": "Completed source/notice coverage assessment uses the controlled ordinary Rust1.93.0 MSVC release recipe, exact359 Cargo source closure,1264 edges,510 verified header records, three complete modified vendor trees and exact source/runtime notice bytes. The unchanged supported hosted VS Enterprise source route and standard release CRT/startup family, plus eligible public SDK UM/UCRT library category where actually applicable, cover the plausible supplier set conservatively. Nonempty build-script requests are the reviewed BLAKE3 assembly libraries and winapi Windows API families. No observed contribution falls outside these covered source families. Installed tool samples are not asserted exhaustive, final linker command/toolset/SDK/static membership remain unknown, and no exact member map is required by this coverage method. SDK installations do not establish copied proprietary SDK code; no separate SDK benchmark restriction is imposed on FlightSim. Only the executable is shipped as native code; external OS, graphics and v14 runtime prerequisites are not redistributed app files. Approved component terms and project/supplier notices are represented at their exact separate source-copy destinations. Coverage here means source/notice/licensing applicability, not dynamic module execution, successful rendering, physical hardware coverage, individual recipient assent or publication permission. Exact installed candidate comparison is now bound to real environment-only run37902203369 (VS Enterprise18.10, toolsets14.29/14.44/14.51, SDK26100). This updates the supplier applicability assessment without claiming that the future application has used those files. All actual candidate fields remain exact future-match conditions; no new family-based acceptance rule was introduced.",
+  "coverage_interpretation": "Completed source/notice coverage assessment uses the controlled ordinary Rust1.93.0 MSVC release recipe, exact359 Cargo source closure,1264 edges,510 verified header records, three complete modified vendor trees and exact source/runtime notice bytes. The unchanged supported hosted VS Enterprise source route and standard release CRT/startup family, plus eligible public SDK UM/UCRT library category where actually applicable, cover the plausible supplier set conservatively. Nonempty build-script requests are the reviewed BLAKE3 assembly libraries and winapi Windows API families. No observed contribution falls outside these covered source families. Installed tool samples are not asserted exhaustive, final linker command/toolset/SDK/static membership remain unknown, and no exact member map is required by this coverage method. SDK installations do not establish copied proprietary SDK code; no separate SDK benchmark restriction is imposed on FlightSim. Only the executable is shipped as native code; external OS, graphics and v14 runtime prerequisites are not redistributed app files. Approved component terms and project/supplier notices are represented at their exact separate source-copy destinations. Coverage here means source/notice/licensing applicability, not dynamic module execution, successful rendering, physical hardware coverage, individual recipient assent or publication permission. Exact installed candidate comparison is now bound to real environment-only run37902203369 (VS Enterprise18.10, toolsets14.29/14.44/14.51, SDK26100). This updates the supplier applicability assessment without claiming that the future application has used those files. All actual candidate fields remain exact future-match conditions; no new family-based acceptance rule was introduced. Alpha.22 amendment: that completed supplier coverage is retained as historical conditional applicability, not as a newly observed platform. Fresh static target metadata verifies the same359 package names, versions except11 project workspace updates, features and1264 normal/build edges modulo those project identities. The modified bevy_pbr source change and shared zune provenance-manifest identity are explicitly reconciled; exact fresh Windows facts must still satisfy a separately completed applicability review.",
   "distribution_qualified": false,
   "environment_evidence": {
     "artifact_zip": {
@@ -122,10 +122,10 @@
     "scope": "environment_only"
   },
   "inventory": {
-    "bytes": 418672,
-    "sha256": "ee835131ecbe10f52d7a35034183486e68b8e73e2efbfc29e4dd1536eed9da74"
+    "bytes": 407610,
+    "sha256": "9028d70de8e818f2e72666a2686b198424cf4f78986b47c5d5683091f1949730"
   },
-  "inventory_sha256": "ee835131ecbe10f52d7a35034183486e68b8e73e2efbfc29e4dd1536eed9da74",
+  "inventory_sha256": "9028d70de8e818f2e72666a2686b198424cf4f78986b47c5d5683091f1949730",
   "kind": "whole_target_dependency_content_review",
   "native_evidence": {
     "build_summary": {
@@ -1671,9 +1671,9 @@
             "sha256": "9db1eb6adf8b7ccc2a6d55a3ff9f9e4619bf7fce9d9a72043a1ac4d3a0f6bbda"
           },
           {
-            "bytes": 714,
+            "bytes": 1295,
             "path": "FLIGHTSIM-MODIFICATION-NOTICE.txt",
-            "sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287"
+            "sha256": "8afc2937173e0732bb97416ccb1776354cb35e0577e41ab7f4197da209548700"
           },
           {
             "bytes": 8168,
@@ -1681,9 +1681,9 @@
             "sha256": "b2db7380b9d00fad6becfbad3738b6bb43ad99390a85cbda2cf0e34ccb21f308"
           },
           {
-            "bytes": 3470,
+            "bytes": 4594,
             "path": "FLIGHTSIM-PATCHES.md",
-            "sha256": "79549aa643f47a8a4098815b0107ac90ae3915afcf31821234f272c9ffa2a164"
+            "sha256": "c8363f10603759ecdbc8a90e0d77c1dd01d2814329e334d4f0ce8ce8937c3a58"
           },
           {
             "bytes": 24598,
@@ -2136,9 +2136,9 @@
             "sha256": "54413b49947dc0060e30f4ca47f61391642a67d963ead00e1037d1a8b61f96f2"
           },
           {
-            "bytes": 1487,
+            "bytes": 1887,
             "path": "src/render/forward_io.wgsl",
-            "sha256": "e140ef1063bf097432fc6866749e3fc2b3893dddcdb24ac1240de0f8fdd0ca8a"
+            "sha256": "6bd5a1eca996b64f3f60c6a53d4a9fd279a2b19fbc3cf84ee97d067eee3617bc"
           },
           {
             "bytes": 116812,
@@ -2403,8 +2403,8 @@
         ],
         "identity": "modified_vendored_source",
         "manifest": {
-          "bytes": 41831,
-          "sha256": "010fb99b2073bc63b1a21eaeb36116e2d103f07340443090c940aff364f360e1"
+          "bytes": 41870,
+          "sha256": "f577a1f47bc6bb2a8be69dad00fc17b7df52913a53661108f529b4f744f7207b"
         },
         "modified_paths": [
           "FLIGHTSIM-MODIFICATION-NOTICE.txt",
@@ -2414,6 +2414,7 @@
           "LICENSE-FLIGHTSIM-APACHE",
           "LICENSE-FLIGHTSIM-MIT",
           "src/meshlet/mod.rs",
+          "src/render/forward_io.wgsl",
           "src/render/parallax_mapping.wgsl",
           "third-party-notices/EA-fastnoise-LICENSE.txt",
           "third-party-notices/EA-fastnoise-NOTICE.txt",
@@ -2423,9 +2424,9 @@
         "original_registry_checksum": "a5ab6944ffc6fd71604c0fbca68cc3e2a3654edfcdbfd232f9d8b88e3d20fdc0",
         "original_upstream_revision": "f667c282dad2c1419afb5836ded22a3ec263970e",
         "replacement_patch": {
-          "bytes": 4231522,
+          "bytes": 4233657,
           "path": "docs/release/modified-source-patches/bevy_pbr-added-vendor.patch",
-          "sha256": "f5f59e6dbfb208c5dbb7e6400bf277b870c23e453107e9c9e7ad7ab5652ceae6"
+          "sha256": "014a6e02764dadef6579531e77cfb9dd44d32f5f6d1f2a65e99d1165d708b12d"
         },
         "retained_notices": [
           "FLIGHTSIM-MODIFICATION-NOTICE.txt",
@@ -2440,7 +2441,7 @@
         ],
         "source_and_license_review_approved": false,
         "source_root": "vendor/bevy_pbr",
-        "tree_sha256": "5c6855578774c6d03a23736c6e03e72488f8991edb87d833534f0c8973662a2a",
+        "tree_sha256": "5b1bb74c24ec29209bce638763677345800753c6ae1501f3cf342c6bdfb7110a",
         "upstream_registry_bytes_are_current_source": false
       },
       "obligations": [
@@ -4147,7 +4148,7 @@
       "exact_features": [
         "default"
       ],
-      "id": "flightsim-app@0.6.0-alpha.21",
+      "id": "flightsim-app@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4162,7 +4163,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-audio@0.6.0-alpha.21",
+      "id": "flightsim-audio@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4181,7 +4182,7 @@
       "exact_features": [
         "default"
       ],
-      "id": "flightsim-content@0.6.0-alpha.21",
+      "id": "flightsim-content@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4196,7 +4197,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-core@0.6.0-alpha.21",
+      "id": "flightsim-core@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4211,7 +4212,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-fdm@0.6.0-alpha.21",
+      "id": "flightsim-fdm@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4226,7 +4227,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-input@0.6.0-alpha.21",
+      "id": "flightsim-input@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4241,7 +4242,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-net@0.6.0-alpha.21",
+      "id": "flightsim-net@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4258,7 +4259,7 @@
       ],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-render@0.6.0-alpha.21",
+      "id": "flightsim-render@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4273,7 +4274,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-sim@0.6.0-alpha.21",
+      "id": "flightsim-sim@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4288,7 +4289,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-ui@0.6.0-alpha.21",
+      "id": "flightsim-ui@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -4303,7 +4304,7 @@
       "conservative_features": [],
       "declared_license": "MIT OR Apache-2.0",
       "exact_features": [],
-      "id": "flightsim-world@0.6.0-alpha.21",
+      "id": "flightsim-world@0.6.0-alpha.22",
       "modified_source": null,
       "obligations": [
         "Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged.",
@@ -9054,8 +9055,8 @@
         ],
         "identity": "modified_vendored_source",
         "manifest": {
-          "bytes": 41831,
-          "sha256": "010fb99b2073bc63b1a21eaeb36116e2d103f07340443090c940aff364f360e1"
+          "bytes": 41870,
+          "sha256": "f577a1f47bc6bb2a8be69dad00fc17b7df52913a53661108f529b4f744f7207b"
         },
         "modified_paths": [
           "Cargo.toml",
@@ -9123,9 +9124,9 @@
   ],
   "release_authorized": false,
   "remaining_delivery_checks": [
-    "Rebuild and independently project final exact source/binary/inventory; compare all explicit content conditions.",
-    "Verify same-build component schedule, Windows dialog/lifecycle behavior and recipient presentation.",
-    "Resolve scene failure and finish both-aircraft, screenshot, switch/replay, archive and publication checks."
+    "Obtain genuine alpha.22 same-source Windows dual-build/native/runtime facts; current Linux metadata and historical native observations are not substitutes.",
+    "Complete exact source/native applicability from genuine changed-source facts; current full-review-applicability.json remains intentionally stale.",
+    "Bind actual alpha.22 publication authority after final evidence/source review; run unchanged same-build archive, extracted two-aircraft smoke and remote source/tag/asset verification."
   ],
   "resolutions": [
     {
@@ -10047,8 +10048,8 @@
       "evidence": [
         {
           "path": "licenses/bevy_pbr-0.18.1/FLIGHTSIM-MODIFICATION-NOTICE.txt",
-          "sha256": "d038bd4936f7c7f402d0a1dbc1993c4945763d50bd500e1a37b5716f5d1e8287",
-          "source": "Exact upstream source https://github.com/bevyengine/bevy at reviewed source550; FLIGHTSIM-MODIFICATION-NOTICE.txt"
+          "sha256": "8afc2937173e0732bb97416ccb1776354cb35e0577e41ab7f4197da209548700",
+          "source": "Project-authored terrain-centroid modification notice from the complete current bevy_pbr vendor tree; reviewed public candidate3574bf175c66851df51ae89903e04a13f4a172e6"
         },
         {
           "path": "licenses/bevy_pbr-0.18.1/LICENSE-APACHE",
@@ -10092,7 +10093,7 @@
         }
       ],
       "id": "bevy_pbr@0.18.1",
-      "reason": "Selected distribution route: MIT for upstream crate code and new project-authored replacement; separately retained component licences/notices apply. Complete reviewed modified source replaces the superseded original routine. The former source-origin finding is resolved only for the exact modified vendor tree; removed original code is not retroactively licensed. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Preserve both Eric Bruneton and INRIA BSD notices and Tomasz Stachowiak source attribution. Historical-only limitation: the removed original tutorial-derived parallax routine remains uncleared and is absent from the exact reviewed 149-file modified vendor tree. This review covers the separately reviewed project-authored replacement; retained Bruneton/INRIA/Stachowiak and other applicable source notices remain required."
+      "reason": "Selected distribution route: MIT for upstream crate code and new project-authored replacement; separately retained component licences/notices apply. Complete reviewed modified source replaces the superseded original routine. The former source-origin finding is resolved only for the exact modified vendor tree; removed original code is not retroactively licensed. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Preserve both Eric Bruneton and INRIA BSD notices and Tomasz Stachowiak source attribution. Historical-only limitation: the removed original tutorial-derived parallax routine remains uncleared and is absent from the exact reviewed 149-file modified vendor tree. This review covers the separately reviewed project-authored replacement; retained Bruneton/INRIA/Stachowiak and other applicable source notices remain required. Bounded alpha.22 amendment additionally covers the project-authored terrain-only centroid interface, its updated modification notice and exact replacement patch. Other vendor licence/source-header obligations and the excluded historical parallax routine are unchanged."
     },
     {
       "evidence": [
@@ -11471,178 +11472,178 @@
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-app-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-app-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-app@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-app-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-app-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-app@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-app@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-app@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-audio-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-audio-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-audio@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-audio-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-audio-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-audio@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-audio@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-audio@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-content-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-content-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-content@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-content-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-content-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-content@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-content@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-content@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-core-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-core-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-core@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-core-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-core-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-core@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-core@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-core@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-fdm-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-fdm-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-fdm@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-fdm-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-fdm-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-fdm@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-fdm@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-fdm@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-input-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-input-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-input@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-input-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-input-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-input@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-input@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-input@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-net-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-net-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-net@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-net-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-net-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-net@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-net@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-net@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-render-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-render-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-render@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-render-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-render-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-render@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-render@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-render@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-sim-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-sim-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-sim@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-sim-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-sim-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-sim@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-sim@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-sim@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-ui-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-ui-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-ui@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-ui-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-ui-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-ui@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-ui@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-ui@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
         {
-          "path": "licenses/flightsim-world-0.6.0-alpha.21/LICENSE-MIT",
+          "path": "licenses/flightsim-world-0.6.0-alpha.22/LICENSE-MIT",
           "sha256": "43d5e9a1dc86439b7882faa044d442dbaf4a0ef1056b1387f24866e0c9dbeb43",
-          "source": "Exact upstream source flightsim-world@0.6.0-alpha.21 at reviewed source550; LICENSE-MIT"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-MIT"
         },
         {
-          "path": "licenses/flightsim-world-0.6.0-alpha.21/LICENSE-APACHE",
+          "path": "licenses/flightsim-world-0.6.0-alpha.22/LICENSE-APACHE",
           "sha256": "8b87d8cfb6a827ee6fa7224b150b994dc2842fc69fdf07273f291abb6c4b21a9",
-          "source": "Exact upstream source flightsim-world@0.6.0-alpha.21 at reviewed source550; LICENSE-APACHE"
+          "source": "Exact project licence bytes in alpha.22 target-filtered source collection; LICENSE-APACHE"
         }
       ],
-      "id": "flightsim-world@0.6.0-alpha.21",
-      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply."
+      "id": "flightsim-world@0.6.0-alpha.22",
+      "reason": "Selected distribution route: MIT. Project-authored workspace source remains under the existing MIT/Apache grant; the controlled component-terms implementation adds no Cargo dependency or third-party source. Retain complete selected licence and actual copyright/permission notices in accompanying distribution documentation; all collected notices stay unchanged. No copyleft/source-offer obligation is introduced by this MIT route; other component terms and notices still apply. Alpha.22 source amendment changes only the workspace version and the separately reviewed terrain implementation; original project licence texts are unchanged. Historical source550 native observations are not relabeled."
     },
     {
       "evidence": [
@@ -17832,7 +17833,7 @@
       "reason": "All557 selected additions are physically integrated unchanged:508 source-header notice texts,3 AccessKit/ron nested records,4 pxfm CORE-MATH/LLVM notices,9 retained zune IJG/libjpeg-turbo/stb/libultrahdr origin notices,20 exact Rust1.93.0 runtime/compiler-builtins/libm/LLVM notice texts and13 accepted constgebra/hexf evidence files. The two other header spans are project SPDX identifiers backed by already included full project licenses. The old unlicensed zune code excerpt is withheld. Source headers and nested licenses are cumulative with the selected crate route; AND obligations remain conjunctive. The exact Rust standard-library copyright and six installed grant texts match observed native bytes;21 installed rlibs are candidates, not asserted linked members. The adaptation notice with DRAFT in its historical filename contains completed factual modification attribution and is retained unchanged, not treated as an inactive legal agreement."
     }
   ],
-  "reviewed_at": "2026-10-09T08:03:00Z",
+  "reviewed_at": "2026-10-10T01:00:00Z",
   "reviewed_by": "OpenAI assistant; substantive source, license-route and notice applicability review",
   "runtime_accepted": false,
   "runtime_observation": {
@@ -17843,12 +17844,83 @@
     "status": "failed"
   },
   "schema_version": 1,
-  "scope": "Full ordinary offline Light Single + Swift content review. Application source/graph/PE/build basis remains genuine source550 run37892874733; exact installed supplier facts are independently observed by environment-only run37902203369. Current reviewed implementation and v2 comparison source is4e943ed. No final application build, runtime success or release permission is asserted by joining these separately labeled review inputs.",
+  "scope": "Bounded alpha.22 source/notice amendment using genuine Linux-host Rust1.93.0 ordinary Windows-target metadata, complete unchanged dependency/feature closure, current exact modified vendor trees and a fresh original-notice assembly. source_sha/source_tree, native_evidence, environment_evidence, component_conditions and runtime_observation retain their explicitly historical source550 or supplier-probe identities; they do not describe an alpha.22 Windows build. The approved component policy is unchanged. Future actual Windows source/native applicability, same-build archive and two-aircraft runtime remain separately required; existing applicability and publication receipts remain stale.",
+  "source_content_amendment": {
+    "candidate_source": "3574bf175c66851df51ae89903e04a13f4a172e6",
+    "candidate_tree": "7ac0cedd0963ac4133fa8c5251f57f26037324d7",
+    "cargo_lock": {
+      "bytes": 154591,
+      "sha256": "7b71d6eb6f3156e3266164e5596067c9792778ff58ecf365da45b060774e05e3"
+    },
+    "cargo_toml": {
+      "bytes": 5018,
+      "sha256": "bc45efaf7e0629aedb86e22865a4253b408f20d0f4e2efea2c4d01b767669832"
+    },
+    "changed_original_notice": "licenses/bevy_pbr-0.18.1/FLIGHTSIM-MODIFICATION-NOTICE.txt",
+    "collector": {
+      "bytes": 13342,
+      "sha256": "5f2ea6860e414ae91dd9672dd1fc75060d0cecce3ba2ae7837afae5cb1fa02f9"
+    },
+    "collector_host": "x86_64-unknown-linux-gnu",
+    "fresh_original_inventory": {
+      "bytes": 407610,
+      "sha256": "9028d70de8e818f2e72666a2686b198424cf4f78986b47c5d5683091f1949730"
+    },
+    "graph": {
+      "bytes": 79718,
+      "sha256": "eb18f005b450aa531c4f5075af3f92bb040a809891c2f1a00457f5c040436830"
+    },
+    "historical_dependency_review": {
+      "bytes": 1098697,
+      "sha256": "1bb8ac78ade6e97219fa503ddc9511d4b1eb2d78a2fba621cde056e63d33f437"
+    },
+    "historical_original_inventory": {
+      "bytes": 418672,
+      "sha256": "ee835131ecbe10f52d7a35034183486e68b8e73e2efbfc29e4dd1536eed9da74"
+    },
+    "kind": "alpha22_source_notice_amendment_not_native_observation",
+    "limits": "Source/notice licensing assessment only. The two collector unresolved findings remain and retain their already reviewed exact package resolutions. No old native source/tree, binary, trace, runtime or supplier fact is relabeled.",
+    "local_equivalent_candidate": "0bc4a4961c677a5173350630bf2641a2c1b40b94",
+    "metadata": {
+      "bytes": 2431378,
+      "sha256": "e79c0d9714b930c1b538bbabcec21ef494320665888f49f873cc8f0819434d6a"
+    },
+    "new_native_build_observed": false,
+    "new_runtime_observed": false,
+    "new_supplier_observed": false,
+    "notice_order_changes": [
+      "cosmic-text@0.16.0",
+      "zune-jpeg@0.5.15"
+    ],
+    "qa_report": {
+      "bytes": 12576,
+      "path": "docs/qa/terrain-night-moving-2026-10-09.md",
+      "sha256": "94e3b41854ed377beaa225e822c0b2eae6d4455860f322246ef2cc1daf4c6eca"
+    },
+    "release_authorized": false,
+    "same_557_supplemental_bytes": true,
+    "schema_version": 1,
+    "target": "x86_64-pc-windows-msvc",
+    "toolchain": "1.93.0",
+    "workspace_version_updates": [
+      "flightsim-app",
+      "flightsim-audio",
+      "flightsim-content",
+      "flightsim-core",
+      "flightsim-fdm",
+      "flightsim-input",
+      "flightsim-net",
+      "flightsim-render",
+      "flightsim-sim",
+      "flightsim-ui",
+      "flightsim-world"
+    ]
+  },
   "source_sha": "55094fa928fbb8f907a2103740ee6824171c26e7",
   "source_tree": "fdd9fc4eeb8eacc8aae9e4a5c6e18da6bdd00cf5",
   "status": "reviewed",
   "supplemental_evidence_binding": {
-    "assembly_sha256": "b58dcb27460a04e0023f11510e38b832f97322880d3e719a108457a02e1fb0b9",
+    "assembly_sha256": "f0509058a6d90f856cc259d418f2211f3b4e0cd1fb6aed1e19dcbf8e8a6d5b88",
     "native_runtime_coverage_complete": true,
     "source_provenance_complete": true
   },
